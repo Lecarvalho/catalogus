@@ -27,7 +27,9 @@ pnpm workspace monorepo, ESM throughout, TypeScript strict.
   `SKILL.md` to `.claude/skills/dagstree/SKILL.md`. It treats the CLI as a hard prerequisite and
   documents the manifest format, so it changes in the same commit as the schema. A drift test
   (`packages/schema/src/skill-drift.test.ts`) enforces that. See `skills/README.md`.
-- `examples/` — reference manifests derived from real projects, used to check the skill's output.
+- `examples/` — reference manifests the skill's output is checked against. Deliberately synthetic:
+  an example derived from a real project would publish that project's whole service inventory and
+  topology in a public repo, which is not the same thing as publishing a schema example.
 
 ## Verify
 

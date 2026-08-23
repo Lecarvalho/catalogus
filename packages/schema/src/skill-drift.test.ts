@@ -11,9 +11,11 @@
 //     project.pm, project.vcs, project.coding_agents, status/replaced_by).
 //     That fragment is marked with an `<!-- dagstree:fragment -->` HTML
 //     comment immediately above its fence.
-//   - examples/*.dagstree.yaml — reference manifests derived from real
-//     projects, used to judge the skill's output. `clapline.dagstree.yaml`
-//     is the only one today.
+//   - examples/*.dagstree.yaml — reference manifests the skill's output is
+//     judged against. Deliberately synthetic: an example derived from a real
+//     project would publish that project's whole service inventory and
+//     topology in a public repo, which is a different thing from publishing
+//     a schema example. `reference.dagstree.yaml` is the only one today.
 //
 // Nothing else connects the schema to either artifact. If the schema
 // changes and one of these doesn't, the artifact starts teaching (or
@@ -294,7 +296,7 @@ describe("examples/*.dagstree.yaml vs. packages/schema", () => {
     expect(
       files.length,
       `found no *.dagstree.yaml files directly under ${examplesDir} — expected at least ` +
-        "examples/clapline.dagstree.yaml. Either it was moved/renamed, or findRepoRoot() resolved the " +
+        "examples/reference.dagstree.yaml. Either it was moved/renamed, or findRepoRoot() resolved the " +
         "wrong directory.",
     ).toBeGreaterThan(0);
   });

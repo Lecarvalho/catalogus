@@ -32,10 +32,7 @@ it found two defects, one fixed and one open. The next three things:
    CLI cannot get out of: every writer is additive, so one wrong `add` leaves deleting the manifest
    as the only move, which is the loop the cold run fell into. Do this before another cold test, or
    the agent hits a dead end the moment it makes a mistake.
-2. **Decide what to do with `examples/clapline.dagstree.yaml`**, which the cold run has made stale —
-   the manifest sitting in Clapline is materially better than the reference it was supposed to be
-   judged against.
-3. **Second cold run, on a different repo.** Clapline is no longer a clean target (it now has a
+2. **Second cold run, on a different repo.** Clapline is no longer a clean target (it now has a
    manifest and an installed skill). `waymark`, `Pomegr`, `fixpic` and `trello-cli` are the
    candidates the detection spike already covered.
 
@@ -222,8 +219,14 @@ Found by an independent verification pass over Phases 0–3 and fixed.
 Using the tool on real projects, which is the most honest test Phases 1–3 will get, and the source
 material for teaching an agent to do the same.
 
-- [x] Reference manifest for Clapline at `examples/clapline.dagstree.yaml` — 18 service entries,
-      19 edges, derived from `appsettings*.json` key names and the four `fly.*.toml` app definitions
+- [x] Reference manifest at `examples/reference.dagstree.yaml` — deliberately **synthetic**, naming
+      no real project. It exists to give the drift test a complete document and the skill something
+      to be judged against, and it covers the shapes that matter: one provider with an entry per
+      deployed app, one service in two roles as two entries, a `phasing_out` entry with its
+      `replaced_by`, off-repo services no scan can find, and edges pointing depender-to-dependency.
+      It replaced a manifest derived from a real private project — publishing that project's whole
+      service inventory and topology in a public repo is a different thing from publishing a schema
+      example, and the example does its job without it.
 - [x] **Agent skill**, source of truth at `skills/dagstree/SKILL.md` in this repo. It is a shipped
       product artifact and is versioned next to the schema and CLI it documents. Teaches evidence
       gathering, the proven-versus-mentioned distinction, the gap catalog, how to ask the user well,
@@ -268,32 +271,27 @@ material for teaching an agent to do the same.
 
 ### What the first cold run produced
 
-The agent worked from Clapline and wrote `C:/Workspace/repos/Clapline/dagstree.yaml`
-(uncommitted, alongside the two installed skill copies). **It is good** — better than the reference
-manifest it was meant to be judged against:
+The agent ran against a real private project and wrote a manifest into that repo, where it stays —
+it is not reproduced here, and the details of a private system are deliberately not recorded in a
+public status board. What matters for this project is the shape of the result:
 
-|  | `examples/clapline.dagstree.yaml` | cold-run output |
-|---|---|---|
-| services | 18 | 23 |
-| edges | 19 | 28 |
-| notes | on some entries | on nearly every entry, specific |
-| `added` dates | all 2025-11-02 / 2026-01-15 | per-service, recovered from git |
+- **23 service entries and 28 edges**, against 10 the reference example carries.
+- A note on nearly every entry, each one specific about what that instance does.
+- `added` dates recovered per service from git history rather than defaulted.
+- Several entries that no scan could ever have produced: the domain registrar, an uptime-check
+  target, a console-configured analytics beacon, the alert contact point, and one hosting provider
+  correctly split into five entries by what each deployed app runs.
+- An architecture description in the owner's own words rather than inferred from directory names.
+- `dagstree validate` exits 0 on it.
 
-It captured things no scan can reach: Namecheap as registrar and DNS, Healthchecks.io as the
-deadman target, Cloudflare Web Analytics as a console-configured beacon, Slack as Grafana's alert
-contact point, and the Fly apps split into five entries by what each one actually runs
-(`fly-api`, `fly-web`, `fly-grafana`, `fly-loki`, `fly-prometheus`). The architecture description is
-the owner's own words, not inferred from directory names. `dagstree validate` on it exits 0.
+So the question flow works. That was the thing most at risk, it is the part no test can check, and
+it needed a human to judge — the owner's assessment of the questions asked was "very accurate".
 
-So the question flow works. That was the thing most at risk, and it is the part that needed a human
-to judge — the owner's assessment of the questions asked was "very accurate".
-
-- [ ] **Reconcile `examples/clapline.dagstree.yaml`.** It is now the weaker of the two and is still
-      what the drift test validates and what a future cold run would be compared against. Either
-      replace it with the cold-run output (it will need re-checking for anything Layer 3 first, and
-      it currently trips the soft guard — see below), or state explicitly that the example is a
-      minimal illustration and the cold-run output is the benchmark. Leaving both without saying
-      which is which is how the next session compares against the wrong one.
+- [x] **The reference example is now synthetic.** The cold-run manifest is richer, but it belongs to
+      the project it describes and stays there; `examples/reference.dagstree.yaml` covers the same
+      shapes without naming anything real. A future cold run is judged on whether it produces those
+      shapes — entries per deployed app, one service split across roles, lifecycle, off-repo
+      services, real edges — not on matching a fixed list of services.
 
 ### Second defect the cold run found — the soft guard fires on payment-service prose ⬜ open
 

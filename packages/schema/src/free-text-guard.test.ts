@@ -62,7 +62,7 @@ describe("HARD categories -- each is a high-precision shape match", () => {
     ["AKIA aws id", "access key AKIAIOSFODNN7EXAMPLE in use", "api-key"],
     ["base64-shaped run 32+", "token dGhpc0lzQVRlc3RUb2tlblZhbHVlMTIzNA== embedded", "api-key"],
     ["credential URL (https)", "clone via https://svc-user:p4ssw0rd@git.example.com/repo.git", "credential-url"],
-    ["credential URL (postgres, dotless host)", "connect with postgres://dsnk:Hunter2Swordfish@localhost:5432/clapline", "credential-url"],
+    ["credential URL (postgres, dotless host)", "connect with postgres://dsnk:Hunter2Swordfish@localhost:5432/example-app", "credential-url"],
     ["credential URL (redis, empty user)", "redis://:s3cr3tpassw0rd@cache:6379 is the queue", "credential-url"],
     ["credential URL (mongodb+srv)", "mongodb+srv://root:letmein@mongo.example.net/db", "credential-url"],
     ["credential URL (amqp)", "broker at amqp://worker:hunter2@queue:5672", "credential-url"],

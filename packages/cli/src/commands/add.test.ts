@@ -7,11 +7,11 @@ import { createTempDir, removeTempDir, writeFixtureFile } from "../test-support/
 import { resolveAddPathArg, runAdd } from "./add.js";
 
 const COMMENTED_MANIFEST = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-# Clapline's manifest -- hand annotated, do not clobber these comments.
+# Example App's manifest -- hand annotated, do not clobber these comments.
 dagstree: 1
 project:
-  name: Clapline
-  slug: clapline
+  name: Example App
+  slug: example-app
   vcs: { provider: github, visibility: private }
 services:
   - id: supabase-db # primary datastore
@@ -39,7 +39,7 @@ describe("runAdd", () => {
 
     const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
     expect(text).toContain("# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json");
-    expect(text).toContain("# Clapline's manifest -- hand annotated, do not clobber these comments.");
+    expect(text).toContain("# Example App's manifest -- hand annotated, do not clobber these comments.");
     expect(text).toContain("# primary datastore");
     // flowCollectionPadding:false (chosen to match HANDOFF.md's compact
     // [from, to] edge tuples) also tightens this pre-existing inline map's

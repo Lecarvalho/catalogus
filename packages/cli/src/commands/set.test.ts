@@ -12,8 +12,8 @@ const SCAFFOLD = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1
 # Hand-written header comment -- must survive every edit.
 dagstree: 1
 project:
-  name: Clapline
-  slug: clapline
+  name: Example App
+  slug: example-app
 services: []
 dependencies: []
 `;
