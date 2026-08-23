@@ -18,6 +18,26 @@ services: []
 dependencies: []
 `;
 
+// A second fixture, carrying real service entries, for services.<id>.role
+// -- the empty-services SCAFFOLD above can't exercise id resolution at all.
+const SCAFFOLD_WITH_SERVICES = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+# Hand-written header comment -- must survive every edit.
+dagstree: 1
+project:
+  name: Example App
+  slug: example-app
+services:
+  - id: heroku-api
+    service: heroku
+    role: hosting
+    added: 2024-01-10
+  - id: fly-api
+    service: fly-io
+    role: hosting
+    added: 2025-11-02
+dependencies: []
+`;
+
 describe("runSet", () => {
   let dir: string;
 
@@ -145,5 +165,119 @@ describe("runSet", () => {
     } finally {
       await removeTempDir(empty);
     }
+  });
+
+  // The field init used to own exclusively: a wrong project.name guessed
+  // from a directory name by `init --yes` had no command that could fix it
+  // before this. See this file's module comment.
+  it("sets project.name and leaves comments and the modeline intact", async () => {
+    const result = await runSet(dir, ["project.name", "Real Project Name"]);
+    expect(result.exitCode).toBe(0);
+
+    const text = await manifestText();
+    expect(text).toContain("yaml-language-server");
+    expect(text).toContain("Hand-written header comment");
+    expect(text).toContain("name: Real Project Name");
+  });
+
+  it("rejects an empty project.name and writes nothing", async () => {
+    const before = await manifestText();
+    const result = await runSet(dir, ["project.name", "   "]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.join("\n")).toContain("empty");
+    expect(await manifestText()).toBe(before);
+  });
+
+  it("sets project.slug to a valid slug", async () => {
+    const result = await runSet(dir, ["project.slug", "real-project-name"]);
+    expect(result.exitCode).toBe(0);
+
+    const text = await manifestText();
+    expect(text).toContain("slug: real-project-name");
+  });
+
+  it("rejects a project.slug that does not match the slug pattern and writes nothing", async () => {
+    const before = await manifestText();
+    const result = await runSet(dir, ["project.slug", "Not A Slug"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.join("\n")).toContain("not a valid slug");
+    expect(await manifestText()).toBe(before);
+  });
+
+  describe("services.<id>.role", () => {
+    beforeEach(async () => {
+      await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD_WITH_SERVICES);
+    });
+
+    it("changes the role on the named entry only", async () => {
+      const result = await runSet(dir, ["services.fly-api.role", "database"]);
+      expect(result.exitCode).toBe(0);
+
+      const text = await manifestText();
+      expect(text).toContain("id: heroku-api");
+      expect(text).toMatch(/id: heroku-api[\s\S]*?role: hosting/);
+      expect(text).toMatch(/id: fly-api[\s\S]*?role: database/);
+    });
+
+    it("rejects an unknown id, exit 1, with known ids listed, and writes nothing", async () => {
+      const before = await manifestText();
+      const result = await runSet(dir, ["services.nonexistent.role", "database"]);
+
+      expect(result.exitCode).toBe(1);
+      const stderr = result.stderr.join("\n");
+      expect(stderr).toContain("no service with id");
+      expect(stderr).toContain("known ids");
+      expect(stderr).toContain("heroku-api");
+      expect(stderr).toContain("fly-api");
+      expect(await manifestText()).toBe(before);
+    });
+
+    it("rejects a malformed role value the same way a malformed slug fails elsewhere", async () => {
+      const before = await manifestText();
+      const result = await runSet(dir, ["services.fly-api.role", "Not A Role"]);
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr.join("\n")).toContain("not a valid slug");
+      expect(await manifestText()).toBe(before);
+    });
+
+    it("rejects a malformed id inside the field name before the manifest is opened", async () => {
+      const before = await manifestText();
+      const result = await runSet(dir, ["services.Not Valid.role", "database"]);
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr.join("\n")).toContain("not a valid local id");
+      expect(await manifestText()).toBe(before);
+    });
+
+    it("leaves the first pair of a two-pair call unwritten when the second names an unknown id", async () => {
+      const before = await manifestText();
+      const result = await runSet(dir, [
+        "services.heroku-api.role",
+        "hosting-api",
+        "services.nonexistent.role",
+        "database",
+      ]);
+
+      expect(result.exitCode).toBe(1);
+      expect(await manifestText()).toBe(before);
+    });
+
+    it("can be combined with a project-level field in one call", async () => {
+      const result = await runSet(dir, ["project.pm", "trello-board", "services.fly-api.role", "database"]);
+      expect(result.exitCode).toBe(0);
+
+      const text = await manifestText();
+      expect(text).toContain("pm: trello-board");
+      expect(text).toMatch(/id: fly-api[\s\S]*?role: database/);
+    });
+  });
+
+  it("names services.<id>.role in the unknown-field message as the shape to fill in", async () => {
+    const result = await runSet(dir, ["project.budget", "1000"]);
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.join("\n")).toContain("services.<id>.role");
   });
 });

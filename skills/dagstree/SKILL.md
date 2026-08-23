@@ -37,9 +37,10 @@ The commands you will use:
 dagstree detect            # what the scanner can see, grouped by category
 dagstree init --yes        # create the manifest: project fields only, no service entries
 dagstree add <service> --role <r> [--depends-on <id>...] [--id <id>]
-dagstree set <field> <value> [<field> <value> ...]   # project-level fields
+dagstree set <field> <value> [<field> <value> ...]   # project fields, or a service's role
 dagstree link <from> <to>  # one edge between services that already exist
 dagstree deprecate <id> [--status phasing_out] [--replaced-by <id>]
+dagstree remove <id>       # delete a wrong entry, and every edge naming it
 dagstree validate          # schema, referential integrity, acyclicity, private-data guard
 dagstree diff              # detected vs declared, both directions
 dagstree graph [--mermaid] # render the DAG
@@ -58,9 +59,15 @@ dagstree set project.architecture "modular monolith (.NET 10, vertical slices)"
 dagstree set project.pm "Trello kanban"
 dagstree set project.vcs.provider github project.vcs.visibility private
 dagstree set project.coding_agents claude-code,codex
+dagstree set project.name "Sluglin" project.slug sluglin
+dagstree set services.supabase-db.role database
 dagstree link fly-api supabase-db
 dagstree deprecate vertex --status phasing_out --replaced-by anthropic-api
 ```
+
+`project.name` and `project.slug` are settable even though `init` writes them first: its `--yes`
+value is a directory name, which is a guess, and this is how you correct it once you know better.
+A service's `role` is settable the same way — a wrong role is a `set`, not a remove-and-re-add.
 
 `project.vcs` takes both halves in one call: the schema requires provider and visibility together,
 so neither can be written alone. `set` takes `--path` rather than a positional directory, because
@@ -115,6 +122,30 @@ uses Supabase; never record which Supabase project.
 
 ## Procedure
 
+**Run `dagstree detect` before you read anything.** It is the first action, not a step you reach
+after orienting yourself. It reads dependency manifests and configuration key names across the tree
+and reports each finding with the file that proved it, which is most of a manual exploration pass
+already done — and its output tells you which files are worth opening. Exploring first means
+re-deriving by hand what one command produces in a second, and burning the context you need for the
+part that actually requires judgement.
+
+**Then work in parallel, because almost none of what follows is ordered.** The corroboration files
+in step 3 do not depend on each other, and the `added` date for one service does not depend on
+another's. Issue them as one batch rather than a chain: on a repo with twenty services, walking them
+one at a time is the difference between a minute and twenty, and the result is identical. A batch is
+either form — several tool calls in a single response where your harness runs them concurrently, or
+one command that covers many files (`for f in fly.toml fly.web.toml ...; do ...; done`). The second
+is often better for reading files, since it is one round trip rather than several. What matters is
+not issuing twenty round trips for twenty independent questions. Only the CLI writes in step 6 are genuinely sequential, because they share one file and
+`--depends-on` needs its target to exist first.
+
+If your harness can delegate a read-only research pass to a separate context, that is better still —
+the reads are large and their answers are small, so delegating keeps your own context for step 5,
+which is the part that carries the value. Two conditions if you do. Seed it with what
+`dagstree detect` already found rather than sending it in blind, or it will re-derive by hand what
+one command already produced. And give it the same rule you work under: key names and file paths,
+never configuration values, and evidence attached to every claim rather than conclusions.
+
 ### 1. Scan
 
 ```
@@ -147,7 +178,9 @@ this instance does here, `database`, `hosting-api` — and detection only knows 
 If a manifest already exists, do not re-initialise it — run `dagstree diff` and work from what it
 reports as missing or stale. **Never delete `dagstree.yaml` to start over.** It is a committed file
 that may hold answers a previous session got from the user, and nothing in this procedure requires
-a clean slate.
+a clean slate. If a wrong entry needs undoing — a typo'd role, a service that turns out not to be
+used — `dagstree remove <id>` takes it out, along with every dependency edge that named it; see
+step 6.
 
 ### 3. Corroborate against configuration
 
@@ -164,6 +197,37 @@ up, which is stronger evidence than a package that may only be a transitive depe
 | `fly.toml`, `vercel.json`, `netlify.toml`, `render.yaml`, `wrangler.toml` | Hosting, often one file per deployed app |
 | `.github/workflows`, `.gitlab-ci.yml` | CI provider and the deployment chain |
 | `docs/ARCHITECTURE.md`, `README.md` | Architecture style and PM method, in prose |
+| Dependency registration — `Program.cs`, `DependencyInjection.cs`, a `startup`/module file | Which providers are actually constructed and wired, including ones no settings file names |
+| Client and adapter classes, often under `Infrastructure/`, `clients/`, `providers/` | One class per external system, usually named after it |
+| A settings-validation or required-configuration guard class | The authoritative list of what the app refuses to start without |
+| C4 / PlantUML / Mermaid diagrams under `docs/` | What the team believes it depends on — a checklist to verify, not a source |
+
+**Where a key group lives is itself an edge.** This is the most under-used evidence in the repo. A
+`Stripe` key group inside `src/backend/Api/appsettings.json` does not merely prove the project uses
+Stripe — it proves *the API* uses Stripe, which is the edge `api -> stripe`. The same reading
+applies across the board: a frontend's API base URL proves `web -> api`; a reverse-proxy config
+(nginx, Caddy, a Fly `[[services]]` block) proves what sits in front of what; a deploy job in
+`.github/workflows` proves `github-actions -> <hosting provider>`; Grafana provisioning under
+`grafana/provisioning/datasources/` names every datasource it queries; a CDN distribution config
+names its origin. Derive every edge you can this way *before* step 5, and carry the file that proved
+each one.
+
+**A service can be absent from every file you are able to read.** Local-only configuration is
+routinely gitignored — `appsettings.Development.json`, `.env.local`, `ops/secrets/*.env` — so a
+provider can be fully wired in the running system and leave no trace in the checkout. This is not
+hypothetical: on a real .NET repo, five of twenty-one services, including the database, the auth
+provider and object storage, had no key in any committed settings file. **Code is what closes that
+gap**, which is why dependency registration, adapter classes and configuration-guard classes are in
+the table above — they name a provider whether or not a settings file does.
+
+The corollary matters when you read `dagstree diff`: an entry listed under **"declared in the
+manifest but no longer detected" is not automatically stale.** It may be a service configured only
+in a file detection cannot see, or one no scan could ever find. `diff` reports what detection can
+see, never what is true. Do not remove an entry on that basis alone.
+
+An architecture diagram earns its row above the same way prose does — as a checklist of what to go
+and verify in code, never as the record itself. The gap runs both ways: the same run found a storage
+provider unconditionally wired in code and missing from the team's own context diagram.
 
 **Separate proven from mentioned.** A provider named in a design document or an ADR is not a
 dependency. A provider with a configuration key, an SDK dependency or a client class is. Grepping
@@ -173,10 +237,17 @@ an entry in the file.
 
 ### 4. Work out what is missing
 
-These can never be read out of a repository. They are why this skill asks questions:
+These are what remains after step 3. They are why this skill asks questions:
 
-- **Dependency edges.** Which service talks to which. The single most valuable thing in the
-  manifest — it is what makes impact analysis possible — and nothing in the repo states it.
+- **Dependency edges that configuration does not show.** Edges are the most valuable thing in the
+  manifest — they are what makes impact analysis possible — but "no scanner produces them" is not
+  the same as "the repo does not state them", and treating the whole edge set as unknowable is the
+  most common way this skill is run badly. Step 3 derives a large share of them from configuration.
+  What genuinely remains is: edges between two off-repo services wired in a web console (a CDN to
+  its bucket, an alert channel to a chat workspace), whether a proxy or gateway sits in a path you
+  can only see the endpoints of, and edges that exist for a semantic reason no config states — a
+  service that reads another's data by convention rather than by client. Bring those, not the ones
+  you could have read.
 - **Domain registrar and DNS.**
 - **PM tooling and methodology.**
 - **Architecture style**, as the owner would describe it rather than as inferred from directory names.
@@ -191,13 +262,26 @@ git log --diff-filter=A --format=%ad --date=short -- <path> | tail -1
 git log -S "<ProviderKeyName>" --format=%ad --date=short --reverse | head -1
 ```
 
+That is one pair of commands *per service*, and they are independent of each other — issue them as
+one batch. Run serially on a twenty-service repo, this single step is usually the slowest thing in
+the whole procedure, and nothing about it is ordered.
+
 Offer what you find as a default the user can correct, rather than asking cold.
 
 ### 5. Ask the user — well
 
 This is the part that determines whether the manifest is worth anything. Ask once, in a batch, with
 your evidence attached, so the user is confirming or correcting rather than composing from nothing.
-Do not interrogate one field at a time, and do not ask for anything you could have looked up.
+Do not interrogate one field at a time.
+
+**Before each question, answer it yourself first.** If the repository can settle it, settling it and
+showing your evidence is always better than asking — a question the user can see you could have
+answered costs their trust in every other question in the batch. These are effectively always
+discoverable, and asking about them cold is a defect in how this skill was run: which services
+exist, which app talks to which provider (step 3), the CI provider and what it deploys, the hosting
+provider per deployed app, when a dependency was added (git, below), and the VCS provider. These
+are never discoverable and are what the batch is for: registrar, PM tooling, lifecycle, off-repo
+services, and the owner's own description of the architecture.
 
 **Resolve prose-only providers:**
 
@@ -205,17 +289,36 @@ Do not interrogate one field at a time, and do not ask for anything you could ha
 > docs also mention Stability and Replicate, but neither has a config key — are those in use, or
 > were they evaluated and dropped?
 
-**Get the edges by proposing a shape rather than asking an open question.** People find it much
-easier to correct a wrong diagram than to produce a right one:
+**Propose the derived edge graph and mark which edges are evidence-backed.** People find it much
+easier to correct a wrong diagram than to produce a right one — but the diagram should be mostly
+*read*, not assumed, and the user needs to see which is which. An edge you derived is a statement
+they can check against reality; an edge you guessed is a question wearing a diagram's clothes, and
+presenting the two identically invites a nod that confirms nothing.
 
-> I can see four Fly apps — api, web, grafana, loki. My assumption is web → api, api → everything
-> external, grafana → loki. Is anything else talking directly to the database, or does it all go
-> through the API?
+> Derived from configuration: web → api (`VITE_API_URL` in `web/.env.example`), api → stripe,
+> supabase, openai (key groups in `src/backend/Api/appsettings.json`), github-actions → fly-io
+> (deploy job in `.github/workflows/deploy.yml`), grafana → loki and prometheus (datasource
+> provisioning).
+>
+> I could not determine: whether web reaches the api directly or through the nginx proxy, whether
+> anything besides the api talks to the database, and where the OTLP exporter actually ships to.
 
-**Surface contradictions instead of picking a side.** Guessing wrong here corrupts the record:
+**Surface a contradiction when it changes the manifest.** Guessing wrong on one of those corrupts
+the record:
 
-> The directory is `Clapline` but the .NET namespaces and `docs/ARCHITECTURE.md` say `Sluglin`.
-> Which is the project name, and is the other a former name or a separate project?
+> `docs/ARCHITECTURE.md` says the queue is SQS, but the only queue configuration in the repo is
+> RabbitMQ in `docker-compose.yml`. Which one is running in production?
+
+Scope this to contradictions that change what gets written — two providers claimed for the same job,
+a service named in prose with no configuration behind it, an environment that disagrees with the
+deploy config. **A codename is not a contradiction.** A repository whose namespaces or solution file
+carry an internal name different from the product name is ordinary, and reconciling the two is not
+this skill's job: the deliverable is the providers, the services, the external dependencies and the
+relationships between them. Record the project name the owner uses and move on.
+
+If the project name does turn out to be wrong — `init --yes` derived it from the directory, which is
+a guess — `dagstree set project.name "<answer>"` corrects it, plus `project.slug` if that should
+change too.
 
 **Ask about lifecycle**, which is invisible to any scan and is half the point of the registry:
 
@@ -240,19 +343,27 @@ One service used in two roles is **two entries with distinct ids**, not one entr
 Four Fly apps are four entries. Edges point from the depender to the dependency:
 `--depends-on supabase-db` on the auth entry means auth needs the database.
 
-Project-level answers through the CLI too — architecture, PM tooling, VCS, coding agents via
-`dagstree set`; an edge you remember later via `dagstree link`; a phase-out via
-`dagstree deprecate`. Nothing gets hand-edited.
+Project-level answers through the CLI too — architecture, PM tooling, VCS, coding agents, and a
+corrected project name or slug via `dagstree set`; an edge you remember later via `dagstree link`;
+a phase-out via `dagstree deprecate`; a wrong `add` undone via `dagstree remove`; a wrong role
+corrected via `dagstree set services.<id>.role` rather than by removing and re-adding the entry.
+Nothing gets hand-edited.
 
 ### 7. Validate
 
 ```
 dagstree validate          # exit 0 valid, 1 invalid, 2 usage error such as no manifest found
-dagstree validate --strict # warnings become errors; the right setting for CI
 dagstree graph             # sanity-check the shape of what you built
 ```
 
 Run this after every change, not once at the end.
+
+Plain `dagstree validate` is the CI setting. `--strict` also exists and additionally fails the run
+on soft warnings, but those are word matches on terms like `billing`, `subscription` or `seat` —
+whether such a word is a leak or ordinary vocabulary depends entirely on what the project does, and
+a payment processor described honestly trips them every time. They are there for a person to read,
+not for a gate to act on. The hard tier — an email address, a currency amount, an API-key shape —
+fails `validate` on its own and needs no flag.
 
 **If validation rejects something that is genuinely ordinary prose, that is a bug in the guard, not
 a signal to reword the user's text.** Report it. The manifest should say what is true, and a guard
@@ -271,9 +382,10 @@ that pushes users into worse prose needs fixing rather than accommodating.
 - **Inventing `added` dates.** Check git, offer a default, or leave the field for the user.
 - **Guessing past a contradiction** instead of surfacing it.
 - **Rewording good prose to satisfy a validator.** Report the false positive instead.
-- **Deleting `dagstree.yaml` and starting over.** There is currently no `dagstree remove`, so a
-  wrong `add` cannot be undone by the CLI — say so and let the user decide, rather than clearing
-  the file. Everything else in the flow is additive and needs no reset.
+- **Deleting `dagstree.yaml` and starting over.** A wrong entry is undone with `dagstree remove
+  <id>`, not by clearing the file. It refuses (exit 1, nothing written) when another entry's
+  `replaced_by` still names the one you're removing — re-point or clear that first with
+  `dagstree deprecate`.
 
 ## Layer 3
 

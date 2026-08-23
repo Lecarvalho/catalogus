@@ -6,6 +6,7 @@
 import type {
   ConfigServiceDetection,
   DetectedTechnology,
+  DetectionKind,
   DetectionResult,
   Evidence,
   HostingDetection,
@@ -16,6 +17,30 @@ export interface DetectedServiceCandidate {
   category: string;
   name: string;
   evidence: Evidence[];
+  /**
+   * "service" or "library" -- see @dagstree/core's DetectionKind. Only
+   * DetectedTechnology can be "library" (an unmapped pass-through, or a
+   * catalog row like lucide-icons/mcp that's worth naming but isn't a
+   * dependency of the business); a HostingDetection or
+   * ConfigServiceDetection is always "service" by construction, so those
+   * two merge passes below set it outright rather than reading a field
+   * that doesn't exist on either source type.
+   */
+  kind: DetectionKind;
+}
+
+/**
+ * "service" wins over "library" when the same slug is reached by more than
+ * one source with different kinds. Hosting and config-key detections are
+ * always "service", so this only matters if a slug's mapping.ts row is
+ * marked "library" (mcp, lucide-icons today) and some other signal also
+ * resolves to the same slug -- an edge case nothing in the table currently
+ * produces, but silently downgrading a confirmed service to "library"
+ * because a library-kind row happened to be merged first would be exactly
+ * the kind of bug this feature exists to avoid.
+ */
+function mergeKind(existing: DetectionKind, incoming: DetectionKind): DetectionKind {
+  return existing === "service" || incoming === "service" ? "service" : "library";
 }
 
 /** True when `e` is already present in `existing` (same file and same detail). */
@@ -55,10 +80,11 @@ function mergeBySlug(
     const existing = bySlug.get(tech.slug);
     if (existing) {
       mergeEvidence(existing.evidence, tech.evidence);
+      existing.kind = mergeKind(existing.kind, tech.kind);
     } else {
       const evidence: Evidence[] = [];
       mergeEvidence(evidence, tech.evidence);
-      bySlug.set(tech.slug, { slug: tech.slug, category: tech.category, name: tech.name, evidence });
+      bySlug.set(tech.slug, { slug: tech.slug, category: tech.category, name: tech.name, evidence, kind: tech.kind });
     }
   }
 
@@ -66,10 +92,11 @@ function mergeBySlug(
     const existing = bySlug.get(host.slug);
     if (existing) {
       mergeEvidence(existing.evidence, host.evidence);
+      existing.kind = mergeKind(existing.kind, "service");
     } else {
       const evidence: Evidence[] = [];
       mergeEvidence(evidence, host.evidence);
-      bySlug.set(host.slug, { slug: host.slug, category: "hosting", name: host.name, evidence });
+      bySlug.set(host.slug, { slug: host.slug, category: "hosting", name: host.name, evidence, kind: "service" });
     }
   }
 
@@ -83,6 +110,7 @@ function mergeBySlug(
     const existing = bySlug.get(service.slug);
     if (existing) {
       mergeEvidence(existing.evidence, service.evidence);
+      existing.kind = mergeKind(existing.kind, "service");
     } else {
       const evidence: Evidence[] = [];
       mergeEvidence(evidence, service.evidence);
@@ -91,6 +119,7 @@ function mergeBySlug(
         category: service.category,
         name: service.name,
         evidence,
+        kind: "service",
       });
     }
   }

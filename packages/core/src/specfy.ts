@@ -198,6 +198,7 @@ export async function runStackAnalyser(repoPath: string): Promise<DetectedTechno
       name: mapped.name,
       specfySlug,
       unmapped: mapped.unmapped,
+      kind: mapped.kind,
       evidence,
     });
   }

@@ -24,6 +24,7 @@ export type {
   CodingAgentDetection,
   ConfigServiceDetection,
   DetectedTechnology,
+  DetectionKind,
   DetectionResult,
   Evidence,
   HostingDetection,

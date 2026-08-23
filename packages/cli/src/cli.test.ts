@@ -243,5 +243,25 @@ describe("runCli", () => {
         await removeTempDir(dir);
       }
     });
+
+    it("remove takes <id> and a positional [path]", async () => {
+      spyOnStreams();
+      const dir = await createTempDir();
+      try {
+        await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+        await runCli(["add", "fly-io", dir, "--role", "hosting"]);
+        await runCli(["add", "supabase", dir, "--role", "database"]);
+        await runCli(["link", "fly-io", "supabase", dir]);
+
+        const exitCode = await runCli(["remove", "supabase", dir]);
+
+        expect(exitCode).toBe(0);
+        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        expect(text).not.toContain("supabase");
+        expect(text).toContain("dependencies: []");
+      } finally {
+        await removeTempDir(dir);
+      }
+    });
   });
 });

@@ -42,6 +42,7 @@ describe("detect", () => {
 
     const supabase = result.technologies.find((tech) => tech.specfySlug === "supabase");
     expect(supabase?.slug).toBe("supabase");
+    expect(supabase?.kind).toBe("service");
 
     // Every detection must carry evidence — never an empty trail.
     for (const tech of result.technologies) {

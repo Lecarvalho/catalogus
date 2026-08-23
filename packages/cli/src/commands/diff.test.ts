@@ -178,6 +178,36 @@ dependencies: []
     expect(result.stderr.join("\n")).toContain("dagstree init");
   });
 
+  // Same lead-with-services treatment as `dagstree detect` (see diff.ts's
+  // pushServiceLines): collectDetectedServices already excludes most
+  // library noise, but a known catalog row can itself be a library
+  // (lucide-icons) rather than a service, and that shouldn't read as a
+  // missed service in the "detected but missing" list either.
+  it("collapses a library-kind catalog entry in the missing-services list rather than listing it as a service", async () => {
+    await writeFixtureFile(dir, "package.json", JSON.stringify({ name: "probe", dependencies: { "lucide-react": "^0.400.0" } }));
+    await writeFixtureFile(
+      dir,
+      "dagstree.yaml",
+      `dagstree: 1
+project:
+  name: X
+  slug: x
+services: []
+dependencies: []
+`
+    );
+
+    const result = await runDiff(dir);
+    const text = result.stdout.join("\n");
+    expect(text).not.toMatch(/\+ lucide-icons \(/);
+    expect(text).toMatch(/\+ 1 library also detected but not declared/);
+
+    const payload = JSON.parse((await runDiff(dir, { json: true })).stdout[0] as string);
+    const lucide = payload.missingServices.find((s: { slug: string }) => s.slug === "lucide-icons");
+    expect(lucide).toBeDefined();
+    expect(lucide.kind).toBe("library");
+  });
+
   it("supports --json output", async () => {
     await writeFixtureFile(
       dir,

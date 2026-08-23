@@ -142,15 +142,30 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
   return { exitCode: hasDiff ? 1 : 0, stdout: lines, stderr: [] };
 }
 
+// Same lead-with-services treatment as `dagstree detect` (see that module's
+// header): collectDetectedServices already excludes most library noise by
+// only offering catalog-known slugs, but a handful of known rows are
+// libraries worth cataloging by name (mcp, lucide-icons) rather than by
+// role, and those would otherwise sit in this list looking exactly like a
+// missed service. No --all here -- `--json` already carries the full,
+// kind-tagged list, and this direction rarely has enough library-kind
+// entries to be worth a second flag on top of the one `detect` already has.
 function pushServiceLines(lines: string[], services: readonly DetectedServiceCandidate[], marker: string): void {
-  if (services.length === 0) {
+  const primary = services.filter((s) => s.kind !== "library");
+  const libraries = services.filter((s) => s.kind === "library");
+
+  if (primary.length === 0 && libraries.length === 0) {
     lines.push("  (none)");
     return;
   }
-  for (const s of services) {
+  for (const s of primary) {
     // Distinct files: evidence is per-signal, so one settings file naming
     // several of a provider's keys contributes several records for it.
     const files = [...new Set(s.evidence.map((e) => e.file))].join(", ");
     lines.push(`  ${marker} ${s.slug} (${s.name}) [${s.category}]${files ? ` - ${files}` : ""}`);
+  }
+  if (libraries.length > 0) {
+    const noun = libraries.length === 1 ? "library" : "libraries";
+    lines.push(`  ${marker} ${libraries.length} ${noun} also detected but not declared -- see --json for the list`);
   }
 }

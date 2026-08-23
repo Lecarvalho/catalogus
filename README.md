@@ -37,7 +37,8 @@ The binary itself lands at `packages/cli/dist/cli.js` if you would rather wire i
 Scan the repo and scaffold a manifest:
 
 ```powershell
-dagstree detect            # print what the scanner can see
+dagstree detect            # services first, by category; libraries collapsed to a count
+dagstree detect --all      # ...and the libraries listed too
 dagstree init --yes        # write dagstree.yaml: project fields, no service entries
 dagstree diff              # the work list: detected services not yet declared
 ```
@@ -57,6 +58,7 @@ dagstree add supabase --role auth --id supabase-auth --depends-on supabase-db
 dagstree link fly-api supabase-db                    # an edge you remember later
 dagstree set project.vcs.provider github project.vcs.visibility private
 dagstree deprecate heroku-api --status phasing_out --replaced-by fly-api
+dagstree remove old-entry                            # undo a wrong add, edges included
 dagstree validate          # schema, referential integrity, acyclicity
 dagstree graph --mermaid   # render the dependency graph
 ```
@@ -70,7 +72,9 @@ untouched. `set` writes the project-level fields (`architecture`, `pm`, `vcs.pro
 `vcs.visibility`, `coding_agents`) and takes several `<field> <value>` pairs at once, which is how
 `vcs` gets written: the schema requires both halves together.
 
-`validate` is the CI entrypoint: exit 0 valid, 1 invalid, 2 usage error.
+`validate` is the CI entrypoint: exit 0 valid, 1 invalid, 2 usage error. Run it without `--strict`
+there — soft private-data warnings are printed for a person to read, not to gate on, because whether
+a word like `billing` is a leak or ordinary vocabulary depends on what the project does.
 
 ## Why anything is manual
 
@@ -112,7 +116,9 @@ The skill teaches the agent to run the CLI, then ask you for everything above th
 - No backend yet, so the private overlay, `login` and `push` do not exist.
 - No viewer yet. `graph --mermaid` is the only rendering.
 - Not published to npm.
-- Detection reports most technologies as `other`; the category mapping is still thin.
+- Dagstree's category enum has thirteen values and no bucket for monitoring, queue or email, so
+  Sentry, Datadog, SQS, RabbitMQ, Resend, SendGrid and Twilio land in `other` despite being
+  unambiguously services. Widening the enum is a schema change and has not been made.
 - Config-key detection matches known provider names only, so a provider absent from its catalog
   still needs `dagstree add`.
 
