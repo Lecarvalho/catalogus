@@ -42,6 +42,7 @@ export type PrivateValueHardCategory =
   | "billing-period-amount"
   | "card-number"
   | "api-key"
+  | "high-entropy-token"
   | "credential-url";
 
 export type PrivateValueSoftCategory =
@@ -63,6 +64,7 @@ export const PRIVATE_VALUE_HARD_CATEGORIES: readonly PrivateValueHardCategory[] 
   "billing-period-amount",
   "card-number",
   "api-key",
+  "high-entropy-token",
   "credential-url",
 ];
 
@@ -242,27 +244,399 @@ const API_KEY_RE = new RegExp(
 // a run only counts if it's pure hex, or mixes at least two of
 // {uppercase, lowercase, digit} the way base64 output does.
 //
-// A pure-hex run is deliberately treated as a *weaker* signal than a
-// mixed-class one: a git commit SHA (40 hex chars) and a sha256 digest (64
-// hex chars) are exactly this shape and are two of the most ordinary things
-// anyone writes in a `notes` field, so a pure-hex match is only ever a SOFT
-// hit ("credentials"), never a hard failure -- real key formats that happen
-// to render as hex (a Django-style secret, a session token) still get
-// flagged, just as a warning rather than something that blocks validate/
-// add/graph/diff outright. A mixed-class run (upper+lower+digit, the shape
-// base64 output actually has) is a much higher-precision signal -- nothing
-// as mundane as a commit hash or digest produces one -- so that stays HARD.
+// A pure-hex run gets different treatment than a mixed-class one, because
+// its false-positive rate is much higher: a git commit SHA (40 hex chars)
+// and a sha256 or md5 digest (64 or 32 hex chars) are exactly this shape,
+// and are among the most ordinary things anyone writes in a `notes` field
+// -- "pinned at <sha> until the drizzle bump lands" is plain technical
+// prose, not a secret. A bare pure-hex run is therefore no hit at all.
+//
+// But a hex-encoded key is also a real thing people paste (a 256-bit key
+// is 64 hex characters), and "SECRET_KEY=<64 hex>" in a notes field is a
+// plausible way for that to happen. So a pure-hex run is context-gated --
+// but the gate is a *label*, not mere co-occurrence in the same string. A
+// first version of this gate fired whenever a secret-ish word appeared
+// anywhere within 40 characters of the run, on the theory that a commit
+// SHA is essentially never written near the word "secret". That held for
+// "secret" but not for the rest of the word list: "key", "auth", "token"
+// and "password" are all ordinary English that shows up near an unrelated
+// hash all the time -- "the key fix landed in <sha>", "auth: fix session
+// refresh (<sha>)" (a plain git-log subject line), "password reset flow
+// fixed in <sha>", "bundle integrity <sha>; key rotation is manual" -- and
+// a wide window fires HARD on every one of them.
+//
+// What "SECRET_KEY=" and "api token:" actually have that those sentences
+// don't is that the word is a *label directly attached to the run* --
+// nothing but punctuation/whitespace between the word and the value it
+// names. So the gate now requires exactly that: a secret-ish word (key,
+// secret, token, password, passwd, credential, apikey, api_key, bearer,
+// auth), immediately followed by a short run of separator characters and
+// then the token, with no other word in between. "SECRET_KEY=", "api
+// token: ", and "apiKey " all satisfy it; "the key fix landed in <sha>"
+// doesn't, because "fix landed in" sits between "key" and the run and
+// none of those are separator characters.
+//
+// The gate only looks *before* the run, not after. A trailing form ("<sha>
+// is the secret") looks appealing to also support, but it can't be told
+// apart from ordinary prose that simply continues past a hash with the
+// same shape: "bundle integrity <sha>; key rotation is manual" has a
+// context word within two characters of the run *after* it, exactly the
+// distance a genuine trailing label would need. Rather than try to
+// distinguish "label" from "next clause" on the trailing side, that side
+// gets no gate at all -- trading a small amount of recall (a hex run
+// explicitly called out only after the fact) for not reopening the same
+// false-positive class the leading gate exists to close.
+//
+// When the gate is satisfied the hit is HARD, not soft -- there's no
+// meaningful "maybe" left once a label is directly attached to the run,
+// so downgrading it to a warning would just be the same defect (breaking
+// --strict on ordinary prose) in a smaller box.
+//
+// A mixed-class run (upper+lower+digit, the shape base64 output actually
+// has) is a much higher-precision signal on its own -- nothing as mundane
+// as a commit hash or digest produces one -- so that stays HARD unconditionally,
+// same as before.
 const LONG_TOKEN_RE = /[A-Za-z0-9+/]{32,}={0,2}/g;
-function tokenEntropyTier(token: string): "hard" | "soft" | null {
-  if (/^[0-9a-fA-F]+$/.test(token)) return "soft";
-  const classes = [/[A-Z]/.test(token), /[a-z]/.test(token), /[0-9]/.test(token)].filter(Boolean).length;
-  return classes >= 2 ? "hard" : null;
+
+// Letter-delimited, not \b-delimited: \b treats "_" as a word character,
+// which would stop "key" from matching inside "SECRET_KEY" (no boundary
+// between "_" and "K"). Bounding on letters only means "_", digits, "=",
+// ":" and whitespace all count as separators, so "SECRET_KEY=", "api_key",
+// and "api token:" are all recognized.
+const SECRET_CONTEXT_WORDS = [
+  "key",
+  "secret",
+  "token",
+  "password",
+  "passwd",
+  "credentials?",
+  "apikey",
+  "api_key",
+  "bearer",
+  "auth",
+];
+
+// A label sitting directly against the run: the context word, then
+// nothing but a short run of separator punctuation/whitespace, then the
+// string ends (the run starts right where the tested slice ends -- see
+// hasSecretLabelBefore). The separator class deliberately excludes
+// letters -- that's what stops "keychain" or "monkey " from reading as
+// the word "key" followed by a separator: the character right after the
+// word would have to be a letter for those, which the class can't
+// consume, so the match fails without needing a separate lookahead. The
+// leading lookbehind is still needed for the mirror case, a context word
+// that is itself the tail of a longer word ("monkey" ending in "key"
+// immediately before a run).
+const SECRET_LABEL_RE = new RegExp(
+  String.raw`(?<![A-Za-z])(?:${SECRET_CONTEXT_WORDS.join("|")})[ \t:=_-]{0,4}$`,
+  "i",
+);
+
+// How much text before the run is even considered. This only has to be
+// wide enough to hold the longest context word ("credentials") plus its
+// separator run -- the "$"-anchored match against the run's own start
+// position is what pins the label directly against the value, so a
+// generous lookback here doesn't reopen the distance-based false
+// positives the label shape was built to close.
+const SECRET_LABEL_LOOKBACK = 32;
+
+function hasSecretLabelBefore(text: string, matchIndex: number): boolean {
+  const start = Math.max(0, matchIndex - SECRET_LABEL_LOOKBACK);
+  return SECRET_LABEL_RE.test(text.slice(start, matchIndex));
 }
-function findHighEntropyTokens(text: string): Array<{ tier: "hard" | "soft"; matched: string }> {
-  const hits: Array<{ tier: "hard" | "soft"; matched: string }> = [];
+
+// "/" and "+" are base64 alphabet characters, but "/" is also a path
+// separator and both join words in ordinary technical prose. Without this,
+// a namespace list like "Domain/Application/Infrastructure/Api" -- 36
+// characters, mixed case, no digits -- reads as base64 and fails HARD, which
+// is what happened to the first real manifest anyone wrote: an architecture
+// description is the field most likely to name layers or directories, and
+// blocking `validate` on one is far worse than missing an exotic key shape.
+//
+// A first version of this exclusion (call it attempt 1) split a token on "/"
+// and "+" and excluded it whenever every resulting piece was purely
+// alphabetic, on the theory that a digit-free base64 segment is "vanishingly
+// unlikely." That claim was never measured, and it is false: sampled against
+// 200k-300k random base64-alphabet tokens (see the measurement test,
+// free-text-guard.leak.test.ts), the digit-free clean-pass rate was 0.26% at
+// 32 chars (about 1 in 390), 0.067% at 40, 0.037% at 44, and 0.002% at 64 --
+// against 0% at every length before that exclusion existed. Worse, "every
+// piece purely alphabetic" is a shape test with no length bound, so it also
+// laundered a real secret sitting right after an ordinary-looking path
+// prefix ("config/secrets/<32-char alphabetic key>" -- the whole run merges
+// into one greedy LONG_TOKEN_RE match, and the exclusion was then applied to
+// the merged token rather than to the key alone), and an empty leading or
+// trailing segment (an absolute path, or a path with a trailing slash) broke
+// the "every piece" test outright and defeated the exclusion the wrong way,
+// reintroducing the original bug for those shapes.
+//
+// This version keeps the same starting move -- split on "/" and "+" -- but
+// replaces "purely alphabetic" with narrower, individually-justified tests,
+// and adds a label check that overrides the exclusion entirely:
+//
+//   1. A secret-ish label directly attached to the token (the same
+//      hasSecretLabelBefore check the hex branch above already uses) wins
+//      unconditionally, before any of the shape tests below run. Nobody
+//      writes "SECRET_KEY=Domain/Application/Infrastructure/Api", so this
+//      costs nothing in precision, and it closes the case a bare shape rule
+//      structurally cannot: "SECRET_KEY=<key with a slash in it>".
+//
+//   2. Every empty leading/trailing segment is dropped before any further
+//      test -- not just one. An absolute path ("/Users/...") or a
+//      trailing-slash path ("foo/bar/") produces exactly one, but a
+//      *doubled* separator -- an s3://, gs://, or rsync:// URL, or a
+//      scheme-relative "//host/path" URL -- produces two in a row, and an
+//      earlier version of this step dropped only the first, leaving the
+//      second to defeat the exclusion the same way a single stray empty
+//      segment did before this exclusion existed at all (an adversarial
+//      review caught this; see free-text-guard.test.ts's "doubled
+//      separators" fixtures). An *interior* empty segment (a doubled slash
+//      in the middle of a path, not at either edge) is left alone and keeps
+//      failing below -- only the edges carry no entropy of their own.
+//
+//   3. A segment that is *purely* digits (1-4 of them) is word-shaped on
+//      its own -- a date-partition component, a numeric resource id, a
+//      port. It has no letter case at all, so the letters-plus-optional-
+//      trailing-digits test in step 5 below can never accept it, and
+//      without this rule it disqualified the whole token even though it's
+//      ordinary path/URL structure, not entropy (another adversarial-review
+//      finding: "storage/renders/2026/08/22/previews" and an id-bearing
+//      documentation URL both failed HARD without it).
+//
+//   4. Each remaining segment is capped at SEGMENT_LENGTH_CAP (24)
+//      characters in the ordinary case -- "Infrastructure" is 14, so real
+//      namespace/path segments clear it with room to spare, and a 32+
+//      character key segment cannot hide behind an ordinary-looking prefix
+//      by staying under this cap, which is what closes the path-prefix
+//      laundering case below. But a hard cutoff at 24 with no escape also
+//      catches real PascalCase type names -- ApplicationDbContextFactory
+//      and ServiceCollectionExtensions are both 27 characters, ordinary in
+//      exactly the .NET layout the original bug came from, and both failed
+//      HARD before this fix. So a segment of 25 to EXTENDED_SEGMENT_LENGTH_
+//      CAP (40) characters gets a second chance in step 5, at double the
+//      ordinary word-start-ratio floor -- real multi-word identifiers of
+//      that length sit at a ratio of 6.75-9, comfortably above the 6.0
+//      floor, while the word-start *cap* (unchanged, still 6) still rejects
+//      an actually-random segment of that length: the path-laundering
+//      key's second segment below has 7 word starts and is rejected on that
+//      alone, independent of the length band it falls into.
+//
+//   5. Each segment must be word-shaped: letters, optionally followed by a
+//      short (<=3) trailing digit run -- "Api/V2", "/v1/", "MySQL8" and
+//      "React19" are all ordinary, so digits are allowed, but only in that
+//      bounded, trailing position; a digit appearing mid-segment
+//      ("K7MDENG") fails this immediately, and this is the single most
+//      load-bearing line in the whole predicate -- relaxing it to admit
+//      one short internal digit run was measured to raise the general-
+//      alphabet leak roughly 20x (0.17% -> 3.26% at 32 characters) and lets
+//      the AWS-secret-shaped required fixture below start passing clean, so
+//      it stays as-is. The cost is real and is paid, deliberately, by any
+//      identifier with a genuinely mid-word digit inside a path --
+//      "Oauth2Callback", "Utf8Encoder", "Sha256Hasher" all read as HARD,
+//      and free-text-guard.test.ts pins these down as known, accepted false
+//      positives rather than leaving them to be rediscovered. Where a
+//      segment has two or more "word starts" (an uppercase letter not
+//      preceded by an uppercase letter -- the camelCase/PascalCase
+//      boundary), its length-to-word-start ratio must stay at or above the
+//      floor from step 4 and its word starts at or below
+//      SEGMENT_WORD_START_CAP: a random base64 chunk flips case every
+//      couple of characters ("TwsqpDeM" is 8 characters with 3 word
+//      starts, ratio 2.67), while real multi-word identifiers don't
+//      ("ServiceGraphContainer" is 21 characters with 3 word starts, ratio
+//      7). A segment with 0 or 1 word starts (an ordinary lowercase word,
+//      or a single capitalized word) always passes this part -- there's no
+//      meaningful "too dense" reading of a single word, at any length.
+//
+//      There is deliberately no separate cap on how many segments in one
+//      token may carry a digit suffix. An earlier version capped this at
+//      2, reasoning that chaining the bounded-digit-suffix allowance
+//      across many segments could launder a token that's actually random
+//      -- but each segment already has to pass this whole test
+//      independently, and measurement showed the extra cap bought no
+//      measurable recall while failing ordinary prose: a three-or-more-
+//      version-suffixed technology list ("Postgres15+Redis7+Node24+
+//      Kubernetes") failed HARD under the old cap for no security benefit.
+//
+// This predicate still leaks -- shape alone cannot perfectly separate a
+// namespace list from a base64 key, and the point of this comment is to
+// state the measured rate instead of asserting it away. Measured by
+// free-text-guard.leak.test.ts (a seeded, deterministic PRNG generating
+// random base64-alphabet tokens and running them through the real scanner,
+// not a hand-wave) and cross-checked with a separate, uniform node:crypto
+// sampler at N=200,000 per length per alphabet, clean-pass rate by length:
+//
+//   length          general (real-secret-shaped)   digit-free (worst case)
+//   32 characters   0.21%                          28.79%
+//   40 characters   0.04%                          20.51%
+//   44 characters   0.02%                          16.14%
+//   64 characters   0.00%                            5.21%
+//
+// (Measured after the fixes above -- steps 2-5's precision corrections
+// move these numbers by less than a hundredth of a percentage point from
+// what the design without them measured: 0.24/0.05/0.01/0.00 general and
+// 28.54/20.14/15.34/4.50 digit-free. Widening the exclusion to admit more
+// ordinary prose did not meaningfully widen the leak, because the new
+// admissions -- doubled-separator edges, numeric path segments, a longer
+// PascalCase band, more digit-bearing segments -- are all still gated by
+// the same per-segment shape tests a random chunk fails.)
+//
+// The "general" column -- the full base64 alphabet, digits included, i.e.
+// what an actual secret is shaped like -- is what matters for real-world
+// risk. It is not, however, comparable to the pre-exclusion baseline: the
+// classes>=2 check below leaked exactly 0% at every length before this
+// exclusion existed (measured on the same samples), so the honest framing
+// is that this exclusion trades that 0% for roughly 0.2% at 32 characters
+// and 0.04% at 40, in exchange for not failing `validate` on ordinary
+// namespace, path, and version-list prose -- not that the new rate is
+// somehow the same shape as the old one. It is, at least, an improvement
+// over attempt 1 above: attempt 1 measured 0.40% at 32 characters on this
+// same general alphabet, so the current design leaks roughly half of what
+// its predecessor did while also closing three regressions attempt 1
+// reintroduced (the path-laundering case, the absolute-path case, and the
+// trailing-slash case) and, per the second review, four more (doubled
+// separators, numeric path segments, the long-PascalCase-name case, and
+// the fixed digit-bearing-segment cap).
+//
+// The "digit-free" column is a deliberately adversarial population (every
+// character drawn only from the 54 non-digit base64 characters) and it is
+// structurally harder to catch: required-clean fixture "MySQL8" (see
+// free-text-guard.test.ts) pins SEGMENT_WORD_START_RATIO_MIN at exactly
+// 3.0, and a uniformly-random 50/50-case letter sequence has an *expected*
+// length-to-word-start ratio of about 4 -- so against pure letters with no
+// digit signal at all, this shape test has real but limited power. A
+// genuine random secret is digit-free at 32+ characters only about 0.4% of
+// the time to begin with (10 of the 64 alphabet characters are digits), so
+// the two worst-case conditions here -- no digits anywhere, and a separator
+// positioned so every resulting segment independently looks word-shaped --
+// compound to a small real risk even though the isolated digit-free rate
+// looks large on its own. See free-text-guard.leak.test.ts for the ceilings
+// this is asserted against and the full rationale.
+function countWordStarts(segment: string): number {
+  let count = 0;
+  let prevIsUpper = false;
+  for (const char of segment) {
+    const isUpper = char >= "A" && char <= "Z";
+    if (isUpper && !prevIsUpper) count++;
+    prevIsUpper = isUpper;
+  }
+  return count;
+}
+
+const SEGMENT_LENGTH_CAP = 24;
+// A second, wider band for a segment that is unmistakably a multi-word
+// identifier rather than a compact one. Real PascalCase type names
+// routinely run past 24 characters in exactly the .NET layout the
+// original bug came from -- ApplicationDbContextFactory (27 characters)
+// and ServiceCollectionExtensions (27) are both ordinary. A segment this
+// long is only word-shaped if its length-to-word-start ratio clears
+// double the normal floor (see EXTENDED_SEGMENT_WORD_START_RATIO_MIN):
+// real multi-word identifiers of this length sit at a ratio of 6.75-9,
+// while it still has to clear SEGMENT_WORD_START_CAP, which is what
+// keeps an actually-random chunk out (the 32-character key segment in
+// the path-laundering fixture below has 7 word starts and is rejected on
+// that alone, independent of length).
+const EXTENDED_SEGMENT_LENGTH_CAP = 40;
+const EXTENDED_SEGMENT_WORD_START_RATIO_MIN = 6;
+const SEGMENT_WORD_START_RATIO_MIN = 3;
+const SEGMENT_WORD_START_CAP = 6;
+// Letters, then zero to three trailing digits, nothing else -- a digit
+// anywhere but the very end of the segment fails this outright. This is
+// the single most load-bearing line in the whole predicate: relaxing it
+// to admit one internal digit run (so "K7MDENG" or "Oauth2Callback"
+// would pass) was measured to raise the general-alphabet leak roughly
+// 20x (0.17%->3.26% at 32 chars) and lets the AWS-secret-shaped required
+// fixture below start passing clean. Do not relax it -- the cost is
+// documented at its own fixture ("Api/V1/Oauth2Callback/...") in
+// free-text-guard.test.ts rather than left to be rediscovered.
+const WORD_SHAPED_SEGMENT_RE = /^[A-Za-z]+[0-9]{0,3}$/;
+// A segment that is *purely* digits -- a date-partition component
+// ("2026/08/22"), a numeric resource id, or a port -- carries no letter
+// case at all, so WORD_SHAPED_SEGMENT_RE (which requires a letter) never
+// accepts it, and it would otherwise disqualify the whole token even
+// though it's ordinary path/URL structure, not entropy. Capped at 4
+// digits so this stays "a path component" rather than an arbitrary digit
+// run standing in for a shape test.
+const NUMERIC_SEGMENT_RE = /^[0-9]{1,4}$/;
+
+function segmentClearsWordStartRatio(segment: string, wordStarts: number, ratioMin: number): boolean {
+  // A segment with 0 or 1 word starts (an ordinary lowercase word, or a
+  // single capitalized word) always passes -- there's no meaningful "too
+  // dense" reading of a single word, at any length.
+  if (wordStarts <= 1) return true;
+  if (wordStarts > SEGMENT_WORD_START_CAP) return false;
+  return segment.length / wordStarts >= ratioMin;
+}
+
+function isWordShapedSegment(segment: string): boolean {
+  if (segment.length === 0) return false;
+  if (NUMERIC_SEGMENT_RE.test(segment)) return true;
+  if (segment.length > EXTENDED_SEGMENT_LENGTH_CAP) return false;
+  if (!WORD_SHAPED_SEGMENT_RE.test(segment)) return false;
+  const wordStarts = countWordStarts(segment);
+  const ratioMin = segment.length <= SEGMENT_LENGTH_CAP ? SEGMENT_WORD_START_RATIO_MIN : EXTENDED_SEGMENT_WORD_START_RATIO_MIN;
+  return segmentClearsWordStartRatio(segment, wordStarts, ratioMin);
+}
+
+function looksLikeSeparatedWords(token: string): boolean {
+  const rawSegments = token.split(/[+/]/);
+  // Drop every empty leading/trailing segment, not just one. A doubled
+  // separator -- s3://, gs://, rsync://, a scheme-relative "//host" URL --
+  // produces two consecutive empty segments at the edge, and dropping
+  // only one left the second to defeat this exclusion the same way a
+  // single stray empty segment did before this fix (an absolute path or
+  // a trailing slash, both single-empty-segment cases, are the ones the
+  // one-sided version already handled). An *interior* empty segment (a
+  // doubled slash in the middle of a path) is left alone and keeps
+  // failing below via isWordShapedSegment("") -- only the edges carry no
+  // entropy of their own.
+  let start = 0;
+  let end = rawSegments.length;
+  while (start < end && rawSegments[start] === "") start++;
+  while (end > start && rawSegments[end - 1] === "") end--;
+  const segments = rawSegments.slice(start, end);
+  // A token with no separator (or nothing left once the empty edges are
+  // dropped) was never eligible for this exclusion -- it keeps whatever
+  // behaviour the classes>=2 check below already gives it.
+  if (segments.length < 2) return false;
+
+  // No separate cap on how many segments may carry a digit suffix. An
+  // earlier version capped this at 2, reasoning that chaining the
+  // bounded-digit-suffix allowance across many segments could launder a
+  // token that's actually random -- but each segment already has to pass
+  // isWordShapedSegment independently (the trailing-digit-only rule, the
+  // length caps, and the word-start-ratio/cap tests all still apply), and
+  // measurement showed the extra cap bought no additional recall while
+  // failing ordinary multi-component prose: a date-partitioned path
+  // ("storage/renders/2026/08/22/previews") has three purely-numeric
+  // segments, and a version-suffixed technology list with three or more
+  // entries ("Postgres15+Redis7+Node24+Kubernetes") has three
+  // digit-suffixed ones -- both unremarkable, both failed HARD under the
+  // old cap. See free-text-guard.leak.test.ts for the measured before/
+  // after leak rate with this cap removed.
+  return segments.every(isWordShapedSegment);
+}
+
+function findHighEntropyTokens(
+  text: string,
+): Array<{ category: "api-key" | "high-entropy-token"; matched: string }> {
+  const hits: Array<{ category: "api-key" | "high-entropy-token"; matched: string }> = [];
   for (const match of text.matchAll(LONG_TOKEN_RE)) {
-    const tier = tokenEntropyTier(match[0]);
-    if (tier) hits.push({ tier, matched: match[0] });
+    const token = match[0];
+    const labeled = match.index !== undefined && hasSecretLabelBefore(text, match.index);
+    if (/^[0-9a-fA-F]+$/.test(token)) {
+      if (labeled) hits.push({ category: "high-entropy-token", matched: token });
+      continue;
+    }
+    // Label wins outright, before the word-shape exclusion runs at all --
+    // see point 1 in the comment above. A labeled token is a hit regardless
+    // of what its "/"/"+" segments look like.
+    if (labeled) {
+      hits.push({ category: "api-key", matched: token });
+      continue;
+    }
+    if (looksLikeSeparatedWords(token)) continue;
+    const classes = [/[A-Z]/.test(token), /[a-z]/.test(token), /[0-9]/.test(token)].filter(Boolean).length;
+    if (classes >= 2) hits.push({ category: "api-key", matched: token });
   }
   return hits;
 }
@@ -314,9 +688,7 @@ export function scanFreeTextForPrivateValues(text: string): PrivateValueMatch[] 
   for (const match of text.matchAll(BILLING_PERIOD_AMOUNT_RE)) hits.push(hardHit("billing-period-amount", match[0]));
   for (const run of findCardLikeDigitRuns(text)) hits.push(hardHit("card-number", run));
   for (const match of text.matchAll(API_KEY_RE)) hits.push(hardHit("api-key", match[0]));
-  for (const token of findHighEntropyTokens(text)) {
-    hits.push(token.tier === "hard" ? hardHit("api-key", token.matched) : softHit("credentials", token.matched));
-  }
+  for (const token of findHighEntropyTokens(text)) hits.push(hardHit(token.category, token.matched));
   for (const match of text.matchAll(CREDENTIAL_URL_RE)) hits.push(hardHit("credential-url", match[0]));
 
   for (const [category, pattern] of SOFT_KEYWORD_PATTERNS) {
@@ -383,6 +755,7 @@ const HARD_CATEGORY_LABELS: Record<PrivateValueHardCategory, string> = {
   "billing-period-amount": "an amount tied to a billing period",
   "card-number": "a card-like number",
   "api-key": "an API-key-shaped string",
+  "high-entropy-token": "a long high-entropy token that looks like a key or secret",
   "credential-url": "a URL carrying embedded credentials",
 };
 
