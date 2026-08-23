@@ -183,7 +183,9 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
 
     if (detection.vcs) {
       vcsProvider = detection.vcs.provider;
-      fileComments.push("visibility below is a guess (private) -- edit if this repo is public");
+      fileComments.push(
+        'visibility below is a guess (private) -- if this repo is public, run "dagstree set project.vcs.visibility public"'
+      );
     }
   }
 

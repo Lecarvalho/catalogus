@@ -18,6 +18,7 @@ import { runDiff } from "./commands/diff.js";
 import { runGraph } from "./commands/graph.js";
 import { runInit } from "./commands/init.js";
 import { runLink } from "./commands/link.js";
+import { runRemove } from "./commands/remove.js";
 import { runSet, SETTABLE_FIELDS } from "./commands/set.js";
 import { runValidate } from "./commands/validate.js";
 import { looksLikePrivateFlagName, privateFlagRefusalMessage } from "./private-guard.js";
@@ -105,7 +106,8 @@ function createProgram(): Command {
     .description("scan a repo and print the detected stack (Layer 1)")
     .argument("[path]", "repo path (defaults to the current directory)")
     .option("--json", "machine-readable output")
-    .action(async (path: string | undefined, opts: { json?: boolean }) => {
+    .option("--all", "list every detected library inline instead of collapsing them under a count")
+    .action(async (path: string | undefined, opts: { json?: boolean; all?: boolean }) => {
       emit(await runDetect(path, opts));
     });
 
@@ -185,7 +187,7 @@ function createProgram(): Command {
 
   program
     .command("set")
-    .description("set a project-level manifest field")
+    .description("set a manifest field: project-level, or an existing service's role")
     .argument("<field>", `one of: ${SETTABLE_FIELDS.join(", ")}`)
     .argument("<value>", "the value; for coding_agents, a comma-separated list")
     .argument("[pairs...]", "further <field> <value> pairs, applied as one edit")
@@ -218,6 +220,15 @@ function createProgram(): Command {
         emit(await runDeprecate(path, id, { status: opts.status, replacedBy: opts.replacedBy }));
       }
     );
+
+  program
+    .command("remove")
+    .description("delete a service entry, and every dependency edge that names it")
+    .argument("<id>", "local id of the entry to delete")
+    .argument("[path]", "target directory (defaults to the current directory)")
+    .action(async (id: string, path: string | undefined) => {
+      emit(await runRemove(path, id));
+    });
 
   return program;
 }

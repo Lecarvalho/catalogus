@@ -14,6 +14,7 @@ describe("runStackAnalyser", () => {
     const supabase = find(technologies, "supabase");
     expect(supabase?.slug).toBe("supabase");
     expect(supabase?.unmapped).toBe(false);
+    expect(supabase?.kind).toBe("service");
     expect(supabase?.evidence).toContainEqual(
       expect.objectContaining({ detail: "supabase matched: /^@supabase\\//" })
     );
@@ -31,6 +32,12 @@ describe("runStackAnalyser", () => {
     expect(vue?.unmapped).toBe(true);
     expect(vue?.slug).toBe("vue");
     expect(vue?.evidence.length).toBeGreaterThan(0);
+    // Vue is a UI framework in stack-analyser's own classification
+    // (specfy type "ui_framework") -- code the project imports, not a
+    // provider it depends on, so it comes back "library" rather than
+    // burying a real service's worth of visibility on something that
+    // can't have an outage or send an invoice.
+    expect(vue?.kind).toBe("library");
   });
 
   it("returns an empty list for a repo with nothing detectable", async () => {

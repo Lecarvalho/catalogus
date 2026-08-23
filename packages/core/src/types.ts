@@ -30,6 +30,18 @@ export interface Evidence {
   detail?: string;
 }
 
+/**
+ * Whether a Layer 1 detection is a service — an owner-facing dependency
+ * that can have an outage and send an invoice — or a library the project's
+ * code merely imports, or a tool a developer runs locally. Only
+ * DetectedTechnology carries this ambiguity: a ConfigServiceDetection,
+ * HostingDetection or coding-agent/MCP detection is never a library by
+ * construction (see each type's own doc comment), so none of them need the
+ * field — a caller that folds several detection kinds into one shape (see
+ * the CLI's DetectedServiceCandidate) treats those as "service" outright.
+ */
+export type DetectionKind = "service" | "library";
+
 export interface DetectedTechnology {
   /** Dagstree catalog slug. Equal to specfySlug when unmapped. */
   slug: string;
@@ -40,6 +52,16 @@ export interface DetectedTechnology {
   specfySlug: string;
   /** True when specfySlug had no entry in mapping.ts — a pass-through, not a discard. */
   unmapped: boolean;
+  /**
+   * "service" or "library" — see DetectionKind. Derived in mapping.ts:
+   * explicit for every known catalog row, and from stack-analyser's own
+   * `type` field for an unmapped pass-through (classifyDetectionKind).
+   * This is what lets `dagstree detect` lead with services instead of
+   * burying them among the languages, frameworks and build tools
+   * stack-analyser reports in equal volume — see PLAN.md's dogfooding
+   * notes, "detect output buries services among the libraries".
+   */
+  kind: DetectionKind;
 }
 
 export interface CodingAgentDetection {

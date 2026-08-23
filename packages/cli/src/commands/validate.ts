@@ -10,8 +10,19 @@
 // exits 0, but the warning is always printed to stderr so it's never
 // missed, and never to stdout -- --json-style pipelines on other commands,
 // and anything piping this command's stdout, must stay clean. --strict
-// promotes every warning to a hard failure (exit 1) for callers who want
-// maximum paranoia in CI.
+// promotes every warning to a hard failure (exit 1).
+//
+// --strict is deliberately not the recommended CI setting, and used to be.
+// The soft tier matches words -- `billing`, `subscription`, `seat` -- and
+// whether such a word is a leak or the project's ordinary vocabulary
+// depends on what the project does, which no word list can know. A real
+// manifest tripped it on a payments provider's notes ("Checkout, Billing
+// Portal, webhooks; subscription tiers plus credit packs"), which named a
+// vendor's products rather than the owner's plan or price. Gating CI on
+// that means no project with a payment processor can pass, and a guard that
+// cries wolf is a guard someone switches off -- see PLAN.md decision 7.
+// Soft hits are for a person to read; the hard tier is what holds the
+// boundary in CI, and it needs no flag.
 import { checkManifestText, warningLines } from "../manifest-checks.js";
 import { findManifest, ManifestNotFoundError, readManifestText } from "../manifest-io.js";
 import { resolveTargetPath } from "../paths.js";

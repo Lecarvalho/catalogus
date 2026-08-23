@@ -2,8 +2,22 @@
 // grouped by category, with the evidence file for each detection. --json
 // emits the raw DetectionResult (already JSON-clean, see @dagstree/core's
 // own round-trip test) for machine consumption.
+//
+// Text output leads with services and collapses libraries under a one-line
+// count rather than listing them: a real project's package.json routinely
+// names ten or twenty libraries (React, TypeScript, Tailwind, ESLint, ...)
+// for every one or two actual services, so an undifferentiated category
+// dump buries the thing this command exists to surface -- see PLAN.md's
+// dogfooding notes, "detect output buries services among the libraries".
+// The governing test for the split (@dagstree/core's DetectionKind) is the
+// plan's own: a service is something that can have an outage and send an
+// invoice. `--all` prints the full library list inline for anyone who
+// wants it; `--json` always carries every detection regardless, kind
+// included, because it's the machine-readable surface and nothing here
+// should ever make it less complete than the underlying DetectionResult.
 import { detect } from "@dagstree/core";
 
+import type { DetectedServiceCandidate } from "../detected-services.js";
 import { groupAllDetections } from "../detected-services.js";
 import { resolveTargetPath } from "../paths.js";
 import type { CommandResult } from "../types.js";
@@ -11,6 +25,11 @@ import { errorMessage } from "../types.js";
 
 export interface DetectCommandOptions {
   json?: boolean;
+  /**
+   * Print every library-kind detection inline instead of collapsing them
+   * under a one-line count. Off by default -- see the module header for why.
+   */
+  all?: boolean;
 }
 
 /**
@@ -47,13 +66,44 @@ export async function runDetect(pathArg: string | undefined, options: DetectComm
   const grouped = groupAllDetections(result);
   const categories = [...grouped.keys()].sort();
 
-  if (categories.length === 0) {
-    lines.push("(no technologies detected)");
-  }
+  const libraries: DetectedServiceCandidate[] = [];
+  let sawService = false;
+
   for (const category of categories) {
+    const entries = grouped.get(category) ?? [];
+    const services = entries.filter((e) => e.kind === "service");
+    for (const entry of entries) {
+      if (entry.kind === "library") {
+        libraries.push(entry);
+      }
+    }
+    if (services.length === 0) {
+      continue;
+    }
+    sawService = true;
     lines.push(`${category}:`);
-    for (const entry of grouped.get(category) ?? []) {
+    for (const entry of services) {
       lines.push(`  ${entry.slug} (${entry.name})${evidenceSuffix(entry.evidence)}`);
+    }
+    lines.push("");
+  }
+
+  if (!sawService) {
+    lines.push("(no services detected)");
+    lines.push("");
+  }
+
+  if (libraries.length > 0) {
+    libraries.sort((a, b) => a.slug.localeCompare(b.slug));
+    if (options.all) {
+      lines.push(`libraries (${libraries.length}):`);
+      for (const entry of libraries) {
+        lines.push(`  ${entry.slug} (${entry.name}) [${entry.category}]${evidenceSuffix(entry.evidence)}`);
+      }
+    } else {
+      lines.push(
+        `libraries: ${libraries.length} detected, not shown -- languages, frameworks and build tools rather than services; rerun with --all to list them`
+      );
     }
     lines.push("");
   }

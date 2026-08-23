@@ -36,9 +36,10 @@ fails, rather than hand-writing a manifest as a fallback — the CLI owns id der
 integrity, acyclicity and the private-data guard, and a hand-rolled file bypasses all of it. When
 adding to the skill, route new work through a command rather than through hand-editing.
 
-Five Layer 2 fields currently have no command and are the documented exception: `project.architecture`,
-`project.pm`, `project.vcs`, `project.coding_agents`, and `status`/`replaced_by` on an existing entry.
-Adding `set`, `link` and `deprecate` subcommands would close that exception entirely — see
-`docs/PLAN.md`. Until then the skill hand-edits exactly those five and validates immediately after.
+That exception is now closed. The five Layer 2 fields that once had no command behind them —
+`project.architecture`, `project.pm`, `project.vcs`, `project.coding_agents`, and
+`status`/`replaced_by` on an existing entry — are covered by `dagstree set` and `dagstree deprecate`,
+edges by `dagstree link`, and undoing a wrong entry by `dagstree remove`. The CLI is the only writer,
+and the skill contains no hand-edit path.
 
 No backend account is needed. Everything the skill does is local.
