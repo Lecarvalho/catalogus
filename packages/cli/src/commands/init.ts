@@ -1,9 +1,25 @@
 // `dagstree init [--yes]` -- scaffolds a dagstree.yaml. Interactive by
 // default (prompts for project name, slug, architecture style, PM method,
-// and VCS provider); with --yes, infers everything it can (detection
-// prefills the service list and coding agents, the directory name becomes
-// the project name) and writes without prompting. Never overwrites an
-// existing manifest without --force.
+// and VCS provider); with --yes, infers the project-level fields it can
+// (VCS provider and coding agents from detection, the directory name as the
+// project name) and writes without prompting. Never overwrites an existing
+// manifest without --force.
+//
+// It deliberately writes NO service entries, even though detection knows
+// several. It used to prefill one per detected service, and that turned out
+// to make the file worse in two ways at once. A service entry needs a
+// `role` -- what this instance does here, "database", "hosting-api" -- and
+// all detection has is a *category*, so every prefilled entry landed with
+// `role: db`, `role: vcs`, or the meaningless `role: other`. Worse, the
+// entries were unremovable: `add` only appends and there is no `remove`, so
+// an agent following the documented flow (init, then `add supabase --role
+// database --id supabase-db`) ended up with `supabase` *and* `supabase-db`
+// in the file and no way back except deleting it and starting over. That
+// was observed happening.
+//
+// `dagstree diff` already reports every detected service missing from the
+// manifest, which is the same information as a work list rather than as
+// entries someone now has to correct.
 import { stat } from "node:fs/promises";
 import { basename } from "node:path";
 
@@ -17,7 +33,7 @@ import { findManifest, writeManifestText } from "../manifest-io.js";
 import { warningLines } from "../manifest-checks.js";
 import { resolveTargetPath } from "../paths.js";
 import { hasBlockingPrivateFreeText, privateFlagRefusalMessage } from "../private-guard.js";
-import { deriveLocalId, isValidSlug, slugify } from "../slug.js";
+import { isValidSlug, slugify } from "../slug.js";
 import type { CommandResult } from "../types.js";
 
 export interface InitCommandOptions {
@@ -141,9 +157,12 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
     }
   }
 
+  // Always empty. See this module's header: services go in through `add`,
+  // with a real role, once someone has decided what each one is.
   const services: Array<Record<string, unknown>> = [];
   let codingAgents: string[] = [];
   const fileComments: string[] = [];
+  let detectedServiceCount = 0;
 
   if (options.yes) {
     let detection;
@@ -156,13 +175,9 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
       throw error;
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const existingIds = new Set<string>();
-    for (const candidate of collectDetectedServices(detection)) {
-      const id = deriveLocalId(candidate.slug, candidate.category, existingIds);
-      existingIds.add(id);
-      services.push({ id, service: candidate.slug, role: candidate.category, added: today });
-    }
+    // Counted, not written: the summary points at `dagstree diff` for the
+    // list, so nobody has to wonder whether detection found anything.
+    detectedServiceCount = collectDetectedServices(detection).length;
 
     codingAgents = detection.codingAgents.map((a) => a.agent);
 
@@ -200,11 +215,14 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
   const filePath = await writeManifestText(targetDir, `${header}${yamlBody}`);
 
   const summary = [`Wrote ${filePath}`];
-  if (services.length > 0) {
-    summary.push(`  ${services.length} service(s) prefilled from detection`);
-  }
   if (codingAgents.length > 0) {
     summary.push(`  coding agents: ${codingAgents.join(", ")}`);
+  }
+  if (detectedServiceCount > 0) {
+    summary.push(
+      `  ${detectedServiceCount} service(s) detected and not yet declared -- run "dagstree diff" to list them,`
+    );
+    summary.push('  then "dagstree add <service> --role <role>" for each one you want recorded.');
   }
 
   // Same reasoning as add.ts: check.warnings is the SOFT-tier half of the

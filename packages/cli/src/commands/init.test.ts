@@ -18,8 +18,9 @@ describe("runInit", () => {
     await removeTempDir(dir);
   });
 
-  it("--yes scaffolds a manifest without prompting, prefilled from detection", async () => {
+  it("--yes scaffolds a manifest without prompting, with project-level fields inferred", async () => {
     await writeFixtureFile(dir, "fly.toml", 'app = "example"\n');
+    await writeFixtureFile(dir, "CLAUDE.md", "# notes\n");
     const result = await runInit(dir, { yes: true });
     expect(result.exitCode).toBe(0);
 
@@ -29,7 +30,33 @@ describe("runInit", () => {
     expect(parsed.dagstree).toBe(1);
     expect(parsed.project.name).toBeTruthy();
     expect(parsed.project.slug).toMatch(/^[a-z0-9]+(?:[_-][a-z0-9]+)*$/);
-    expect(parsed.services.some((s: { service: string }) => s.service === "fly-io")).toBe(true);
+    expect(parsed.project.coding_agents).toContain("claude-code");
+  });
+
+  // init used to write one entry per detected service, with the detection
+  // *category* standing in for `role` -- so entries arrived as `role: db`,
+  // `role: vcs`, `role: other`. Since `add` only appends and there is no
+  // `remove`, the documented next step (`add supabase --role database --id
+  // supabase-db`) left both `supabase` and `supabase-db` in the file with no
+  // way back except deleting it. An empty services list is what makes the
+  // scan-then-add flow composable.
+  it("writes no service entries, however much detection found", async () => {
+    await writeFixtureFile(dir, "fly.toml", 'app = "example"\n');
+    const result = await runInit(dir, { yes: true });
+
+    const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+    expect(parsed.services).toEqual([]);
+    expect(parsed.dependencies).toEqual([]);
+  });
+
+  it("says how many services were detected and points at diff, rather than writing them", async () => {
+    await writeFixtureFile(dir, "fly.toml", 'app = "example"\n');
+    const result = await runInit(dir, { yes: true });
+
+    const summary = result.stdout.join("\n");
+    expect(summary).toMatch(/\d+ service\(s\) detected and not yet declared/);
+    expect(summary).toContain("dagstree diff");
+    expect(summary).toContain("dagstree add");
   });
 
   it("never overwrites an existing manifest without --force", async () => {
