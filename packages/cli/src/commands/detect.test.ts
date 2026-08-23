@@ -33,6 +33,30 @@ describe("runDetect", () => {
     expect(Array.isArray(payload.hosting)).toBe(true);
   });
 
+  // Config-key evidence is one record per matching key, so a settings file
+  // naming four of a provider's keys contributes four records naming the
+  // same file. The text report shows files, so it has to show that file
+  // once; --json still carries every record, key names included.
+  it("names an evidence file once per detection however many keys in it proved the service", async () => {
+    await writeFixtureFile(
+      dir,
+      "appsettings.json",
+      JSON.stringify({ Stripe: { SecretKey: "" }, StripeWebhook: { Secret: "" } }, null, 2)
+    );
+
+    const text = (await runDetect(dir)).stdout.join("\n");
+    const stripeLine = text.split("\n").find((line) => line.includes("stripe (Stripe)")) ?? "";
+    expect(stripeLine).toContain("appsettings.json");
+    expect(stripeLine.match(/appsettings\.json/g)).toHaveLength(1);
+
+    const payload = JSON.parse((await runDetect(dir, { json: true })).stdout[0] as string);
+    const stripe = payload.configServices.find((s: { slug: string }) => s.slug === "stripe");
+    expect(stripe.evidence.map((e: { detail: string }) => e.detail)).toEqual([
+      "config key: Stripe",
+      "config key: StripeWebhook",
+    ]);
+  });
+
   it("reports a clean empty result for a repo with nothing to detect", async () => {
     await writeFixtureFile(dir, "README.md", "# Nothing here\n");
     const result = await runDetect(dir);

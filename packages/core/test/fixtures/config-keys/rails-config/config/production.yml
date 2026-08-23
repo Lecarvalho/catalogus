@@ -1,0 +1,6 @@
+algolia:
+  application_id: "SENTINEL-VALUE-MUST-NOT-LEAK"
+mailgun:
+  domain: ""
+cache:
+  store: memory

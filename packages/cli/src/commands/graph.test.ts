@@ -5,8 +5,8 @@ import { runGraph } from "./graph.js";
 
 const MANIFEST = `dagstree: 1
 project:
-  name: Clapline
-  slug: clapline
+  name: Example App
+  slug: example-app
 services:
   - id: supabase-db
     service: supabase

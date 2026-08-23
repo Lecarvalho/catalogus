@@ -33,6 +33,11 @@ describe("every fixture in test/fixtures/valid parses and validates", () => {
     const result = parseManifest(readFixture("valid", "handoff-example.yaml"));
     expect(result.valid).toBe(true);
     if (!result.valid) return;
+    // Deliberately still the spec's own project name. This fixture is a
+    // verbatim copy of HANDOFF.md section 5, and its whole value is being
+    // verbatim -- renaming it here would leave the copy silently diverged
+    // from the document it exists to track. Every other fixture and inline
+    // manifest in the suite uses a synthetic name instead.
     expect(result.manifest.project.name).toBe("Clapline");
     expect(result.manifest.services).toHaveLength(6);
     expect(result.manifest.dependencies).toHaveLength(3);
@@ -73,8 +78,8 @@ describe("private-key rejection targets property names, not free-text content", 
     const yamlText = [
       "dagstree: 1",
       "project:",
-      "  name: Clapline",
-      "  slug: clapline",
+      "  name: Example App",
+      "  slug: example-app",
       "services:",
       "  - id: fly",
       "    service: fly-io",

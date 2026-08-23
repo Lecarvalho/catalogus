@@ -1,14 +1,17 @@
 // @dagstree/core — the Layer 1 detection engine. Wraps @specfy/stack-analyser
 // for general-purpose tech detection and adds the Dagstree-specific
 // detectors HANDOFF.md §6 calls for (coding agents, MCP servers, hosting
-// config files, VCS/CI provider), then merges the two into one
-// JSON-serialisable DetectionResult with evidence on every entry.
+// config files, VCS/CI provider), plus a config-key detector for the
+// services stack-analyser structurally cannot see — anything wired through
+// a settings file rather than a dependency manifest — then merges them into
+// one JSON-serialisable DetectionResult with evidence on every entry.
 export const CORE_PACKAGE_NAME = "@dagstree/core";
 
 import { stat } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 
 import { detectCodingAgents } from "./detectors/coding-agents.js";
+import { detectConfigKeys } from "./detectors/config-keys.js";
 import { pathExists } from "./detectors/fs-helpers.js";
 import { detectHosting } from "./detectors/hosting.js";
 import { detectMcpServers } from "./detectors/mcp-servers.js";
@@ -19,6 +22,7 @@ import type { DetectionResult, Evidence, HostingDetection } from "./types.js";
 export type {
   CiDetection,
   CodingAgentDetection,
+  ConfigServiceDetection,
   DetectedTechnology,
   DetectionResult,
   Evidence,
@@ -67,11 +71,12 @@ async function assertValidRepoPath(repoPath: string): Promise<void> {
 export async function detect(repoPath: string): Promise<DetectionResult> {
   await assertValidRepoPath(repoPath);
 
-  const [technologies, codingAgents, mcp, dagstreeHosting, vcs, ci] = await Promise.all([
+  const [technologies, codingAgents, mcp, dagstreeHosting, configKeys, vcs, ci] = await Promise.all([
     runStackAnalyser(repoPath),
     detectCodingAgents(repoPath),
     detectMcpServers(repoPath),
     detectHosting(repoPath),
+    detectConfigKeys(repoPath),
     detectVcs(repoPath),
     detectCi(repoPath),
   ]);
@@ -85,9 +90,10 @@ export async function detect(repoPath: string): Promise<DetectionResult> {
     codingAgents,
     mcpServers: mcp.servers,
     hosting,
+    configServices: configKeys.services,
     vcs,
     ci,
-    warnings: mcp.warnings,
+    warnings: [...mcp.warnings, ...configKeys.warnings],
   };
 }
 

@@ -34,9 +34,23 @@ export function slugify(text: string): string {
  * --id colliding with an existing one is not handled here -- that's caught
  * uniformly by validateManifest's duplicate-id check when the mutated
  * manifest is validated before writing.
+ *
+ * `existingServices` is the set of catalog slugs the manifest already uses,
+ * which is a different question from which *ids* are taken. Once a manifest
+ * holds `supabase-db` (an explicit --id, or a second role), a later
+ * `add supabase --role auth` finds the bare id `supabase` unclaimed and,
+ * without this, takes it -- leaving `supabase` sitting beside `supabase-db`,
+ * legal but reading as though the two were different kinds of thing. When
+ * the service already appears, the role-qualified id is the right default
+ * even though the bare one is free.
  */
-export function deriveLocalId(serviceSlug: string, role: string, existingIds: ReadonlySet<string>): string {
-  if (!existingIds.has(serviceSlug)) {
+export function deriveLocalId(
+  serviceSlug: string,
+  role: string,
+  existingIds: ReadonlySet<string>,
+  existingServices: ReadonlySet<string> = new Set()
+): string {
+  if (!existingIds.has(serviceSlug) && !existingServices.has(serviceSlug)) {
     return serviceSlug;
   }
   const withRole = `${serviceSlug}-${role}`;

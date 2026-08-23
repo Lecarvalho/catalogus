@@ -148,7 +148,9 @@ function pushServiceLines(lines: string[], services: readonly DetectedServiceCan
     return;
   }
   for (const s of services) {
-    const files = s.evidence.map((e) => e.file).join(", ");
+    // Distinct files: evidence is per-signal, so one settings file naming
+    // several of a provider's keys contributes several records for it.
+    const files = [...new Set(s.evidence.map((e) => e.file))].join(", ");
     lines.push(`  ${marker} ${s.slug} (${s.name}) [${s.category}]${files ? ` - ${files}` : ""}`);
   }
 }

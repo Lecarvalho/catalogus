@@ -1,0 +1,98 @@
+# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+#
+# A reference manifest, deliberately synthetic. It names no real project.
+#
+# Its job is to show the shapes a manifest has to be able to express, so that
+# packages/schema's drift test has a complete document to validate and so the
+# agent skill has something to be judged against. A manifest derived from a
+# real project would do that job too, but it would also publish that
+# project's entire service inventory and topology in a public repo, which is
+# a different thing from publishing a schema example.
+#
+# Layer 2 only, and safe to commit. Cost, billing and account references are
+# Layer 3: they live in the private overlay, never here.
+
+dagstree: 1
+
+project:
+  name: Example App
+  slug: example-app
+  architecture: "two-tier: an HTTP API behind a reverse proxy, with a single-page front end served from the same origin"
+  pm: "kanban board, one card per shipped change"
+  vcs:
+    provider: github
+    visibility: private
+  coding_agents:
+    - claude-code
+
+services:
+  # One hosting provider, one entry per deployed app. Four apps would be four
+  # entries, not one entry that mentions four.
+  - id: host-api
+    service: fly-io
+    role: hosting-api
+    added: 2025-11-02
+    notes: "runs the API container"
+  - id: host-web
+    service: fly-io
+    role: hosting-web
+    added: 2025-11-02
+    notes: "serves the front end and proxies to the API"
+
+  # One service used in two roles is two entries with distinct ids, not one
+  # entry carrying two roles. HANDOFF §9 settled this.
+  - id: supabase-db
+    service: supabase
+    role: database
+    added: 2025-11-02
+  - id: supabase-auth
+    service: supabase
+    role: auth
+    added: 2025-11-02
+
+  # Lifecycle: something on the way out, and the entry that replaces it.
+  # Nothing in a repository states this — it is always answered by a person.
+  - id: legacy-mailer
+    service: mailgun
+    role: email
+    added: 2025-03-14
+    status: phasing_out
+    replaced_by: mailer
+  - id: mailer
+    service: resend
+    role: email
+    added: 2026-01-15
+
+  # Off-repo. No scan finds either of these; they are here because someone
+  # was asked.
+  - id: registrar
+    service: namecheap
+    role: dns
+    added: 2025-11-02
+    notes: "apex domain and DNS records"
+  - id: board
+    service: trello
+    role: pm
+    added: 2025-11-02
+
+  - id: github
+    service: github
+    role: vcs
+    added: 2025-11-02
+  - id: github-actions
+    service: github-actions
+    role: ci
+    added: 2025-11-02
+
+dependencies:
+  # Edges point from the depender to the dependency.
+  - [host-web, host-api]
+  - [host-api, supabase-db]
+  - [host-api, supabase-auth]
+  - [host-api, mailer]
+  - [host-api, legacy-mailer]
+  - [supabase-auth, supabase-db]
+  - [host-web, registrar]
+  - [github-actions, github]
+  - [github-actions, host-api]
+  - [github-actions, host-web]

@@ -7,15 +7,9 @@
 // validated -- schema plus acyclicity, the same check `dagstree validate`
 // runs -- before anything is written; a manifest that would fail that check
 // is never written, duplicate ids included.
-import { stat } from "node:fs/promises";
-
-import { MANIFEST_FILENAME_FALLBACK } from "@dagstree/schema";
-import { parseDocument } from "yaml";
 import type { YAMLSeq } from "yaml";
 
-import { checkManifestObject, warningLines } from "../manifest-checks.js";
-import { loadValidManifest } from "../load-manifest.js";
-import { writeManifestText } from "../manifest-io.js";
+import { commitManifestEdit, openManifestForEdit, preferBlockStyleWhenEmpty } from "../manifest-edit.js";
 import { resolveTargetPath } from "../paths.js";
 import { hasBlockingPrivateFreeText, privateFlagRefusalMessage } from "../private-guard.js";
 import { deriveLocalId, isValidSlug } from "../slug.js";
@@ -72,38 +66,11 @@ export function resolveAddPathArg(
   return { ok: true, value: positional ?? pathFlag };
 }
 
-/** Empty sequences parsed from `[]` default to flow style; forcing block style before the first real entry keeps a freshly-scaffolded manifest from turning into an ugly single-line list the first time something is added to it. A sequence that already has entries keeps whatever style the human gave it. */
-function preferBlockStyleWhenEmpty(seq: YAMLSeq): void {
-  if (seq.items.length === 0) {
-    seq.flow = false;
-  }
-}
-
 export async function runAdd(
   pathArg: string | undefined,
   service: string,
   options: AddCommandOptions
 ): Promise<CommandResult> {
-  const targetDir = resolveTargetPath(pathArg);
-
-  // A path argument the caller actually typed (positional or --path) is a
-  // concrete claim about which project this edit targets -- unlike the
-  // no-argument default, it should never silently fall back to some
-  // ancestor directory's manifest via findManifest's git-style upward walk.
-  // Without this check, a typo'd subdirectory that happens to sit under a
-  // directory with its own manifest edits that unrelated parent manifest
-  // instead of failing loudly.
-  if (pathArg !== undefined) {
-    try {
-      const info = await stat(targetDir);
-      if (!info.isDirectory()) {
-        return { exitCode: 2, stdout: [], stderr: [`"${targetDir}" is not a directory.`] };
-      }
-    } catch {
-      return { exitCode: 2, stdout: [], stderr: [`"${targetDir}" does not exist.`] };
-    }
-  }
-
   if (options.status && !VALID_STATUSES.has(options.status)) {
     return {
       exitCode: 2,
@@ -157,14 +124,15 @@ export async function runAdd(
     }
   }
 
-  const loaded = await loadValidManifest(targetDir);
-  if (!loaded.ok) {
-    return loaded.error;
+  const opened = await openManifestForEdit(pathArg);
+  if (!opened.ok) {
+    return opened.error;
   }
-  const { location, text, manifest } = loaded.value;
+  const { location, manifest, doc } = opened.value;
 
   const existingIds = new Set(manifest.services.map((s) => s.id));
-  const id = options.id ?? deriveLocalId(service, options.role, existingIds);
+  const existingServices = new Set(manifest.services.map((s) => s.service));
+  const id = options.id ?? deriveLocalId(service, options.role, existingIds, existingServices);
 
   // Every --depends-on value is slug-shaped by now (checked above); this
   // second pass catches the case where it's a *valid-looking* slug that
@@ -189,8 +157,6 @@ export async function runAdd(
     }
   }
 
-  const doc = parseDocument(text);
-
   const servicesSeq = doc.get("services", true) as YAMLSeq;
   preferBlockStyleWhenEmpty(servicesSeq);
 
@@ -211,33 +177,14 @@ export async function runAdd(
     }
   }
 
-  const check = checkManifestObject(doc.toJS());
-  if (!check.ok) {
-    return {
-      exitCode: 1,
-      stdout: [],
-      stderr: [`Adding "${id}" would make ${location.filePath} invalid:`, ...check.lines],
-    };
-  }
-
-  const filePath = await writeManifestText(location.dir, doc.toString({ flowCollectionPadding: false }));
-
-  const lines = [`Added service "${id}" (${service}, role: ${options.role}) to ${filePath}`];
-  // writeManifestText always writes dagstree.yaml, even when the manifest
-  // was read from the stack.yaml fallback (manifest-io.ts's contract) -- so
-  // a repo that still used the old name now has two files that disagree.
-  // Say so explicitly rather than leaving the stale stack.yaml to surprise
-  // whoever reads it next.
-  if (location.filename === MANIFEST_FILENAME_FALLBACK) {
-    lines.push(`  migrated ${location.filePath} -> ${filePath}; delete ${location.filePath} once you've checked this in.`);
-  }
-  if (dependsOn.length > 0) {
-    lines.push(`  depends on: ${dependsOn.join(", ")}`);
-  }
-  // check.warnings comes from the same full-document scan `dagstree
-  // validate` runs -- a SOFT-only hit (e.g. a bare "renewal" in --notes)
-  // was never blocking, so surface it here rather than silently dropping
-  // it now that hasBlockingPrivateFreeText's pre-check only refuses on hard
-  // hits (see private-guard.ts's header comment).
-  return { exitCode: 0, stdout: lines, stderr: warningLines(check.warnings) };
+  return commitManifestEdit(doc, location, {
+    failurePrefix: `Adding "${id}" would make`,
+    successLines: (filePath) => {
+      const lines = [`Added service "${id}" (${service}, role: ${options.role}) to ${filePath}`];
+      if (dependsOn.length > 0) {
+        lines.push(`  depends on: ${dependsOn.join(", ")}`);
+      }
+      return lines;
+    },
+  });
 }

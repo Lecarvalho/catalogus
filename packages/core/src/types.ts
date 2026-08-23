@@ -59,6 +59,21 @@ export interface HostingDetection {
   evidence: Evidence[];
 }
 
+/**
+ * A service proven by a configuration key NAME rather than by a dependency
+ * manifest — the signal a .NET, Rails, Go or Python backend leaves behind
+ * (see detectors/config-keys.ts). Carries a category directly, because the
+ * catalog it came from already knows one; there is no `unmapped`
+ * pass-through here, since an unrecognised key name is not a detection at
+ * all.
+ */
+export interface ConfigServiceDetection {
+  slug: string;
+  category: ServiceCategory;
+  name: string;
+  evidence: Evidence[];
+}
+
 export interface VcsDetection {
   provider: string;
   evidence: Evidence[];
@@ -76,6 +91,14 @@ export interface DetectionResult {
   codingAgents: CodingAgentDetection[];
   mcpServers: McpServerDetection[];
   hosting: HostingDetection[];
+  /**
+   * Services named by a configuration key. Kept as its own list rather than
+   * folded into `technologies` because a DetectedTechnology carries a
+   * `specfySlug`, and there is no stack-analyser slug behind these — writing
+   * one would be inventing provenance for a detection that came from
+   * somewhere else entirely.
+   */
+  configServices: ConfigServiceDetection[];
   vcs: VcsDetection | null;
   ci: CiDetection | null;
   /**
