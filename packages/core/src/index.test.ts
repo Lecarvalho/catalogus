@@ -55,9 +55,23 @@ describe("detect", () => {
     expect(result.codingAgents).toEqual([]);
     expect(result.mcpServers).toEqual([]);
     expect(result.hosting).toEqual([]);
+    expect(result.configServices).toEqual([]);
     expect(result.vcs).toBeNull();
     expect(result.ci).toBeNull();
     expect(result.warnings).toEqual([]);
+  });
+
+  // The gap dogfooding exposed: a .NET backend wires its providers through
+  // appsettings*.json, which is not a dependency manifest, so
+  // @specfy/stack-analyser sees none of them. detect() has to surface what
+  // the config-key detector found, or the miss survives one layer up.
+  it("surfaces services that are only wired through configuration, which the dependency scanner cannot see", async () => {
+    const result = await detect(fixturePath("config-keys", "dotnet-backend"));
+
+    expect(result.technologies.map((tech) => tech.slug)).not.toContain("supabase");
+    expect(result.configServices.map((service) => service.slug)).toEqual(
+      expect.arrayContaining(["supabase", "stripe", "openai", "anthropic", "aws-s3"])
+    );
   });
 
   it("round-trips through JSON without loss", async () => {

@@ -3,7 +3,13 @@
 // and `dagstree diff`'s staleness check) and just the catalog-known subset
 // worth offering as manifest service candidates (for `dagstree diff`'s
 // missing-service check and `dagstree init --yes`).
-import type { DetectedTechnology, DetectionResult, Evidence, HostingDetection } from "@dagstree/core";
+import type {
+  ConfigServiceDetection,
+  DetectedTechnology,
+  DetectionResult,
+  Evidence,
+  HostingDetection,
+} from "@dagstree/core";
 
 export interface DetectedServiceCandidate {
   slug: string;
@@ -37,6 +43,7 @@ function mergeEvidence(target: Evidence[], incoming: readonly Evidence[]): void 
 function mergeBySlug(
   technologies: readonly DetectedTechnology[],
   hosting: readonly HostingDetection[],
+  configServices: readonly ConfigServiceDetection[],
   includeUnmapped: boolean
 ): Map<string, DetectedServiceCandidate> {
   const bySlug = new Map<string, DetectedServiceCandidate>();
@@ -66,6 +73,28 @@ function mergeBySlug(
     }
   }
 
+  // Config-key detections are catalog-known by construction (an
+  // unrecognised key name is never emitted), so they belong in both the
+  // filtered and unfiltered views. They arrive last so that a provider
+  // stack-analyser also found keeps that detector's category and display
+  // name, rather than having the answer depend on which detector happened
+  // to run first.
+  for (const service of configServices) {
+    const existing = bySlug.get(service.slug);
+    if (existing) {
+      mergeEvidence(existing.evidence, service.evidence);
+    } else {
+      const evidence: Evidence[] = [];
+      mergeEvidence(evidence, service.evidence);
+      bySlug.set(service.slug, {
+        slug: service.slug,
+        category: service.category,
+        name: service.name,
+        evidence,
+      });
+    }
+  }
+
   return bySlug;
 }
 
@@ -84,7 +113,7 @@ function mergeBySlug(
  * Layer 1 report nor "is this really gone" should hide anything.
  */
 export function collectDetectedServices(result: DetectionResult): DetectedServiceCandidate[] {
-  const bySlug = mergeBySlug(result.technologies, result.hosting, false);
+  const bySlug = mergeBySlug(result.technologies, result.hosting, result.configServices, false);
   return [...bySlug.values()].sort((a, b) => a.category.localeCompare(b.category) || a.slug.localeCompare(b.slug));
 }
 
@@ -101,7 +130,7 @@ export function collectDetectedServices(result: DetectionResult): DetectedServic
  * detection still finds it.
  */
 export function collectAllDetectedServices(result: DetectionResult): DetectedServiceCandidate[] {
-  const bySlug = mergeBySlug(result.technologies, result.hosting, true);
+  const bySlug = mergeBySlug(result.technologies, result.hosting, result.configServices, true);
   return [...bySlug.values()].sort((a, b) => a.category.localeCompare(b.category) || a.slug.localeCompare(b.slug));
 }
 

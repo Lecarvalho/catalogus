@@ -13,8 +13,16 @@ export interface DetectCommandOptions {
   json?: boolean;
 }
 
+/**
+ * The distinct files behind a detection, in the order they were proved.
+ * Distinct because evidence is per-signal, not per-file: the config-key
+ * detector emits one record per matching key, so a settings file naming
+ * four Grafana variables would otherwise print its own path four times on
+ * one line. `--json` still carries every individual record, key names
+ * included.
+ */
 function evidenceSuffix(evidence: ReadonlyArray<{ file: string }>): string {
-  const files = evidence.map((e) => e.file).join(", ");
+  const files = [...new Set(evidence.map((e) => e.file))].join(", ");
   return files ? ` - ${files}` : "";
 }
 

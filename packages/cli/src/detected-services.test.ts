@@ -11,6 +11,7 @@ function baseResult(overrides: Partial<DetectionResult> = {}): DetectionResult {
     codingAgents: [],
     mcpServers: [],
     hosting: [],
+    configServices: [],
     vcs: null,
     ci: null,
     warnings: [],
@@ -86,6 +87,60 @@ describe("collectDetectedServices", () => {
       { file: "fly.toml", detail: "matched file: fly.toml" },
       { file: "fly.toml" },
       { file: "fly.web.toml" },
+    ]);
+  });
+
+  // A config-key detection is catalog-known by construction, so unlike an
+  // unmapped technology it belongs in the candidate list -- and it is the
+  // only list a .NET or Rails backend's providers can reach, since no
+  // dependency manifest names them.
+  it("offers config-key detections as candidates", () => {
+    const result = baseResult({
+      configServices: [
+        {
+          slug: "supabase",
+          category: "db",
+          name: "Supabase",
+          evidence: [{ file: "src/Api/appsettings.json", detail: "config key: Supabase" }],
+        },
+      ],
+    });
+    expect(collectDetectedServices(result)).toEqual([
+      {
+        slug: "supabase",
+        category: "db",
+        name: "Supabase",
+        evidence: [{ file: "src/Api/appsettings.json", detail: "config key: Supabase" }],
+      },
+    ]);
+  });
+
+  it("merges a service found by both a dependency and a config key into one entry, keeping both trails", () => {
+    const result = baseResult({
+      technologies: [
+        {
+          slug: "stripe",
+          category: "payments",
+          name: "Stripe",
+          specfySlug: "stripe",
+          unmapped: false,
+          evidence: [{ file: "package.json" }],
+        },
+      ],
+      configServices: [
+        {
+          slug: "stripe",
+          category: "payments",
+          name: "Stripe",
+          evidence: [{ file: "src/Api/appsettings.json", detail: "config key: Stripe" }],
+        },
+      ],
+    });
+    const services = collectDetectedServices(result);
+    expect(services).toHaveLength(1);
+    expect(services[0]?.evidence).toEqual([
+      { file: "package.json" },
+      { file: "src/Api/appsettings.json", detail: "config key: Stripe" },
     ]);
   });
 });

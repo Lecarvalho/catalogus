@@ -5,6 +5,12 @@ coverage/
 .env.*
 *.local
 
+# ...except the detector fixtures. `.env.example` templates are exactly what
+# the config-key detector reads (a real `.env` is never opened — see
+# packages/core/src/detectors/config-keys.ts), so the fixtures proving that
+# have to be committable.
+!packages/core/test/fixtures/**/.env.*
+
 # OS cruft
 .DS_Store
 Thumbs.db
