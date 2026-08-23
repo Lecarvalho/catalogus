@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+dagstree: 1
+project:
+  name: Clapline
+  slug: clapline
+  architecture: "modular monolith (.NET 10, vertical slices)"
+  pm: "Trello kanban (PAUTA agent sync)"
+  vcs: { provider: github, visibility: private }
+  coding_agents:
+    - claude-code
+    - pauta
+
+services:
+  - id: supabase-db          # local id, unique within file
+    service: supabase        # slug into global catalog
+    role: database
+    added: 2025-11-02
+  - id: supabase-auth
+    service: supabase
+    role: auth
+    added: 2025-11-02
+  - id: vertex
+    service: google-vertex-ai
+    role: ai-models
+    added: 2026-01-15
+    status: phasing_out
+    replaced_by: anthropic-api
+  - id: anthropic-api
+    service: anthropic
+    role: ai-models
+    added: 2026-06-01
+  - id: fly
+    service: fly-io
+    role: hosting
+    added: 2025-11-02
+  - id: namecheap
+    service: namecheap
+    role: dns
+    added: 2025-11-02
+
+dependencies:              # edges, from → to
+  - [supabase-auth, supabase-db]
+  - [fly, supabase-db]
+  - [fly, anthropic-api]

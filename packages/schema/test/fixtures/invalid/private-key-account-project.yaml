@@ -1,0 +1,9 @@
+# Private-key family: account. Nested one level down, inside project, with
+# an underscore variant (account_id).
+dagstree: 1
+project:
+  name: Clapline
+  slug: clapline
+  account_id: "acct_9f2c1"
+services: []
+dependencies: []

@@ -1,0 +1,9 @@
+# Private-key family: cost. Placed at the document root, with a hyphenated
+# variant name (monthly-cost) to exercise separator-tolerant matching.
+dagstree: 1
+project:
+  name: Clapline
+  slug: clapline
+services: []
+dependencies: []
+monthly-cost: 49

@@ -1,0 +1,14 @@
+# A service can't replace itself -- replaced_by must name a different
+# entry's id.
+dagstree: 1
+project:
+  name: Clapline
+  slug: clapline
+services:
+  - id: vertex
+    service: vertex-ai
+    role: llm
+    added: 2025-11-02
+    status: phasing_out
+    replaced_by: vertex
+dependencies: []

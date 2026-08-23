@@ -1,0 +1,24 @@
+# Covers the object form of a dependency edge (from/to/notes), alongside
+# the compact tuple form, in the same dependencies[] array.
+dagstree: 1
+project:
+  name: Lookout
+  slug: lookout
+services:
+  - id: fly
+    service: fly-io
+    role: hosting
+    added: 2025-10-01
+  - id: postgres
+    service: fly-io-postgres
+    role: database
+    added: 2025-10-01
+  - id: sentry
+    service: sentry
+    role: error-tracking
+    added: 2025-10-05
+dependencies:
+  - [fly, postgres]
+  - from: fly
+    to: sentry
+    notes: "wired up after the first prod incident"

@@ -1,0 +1,9 @@
+# Smallest legal manifest: only project.name and project.slug are required
+# beyond the top-level shape. A freshly-scaffolded `dagstree init` file
+# should look like this before architecture/pm/vcs get filled in.
+dagstree: 1
+project:
+  name: Sluglin
+  slug: sluglin
+services: []
+dependencies: []

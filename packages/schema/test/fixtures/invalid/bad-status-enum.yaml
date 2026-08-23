@@ -1,0 +1,12 @@
+# "on_hold" is not one of active | deprecated | phasing_out | removed.
+dagstree: 1
+project:
+  name: Clapline
+  slug: clapline
+services:
+  - id: vertex
+    service: google-vertex-ai
+    role: ai-models
+    added: 2026-01-15
+    status: on_hold
+dependencies: []

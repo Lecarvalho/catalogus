@@ -1,0 +1,18 @@
+# The same catalog service (supabase) used in two roles in one project,
+# modelled as two entries with distinct local ids (HANDOFF.md section 9,
+# decision 4) rather than one entry with a list of roles.
+dagstree: 1
+project:
+  name: FixPic
+  slug: fixpic
+services:
+  - id: supabase-db
+    service: supabase
+    role: database
+    added: 2025-09-01
+  - id: supabase-auth
+    service: supabase
+    role: auth
+    added: 2025-09-01
+dependencies:
+  - [supabase-auth, supabase-db]

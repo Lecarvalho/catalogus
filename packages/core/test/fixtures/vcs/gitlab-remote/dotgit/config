@@ -1,0 +1,5 @@
+[core]
+	repositoryformatversion = 0
+[remote "origin"]
+	url = https://gitlab.com/example-org/example-repo.git
+	fetch = +refs/heads/*:refs/remotes/origin/*

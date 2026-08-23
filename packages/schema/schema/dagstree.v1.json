@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dagstree.dev/schema/v1.json",
+  "title": "Dagstree manifest v1",
+  "description": "dagstree.yaml (Layer 2 of the Dagstree data model): project metadata and the service DAG for one project. Committed to the repo — safe in a public repo. Anything cost, billing, or account-shaped belongs in the private overlay instead (`dagstree push --private`), and this schema actively rejects it — see the patternProperties deny rule repeated on every object below.",
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[_-][a-z0-9]+)*$",
+      "description": "Lowercase identifier: letters, digits, and single internal - or _ separators. No leading/trailing separators, no doubled separators."
+    },
+    "vcs": {
+      "type": "object",
+      "description": "Source control provider and repo visibility.",
+      "patternProperties": {
+        "(?:[cC][oO][sS][tT]|[pP][rR][iI][cC][eE]|[pP][rR][iI][cC][iI][nN][gG]|[aA][mM][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT][_-]?[iI][dD]|[uU][sS][eE][rR][nN][aA][mM][eE]|[uU][sS][eE][rR]|[eE][mM][aA][iI][lL]|[tT][oO][kK][eE][nN]|[aA][pP][iI][_-]?[kK][eE][yY]|[kK][eE][yY]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][sS]|[bB][iI][lL][lL][iI][nN][gG]|[iI][nN][vV][oO][iI][cC][eE]|[rR][eE][nN][eE][wW][aA][lL]|[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][_-]?[iI][dD]|[pP][aA][yY][mM][eE][nN][tT]|[cC][aA][rR][dD]|[pP][lL][aA][nN][_-]?[tT][iI][eE][rR]|[sS][eE][aA][tT]|[sS][pP][eE][nN][dD])": false
+      },
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "description": "VCS host, e.g. \"github\", \"gitlab\", \"bitbucket\"."
+        },
+        "visibility": {
+          "enum": [
+            "public",
+            "private",
+            "internal"
+          ],
+          "description": "Repo visibility as configured on the VCS host. \"internal\" covers org-visible-only repos (GitHub/GitLab Enterprise)."
+        }
+      },
+      "required": [
+        "provider",
+        "visibility"
+      ],
+      "additionalProperties": false
+    },
+    "project": {
+      "type": "object",
+      "description": "Layer 2 project-level metadata: identity, architecture style, PM method, VCS, and coding agents in use. Everything except name/slug is optional so a freshly-scaffolded manifest is already valid.",
+      "patternProperties": {
+        "(?:[cC][oO][sS][tT]|[pP][rR][iI][cC][eE]|[pP][rR][iI][cC][iI][nN][gG]|[aA][mM][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT][_-]?[iI][dD]|[uU][sS][eE][rR][nN][aA][mM][eE]|[uU][sS][eE][rR]|[eE][mM][aA][iI][lL]|[tT][oO][kK][eE][nN]|[aA][pP][iI][_-]?[kK][eE][yY]|[kK][eE][yY]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][sS]|[bB][iI][lL][lL][iI][nN][gG]|[iI][nN][vV][oO][iI][cC][eE]|[rR][eE][nN][eE][wW][aA][lL]|[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][_-]?[iI][dD]|[pP][aA][yY][mM][eE][nN][tT]|[cC][aA][rR][dD]|[pP][lL][aA][nN][_-]?[tT][iI][eE][rR]|[sS][eE][aA][tT]|[sS][pP][eE][nN][dD])": false
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable project name, e.g. \"Clapline\"."
+        },
+        "slug": {
+          "$ref": "#/$defs/slug",
+          "description": "Machine identifier for the project."
+        },
+        "architecture": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Architecture style in free text, e.g. \"modular monolith (.NET 10, vertical slices)\"."
+        },
+        "pm": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Project management methodology in free text, e.g. \"Trello kanban (PAUTA agent sync)\"."
+        },
+        "vcs": {
+          "$ref": "#/$defs/vcs",
+          "description": "Source control provider and repo visibility."
+        },
+        "coding_agents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Coding agents used on this project, e.g. \"claude-code\", \"pauta\"."
+        }
+      },
+      "required": [
+        "name",
+        "slug"
+      ],
+      "additionalProperties": false
+    },
+    "serviceEntry": {
+      "type": "object",
+      "description": "One service instance inside this project's DAG (a node). The same catalog service can appear more than once under different roles/ids — e.g. supabase-db and supabase-auth both service: supabase.",
+      "patternProperties": {
+        "(?:[cC][oO][sS][tT]|[pP][rR][iI][cC][eE]|[pP][rR][iI][cC][iI][nN][gG]|[aA][mM][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT][_-]?[iI][dD]|[uU][sS][eE][rR][nN][aA][mM][eE]|[uU][sS][eE][rR]|[eE][mM][aA][iI][lL]|[tT][oO][kK][eE][nN]|[aA][pP][iI][_-]?[kK][eE][yY]|[kK][eE][yY]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][sS]|[bB][iI][lL][lL][iI][nN][gG]|[iI][nN][vV][oO][iI][cC][eE]|[rR][eE][nN][eE][wW][aA][lL]|[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][_-]?[iI][dD]|[pP][aA][yY][mM][eE][nN][tT]|[cC][aA][rR][dD]|[pP][lL][aA][nN][_-]?[tT][iI][eE][rR]|[sS][eE][aA][tT]|[sS][pP][eE][nN][dD])": false
+      },
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug",
+          "description": "Local identifier for this service instance, unique within the file. Referenced by dependencies[] and by other entries' replaced_by."
+        },
+        "service": {
+          "$ref": "#/$defs/slug",
+          "description": "Slug into the global Dagstree service catalog, e.g. \"supabase\", \"fly-io\". Not the same namespace as @specfy/stack-analyser's slugs — the CLI maps between them."
+        },
+        "role": {
+          "$ref": "#/$defs/slug",
+          "description": "The role this instance plays in the project, e.g. \"database\", \"auth\", \"hosting\"."
+        },
+        "added": {
+          "type": "string",
+          "format": "date",
+          "description": "Date this dependency was added, ISO 8601 (YYYY-MM-DD)."
+        },
+        "status": {
+          "enum": [
+            "active",
+            "deprecated",
+            "phasing_out",
+            "removed"
+          ],
+          "description": "Lifecycle status of this service instance. Treated as \"active\" when omitted."
+        },
+        "replaced_by": {
+          "$ref": "#/$defs/slug",
+          "description": "Local id of the service instance that replaces this one when phasing out. Must name another entry's id — the schema can't express that; `dagstree validate` checks it."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Free-text annotation. Public information only — never cost, billing, or account details; those belong in the private overlay."
+        }
+      },
+      "required": [
+        "id",
+        "service",
+        "role",
+        "added"
+      ],
+      "additionalProperties": false
+    },
+    "dependencyEdgeTuple": {
+      "type": "array",
+      "description": "Compact edge form: [from, to], both local service ids.",
+      "items": {
+        "$ref": "#/$defs/slug"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "dependencyEdgeObject": {
+      "type": "object",
+      "description": "Annotated edge form, for when an edge needs a note the tuple form has no room for.",
+      "patternProperties": {
+        "(?:[cC][oO][sS][tT]|[pP][rR][iI][cC][eE]|[pP][rR][iI][cC][iI][nN][gG]|[aA][mM][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT][_-]?[iI][dD]|[uU][sS][eE][rR][nN][aA][mM][eE]|[uU][sS][eE][rR]|[eE][mM][aA][iI][lL]|[tT][oO][kK][eE][nN]|[aA][pP][iI][_-]?[kK][eE][yY]|[kK][eE][yY]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][sS]|[bB][iI][lL][lL][iI][nN][gG]|[iI][nN][vV][oO][iI][cC][eE]|[rR][eE][nN][eE][wW][aA][lL]|[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][_-]?[iI][dD]|[pP][aA][yY][mM][eE][nN][tT]|[cC][aA][rR][dD]|[pP][lL][aA][nN][_-]?[tT][iI][eE][rR]|[sS][eE][aA][tT]|[sS][pP][eE][nN][dD])": false
+      },
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/slug",
+          "description": "Local id of the dependent service instance."
+        },
+        "to": {
+          "$ref": "#/$defs/slug",
+          "description": "Local id of the service instance depended on."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Free-text annotation for this edge."
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "dependencyEdge": {
+      "description": "One dependency edge (from -> to) in the project's service DAG. Accepts the compact array form or the object form; acyclicity is checked by `dagstree validate`, not by this schema.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/dependencyEdgeTuple"
+        },
+        {
+          "$ref": "#/$defs/dependencyEdgeObject"
+        }
+      ]
+    }
+  },
+  "type": "object",
+  "patternProperties": {
+    "(?:[cC][oO][sS][tT]|[pP][rR][iI][cC][eE]|[pP][rR][iI][cC][iI][nN][gG]|[aA][mM][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT][_-]?[iI][dD]|[uU][sS][eE][rR][nN][aA][mM][eE]|[uU][sS][eE][rR]|[eE][mM][aA][iI][lL]|[tT][oO][kK][eE][nN]|[aA][pP][iI][_-]?[kK][eE][yY]|[kK][eE][yY]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][sS]|[bB][iI][lL][lL][iI][nN][gG]|[iI][nN][vV][oO][iI][cC][eE]|[rR][eE][nN][eE][wW][aA][lL]|[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][_-]?[iI][dD]|[pP][aA][yY][mM][eE][nN][tT]|[cC][aA][rR][dD]|[pP][lL][aA][nN][_-]?[tT][iI][eE][rR]|[sS][eE][aA][tT]|[sS][pP][eE][nN][dD])": false
+  },
+  "properties": {
+    "dagstree": {
+      "const": 1,
+      "description": "Manifest format version. Always 1 for this schema."
+    },
+    "project": {
+      "$ref": "#/$defs/project",
+      "description": "This project's identity, architecture, PM method, VCS, and coding agents."
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/serviceEntry"
+      },
+      "description": "Every service instance (node) in this project's DAG. Can be empty on a freshly-scaffolded manifest."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dependencyEdge"
+      },
+      "description": "Every dependency edge (from -> to) between the service instances above. Can be empty."
+    }
+  },
+  "required": [
+    "dagstree",
+    "project",
+    "services",
+    "dependencies"
+  ],
+  "additionalProperties": false
+}

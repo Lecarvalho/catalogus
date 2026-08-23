@@ -1,0 +1,10 @@
+# A services[] entry with no "added" date — required alongside id/service/role.
+dagstree: 1
+project:
+  name: Clapline
+  slug: clapline
+services:
+  - id: fly
+    service: fly-io
+    role: hosting
+dependencies: []

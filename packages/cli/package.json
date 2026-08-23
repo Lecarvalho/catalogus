@@ -1,0 +1,39 @@
+{
+  "name": "dagstree",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "dagstree": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dagstree/core": "workspace:*",
+    "@dagstree/schema": "workspace:*",
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1",
+    "prompts": "^2.4.2",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@types/prompts": "^2.4.9",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

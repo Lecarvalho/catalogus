@@ -1,0 +1,7 @@
+{
+  "name": "kitchen-sink",
+  "version": "1.0.0",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.56.1"
+  }
+}

@@ -1,0 +1,12 @@
+# Private-key family: billing. Nested two levels down (project.vcs), with
+# a shouting-case variant (BILLING) to exercise case-insensitive matching.
+dagstree: 1
+project:
+  name: Clapline
+  slug: clapline
+  vcs:
+    provider: github
+    visibility: private
+    BILLING: monthly
+services: []
+dependencies: []

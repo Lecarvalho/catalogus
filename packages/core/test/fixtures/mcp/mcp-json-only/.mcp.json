@@ -1,0 +1,6 @@
+{
+  "mcpServers": {
+    "trello": { "command": "npx", "args": ["trello-mcp"] },
+    "playwright": { "command": "npx", "args": ["playwright-mcp"] }
+  }
+}

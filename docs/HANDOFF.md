@@ -1,0 +1,324 @@
+# DAGSTREE — Project Operations Registry
+## Handoff Document for Claude Code
+
+> **Status:** Concept fully designed, ready for implementation planning.
+> **Owner:** Dsnk
+> **Date:** 2026-08-22
+> **Working name:** Dagstree (DAG + registry; homophone spelling "dagstry" should also be registered and redirected)
+
+---
+
+## 1. What This Is
+
+A **project operations registry**: an app + CLI that catalogs, for every one of the owner's app projects, all the service providers, infrastructure companies, dependencies, and stack/meta information — rendered with brand icons, dependency graphs, and cost visibility.
+
+**The problem it solves:** A solo dev / small agency running many projects (Clapline, Sluglin, FixPic, Lookout, DSPrintWorks3D site, multiple YouTube channel pipelines...) has no single place to answer:
+
+- Which services does project X depend on?
+- Which projects depend on service Y? (impact analysis: "Supabase is down → what's red?")
+- What am I paying, per service and in total, across all projects?
+- Which account/identity do I use to connect to each service? (reference only, never secrets)
+- When was a dependency added? Is it deprecated? What replaces it?
+- What coding agents, source control provider, architecture style, and PM methodology does each project use?
+
+**Why nothing existing works** (validated by research, Aug 2026):
+
+| Tool | What it covers | Why it falls short |
+|---|---|---|
+| StackShare | Public stack listings with icons | Community/public-facing; no cost, no auth refs, no dependency graph, no lifecycle, no meta-tooling |
+| @specfy/stack-analyser | OSS CLI, detects 500–700+ techs from repo files | Detection only; the Specfy SaaS dashboard on top was **archived in 2024** |
+| Backstage / Port / OpsLevel | Service catalogs, ownership, lifecycle, dependency graphs | Enterprise-heavy, painful setup, no pricing/cost layer, wrong audience |
+| Cledara / Torii (SaaS spend) | Subscription cost tracking | Finance-team oriented; not per-project, no stack/dependency model |
+| Renovate / Dependabot | Package staleness | Package-level only; no service/SaaS/institutional-knowledge layer |
+
+**Market note:** there is a plausible indie product here. ICP = solo devs and small agencies juggling 5–15 projects.
+
+---
+
+## 2. Name & Brand
+
+- **Product:** Dagstree — pronounced "DAG-stree". Chosen over `platef` (vague), `gustry` (food connotation), `dagstry` (fails dictation test — homophone loses to self-spelling "tree"), `dagst` (unpronounceable cluster, "1 taken" in domain family).
+- **Why it wins:** self-spelling ("tree" is a real word), semantically exact (registry of dependency graphs), whole TLD family available at time of search (0 taken: .com .ca .net .org .ai .io .xyz .app .online .info .co .store), insider appeal for the dev audience.
+- **Known pedantry:** a DAG is not a tree (nodes can have multiple parents — which is exactly why the data model is a DAG). Accepted; same as Git users saying "commit tree." Lean into the joke if useful.
+- **Logo concept:** a small tree whose branches reconnect — literally a DAG.
+- **CLI binary:** `dagstree`. Optional short alias `dagst` reserved but not primary.
+
+### Action items (do before/alongside dev)
+- [ ] Register `dagstree.com`, `dagstree.ca`, `dagstree.dev` (dev-tool credibility)
+- [ ] Register homophone `dagstry.com` → 301 redirect
+- [ ] Reserve npm package name `dagstree`
+- [ ] Reserve GitHub org `dagstree`
+- [ ] Quick CIPO/USPTO knock-out search, Nice Class 9 + 42 (same drill as CLAPLINE — word mark, coined term)
+
+---
+
+## 3. Three-Layer Data Model
+
+This is the core architectural decision. Every piece of data belongs to exactly one layer, and each layer has a different home and trust model.
+
+### Layer 1 — Auto-detected (machine-owned)
+- **Source:** repo scan (stack-analyser style detection engine).
+- **Examples:** languages, frameworks, SDKs present, `fly.toml` → Fly.io, `supabase/` dir → Supabase, `.mcp.json` → MCP servers in use, `CLAUDE.md` → Claude Code as coding agent, `.github/workflows` → GitHub Actions, lockfiles → package dependencies.
+- **Rules:** regenerated on every scan; never hand-edited; diffs against previous scan drive agent suggestions ("I see you added the Anthropic SDK — add it to the manifest?").
+
+### Layer 2 — Manual but shareable (`stack.yaml`, lives in the repo)
+- **Source:** human- or agent-written, committed to the repo. Safe in a public repo.
+- **Contents:** architecture style (e.g., "modular monolith", "vertical slices + MediatR"), PM methodology (e.g., "Trello kanban via PAUTA agent"), source control provider, coding agents used, service list with `added_at`, lifecycle status, `replaced_by` notes, human annotations.
+- **Rules:** validated against a published JSON Schema (also gives free editor autocomplete via `$schema`). Portable — works even for someone who clones the repo without the platform.
+
+### Layer 3 — Private overlay (platform DB only, per-user, behind auth)
+- **Source:** user or agent via authenticated CLI push. **Never touches the repo.**
+- **Contents:** cost, currency, billing cycle, renewal dates, plan/tier, account reference ("auth via GitHub SSO", "billing account: dsnk@…"), private notes.
+- **Rules:** Supabase with RLS, row ownership per user. Joined to projects/services by ID at render time.
+- **Hard rule — no secrets:** store *references* to identity, never credentials, API keys, or passwords. Those stay in a password manager. Rationale: a file/DB listing every service + cost + how to log in is a high-value target; the registry must never become that.
+
+---
+
+## 4. Domain Model (DAG, service-to-service)
+
+**Decision made:** dependencies are **service-to-service within a project**, not just project-to-service. This is a directed acyclic graph, not a flat list. It's harder than a flat v1 but it's what makes impact analysis and phase-out planning real.
+
+### Entities
+
+```
+users
+  id, ...
+
+projects
+  id, owner_id, name, slug, repo_url, description, created_at
+
+services            -- GLOBAL catalog (see §4.1)
+  id, name, slug, icon_ref, category,        -- category: db|auth|ai|hosting|dns|payments|analytics|storage|ci|agent|pm|vcs|other
+  pricing_model,                              -- free|freemium|subscription|usage|one_time
+  vendor_url, status,                         -- active|deprecated|sunset
+  sunset_date, successor_service_id           -- vendor-level deprecation ("service X is sunsetting")
+
+project_services    -- a service *instance* inside a project (node in the DAG)
+  id, project_id, service_id,
+  role,                                       -- e.g. "db", "auth" (Supabase can appear twice with different roles)
+  added_at, status,                           -- active|deprecated|phasing_out|removed
+  replaced_by_project_service_id,             -- project-level phase-out plan
+  detected | manual,                          -- provenance flag (Layer 1 vs Layer 2)
+  notes
+
+service_dependencies  -- EDGES: who depends on who
+  id, project_id,
+  from_project_service_id, to_project_service_id,
+  added_at, status, replaced_by_edge_id, notes
+  -- constraint: acyclic within project (enforce in app layer / CLI validation)
+
+user_service_accounts -- PRIVATE overlay (RLS: owner only)
+  id, user_id, service_id, project_id (nullable = account spans projects),
+  account_ref,          -- "GitHub SSO", "dsnk@... billing"
+  plan_tier, cost_amount, cost_currency, billing_cycle,   -- monthly|yearly|usage
+  renewal_date, started_at, notes_private
+
+project_meta        -- Layer 2 mirror in DB (synced from stack.yaml)
+  project_id, architecture_style, pm_method, vcs_provider,
+  coding_agents[],    -- ["Claude Code", "PAUTA", "PLACOTEUX", ...]
+  extra jsonb
+```
+
+### 4.1 Global service catalog — key strategic decision
+The `services` table is **global and community-maintainable**, not per-user. This is where long-term value compounds: "Namecheap raised .com renewal prices" or "vendor X announced sunset" is updated once and every user's dashboard reflects it. Per-user catalogs would fragment this. Seed it manually for v1 (the ~30–50 services Dsnk actually uses), open contribution later.
+
+### 4.2 Queries the model must answer (acceptance tests)
+1. All services for project X, grouped by category, with icons.
+2. All projects depending on service Y (direct or transitive) → impact analysis / blast radius.
+3. Total monthly cost across all projects; cost per project; cost per service. (Private layer, owner only.)
+4. All edges/nodes marked `phasing_out`, with their `replaced_by` targets → migration dashboard.
+5. Everything added in the last N days (from `added_at`).
+6. Which projects use coding agent Z / architecture style W / PM method V.
+
+---
+
+## 5. `stack.yaml` — Public Manifest
+
+Lives at repo root. Draft shape (v1 — iterate in implementation):
+
+```yaml
+# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+dagstree: 1
+project:
+  name: Clapline
+  slug: clapline
+  architecture: "modular monolith (.NET 10, vertical slices)"
+  pm: "Trello kanban (PAUTA agent sync)"
+  vcs: { provider: github, visibility: private }
+  coding_agents:
+    - claude-code
+    - pauta
+
+services:
+  - id: supabase-db          # local id, unique within file
+    service: supabase        # slug into global catalog
+    role: database
+    added: 2025-11-02
+  - id: supabase-auth
+    service: supabase
+    role: auth
+    added: 2025-11-02
+  - id: vertex
+    service: google-vertex-ai
+    role: ai-models
+    added: 2026-01-15
+    status: phasing_out
+    replaced_by: anthropic-api
+  - id: anthropic-api
+    service: anthropic
+    role: ai-models
+    added: 2026-06-01
+  - id: fly
+    service: fly-io
+    role: hosting
+    added: 2025-11-02
+  - id: namecheap
+    service: namecheap
+    role: dns
+    added: 2025-11-02
+
+dependencies:              # edges, from → to
+  - [supabase-auth, supabase-db]
+  - [fly, supabase-db]
+  - [fly, anthropic-api]
+```
+
+### Schema guardrail (critical)
+The published JSON Schema **must reject private-looking keys** in this file: `cost`, `price`, `account`, `username`, `token`, `key`, `password`, `billing`, `renewal`, etc. The CLI validation refuses to write them and redirects to the private channel with a clear message. **Rationale:** coding agents are helpful to a fault and will otherwise happily commit billing info to a public repo. Make the safe path the only path — the tool enforces the boundary, not agent discipline.
+
+---
+
+## 6. CLI — `dagstree`
+
+### Commands (v1 surface)
+```
+dagstree init                 # scaffold stack.yaml (interactive or --yes)
+dagstree detect               # scan repo, print detected stack (Layer 1)
+dagstree diff                 # detected vs stack.yaml — what's missing/stale
+dagstree add <service> --role=<r> [--depends-on=<id>...]   # edit stack.yaml
+dagstree validate             # schema + acyclicity check (CI-friendly, exit codes)
+dagstree graph                # ASCII/mermaid render of the project DAG
+dagstree push                 # sync stack.yaml + detection to platform
+dagstree push --private key=value ...   # write to private overlay (authenticated)
+dagstree login                # device flow auth (see below)
+dagstree mcp                  # run as MCP server (stdio)
+```
+
+### Auth design (decided)
+- CLI gets **its own scoped token** via device flow (`gh auth login` pattern: show code, user approves in browser).
+- Token stored in **OS keychain** (Windows Credential Manager / macOS Keychain / libsecret) — **never in any file an agent can read into context**.
+- The agent invokes `dagstree push --private cost=...`; the **CLI holds the credential, the agent never sees it**.
+- Supabase Auth can back this (device-flow-style exchange, or PKCE + local callback as fallback).
+
+### MCP server mode (the agent workflow — this is the differentiator)
+`dagstree mcp` exposes tools so Claude Code (and other agents) can:
+- `detect_stack` → run detection, return structured diff vs manifest
+- `read_manifest` / `propose_manifest_edit` → agent infers Layer 2 facts mid-session ("this repo has CLAUDE.md and .mcp.json → coding_agents: claude-code; MCP servers: X, Y") and proposes edits
+- `push_private` → routes through the CLI's credential; input validated so no secrets are accepted, only the allowed private-overlay fields
+
+Typical loop: during any coding session, the agent runs detect → diff → proposes "I see you added the Anthropic SDK — add it to stack.yaml?" → on approval, edits the manifest → `dagstree push`.
+
+### Detection engine
+- Reference/foundation: **`@specfy/stack-analyser`** (MIT, TypeScript, npm: `@specfy/stack-analyser`, still maintained as of Jan 2026). Detects 500–700+ technologies from `package.json`, `docker-compose.yml`, `go.mod`, lockfiles, config files. Usable via `npx` or programmatically (`analyser({ provider: new FSProvider({...}) })`, `flatten(result)`).
+- Options: (a) depend on it directly and map its output slugs → Dagstree catalog slugs; (b) vendor the rules; (c) reimplement a smaller ruleset. **Recommend (a) for v1** — mapping table `specfy_slug → dagstree_service_slug`.
+- Add Dagstree-specific detectors stack-analyser won't have: `CLAUDE.md` / `.claude/` / `.agents/` → coding agents; `.mcp.json` → MCP servers; `fly.toml`, `vercel.json`, `netlify.toml` → hosting; `.github/` vs `.gitlab-ci.yml` → VCS/CI provider.
+- Known ceiling: domain registrar (Namecheap), PM tool, costs are **not detectable** — that's Layers 2/3 by design.
+
+---
+
+## 7. Platform (backend + viewer)
+
+### Backend
+- **Supabase** (Postgres + RLS + Auth) — matches owner's existing expertise and infrastructure.
+- RLS: `projects`, `project_services`, `service_dependencies`, `project_meta`, `user_service_accounts` owner-scoped. `services` catalog readable by all, writable by admin (later: moderated contributions).
+- API surface: PostgREST is likely enough for v1; add edge functions only where logic demands (e.g., transitive dependency queries, cost rollups — or do those client-side / in SQL views).
+- Useful SQL views: `v_project_costs` (sum private costs per project), `v_service_blast_radius` (recursive CTE over edges), `v_phaseouts`.
+
+### Viewer (web app)
+- Per-project page: DAG of service nodes with **brand icons**, edges, status colors (active / phasing_out red-amber / deprecated).
+- Portfolio page: all projects, cost totals (private layer), service usage matrix ("which projects touch Vertex").
+- Migration dashboard: everything `phasing_out` + `replaced_by` targets.
+- **Graph layout:** `dagre` or `elkjs` (both handle DAG layout; elkjs better for larger graphs). Render with React Flow or plain SVG.
+- **Icons:** `simple-icons` (3,000+ brand SVGs, free, slug-addressable) as primary source; fallback generic category icons for services not in the set. Store `icon_ref` in catalog as simple-icons slug or URL.
+- Stack choice open: owner is .NET-native but the detection engine is TS. Pragmatic split: **CLI + detection in TypeScript/Node** (reuses stack-analyser, npm distribution, MCP SDK availability), **viewer as web app** (React), backend Supabase. A .NET CLI wrapper is possible later but adds no v1 value.
+
+---
+
+## 8. Scope Cut
+
+### v1 (ship this)
+1. `stack.yaml` schema v1 + published JSON Schema (with private-key rejection).
+2. CLI: `init`, `detect` (via stack-analyser + custom detectors), `diff`, `validate`, `graph` (mermaid output), `login`, `push`.
+3. Supabase schema + RLS as in §4.
+4. Seeded global catalog (~40 services Dsnk actually uses, with simple-icons refs, pricing_model, category).
+5. Viewer: project list, per-project DAG with icons, private-overlay panel (cost/account ref) for logged-in owner.
+6. MCP server mode with `detect_stack`, `read_manifest`, `propose_manifest_edit`.
+
+### v1.5
+- `push --private`, cost rollups, renewal-date reminders.
+- Migration dashboard (phase-out view).
+- Cross-project blast radius view.
+
+### v2 / later
+- Community catalog contributions + moderation.
+- Vendor sunset feed (catalog-level `status`/`sunset_date` updates).
+- GitHub Action (`dagstree validate` + `push` in CI).
+- Multi-user / team sharing.
+- Public profile pages (opt-in, Layer 1+2 only — never Layer 3).
+
+### Explicit non-goals
+- Storing secrets/credentials. Ever.
+- Uptime monitoring (IncidentHub et al. exist; maybe integrate later, don't build).
+- Package-level dependency management (Renovate's job).
+
+---
+
+## 9. Open Decisions (make these early in implementation)
+
+1. **Catalog slug taxonomy** — adopt specfy's slugs wholesale vs own namespace with mapping table. (Leaning: own slugs + mapping.)
+2. **Acyclicity enforcement point** — CLI validate only, or also DB trigger? (Leaning: CLI + app layer; DB trigger later.)
+3. **`stack.yaml` vs `dagstree.yaml`** filename. (`stack.yaml` is generic/collision-prone; `dagstree.yaml` is unambiguous and brand-reinforcing. Leaning: `dagstree.yaml`, accept `stack.yaml` as fallback read.)
+4. **Same service, multiple roles**: modeled as two `project_services` rows (supabase-db, supabase-auth) — confirm this holds up in UI grouping.
+5. **Monorepo handling**: one `dagstree.yaml` at root with per-app sections, or one per app dir? (Punt to v1.5 unless it bites immediately.)
+6. **Auth provider for the platform itself**: Supabase Auth with GitHub OAuth is the obvious fit for the audience.
+
+---
+
+## 10. Suggested First Claude Code Session
+
+1. `npm create` a monorepo (pnpm workspaces): `packages/cli`, `packages/schema`, `apps/web`, `supabase/`.
+2. Write the JSON Schema for `dagstree.yaml` v1 **first** (it's the contract everything else consumes) — include the private-key rejection patterns and acyclicity note.
+3. Spike: run `@specfy/stack-analyser` programmatically against 2–3 real repos (Clapline, Sluglin), inspect `flatten(result)` output, draft the slug mapping table from real data.
+4. Implement `dagstree detect` + `dagstree validate` + `dagstree graph --mermaid`.
+5. Supabase migration files for §4 schema + RLS policies.
+6. Then MCP mode, then viewer.
+
+Recommended model split (per owner's established practice): Sonnet for ~80% of implementation, frontier model for the schema design and RLS policy review.
+
+---
+
+## Appendix A — Metadata fields the product must support (original requirements checklist)
+
+- [x] Pricing model of each dependency (Free / Subscription / Usage) → `services.pricing_model`
+- [x] How much I pay → `user_service_accounts.cost_*` (private)
+- [x] Username/identity used to connect → `user_service_accounts.account_ref` (private, reference only, never secrets)
+- [x] Who depends on who (service-to-service) → `service_dependencies` edges (DAG)
+- [x] When the dependency was added → `project_services.added_at` / `added` in yaml
+- [x] Deprecated / phasing out / replaced by what → `status` + `replaced_by_*` at node, edge, and vendor level
+- [x] Coding agents used → `project_meta.coding_agents` (+ auto-detect via CLAUDE.md/.agents/)
+- [x] Source control + provider → `project_meta.vcs_provider` (+ auto-detect)
+- [x] Architecture style → `project_meta.architecture_style` (manual, Layer 2)
+- [x] PM methodology → `project_meta.pm_method` (manual, Layer 2)
+- [x] Brand icons per service → `services.icon_ref` (simple-icons)
+- [x] Multi-project portfolio view → portfolio page + cross-project queries
+- [x] Easy out-of-the-box / CLI setup → `dagstree init` + agent-assisted population via MCP
+
+## Appendix B — Provenance rules (agent trust model)
+
+| Layer | Written by | Validated by | Lives in | Visible to |
+|---|---|---|---|---|
+| 1 Auto-detected | CLI scanner | detection rules | scan output / DB cache | anyone with repo access |
+| 2 Manifest | human or agent (approved) | JSON Schema (rejects private keys) | repo (`dagstree.yaml`) | anyone with repo access |
+| 3 Private overlay | human or agent via authed CLI | field allow-list, no secrets | Supabase (RLS) | owner only |
+
+Credential rule: CLI token in OS keychain via device flow; agents invoke commands but never read the credential.

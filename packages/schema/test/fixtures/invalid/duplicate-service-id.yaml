@@ -1,0 +1,16 @@
+# Two entries share the local id "fly" — not expressible in JSON Schema,
+# checked as referential integrity by validateManifest().
+dagstree: 1
+project:
+  name: Clapline
+  slug: clapline
+services:
+  - id: fly
+    service: fly-io
+    role: hosting
+    added: 2025-11-02
+  - id: fly
+    service: fly-io
+    role: dns
+    added: 2025-11-03
+dependencies: []

@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "trello": { "command": "npx", "args": ["trello-mcp"] }
+  }
+}
