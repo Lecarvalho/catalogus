@@ -10,6 +10,8 @@
     "build": "pnpm -r run build",
     "test": "vitest run",
     "typecheck": "pnpm -r run typecheck",
+    "link:cli": "node scripts/link-cli.mjs",
+    "unlink:cli": "node scripts/link-cli.mjs --remove",
     "dev": "pnpm -r --parallel run dev"
   },
   "devDependencies": {
