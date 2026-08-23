@@ -6,15 +6,19 @@
 // directly from cli.test.ts, driven by argv rather than a spawned process,
 // which is what makes commander's own error/help paths -- not just the
 // command functions -- testable at all.
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 import { Command, CommanderError } from "commander";
 
 import { resolveAddPathArg, runAdd } from "./commands/add.js";
+import { runDeprecate } from "./commands/deprecate.js";
 import { runDetect } from "./commands/detect.js";
 import { runDiff } from "./commands/diff.js";
 import { runGraph } from "./commands/graph.js";
 import { runInit } from "./commands/init.js";
+import { runLink } from "./commands/link.js";
+import { runSet, SETTABLE_FIELDS } from "./commands/set.js";
 import { runValidate } from "./commands/validate.js";
 import { looksLikePrivateFlagName, privateFlagRefusalMessage } from "./private-guard.js";
 import type { CommandResult } from "./types.js";
@@ -37,12 +41,22 @@ function emit(result: CommandResult): void {
  * calls (as tests do, repeatedly) would leak one call's flags into the
  * next.
  */
+// Read the version from package.json rather than repeating it here. A
+// hardcoded copy had already drifted -- `--version` reported 0.1.0 while the
+// package said 0.0.1 -- and a CLI that misreports its own version undermines
+// every bug report filed against it.
+function packageVersion(): string {
+  const require = createRequire(import.meta.url);
+  const pkg = require("../package.json") as { version?: string };
+  return pkg.version ?? "0.0.0";
+}
+
 function createProgram(): Command {
   const program = new Command();
   program
     .name("dagstree")
     .description("Dagstree -- a project operations registry (offline commands)")
-    .version("0.1.0")
+    .version(packageVersion())
     .exitOverride()
     .configureOutput({
       // Commander writes every one of its own error/usage messages (a bare
@@ -166,6 +180,42 @@ function createProgram(): Command {
             notes: opts.notes,
           })
         );
+      }
+    );
+
+  program
+    .command("set")
+    .description("set a project-level manifest field")
+    .argument("<field>", `one of: ${SETTABLE_FIELDS.join(", ")}`)
+    .argument("<value>", "the value; for coding_agents, a comma-separated list")
+    .argument("[pairs...]", "further <field> <value> pairs, applied as one edit")
+    // Positional [path] is impossible here: the pair list is variadic, so a
+    // trailing directory would be read as a field name. See commands/set.ts.
+    .option("--path <path>", "target directory (defaults to the current directory)")
+    .action(async (field: string, value: string, pairs: string[], opts: { path?: string }) => {
+      emit(await runSet(opts.path, [field, value, ...pairs]));
+    });
+
+  program
+    .command("link")
+    .description("add a dependency edge between two services that already exist")
+    .argument("<from>", "local id that depends on <to>")
+    .argument("<to>", "local id that <from> depends on")
+    .argument("[path]", "target directory (defaults to the current directory)")
+    .action(async (from: string, to: string, path: string | undefined) => {
+      emit(await runLink(path, from, to));
+    });
+
+  program
+    .command("deprecate")
+    .description("mark a service entry deprecated or phasing out")
+    .argument("<id>", "local id of the entry to mark")
+    .argument("[path]", "target directory (defaults to the current directory)")
+    .option("--status <status>", "deprecated | phasing_out (default: deprecated)")
+    .option("--replaced-by <id>", "local id of the entry that replaces this one")
+    .action(
+      async (id: string, path: string | undefined, opts: { status?: string; replacedBy?: string }) => {
+        emit(await runDeprecate(path, id, { status: opts.status, replacedBy: opts.replacedBy }));
       }
     );
 

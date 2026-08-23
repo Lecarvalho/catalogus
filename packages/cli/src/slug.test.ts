@@ -54,4 +54,19 @@ describe("deriveLocalId", () => {
     const existing = new Set(["supabase", "supabase-auth", "supabase-auth-2", "supabase-auth-3"]);
     expect(deriveLocalId("supabase", "auth", existing)).toBe("supabase-auth-4");
   });
+
+  // Which *ids* are taken is a different question from which *services* the
+  // manifest already names. A manifest holding supabase under the explicit id
+  // "supabase-db" leaves the bare id free -- and taking it would put
+  // "supabase" beside "supabase-db", legal but reading as though they were
+  // different kinds of thing.
+  it("qualifies by role when the service already appears, even though the bare id is free", () => {
+    expect(deriveLocalId("supabase", "auth", new Set(["supabase-db"]), new Set(["supabase"]))).toBe(
+      "supabase-auth"
+    );
+  });
+
+  it("still uses the bare slug for a service the manifest does not name yet", () => {
+    expect(deriveLocalId("fly-io", "hosting", new Set(["supabase-db"]), new Set(["supabase"]))).toBe("fly-io");
+  });
 });

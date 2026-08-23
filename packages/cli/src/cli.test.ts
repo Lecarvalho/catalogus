@@ -163,4 +163,85 @@ describe("runCli", () => {
       }
     });
   });
+
+  // set/link/deprecate are the three writers added so the CLI, rather than a
+  // hand edit, owns every Layer 2 field. Their argument shapes differ from
+  // each other on purpose -- set's pair list is variadic, so it takes --path
+  // where link and deprecate take a positional [path] -- and that is exactly
+  // the kind of wiring a direct call to the command function cannot check.
+  describe("the manifest-writing commands, driven through argv", () => {
+    const SCAFFOLD = ["dagstree: 1", "project:", "  name: X", "  slug: x", "services: []", "dependencies: []", ""].join(
+      "\n"
+    );
+
+    it("set takes repeated <field> <value> pairs and --path", async () => {
+      spyOnStreams();
+      const dir = await createTempDir();
+      try {
+        await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+
+        const exitCode = await runCli([
+          "set",
+          "project.vcs.provider",
+          "github",
+          "project.vcs.visibility",
+          "private",
+          "--path",
+          dir,
+        ]);
+
+        expect(exitCode).toBe(0);
+        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        expect(text).toContain("provider: github");
+        expect(text).toContain("visibility: private");
+      } finally {
+        await removeTempDir(dir);
+      }
+    });
+
+    it("link takes <from> <to> and a positional [path]", async () => {
+      spyOnStreams();
+      const dir = await createTempDir();
+      try {
+        await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+        await runCli(["add", "fly-io", dir, "--role", "hosting"]);
+        await runCli(["add", "supabase", dir, "--role", "database"]);
+
+        const exitCode = await runCli(["link", "fly-io", "supabase", dir]);
+
+        expect(exitCode).toBe(0);
+        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        expect(text).toContain("[fly-io, supabase]");
+      } finally {
+        await removeTempDir(dir);
+      }
+    });
+
+    it("deprecate takes <id>, a positional [path], --status and --replaced-by", async () => {
+      spyOnStreams();
+      const dir = await createTempDir();
+      try {
+        await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+        await runCli(["add", "heroku", dir, "--role", "hosting"]);
+        await runCli(["add", "fly-io", dir, "--role", "hosting"]);
+
+        const exitCode = await runCli([
+          "deprecate",
+          "heroku",
+          dir,
+          "--status",
+          "phasing_out",
+          "--replaced-by",
+          "fly-io",
+        ]);
+
+        expect(exitCode).toBe(0);
+        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        expect(text).toContain("status: phasing_out");
+        expect(text).toContain("replaced_by: fly-io");
+      } finally {
+        await removeTempDir(dir);
+      }
+    });
+  });
 });

@@ -51,17 +51,28 @@ describe("runAdd", () => {
     expect(text).toContain("service: fly-io");
   });
 
-  it("derives the bare service slug as the id when it's free", async () => {
-    const result = await runAdd(dir, "supabase", { role: "auth" });
+  it("derives the bare service slug as the id for a service the manifest doesn't have yet", async () => {
+    const result = await runAdd(dir, "fly-io", { role: "hosting" });
     expect(result.exitCode).toBe(0);
-    expect(result.stdout.join("\n")).toContain('"supabase"');
+    expect(result.stdout.join("\n")).toContain('"fly-io"');
   });
 
-  it("falls back to service-role when the bare slug id is already taken", async () => {
-    await runAdd(dir, "supabase", { role: "storage" }); // takes the bare id "supabase"
+  // The fixture already holds supabase, under the explicit id "supabase-db".
+  // The bare id "supabase" is therefore free -- and taking it would leave
+  // "supabase" sitting beside "supabase-db", legal but reading as though the
+  // two were different kinds of thing. Once a service is present, the
+  // role-qualified id is the right default.
+  it("derives service-role once that service already appears, even when the bare id is free", async () => {
     const result = await runAdd(dir, "supabase", { role: "auth" });
     expect(result.exitCode).toBe(0);
     expect(result.stdout.join("\n")).toContain('"supabase-auth"');
+  });
+
+  it("falls back to service-role-2 when the role-qualified id is also taken", async () => {
+    await runAdd(dir, "supabase", { role: "auth" }); // takes "supabase-auth"
+    const result = await runAdd(dir, "supabase", { role: "auth" });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.join("\n")).toContain('"supabase-auth-2"');
   });
 
   it("refuses a duplicate id and writes nothing", async () => {
