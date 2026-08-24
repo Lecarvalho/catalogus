@@ -14,7 +14,7 @@
 // pure parsing, kept out of this file and out of `window` the same way
 // group-services.ts is kept out of the render tree).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ViewPayload } from "dagstree";
+import type { ViewPayload } from "@catalogus/cli";
 
 import styles from "./App.module.css";
 import { EdgesList } from "./components/EdgesList.js";
@@ -32,7 +32,7 @@ type LoadState = { kind: "loading" } | { kind: "error"; message: string } | { ki
  * and a plain id -> label lookup for rendering an edge endpoint or a
  * replaced_by target -- falls back to the bare id for a dangling reference,
  * which should never happen against a manifest that already passed
- * `dagstree validate`'s referential-integrity check, but a rendering bug
+ * `catalogus validate`'s referential-integrity check, but a rendering bug
  * must degrade to the id rather than crash the page.
  */
 function deriveEdgeMaps(payload: ViewPayload) {

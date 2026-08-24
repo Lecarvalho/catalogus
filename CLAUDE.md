@@ -1,6 +1,6 @@
-# Dagstree
+# Catalogus
 
-Dagstree is a project operations registry: an app + CLI that catalogs, for each of the owner's
+Catalogus is a project operations registry: an app + CLI that catalogs, for each of the owner's
 projects, its service providers, infrastructure, dependencies and stack metadata, rendered with
 brand icons, dependency graphs and cost visibility.
 
@@ -16,15 +16,15 @@ complete — check a box only when the work is verified, not merely written.
 
 pnpm workspace monorepo, ESM throughout, TypeScript strict.
 
-- `packages/schema` (`@dagstree/schema`) — the JSON Schema for `dagstree.yaml` and its validator.
-- `packages/core` (`@dagstree/core`) — the detection engine, built on `@specfy/stack-analyser`.
-- `packages/cli` (`dagstree`) — the offline CLI: `init`, `detect`, `diff`, `add`, `set`, `link`,
-  `deprecate`, `remove`, `rename`, `validate`, `graph`. Depends on `@dagstree/schema` and
-  `@dagstree/core`. Every command that writes goes through `src/manifest-edit.ts`, which edits the
+- `packages/schema` (`@catalogus/schema`) — the JSON Schema for `catalogus.yaml` and its validator.
+- `packages/core` (`@catalogus/core`) — the detection engine, built on `@specfy/stack-analyser`.
+- `packages/cli` (`@catalogus/cli`) — the offline CLI: `init`, `detect`, `diff`, `add`, `set`, `link`,
+  `deprecate`, `remove`, `rename`, `validate`, `graph`. Depends on `@catalogus/schema` and
+  `@catalogus/core`. Every command that writes goes through `src/manifest-edit.ts`, which edits the
   parsed YAML Document (comments and the `$schema` modeline survive) and refuses to write anything
   that would fail `validate`. The CLI is the only writer: there is no supported hand-edit path.
-- `skills/dagstree` — the agent skill, a shipped artifact installed into client repos by copying
-  `SKILL.md` to `.claude/skills/dagstree/SKILL.md`. It treats the CLI as a hard prerequisite and
+- `skills/catalogus` — the agent skill, a shipped artifact installed into client repos by copying
+  `SKILL.md` to `.claude/skills/catalogus/SKILL.md`. It treats the CLI as a hard prerequisite and
   documents the manifest format, so it changes in the same commit as the schema. A drift test
   (`packages/schema/src/skill-drift.test.ts`) enforces that. See `skills/README.md`.
 - `examples/` — reference manifests the skill's output is checked against. Deliberately synthetic:
@@ -105,17 +105,17 @@ Two corollaries, both learned the same way:
   which is a provider-shaped guess standing in for a visibility-shaped one. Prefer a
   provider-agnostic question over a provider-specific inference.
 - **An absent field reads as "not answered yet"; a filled one reads as an answer.** When the CLI
-  cannot know, omitting the field and printing the `dagstree set ...` line that fills it is the
+  cannot know, omitting the field and printing the `catalogus set ...` line that fills it is the
   correct behaviour, not a degraded one.
 
-The same rule governs the agent skill: `skills/dagstree/SKILL.md` tells the agent to ask rather than
-infer, and `dagstree detect` reports what it cannot identify instead of naming it.
+The same rule governs the agent skill: `skills/catalogus/SKILL.md` tells the agent to ask rather than
+infer, and `catalogus detect` reports what it cannot identify instead of naming it.
 
 ## Hard rule: no secrets, ever
 
-Dagstree must never store secrets, credentials, API keys or passwords anywhere. `dagstree.yaml`
+Catalogus must never store secrets, credentials, API keys or passwords anywhere. `catalogus.yaml`
 (Layer 2) is committed to the repo and must stay safe in a public repo — the schema rejects
 private-looking keys (`cost`, `price`, `account`, `token`, `key`, `password`, `billing`,
 `renewal`, etc.) on write. Cost and account-reference data (Layer 3) exists only in a private
 backend overlay, never in this repo, never in any file an agent writes. When in doubt, leave the
-field out of `dagstree.yaml` and route it to the private channel instead.
+field out of `catalogus.yaml` and route it to the private channel instead.

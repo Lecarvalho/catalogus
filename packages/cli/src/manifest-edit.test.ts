@@ -27,8 +27,8 @@ const WRITERS: Array<{ name: string; run: (dir: string) => Promise<CommandResult
   { name: "remove", run: (dir) => runRemove(dir, "svc-a") },
 ];
 
-const HEALTHY = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+const HEALTHY = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -46,8 +46,8 @@ dependencies: []
 
 // svc-a is declared first and touches neither edge, so a command aimed at it
 // is unambiguously innocent of the cycle between svc-b and svc-c.
-const PREEXISTING_CYCLE = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+const PREEXISTING_CYCLE = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -72,7 +72,7 @@ dependencies:
 // The same cycle, plus a half-built second one: svc-a -> svc-d is here
 // already, so one added edge back the other way closes a fresh loop while
 // the svc-b/svc-c loop stays exactly as it was.
-const MIXED_CYCLES = `dagstree: 1
+const MIXED_CYCLES = `catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -104,7 +104,7 @@ describe("openManifestForEdit -- an explicit path never falls through to an ance
 
   beforeEach(async () => {
     dir = await createTempDir();
-    await writeFixtureFile(dir, "dagstree.yaml", HEALTHY);
+    await writeFixtureFile(dir, "catalogus.yaml", HEALTHY);
     await mkdir(join(dir, "sub"), { recursive: true });
   });
 
@@ -114,20 +114,20 @@ describe("openManifestForEdit -- an explicit path never falls through to an ance
 
   for (const writer of WRITERS) {
     it(`${writer.name} refuses an existing subdirectory that holds no manifest, leaving the ancestor's untouched`, async () => {
-      const before = await readFile(join(dir, "dagstree.yaml"), "utf8");
+      const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
 
       const result = await writer.run(join(dir, "sub"));
 
       expect(result.exitCode).toBe(2);
       const stderr = result.stderr.join(" ");
-      expect(stderr).toContain("No dagstree.yaml in");
+      expect(stderr).toContain("No catalogus.yaml in");
       expect(stderr).toContain(join(dir, "sub"));
       // Naming the manifest that does exist is the half that makes the error
       // actionable -- without it the message says a typo'd path is empty and
       // leaves the user to guess that the parent is what they meant.
-      expect(stderr).toContain(join(dir, "dagstree.yaml"));
+      expect(stderr).toContain(join(dir, "catalogus.yaml"));
 
-      expect(await readFile(join(dir, "dagstree.yaml"), "utf8")).toBe(before);
+      expect(await readFile(join(dir, "catalogus.yaml"), "utf8")).toBe(before);
     });
   }
 
@@ -139,8 +139,8 @@ describe("openManifestForEdit -- an explicit path never falls through to an ance
 
       expect(result.exitCode).toBe(2);
       const stderr = result.stderr.join(" ");
-      expect(stderr).toContain("No dagstree.yaml in");
-      expect(stderr).toContain('Run "dagstree init" to create one.');
+      expect(stderr).toContain("No catalogus.yaml in");
+      expect(stderr).toContain('Run "catalogus init" to create one.');
       // The ancestor sentence is the wrong advice when there is no ancestor.
       expect(stderr).not.toContain("was named explicitly");
     } finally {
@@ -153,7 +153,7 @@ describe("openManifestForEdit -- an explicit path never falls through to an ance
     expect(result.exitCode).toBe(0);
   });
 
-  // The check asks "is there a manifest here", not "is there a dagstree.yaml
+  // The check asks "is there a manifest here", not "is there a catalogus.yaml
   // here" -- reading stack.yaml is still supported, so a repo on the old
   // filename must not be locked out of every writer by this fix.
   it("accepts an explicit path to a directory holding only the stack.yaml fallback", async () => {
@@ -162,7 +162,7 @@ describe("openManifestForEdit -- an explicit path never falls through to an ance
       await writeFixtureFile(fallbackDir, "stack.yaml", HEALTHY);
       const result = await runRemove(fallbackDir, "svc-a");
       expect(result.exitCode).toBe(0);
-      expect(result.stdout.join(" ")).toContain("dagstree.yaml");
+      expect(result.stdout.join(" ")).toContain("catalogus.yaml");
     } finally {
       await removeTempDir(fallbackDir);
     }
@@ -174,7 +174,7 @@ describe("commitManifestEdit -- a pre-existing cycle is not blamed on the curren
 
   beforeEach(async () => {
     dir = await createTempDir();
-    await writeFixtureFile(dir, "dagstree.yaml", PREEXISTING_CYCLE);
+    await writeFixtureFile(dir, "catalogus.yaml", PREEXISTING_CYCLE);
   });
 
   afterEach(async () => {
@@ -183,7 +183,7 @@ describe("commitManifestEdit -- a pre-existing cycle is not blamed on the curren
 
   for (const writer of WRITERS) {
     it(`${writer.name} reports the cycle against the file, not against itself`, async () => {
-      const before = await readFile(join(dir, "dagstree.yaml"), "utf8");
+      const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
 
       const result = await writer.run(join(dir, "."));
 
@@ -195,7 +195,7 @@ describe("commitManifestEdit -- a pre-existing cycle is not blamed on the curren
       expect(stderr).not.toContain("would make");
       expect(stderr).toContain("Nothing was written.");
 
-      expect(await readFile(join(dir, "dagstree.yaml"), "utf8")).toBe(before);
+      expect(await readFile(join(dir, "catalogus.yaml"), "utf8")).toBe(before);
     });
   }
 
@@ -222,7 +222,7 @@ describe("commitManifestEdit -- a pre-existing cycle is not blamed on the curren
   it("blames a cycle the edit actually created, even on a file that already had one", async () => {
     const mixedDir = await createTempDir();
     try {
-      await writeFixtureFile(mixedDir, "dagstree.yaml", MIXED_CYCLES);
+      await writeFixtureFile(mixedDir, "catalogus.yaml", MIXED_CYCLES);
 
       const result = await runLink(mixedDir, "svc-d", "svc-a");
 
@@ -239,7 +239,7 @@ describe("commitManifestEdit -- a pre-existing cycle is not blamed on the curren
   it("blames a cycle the edit created on a previously healthy file", async () => {
     const healthyDir = await createTempDir();
     try {
-      await writeFixtureFile(healthyDir, "dagstree.yaml", HEALTHY);
+      await writeFixtureFile(healthyDir, "catalogus.yaml", HEALTHY);
       expect((await runLink(healthyDir, "svc-a", "svc-b")).exitCode).toBe(0);
 
       const result = await runLink(healthyDir, "svc-b", "svc-a");

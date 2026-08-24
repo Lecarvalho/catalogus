@@ -429,7 +429,7 @@ describe("false positives -- ordinary technical prose must stay completely clean
     // supposed to fix. The current exclusion drops one empty leading and
     // one empty trailing segment before testing anything.
     ["a long source path with a trailing slash", "entrypoint at src/components/dashboard/ServiceGraphContainer/"],
-    ["an absolute path (leading slash produces an empty first segment)", "source lives at /Users/Leandro/Repos/dagstree/packages"],
+    ["an absolute path (leading slash produces an empty first segment)", "source lives at /Users/Leandro/Repos/catalogus/packages"],
     // A single digit-bearing segment ("V2") must not disqualify the whole
     // token -- attempt 1's "every piece purely alphabetic" test failed the
     // instant any segment carried a digit, which is exactly backwards from
@@ -549,7 +549,7 @@ describe("soft-hit messages are a nudge, not an accusation, and mention --strict
 describe("scanManifestForPrivateValues -- generic recursive walk", () => {
   it("catches a hard hit buried inside a dependency-edge object, not only at the top level", () => {
     const { hard } = scanManifestForPrivateValues({
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [
         { id: "a", service: "b", role: "c", added: "2025-01-01" },
@@ -562,7 +562,7 @@ describe("scanManifestForPrivateValues -- generic recursive walk", () => {
 
   it("catches a hit buried inside a coding_agents array entry", () => {
     const { hard } = scanManifestForPrivateValues({
-      dagstree: 1,
+      catalogus: 1,
       project: {
         name: "x",
         slug: "x",
@@ -576,7 +576,7 @@ describe("scanManifestForPrivateValues -- generic recursive walk", () => {
 
   it("catches a soft hit buried inside a services[] entry", () => {
     const { soft } = scanManifestForPrivateValues({
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [{ id: "a", service: "b", role: "c", added: "2025-01-01", notes: "billing is handled elsewhere" }],
       dependencies: [],
@@ -596,7 +596,7 @@ describe("scanManifestForPrivateValues -- generic recursive walk", () => {
   });
 
   it("returns no findings for a document with no string values at all", () => {
-    expect(scanManifestForPrivateValues({ dagstree: 1, count: 3, nested: { flag: true, list: [1, 2, 3] } })).toEqual({
+    expect(scanManifestForPrivateValues({ catalogus: 1, count: 3, nested: { flag: true, list: [1, 2, 3] } })).toEqual({
       hard: [],
       soft: [],
     });

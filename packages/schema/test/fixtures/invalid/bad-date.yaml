@@ -1,6 +1,6 @@
 # "added" must be a real ISO 8601 date; 2025-13-40 has an invalid month and
 # day.
-dagstree: 1
+catalogus: 1
 project:
   name: Clapline
   slug: clapline

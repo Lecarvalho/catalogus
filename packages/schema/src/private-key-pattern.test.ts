@@ -44,9 +44,9 @@ describe("looksLikePrivateKey", () => {
     }
   });
 
-  it("does not flag every real dagstree.yaml property name", () => {
+  it("does not flag every real catalogus.yaml property name", () => {
     const legitimateNames = [
-      "dagstree",
+      "catalogus",
       "project",
       "name",
       "slug",

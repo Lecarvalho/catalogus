@@ -1,4 +1,4 @@
-// Dagstree-specific hosting detector (HANDOFF.md §6). stack-analyser's own
+// Catalogus-specific hosting detector (HANDOFF.md §6). stack-analyser's own
 // rules already catch the exact filenames fly.toml/netlify.toml/vercel.json
 // (see docs/detection-spike.md), but its fly.toml rule is an exact-name
 // match — it does not catch fly.web.toml/fly.grafana.toml/fly.loki.toml,

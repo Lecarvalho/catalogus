@@ -1,18 +1,18 @@
 // Manifest resolution and raw file I/O. HANDOFF.md's cross-cutting rules:
-// look for dagstree.yaml, fall back to stack.yaml when reading, always
-// write dagstree.yaml; walk up from the current directory to find it, the
+// look for catalogus.yaml, fall back to stack.yaml when reading, always
+// write catalogus.yaml; walk up from the current directory to find it, the
 // way git finds its root; a clear error when no manifest exists, naming the
 // command that creates one.
 import { access, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { MANIFEST_FILENAME, MANIFEST_FILENAME_FALLBACK } from "@dagstree/schema";
+import { MANIFEST_FILENAME, MANIFEST_FILENAME_FALLBACK } from "@catalogus/schema";
 
 export class ManifestNotFoundError extends Error {
   constructor(startPath: string) {
     super(
       `No ${MANIFEST_FILENAME} (or ${MANIFEST_FILENAME_FALLBACK}) found in "${startPath}" or any parent directory. ` +
-        'Run "dagstree init" to create one.'
+        'Run "catalogus init" to create one.'
     );
     this.name = "ManifestNotFoundError";
   }
@@ -23,7 +23,7 @@ export interface ManifestLocation {
   dir: string;
   /** Absolute path to the manifest file that was actually found. */
   filePath: string;
-  /** Which filename was found -- dagstree.yaml, or the stack.yaml fallback. */
+  /** Which filename was found -- catalogus.yaml, or the stack.yaml fallback. */
   filename: string;
 }
 
@@ -42,7 +42,7 @@ async function fileExists(path: string): Promise<boolean> {
  * Split out from findManifest rather than inlined into it because callers
  * that were handed an explicit directory need the "is it *here*" question
  * answered without the walk (see manifest-edit.ts's openManifestForEdit),
- * and the dagstree.yaml-beats-stack.yaml precedence has to be the same
+ * and the catalogus.yaml-beats-stack.yaml precedence has to be the same
  * answer for both questions or the two disagree about which file a
  * directory holds.
  */
@@ -58,8 +58,8 @@ export async function findManifestIn(dir: string): Promise<ManifestLocation | nu
 
 /**
  * Walks upward from startDir (inclusive), the way git locates .git/,
- * looking for dagstree.yaml and falling back to stack.yaml at each level.
- * dagstree.yaml wins over stack.yaml within the same directory. Returns
+ * looking for catalogus.yaml and falling back to stack.yaml at each level.
+ * catalogus.yaml wins over stack.yaml within the same directory. Returns
  * null once the filesystem root is reached with nothing found.
  */
 export async function findManifest(startDir: string): Promise<ManifestLocation | null> {
@@ -82,7 +82,7 @@ export async function readManifestText(location: ManifestLocation): Promise<stri
 }
 
 /**
- * Writes text to dagstree.yaml in `dir`, regardless of which filename the
+ * Writes text to catalogus.yaml in `dir`, regardless of which filename the
  * manifest was originally read from -- per HANDOFF.md, the CLI never writes
  * stack.yaml, even when editing a repo that still uses the fallback name.
  */

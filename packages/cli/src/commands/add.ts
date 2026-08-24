@@ -1,10 +1,10 @@
-// `dagstree add <service> --role <role> [--depends-on <id>...] [--id <id>]`
+// `catalogus add <service> --role <role> [--depends-on <id>...] [--id <id>]`
 // -- adds a service entry (and any dependency edges) to the manifest. The
 // manifest is a human-edited file: this edits the parsed yaml Document in
 // place via the `yaml` package's Document API rather than round-tripping
 // through a plain object, so comments, key order, and formatting (including
 // the $schema modeline) all survive untouched. The result is always
-// validated -- schema plus acyclicity, the same check `dagstree validate`
+// validated -- schema plus acyclicity, the same check `catalogus validate`
 // runs -- before anything is written; a manifest that would fail that check
 // is never written, duplicate ids included.
 import type { YAMLSeq } from "yaml";
@@ -183,7 +183,7 @@ export async function runAdd(
   const servicesSeq = doc.get("services", true) as YAMLSeq;
   preferBlockStyleWhenEmpty(servicesSeq);
 
-  // Key order matches examples/reference.dagstree.yaml and SKILL.md's
+  // Key order matches examples/reference.catalogus.yaml and SKILL.md's
   // fragment: identity (id, service, kind, version), then what it does here
   // (role), then when and what state (added, status, ...). A file whose
   // shape differs from the one the skill teaches invites hand-editing to

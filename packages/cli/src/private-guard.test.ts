@@ -12,7 +12,7 @@ describe("looksLikePrivateFlagName", () => {
     expect(looksLikePrivateFlagName("billing-cycle")).toBe(true);
   });
 
-  it("does not flag dagstree's own fixed flag names", () => {
+  it("does not flag catalogus's own fixed flag names", () => {
     expect(looksLikePrivateFlagName("role")).toBe(false);
     expect(looksLikePrivateFlagName("id")).toBe(false);
     expect(looksLikePrivateFlagName("service")).toBe(false);
@@ -34,7 +34,7 @@ describe("hasBlockingPrivateFreeText", () => {
   // add/init's write-time gate only refuses on a HARD hit now -- a merely
   // SOFT hit (a bare billing-adjacent keyword) is not blocked here; it
   // surfaces as a warning on the successful CommandResult instead (see
-  // add.test.ts / init.test.ts), the same way `dagstree validate` treats
+  // add.test.ts / init.test.ts), the same way `catalogus validate` treats
   // it. See this module's header comment for why that changed.
 
   it("flags an email address (hard)", () => {
@@ -60,7 +60,7 @@ describe("hasBlockingPrivateFreeText", () => {
     expect(hasBlockingPrivateFreeText("billing account for this project")).toBe(false);
     expect(hasBlockingPrivateFreeText("plan tier pro")).toBe(false);
     // Bare "renewal" alone, no email/currency/date nearby -- exactly what
-    // `dagstree init`'s pm-answer test exercises (init.test.ts).
+    // `catalogus init`'s pm-answer test exercises (init.test.ts).
     expect(hasBlockingPrivateFreeText("renewal is automated via GitHub Actions")).toBe(false);
   });
 
@@ -87,16 +87,16 @@ describe("hasBlockingPrivateFreeText", () => {
 
 describe("no duplicate pattern list", () => {
   // The whole point of FIX 1 is that there is exactly one implementation of
-  // these patterns, in @dagstree/schema -- a second copy here is precisely
+  // these patterns, in @catalogus/schema -- a second copy here is precisely
   // how the two silently drift apart. This reads the module's own source
   // and fails if any of the distinctive regex fragments the old, pre-fix
   // local implementation used ever reappear, or if the module stops
-  // importing the shared guard from @dagstree/schema.
+  // importing the shared guard from @catalogus/schema.
   const sourcePath = fileURLToPath(new URL("./private-guard.ts", import.meta.url));
   const source = readFileSync(sourcePath, "utf8");
 
-  it("imports the free-text guard from @dagstree/schema rather than defining its own", () => {
-    expect(source).toMatch(/from ["']@dagstree\/schema["']/);
+  it("imports the free-text guard from @catalogus/schema rather than defining its own", () => {
+    expect(source).toMatch(/from ["']@catalogus\/schema["']/);
     expect(source).toMatch(/scanFreeTextForPrivateValues/);
   });
 

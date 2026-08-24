@@ -1,5 +1,5 @@
 // Viewer-side display labels for a rollup heading. `rollup` (the segment of
-// `role` before the first "-", computed server-side -- see @dagstree/cli's
+// `role` before the first "-", computed server-side -- see @catalogus/cli's
 // view-payload.ts) is presentation-neutral by design: it groups a real
 // manifest's roles, nothing more. Almost every rollup already reads fine as
 // a heading on its own -- "hosting", "database" -- but `coding-agent` is the
@@ -11,17 +11,17 @@
 // needed changing.
 //
 // Deliberately not a schema change and not an exception to the one-line
-// rollup rule (@dagstree/cli's rollupOf) -- presentation stays in
+// rollup rule (@catalogus/cli's rollupOf) -- presentation stays in
 // presentation. And deliberately not exhaustive: seeded from the rollups
-// examples/reference.dagstree.yaml actually uses plus the base-word
-// vocabulary skills/dagstree/SKILL.md's "Naming a role" section documents
+// examples/reference.catalogus.yaml actually uses plus the base-word
+// vocabulary skills/catalogus/SKILL.md's "Naming a role" section documents
 // (services and the stack/component base words alike). A rollup outside
 // both lists renders its own raw text -- see rollupLabel below -- which is
 // the correct behaviour for a role nobody has used yet, not a gap in this
 // table.
 //
 // Built on a null-prototype record, not a plain `{}` literal, for the exact
-// reason DAGSTREE_CATALOG (packages/core/src/catalog.ts) and GLYPHS
+// reason CATALOGUS_CATALOG (packages/core/src/catalog.ts) and GLYPHS
 // (./fallback-icons.tsx) are: `rollup` is derived from `role`, and the
 // schema's slug pattern (`^[a-z0-9]+(?:[_-][a-z0-9]+)*$`) admits
 // "constructor" as a legal role. On a plain object literal,
@@ -31,7 +31,7 @@
 // string. Read fallback-icons.tsx's top comment for the fuller account of
 // how this exact shape blanked the page once already.
 const ROLLUP_LABELS: Record<string, string> = Object.assign(Object.create(null) as Record<string, string>, {
-  // Service base words, examples/reference.dagstree.yaml plus SKILL.md's
+  // Service base words, examples/reference.catalogus.yaml plus SKILL.md's
   // "Naming a role" list.
   hosting: "Hosting",
   database: "Database",
@@ -59,7 +59,7 @@ const ROLLUP_LABELS: Record<string, string> = Object.assign(Object.create(null) 
   // mid-base-word and the key reads as a truncation rather than a name.
   // `coding-agent` was the one that prompted this table, but it is not the
   // only one and an earlier version of this comment claimed it was --
-  // examples/reference.dagstree.yaml alone carries three more, and the
+  // examples/reference.catalogus.yaml alone carries three more, and the
   // viewer rendered INGRESS and TELEMETRY, which is the same defect the
   // "coding" fix was written to prevent. The rule stays mechanical (see
   // SKILL.md's "the part before the first -"); the label is where the word

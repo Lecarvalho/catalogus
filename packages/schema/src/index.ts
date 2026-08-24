@@ -1,12 +1,12 @@
-// @dagstree/schema — the contract every other Dagstree package consumes,
+// @catalogus/schema — the contract every other Catalogus package consumes,
 // and the security boundary that keeps Layer 3 (private overlay) data out
-// of Layer 2 (dagstree.yaml, committed to the repo). See docs/HANDOFF.md
+// of Layer 2 (catalogus.yaml, committed to the repo). See docs/HANDOFF.md
 // section 3.
 
-export { dagstreeSchemaV1 } from "./schema.js";
+export { catalogusSchemaV1 } from "./schema.js";
 
 export type {
-  DagstreeManifestV1,
+  CatalogusManifestV1,
   ProjectMeta,
   VcsInfo,
   VcsVisibility,
@@ -25,10 +25,10 @@ export {
   edgePairs,
 } from "./validate.js";
 export type {
-  DagstreeManifestError,
-  DagstreeManifestErrorKind,
-  DagstreeManifestWarning,
-  DagstreeValidationResult,
+  CatalogusManifestError,
+  CatalogusManifestErrorKind,
+  CatalogusManifestWarning,
+  CatalogusValidationResult,
 } from "./validate.js";
 
 export {
@@ -63,6 +63,6 @@ export type {
 } from "./free-text-guard.js";
 
 /** Canonical manifest filename. The CLI always writes this. */
-export const MANIFEST_FILENAME = "dagstree.yaml";
-/** Accepted when reading, for repos that predate the dagstree.yaml rename. */
+export const MANIFEST_FILENAME = "catalogus.yaml";
+/** Accepted when reading, for repos that predate the catalogus.yaml rename. */
 export const MANIFEST_FILENAME_FALLBACK = "stack.yaml";

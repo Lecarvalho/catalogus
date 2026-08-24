@@ -57,21 +57,21 @@ function packageVersion(): string {
 function createProgram(): Command {
   const program = new Command();
   program
-    .name("dagstree")
-    .description("Dagstree -- a project operations registry (offline commands)")
+    .name("catalogus")
+    .description("Catalogus -- a project operations registry (offline commands)")
     .version(packageVersion())
     // Without this, commander's own `--version` (registered on the program by
     // .version() above) is inherited by every subcommand and beats a
-    // subcommand's identically-named option -- so `dagstree add dotnet
+    // subcommand's identically-named option -- so `catalogus add dotnet
     // --kind stack --version 10` printed "0.0.1" and added nothing, exit 0.
     // Silent data loss, not an error. enablePositionalOptions scopes an
-    // option to the command it follows: `dagstree --version` still reports
-    // the CLI version, `dagstree add ... --version 10` reaches `add`.
+    // option to the command it follows: `catalogus --version` still reports
+    // the CLI version, `catalogus add ... --version 10` reaches `add`.
     .enablePositionalOptions()
     .exitOverride()
     .configureOutput({
       // Commander writes every one of its own error/usage messages (a bare
-      // `dagstree` invocation's usage-and-exit-1, an unknown option, an
+      // `catalogus` invocation's usage-and-exit-1, an unknown option, an
       // unknown command, a missing required argument, ...) through this
       // hook before throwing (exitOverride makes it throw instead of
       // calling process.exit() itself). The only message that ever needs
@@ -87,7 +87,7 @@ function createProgram(): Command {
       // mostly worked, because `error.message` on the thrown
       // CommanderError carries the real text for every other commander
       // error code -- except this one: `this.help({error: true})` (the
-      // path a bare `dagstree` with no subcommand takes) writes its actual
+      // path a bare `catalogus` with no subcommand takes) writes its actual
       // help text through this hook and passes the CommanderError only a
       // useless placeholder, `'(outputHelp)'`. Silencing writeErr there
       // swallowed the help text with nothing to reprint it from -- see
@@ -103,7 +103,7 @@ function createProgram(): Command {
 
   program
     .command("init")
-    .description("scaffold a dagstree.yaml in the target directory")
+    .description("scaffold a catalogus.yaml in the target directory")
     .argument("[path]", "target directory (defaults to the current directory)")
     .option("--yes", "infer everything possible from detection and write without prompting")
     .option("--visibility <visibility>", "repo visibility: public | private | internal (never inferred)")
@@ -303,7 +303,7 @@ export async function runCli(argv: string[]): Promise<number> {
     // Every commander-native path reaching here -- help, version, and
     // every other Command.error() failure (missing/unknown option, unknown
     // command, ...) -- already wrote its message to the right stream
-    // (writeOut for --help/--version/`dagstree help`, the writeErr hook
+    // (writeOut for --help/--version/`catalogus help`, the writeErr hook
     // above for everything else, private-flag redirection included) by the
     // time this throw happens. Nothing left to print; just propagate the
     // exit code commander computed.

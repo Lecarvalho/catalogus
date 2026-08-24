@@ -5,15 +5,15 @@
 // First, the manifest is a human-edited file, so edits go through the `yaml`
 // package's Document API rather than a round-trip through a plain object:
 // comments, key order and the `$schema` modeline all survive untouched.
-// Second, a manifest that would fail `dagstree validate` is never written --
+// Second, a manifest that would fail `catalogus validate` is never written --
 // schema, referential integrity, the private-value guard and acyclicity are
 // all checked against the mutated document *before* it reaches disk. A
 // command that forgot either property would look like it worked and leave a
 // file nobody can validate.
 import { stat } from "node:fs/promises";
 
-import { edgePairs, MANIFEST_FILENAME, MANIFEST_FILENAME_FALLBACK } from "@dagstree/schema";
-import type { DagstreeManifestV1 } from "@dagstree/schema";
+import { edgePairs, MANIFEST_FILENAME, MANIFEST_FILENAME_FALLBACK } from "@catalogus/schema";
+import type { CatalogusManifestV1 } from "@catalogus/schema";
 import { parseDocument } from "yaml";
 import type { Document, YAMLSeq } from "yaml";
 
@@ -28,7 +28,7 @@ import type { CommandResult } from "./types.js";
 export interface OpenedManifest {
   location: ManifestLocation;
   /** The manifest as it validated on disk, for pre-checks that read ids or services. */
-  manifest: DagstreeManifestV1;
+  manifest: CatalogusManifestV1;
   /** The same file as an editable Document, comments and formatting intact. */
   doc: Document;
   /**
@@ -71,8 +71,8 @@ export async function openManifestForEdit(pathArg: string | undefined): Promise<
     // subdirectory exists perfectly often, and letting it through means
     // loadValidManifest's upward walk silently retargets the edit at
     // whichever ancestor happens to hold a manifest -- observed as
-    // `dagstree remove fly-api <dir>/sub` deleting the entry from
-    // <dir>/dagstree.yaml at exit 0. Refuse here instead, and name the
+    // `catalogus remove fly-api <dir>/sub` deleting the entry from
+    // <dir>/catalogus.yaml at exit 0. Refuse here instead, and name the
     // ancestor that *was* found so the message says what to type next
     // rather than only what went wrong.
     if (!(await findManifestIn(targetDir))) {
@@ -82,7 +82,7 @@ export async function openManifestForEdit(pathArg: string | undefined): Promise<
         ancestor
           ? `${ancestor.filePath} exists, but "${targetDir}" was named explicitly, so the search did not walk up to it. ` +
               `Point the command at "${ancestor.dir}" to edit that manifest.`
-          : `Run "dagstree init" to create one.`
+          : `Run "catalogus init" to create one.`
       );
       return { ok: false, error: { exitCode: 2, stdout: [], stderr } };
     }
@@ -151,7 +151,7 @@ export function cycleKey(cycle: readonly string[]): string {
 /**
  * Validates the mutated document and, only if it passes, writes it.
  *
- * The check is the same one `dagstree validate` runs, so "the CLI wrote it"
+ * The check is the same one `catalogus validate` runs, so "the CLI wrote it"
  * and "it validates" cannot come apart.
  */
 export async function commitManifestEdit(opened: OpenedManifest, options: CommitOptions): Promise<CommandResult> {
@@ -166,7 +166,7 @@ export async function commitManifestEdit(opened: OpenedManifest, options: Commit
     // name this command as the cause of a cycle that predates it, sending
     // the user to fix an edit that was never the problem.
     //
-    // Opening it at all is deliberate: `dagstree remove` on one of the
+    // Opening it at all is deliberate: `catalogus remove` on one of the
     // cycle's services is the only thing in the CLI that breaks a cycle, so
     // refusing to open a cyclic manifest would make it unfixable by the
     // tool that reports it. The edit is still refused when it leaves the
@@ -181,8 +181,8 @@ export async function commitManifestEdit(opened: OpenedManifest, options: Commit
         stderr: [
           `${location.filePath} already contained a cyclic dependency before this command, and this edit does not break it:`,
           ...check.lines,
-          `Nothing was written. Run "dagstree validate" for the full report; ` +
-            `"dagstree remove" on one of the services above drops its edges with it.`,
+          `Nothing was written. Run "catalogus validate" for the full report; ` +
+            `"catalogus remove" on one of the services above drops its edges with it.`,
         ],
       };
     }
@@ -196,7 +196,7 @@ export async function commitManifestEdit(opened: OpenedManifest, options: Commit
   const filePath = await writeManifestText(location.dir, doc.toString({ flowCollectionPadding: false }));
   const lines = options.successLines(filePath);
 
-  // writeManifestText always writes dagstree.yaml, even when the manifest
+  // writeManifestText always writes catalogus.yaml, even when the manifest
   // was read from the stack.yaml fallback (manifest-io.ts's contract) -- so
   // a repo that still used the old name now has two files that disagree.
   // Say so explicitly rather than leaving the stale stack.yaml to surprise

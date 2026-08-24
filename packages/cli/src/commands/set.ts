@@ -1,4 +1,4 @@
-// `dagstree set <field> <value> [<field> <value> ...]` -- writes manifest
+// `catalogus set <field> <value> [<field> <value> ...]` -- writes manifest
 // fields whose first value is a guess only a human can correct, wherever
 // that guess got written down.
 //
@@ -77,7 +77,7 @@ const FIELDS: Record<string, SettableField> = {
   // inside a manifest references it -- service ids are local to the file,
   // so a slug rename cannot dangle an edge or a replaced_by the way a
   // service id rename would. But Phase 4/5 (docs/PLAN.md) makes the slug
-  // the key the backend's project row is keyed on, and `dagstree push`
+  // the key the backend's project row is keyed on, and `catalogus push`
   // does not exist yet to have an opinion about what a rename after that
   // should do -- migrate the row, refuse the rename, something else.
   // Whoever adds `push` has to decide that then; this command only knows
@@ -89,7 +89,7 @@ const FIELDS: Record<string, SettableField> = {
   // project-level field can never be an edge target, and each of these three
   // names something with an identity and an icon -- a PM tool, a VCS host, a
   // coding agent product -- exactly the shape a service entry already
-  // covers. They are `dagstree add <slug> --role pm|vcs|coding-agent` now,
+  // covers. They are `catalogus add <slug> --role pm|vcs|coding-agent` now,
   // not `set` targets. `project.vcs` keeps only `visibility` below.
   "project.vcs.visibility": {
     path: ["project", "vcs", "visibility"],
@@ -127,15 +127,15 @@ const SERVICE_FIELD_PLACEHOLDERS = Object.keys(SERVICE_FIELD_SPECS).map((name) =
 
 // The three fields the 2026-08-24 amendment moved to service entries (see
 // FIELDS's own comment above). A caller still typing the old field name gets
-// a message naming exactly what replaced it, the same way @dagstree/schema's
+// a message naming exactly what replaced it, the same way @catalogus/schema's
 // validate.ts does for a manifest still holding the old shape -- not the
 // generic "Unknown field" list below, which would leave them to guess.
 const MOVED_FIELD_HINTS: Record<string, string> = {
-  "project.pm": 'PM tooling is a service entry now -- use, e.g., "dagstree add trello --role pm".',
+  "project.pm": 'PM tooling is a service entry now -- use, e.g., "catalogus add trello --role pm".',
   "project.vcs.provider":
-    'the VCS provider is a service entry now -- use, e.g., "dagstree add github --role vcs".',
+    'the VCS provider is a service entry now -- use, e.g., "catalogus add github --role vcs".',
   "project.coding_agents":
-    'coding agents are service entries now, one per agent -- use, e.g., "dagstree add claude-code --role coding-agent".',
+    'coding agents are service entries now, one per agent -- use, e.g., "catalogus add claude-code --role coding-agent".',
 };
 
 // The static field names, sorted, with the patterns appended rather than
@@ -214,7 +214,7 @@ export async function runSet(pathArg: string | undefined, tokens: string[]): Pro
   if (tokens.length === 0 || tokens.length % 2 !== 0) {
     return usageError([
       "set takes <field> <value> pairs, e.g. " +
-        'dagstree set project.architecture "modular monolith" project.vcs.visibility private',
+        'catalogus set project.architecture "modular monolith" project.vcs.visibility private',
       `  settable fields: ${SETTABLE_FIELDS.join(", ")}`,
     ]);
   }

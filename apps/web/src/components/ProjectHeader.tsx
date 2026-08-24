@@ -1,7 +1,7 @@
 // Pure. Renders only the fields the manifest actually set -- an absent
 // field means "not answered yet" (CLAUDE.md's ask-never-guess rule applied
 // to rendering) so this never falls back to a placeholder like "unknown".
-import type { ViewPayload } from "dagstree";
+import type { ViewPayload } from "@catalogus/cli";
 
 import styles from "./ProjectHeader.module.css";
 

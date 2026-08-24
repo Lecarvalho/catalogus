@@ -1,9 +1,9 @@
-// Builds the JSON payload `dagstree view`'s server hands to the browser
+// Builds the JSON payload `catalogus view`'s server hands to the browser
 // (GET /api/project -- see commands/view.ts). This is the one place the
 // manifest's own defaulting rules and the catalog's icon lookup are turned
 // into a single flat shape a render layer can consume without importing
-// @dagstree/schema or @dagstree/core itself -- the browser gets plain data,
-// never ajv, and never the 5.2 MB simple-icons bundle (see @dagstree/core's
+// @catalogus/schema or @catalogus/core itself -- the browser gets plain data,
+// never ajv, and never the 5.2 MB simple-icons bundle (see @catalogus/core's
 // icons.ts for why that resolution has to stay server-side).
 //
 // `kind` and `status` default the exact way commands/graph.ts already does
@@ -12,8 +12,8 @@
 // mean". If that ever needs to change, change it in both places or extract
 // a shared helper; this file does not re-derive the rule from the schema
 // description on its own.
-import { edgeEndpoints, type DagstreeManifestV1, type ServiceEntry } from "@dagstree/schema";
-import { getCatalogEntry, resolveIconPath } from "@dagstree/core";
+import { edgeEndpoints, type CatalogusManifestV1, type ServiceEntry } from "@catalogus/schema";
+import { getCatalogEntry, resolveIconPath } from "@catalogus/core";
 
 export interface ViewPayload {
   /** Absolute path of the manifest file being served. */
@@ -34,7 +34,7 @@ export interface ViewPayload {
      * Repo visibility only, as of the 2026-08-24 schema amendment -- the VCS
      * provider is a service entry now (role: vcs), not a project field, so
      * it renders through `services`/`edges` like anything else with an
-     * identity and an icon. See @dagstree/schema's schema.ts for why.
+     * identity and an icon. See @catalogus/schema's schema.ts for why.
      */
     vcs?: { visibility: string };
   };
@@ -101,7 +101,7 @@ async function buildViewService(entry: ServiceEntry): Promise<ViewService> {
 /**
  * Builds the full view payload for one manifest. `manifestPath` is carried
  * through rather than re-derived from the manifest itself because it names
- * the file on disk `dagstree view` actually read -- information the parsed
+ * the file on disk `catalogus view` actually read -- information the parsed
  * manifest object has no field for. `readAt` is likewise supplied by the
  * caller rather than stamped with `new Date()` in here: the moment that
  * matters is when commands/view.ts actually read the manifest off disk,
@@ -117,7 +117,7 @@ async function buildViewService(entry: ServiceEntry): Promise<ViewService> {
  */
 export async function buildViewPayload(
   manifestPath: string,
-  manifest: DagstreeManifestV1,
+  manifest: CatalogusManifestV1,
   readAt: string
 ): Promise<ViewPayload> {
   const services = await Promise.all(manifest.services.map(buildViewService));

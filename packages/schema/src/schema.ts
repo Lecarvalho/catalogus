@@ -1,11 +1,11 @@
-// The dagstree.yaml v1 JSON Schema, authored here as a TypeScript `as const`
+// The catalogus.yaml v1 JSON Schema, authored here as a TypeScript `as const`
 // literal rather than a plain .json file. That's not a style choice: only a
 // literal object TypeScript can see at compile time lets json-schema-to-ts's
 // FromSchema derive the manifest types below without hand-written duplicates
 // (a JSON module import widens `"type": "object"` down to `string`, which
 // FromSchema can't work with — see the notes in index.test.ts).
 //
-// packages/schema/schema/dagstree.v1.json is generated from this object by
+// packages/schema/schema/catalogus.v1.json is generated from this object by
 // scripts/generate-schema-json.mjs (part of `pnpm build`) so the published,
 // standalone artifact and this source can never diverge; schema-sync.test.ts
 // enforces that even between builds.
@@ -29,12 +29,12 @@
 const PRIVATE_KEY_PATTERN =
   "(?:[cC][oO][sS][tT]|[pP][rR][iI][cC][eE]|[pP][rR][iI][cC][iI][nN][gG]|[aA][mM][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT][_-]?[iI][dD]|[uU][sS][eE][rR][nN][aA][mM][eE]|[uU][sS][eE][rR]|[eE][mM][aA][iI][lL]|[tT][oO][kK][eE][nN]|[aA][pP][iI][_-]?[kK][eE][yY]|[kK][eE][yY]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][sS]|[bB][iI][lL][lL][iI][nN][gG]|[iI][nN][vV][oO][iI][cC][eE]|[rR][eE][nN][eE][wW][aA][lL]|[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][_-]?[iI][dD]|[pP][aA][yY][mM][eE][nN][tT]|[cC][aA][rR][dD]|[pP][lL][aA][nN][_-]?[tT][iI][eE][rR]|[sS][eE][aA][tT]|[sS][pP][eE][nN][dD])";
 
-export const dagstreeSchemaV1 = {
+export const catalogusSchemaV1 = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
-  $id: "https://dagstree.dev/schema/v1.json",
-  title: "Dagstree manifest v1",
+  $id: "https://catalogus.dev/schema/v1.json",
+  title: "Catalogus manifest v1",
   description:
-    "dagstree.yaml (Layer 2 of the Dagstree data model): project metadata and the service DAG for one project. Committed to the repo — safe in a public repo. Anything cost, billing, or account-shaped belongs in the private overlay instead (`dagstree push --private`), and this schema actively rejects it — see the patternProperties deny rule repeated on every object below.",
+    "catalogus.yaml (Layer 2 of the Catalogus data model): project metadata and the service DAG for one project. Committed to the repo — safe in a public repo. Anything cost, billing, or account-shaped belongs in the private overlay instead (`catalogus push --private`), and this schema actively rejects it — see the patternProperties deny rule repeated on every object below.",
 
   $defs: {
     slug: {
@@ -47,7 +47,7 @@ export const dagstreeSchemaV1 = {
     // Repo visibility only, as of the 2026-08-24 amendment (see HANDOFF.md's
     // amendment log): the provider used to live here too, but a project-level
     // field can never be an edge target, and `[github-actions, github]` is a
-    // real edge (examples/reference.dagstree.yaml) -- so the VCS provider has
+    // real edge (examples/reference.catalogus.yaml) -- so the VCS provider has
     // to be a service entry (`role: vcs`) like anything else with an identity
     // and an icon. Visibility has no identity and is never an edge target, so
     // it stays here rather than becoming a service entry of its own.
@@ -122,7 +122,7 @@ export const dagstreeSchemaV1 = {
         service: {
           $ref: "#/$defs/slug",
           description:
-            "Slug into the global Dagstree service catalog, e.g. \"supabase\", \"fly-io\". Not the same namespace as @specfy/stack-analyser's slugs — the CLI maps between them.",
+            "Slug into the global Catalogus service catalog, e.g. \"supabase\", \"fly-io\". Not the same namespace as @specfy/stack-analyser's slugs — the CLI maps between them.",
         },
         role: {
           $ref: "#/$defs/slug",
@@ -152,7 +152,7 @@ export const dagstreeSchemaV1 = {
         replaced_by: {
           $ref: "#/$defs/slug",
           description:
-            "Local id of the service instance that replaces this one when phasing out. Must name another entry's id — the schema can't express that; `dagstree validate` checks it.",
+            "Local id of the service instance that replaces this one when phasing out. Must name another entry's id — the schema can't express that; `catalogus validate` checks it.",
         },
         notes: {
           type: "string",
@@ -202,7 +202,7 @@ export const dagstreeSchemaV1 = {
 
     dependencyEdge: {
       description:
-        "One dependency edge (from -> to) in the project's service DAG. Accepts the compact array form or the object form; acyclicity is checked by `dagstree validate`, not by this schema.",
+        "One dependency edge (from -> to) in the project's service DAG. Accepts the compact array form or the object form; acyclicity is checked by `catalogus validate`, not by this schema.",
       oneOf: [
         { $ref: "#/$defs/dependencyEdgeTuple" },
         { $ref: "#/$defs/dependencyEdgeObject" },
@@ -213,7 +213,7 @@ export const dagstreeSchemaV1 = {
   type: "object",
   patternProperties: { [PRIVATE_KEY_PATTERN]: false },
   properties: {
-    dagstree: {
+    catalogus: {
       const: 1,
       description: "Manifest format version. Always 1 for this schema.",
     },
@@ -234,6 +234,6 @@ export const dagstreeSchemaV1 = {
         "Every dependency edge (from -> to) between the service instances above. Can be empty.",
     },
   },
-  required: ["dagstree", "project", "services", "dependencies"],
+  required: ["catalogus", "project", "services", "dependencies"],
   additionalProperties: false,
 } as const;

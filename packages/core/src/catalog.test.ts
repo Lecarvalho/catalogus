@@ -1,9 +1,9 @@
 import { getIconsData } from "simple-icons/sdk";
 import { describe, expect, it } from "vitest";
 
-import { DAGSTREE_CATALOG, deriveBaseCatalog, getCatalogEntry, ICON_OVERLAY } from "./catalog.js";
+import { CATALOGUS_CATALOG, deriveBaseCatalog, getCatalogEntry, ICON_OVERLAY } from "./catalog.js";
 import type { MappingEntry } from "./mapping.js";
-import { SPECFY_TO_DAGSTREE } from "./mapping.js";
+import { SPECFY_TO_CATALOGUS } from "./mapping.js";
 
 /** Builds a minimal, valid MappingEntry for deriveBaseCatalog test fixtures. */
 function mappingEntry(slug: string, name: string): MappingEntry {
@@ -19,7 +19,7 @@ describe("deriveBaseCatalog", () => {
     expect(derived.probe).toEqual({ name: "Probe" });
   });
 
-  it("rule 2: a bare specfy key equal to the dagstree slug wins over disagreeing role-specific rows, regardless of declaration order", () => {
+  it("rule 2: a bare specfy key equal to the catalogus slug wins over disagreeing role-specific rows, regardless of declaration order", () => {
     const inOneOrder = deriveBaseCatalog({
       "probe.role-a": mappingEntry("probe", "Probe Role A"),
       probe: mappingEntry("probe", "Probe"),
@@ -76,24 +76,24 @@ describe("deriveBaseCatalog", () => {
     }
   });
 
-  it("agrees on name for every real dagstree slug targeted by more than one specfy key, except the documented supabase exception, and derives every slug without dropping one", () => {
+  it("agrees on name for every real catalogus slug targeted by more than one specfy key, except the documented supabase exception, and derives every slug without dropping one", () => {
     // Runs the real rule against the real table rather than a constructed
-    // fixture: this is the integration check that SPECFY_TO_DAGSTREE itself
+    // fixture: this is the integration check that SPECFY_TO_CATALOGUS itself
     // still only has the one known, resolvable disagreement.
-    const derived = deriveBaseCatalog(SPECFY_TO_DAGSTREE);
-    const expectedSlugs = new Set(Object.values(SPECFY_TO_DAGSTREE).map((e) => e.slug));
+    const derived = deriveBaseCatalog(SPECFY_TO_CATALOGUS);
+    const expectedSlugs = new Set(Object.values(SPECFY_TO_CATALOGUS).map((e) => e.slug));
     expect(new Set(Object.keys(derived))).toEqual(expectedSlugs);
   });
 
   it("resolves the real supabase disagreement to the generic row (bare 'supabase' specfy key), not an arbitrary sub-tech", () => {
-    const derived = deriveBaseCatalog(SPECFY_TO_DAGSTREE);
+    const derived = deriveBaseCatalog(SPECFY_TO_CATALOGUS);
     expect(derived.supabase).toEqual({ name: "Supabase" });
   });
 });
 
-describe("DAGSTREE_CATALOG invariants", () => {
+describe("CATALOGUS_CATALOG invariants", () => {
   it("every row has a non-empty slug and name, and a key matching its own slug", () => {
-    for (const [key, entry] of Object.entries(DAGSTREE_CATALOG)) {
+    for (const [key, entry] of Object.entries(CATALOGUS_CATALOG)) {
       expect(entry.slug, `key ${key} should equal its own entry.slug`).toBe(key);
       expect(entry.slug.length, `slug for ${key}`).toBeGreaterThan(0);
       expect(entry.name.length, `name for ${key}`).toBeGreaterThan(0);
@@ -103,7 +103,7 @@ describe("DAGSTREE_CATALOG invariants", () => {
   it("carries no kind field on any row", () => {
     // CatalogEntry deliberately has no `kind` -- see catalog.ts's interface
     // doc comment. This guards against one being added back by accident.
-    for (const entry of Object.values(DAGSTREE_CATALOG)) {
+    for (const entry of Object.values(CATALOGUS_CATALOG)) {
       expect("kind" in entry).toBe(false);
     }
   });
@@ -112,12 +112,12 @@ describe("DAGSTREE_CATALOG invariants", () => {
     // CatalogEntry deliberately has no `category` -- role, a per-project
     // fact on the manifest entry, already answers that question. This
     // guards against a category being reintroduced by accident.
-    for (const entry of Object.values(DAGSTREE_CATALOG)) {
+    for (const entry of Object.values(CATALOGUS_CATALOG)) {
       expect("category" in entry).toBe(false);
     }
   });
 
-  it("includes every EXTRA_ROWS slug used in examples/reference.dagstree.yaml", () => {
+  it("includes every EXTRA_ROWS slug used in examples/reference.catalogus.yaml", () => {
     for (const slug of ["dotnet", "opentelemetry", "namecheap", "trello", "github-actions", "claude-code"]) {
       expect(getCatalogEntry(slug), `expected an extra row for ${slug}`).toBeDefined();
     }
@@ -159,8 +159,8 @@ describe("getCatalogEntry", () => {
   });
 
   it("returns undefined for Object.prototype property names instead of resolving through the prototype chain", () => {
-    // DAGSTREE_CATALOG is a plain object keyed by an open-vocabulary slug
-    // (@dagstree/schema's slug pattern admits "constructor" etc.), so a
+    // CATALOGUS_CATALOG is a plain object keyed by an open-vocabulary slug
+    // (@catalogus/schema's slug pattern admits "constructor" etc.), so a
     // lookup that isn't guarded against Object.prototype would return the
     // inherited function/property instead of undefined -- and a caller
     // checking truthiness would treat that as a known service. Demonstrated
@@ -185,7 +185,7 @@ describe("icon verification against the installed simple-icons package", () => {
     const installedSlugs = new Set(icons.map((icon) => icon.slug));
 
     const brokenEntries: string[] = [];
-    for (const [slug, entry] of Object.entries(DAGSTREE_CATALOG)) {
+    for (const [slug, entry] of Object.entries(CATALOGUS_CATALOG)) {
       if (entry.icon !== undefined && !installedSlugs.has(entry.icon)) {
         brokenEntries.push(`${slug} -> icon "${entry.icon}" not found in installed simple-icons`);
       }
@@ -194,8 +194,8 @@ describe("icon verification against the installed simple-icons package", () => {
   });
 
   it("has at least one catalog row with an icon and at least one without, so this test suite cannot pass vacuously", async () => {
-    const withIcon = Object.values(DAGSTREE_CATALOG).filter((e) => e.icon !== undefined);
-    const withoutIcon = Object.values(DAGSTREE_CATALOG).filter((e) => e.icon === undefined);
+    const withIcon = Object.values(CATALOGUS_CATALOG).filter((e) => e.icon !== undefined);
+    const withoutIcon = Object.values(CATALOGUS_CATALOG).filter((e) => e.icon === undefined);
     expect(withIcon.length).toBeGreaterThan(0);
     expect(withoutIcon.length).toBeGreaterThan(0);
   });

@@ -7,7 +7,7 @@ import { createTempDir, removeTempDir, writeFixtureFile } from "./test-support/t
 import { InvalidWorkspaceRootError, scanWorkspace } from "./workspace-scan.js";
 
 function manifestNamed(name: string): string {
-  return `dagstree: 1
+  return `catalogus: 1
 project:
   name: ${name}
   slug: ${name}
@@ -49,7 +49,7 @@ async function tryDirLink(target: string, linkPath: string): Promise<boolean> {
 // (visibly, as "skipped" rather than "passed") when the probe fails,
 // rather than silently asserting nothing.
 async function probeDirLinkSupport(): Promise<boolean> {
-  const probeRoot = await createTempDir("dagstree-cli-test-linkprobe-");
+  const probeRoot = await createTempDir("catalogus-cli-test-linkprobe-");
   try {
     const target = join(probeRoot, "target");
     await mkdir(target);
@@ -74,7 +74,7 @@ describe("scanWorkspace", () => {
 
   it("finds manifests in some immediate children and leaves the rest unmanaged", async () => {
     const withManifest = await makeRepoDir(root, "has-manifest");
-    await writeFixtureFile(withManifest, "dagstree.yaml", manifestNamed("has-manifest"));
+    await writeFixtureFile(withManifest, "catalogus.yaml", manifestNamed("has-manifest"));
     await makeRepoDir(root, "no-manifest");
 
     const result = await scanWorkspace(root);
@@ -91,7 +91,7 @@ describe("scanWorkspace", () => {
 
   it("reports malformed YAML as a failure, not a thrown error", async () => {
     const dir = await makeRepoDir(root, "broken-yaml");
-    await writeFixtureFile(dir, "dagstree.yaml", "dagstree: [this is not\n  valid: yaml: at all\n");
+    await writeFixtureFile(dir, "catalogus.yaml", "catalogus: [this is not\n  valid: yaml: at all\n");
 
     const result = await scanWorkspace(root);
 
@@ -110,8 +110,8 @@ describe("scanWorkspace", () => {
     // Missing required project.slug.
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: Missing Slug
 services: []
@@ -130,7 +130,7 @@ dependencies: []
     expect(failure.message).toContain(failure.location.filePath);
   });
 
-  it("falls back to stack.yaml when dagstree.yaml is absent, same as the single-repo lookup", async () => {
+  it("falls back to stack.yaml when catalogus.yaml is absent, same as the single-repo lookup", async () => {
     const dir = await makeRepoDir(root, "legacy-name");
     await writeFixtureFile(dir, "stack.yaml", manifestNamed("legacy-name"));
 
@@ -143,7 +143,7 @@ dependencies: []
   it("skips a file sitting directly in the root", async () => {
     await writeFixtureFile(root, "README.md", "not a repo\n");
     const dir = await makeRepoDir(root, "actual-repo");
-    await writeFixtureFile(dir, "dagstree.yaml", manifestNamed("actual-repo"));
+    await writeFixtureFile(dir, "catalogus.yaml", manifestNamed("actual-repo"));
 
     const result = await scanWorkspace(root);
 
@@ -177,16 +177,16 @@ dependencies: []
   it("sorts every list ordinally by directory name, independent of creation or read order", async () => {
     // Created out of alphabetical order on purpose.
     const zManifest = await makeRepoDir(root, "zeta-project");
-    await writeFixtureFile(zManifest, "dagstree.yaml", manifestNamed("zeta-project"));
+    await writeFixtureFile(zManifest, "catalogus.yaml", manifestNamed("zeta-project"));
     const aManifest = await makeRepoDir(root, "alpha-project");
-    await writeFixtureFile(aManifest, "dagstree.yaml", manifestNamed("alpha-project"));
+    await writeFixtureFile(aManifest, "catalogus.yaml", manifestNamed("alpha-project"));
     const mManifest = await makeRepoDir(root, "mid-project");
-    await writeFixtureFile(mManifest, "dagstree.yaml", manifestNamed("mid-project"));
+    await writeFixtureFile(mManifest, "catalogus.yaml", manifestNamed("mid-project"));
 
     const zFail = await makeRepoDir(root, "zeta-broken");
-    await writeFixtureFile(zFail, "dagstree.yaml", "not: [valid yaml\n");
+    await writeFixtureFile(zFail, "catalogus.yaml", "not: [valid yaml\n");
     const aFail = await makeRepoDir(root, "alpha-broken");
-    await writeFixtureFile(aFail, "dagstree.yaml", "not: [valid yaml\n");
+    await writeFixtureFile(aFail, "catalogus.yaml", "not: [valid yaml\n");
 
     await makeRepoDir(root, "zeta-empty");
     await makeRepoDir(root, "alpha-empty");
@@ -200,12 +200,12 @@ dependencies: []
 
   it("reports a read failure separately from a parse/validation failure", async () => {
     // findManifestIn() finds the file; make the "read" step itself fail by
-    // pointing readManifestText at a directory named dagstree.yaml instead
+    // pointing readManifestText at a directory named catalogus.yaml instead
     // of a file, which is a directory-not-a-file failure findManifestIn's
     // fileExists() (an access() check) does not distinguish, but reading
     // it does.
     const dir = await makeRepoDir(root, "unreadable-manifest");
-    await mkdir(join(dir, "dagstree.yaml"));
+    await mkdir(join(dir, "catalogus.yaml"));
 
     const result = await scanWorkspace(root);
 
@@ -221,8 +221,8 @@ dependencies: []
     const dir = await makeRepoDir(root, "dup-ids");
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: Dup
   slug: dup
@@ -250,7 +250,7 @@ dependencies: []
   describe.skipIf(!canCreateDirLinks)("symlinks and junctions (followed at this depth-1 scan)", () => {
     it("treats a junction/symlink to a directory holding a valid manifest as an ordinary repo", async () => {
       const targetDir = await makeRepoDir(root, "zebra-target");
-      await writeFixtureFile(targetDir, "dagstree.yaml", manifestNamed("zebra-target"));
+      await writeFixtureFile(targetDir, "catalogus.yaml", manifestNamed("zebra-target"));
       const linkPath = join(root, "junction-repo");
       expect(await tryDirLink(targetDir, linkPath)).toBe(true);
 
@@ -283,7 +283,7 @@ dependencies: []
       expect(await tryDirLink(join(root, "does-not-exist-target"), linkPath)).toBe(true);
 
       const withManifest = await makeRepoDir(root, "has-manifest");
-      await writeFixtureFile(withManifest, "dagstree.yaml", manifestNamed("has-manifest"));
+      await writeFixtureFile(withManifest, "catalogus.yaml", manifestNamed("has-manifest"));
       await makeRepoDir(root, "no-manifest");
 
       const result = await scanWorkspace(root);

@@ -1,7 +1,7 @@
 # The same catalog service (supabase) used in two roles in one project,
 # modelled as two entries with distinct local ids (HANDOFF.md section 9,
 # decision 4) rather than one entry with a list of roles.
-dagstree: 1
+catalogus: 1
 project:
   name: FixPic
   slug: fixpic

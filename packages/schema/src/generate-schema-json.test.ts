@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 // Regression coverage for a Node-version trap: scripts/generate-schema-
-// json.mjs used to `import { dagstreeSchemaV1 } from "../src/schema.ts"`
+// json.mjs used to `import { catalogusSchemaV1 } from "../src/schema.ts"`
 // straight from plain Node, relying on TypeScript type-stripping being on
 // by default -- true only from Node 22.18 onward, while the root
 // package.json's declared engines range ("node": ">=22") permits older

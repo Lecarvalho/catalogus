@@ -1,10 +1,10 @@
-// The Dagstree service catalog: what a manifest's `service:` slug IS, for
-// display. Keyed by Dagstree's own slug namespace, same as SPECFY_TO_DAGSTREE
+// The Catalogus service catalog: what a manifest's `service:` slug IS, for
+// display. Keyed by Catalogus's own slug namespace, same as SPECFY_TO_CATALOGUS
 // in mapping.ts -- but a different table answering a different question.
 // mapping.ts is a *detection* mapping: given a raw @specfy/stack-analyser
-// key, what Dagstree slug/category/kind does it become? This module never
+// key, what Catalogus slug/category/kind does it become? This module never
 // runs during detect() and carries no `kind` and no `category` -- it answers
-// "given a slug already sitting in dagstree.yaml, what name and brand icon
+// "given a slug already sitting in catalogus.yaml, what name and brand icon
 // does the viewer show for it?", a question detection never has to answer
 // and that a slug detection can never produce (an off-repo registrar someone
 // named, a stack entry) still needs answered for.
@@ -29,7 +29,7 @@
 //
 // Every row's `name` comes from one of two places:
 //
-//  1. Derived from SPECFY_TO_DAGSTREE at module load (deriveBaseCatalog
+//  1. Derived from SPECFY_TO_CATALOGUS at module load (deriveBaseCatalog
 //     below) -- not retyped, so the two tables cannot drift apart the way a
 //     hand-copied second table would the first time someone edited one and
 //     not the other. mapping.ts's own module doc comment carries the
@@ -43,11 +43,11 @@
 // A slug's icon, when present, is a third and separate layer (ICON_OVERLAY)
 // applied on top of both: see that constant's doc comment for what "present"
 // is required to mean.
-import { SPECFY_TO_DAGSTREE } from "./mapping.js";
+import { SPECFY_TO_CATALOGUS } from "./mapping.js";
 import type { MappingEntry } from "./mapping.js";
 
 /**
- * One row of the display catalog for a Dagstree slug -- what a manifest's
+ * One row of the display catalog for a Catalogus slug -- what a manifest's
  * `service:` (or `component:`/`stack:`) field holds.
  *
  * Deliberately has no `category` and no `kind`.
@@ -61,13 +61,13 @@ import type { MappingEntry } from "./mapping.js";
  * concept -- whether a raw stack-analyser hit earns a node at all. A
  * CatalogEntry only ever exists for a slug that already earned one -- the
  * manifest entry itself carries the authoritative `kind` (`service` |
- * `component` | `stack`, see @dagstree/schema and
- * examples/reference.dagstree.yaml), set by whoever wrote that entry, not
+ * `component` | `stack`, see @catalogus/schema and
+ * examples/reference.catalogus.yaml), set by whoever wrote that entry, not
  * re-derived here. Re-adding a kind field to this table would let two
  * different `kind`s exist for the same slug and disagree with each other.
  */
 export interface CatalogEntry {
-  /** Dagstree catalog slug — what a manifest's `service:` field holds. */
+  /** Catalogus catalog slug — what a manifest's `service:` field holds. */
   slug: string;
   /** Human-facing display name, e.g. "Fly.io". */
   name: string;
@@ -76,16 +76,16 @@ export interface CatalogEntry {
 }
 
 /**
- * Collapses a specfySlug -> MappingEntry table (many-to-one onto dagstree
- * slug) into one display `name` per dagstree slug.
+ * Collapses a specfySlug -> MappingEntry table (many-to-one onto catalogus
+ * slug) into one display `name` per catalogus slug.
  *
  * Takes the mapping table as a parameter rather than closing over the
- * SPECFY_TO_DAGSTREE import so a test can construct a conflicting input
+ * SPECFY_TO_CATALOGUS import so a test can construct a conflicting input
  * directly and self-contained, without mutating mapping.ts to manufacture a
  * disagreement.
  *
  * The collapse is a no-op for the overwhelming majority of slugs: only two
- * dagstree slugs today are targeted by more than one specfy key ("vue" and
+ * catalogus slugs today are targeted by more than one specfy key ("vue" and
  * "supabase"). "vue" agrees (both keys say "Vue.js"). "supabase" disagrees
  * on name across its six specfy keys, because each key is a *per-role
  * signal* ("supabase.auth" proves auth, not "this project uses Supabase for
@@ -95,7 +95,7 @@ export interface CatalogEntry {
  *
  *  1. If every row collapsing onto the slug agrees on `name`, use it.
  *  2. Else, if exactly one of the specfy keys collapsing onto the slug is
- *     literally equal to the dagstree slug, that row's name wins -- a bare
+ *     literally equal to the catalogus slug, that row's name wins -- a bare
  *     key is the vendor's own generic row, not a per-role sub-detection, so
  *     it is the one entitled to speak for the slug as a whole. (This is how
  *     "supabase" resolves: the bare `supabase` specfy key gives "Supabase".)
@@ -145,7 +145,7 @@ export function deriveBaseCatalog(mapping: Record<string, MappingEntry>): Record
 
     const competing = rows.map((row) => `${row.specfyKey} -> "${row.name}"`).join(", ");
     throw new Error(
-      `deriveBaseCatalog: dagstree slug "${slug}" has disagreeing names with no bare "${slug}" specfy key to resolve it: ${competing}`
+      `deriveBaseCatalog: catalogus slug "${slug}" has disagreeing names with no bare "${slug}" specfy key to resolve it: ${competing}`
     );
   }
   return derived;
@@ -155,9 +155,9 @@ export function deriveBaseCatalog(mapping: Record<string, MappingEntry>): Record
  * Rows for slugs a manifest legitimately uses that detect() structurally
  * cannot ever produce: off-repo services a person named (no scan finds a
  * domain registrar or a Trello board) and `kind: stack`/`kind: component`
- * entries no @specfy/stack-analyser rule or Dagstree detector emits.
+ * entries no @specfy/stack-analyser rule or Catalogus detector emits.
  *
- * Sourced from examples/reference.dagstree.yaml, the repo's own evidence of
+ * Sourced from examples/reference.catalogus.yaml, the repo's own evidence of
  * what a real manifest's open vocabulary looks like -- every slug below
  * appears there under a `service:` key with no row anywhere else in this
  * package. Each row's slug is independently justified by that actual
@@ -167,25 +167,25 @@ export function deriveBaseCatalog(mapping: Record<string, MappingEntry>): Record
 const EXTRA_ROWS: CatalogEntry[] = [
   // .NET the runtime/platform, not a specific language row (csharp already
   // covers the language) or framework row (aspnet already covers that) --
-  // reference.dagstree.yaml uses it as `kind: stack, role: runtime-backend`.
+  // reference.catalogus.yaml uses it as `kind: stack, role: runtime-backend`.
   { slug: "dotnet", name: ".NET" },
-  // reference.dagstree.yaml uses this as `kind: component, role: telemetry-transport`.
+  // reference.catalogus.yaml uses this as `kind: component, role: telemetry-transport`.
   { slug: "opentelemetry", name: "OpenTelemetry" },
-  // A domain registrar -- reference.dagstree.yaml uses this exact slug with
+  // A domain registrar -- reference.catalogus.yaml uses this exact slug with
   // `role: dns, notes: "apex domain and DNS records"`.
   { slug: "namecheap", name: "Namecheap" },
-  // Kanban/project-management tool, `role: pm` in reference.dagstree.yaml.
+  // Kanban/project-management tool, `role: pm` in reference.catalogus.yaml.
   { slug: "trello", name: "Trello" },
   // Detected today only as a raw provider string by the CI detector
   // (detectCi in detectors/vcs.ts returns provider: "github-actions" with no
-  // name attached) -- never through SPECFY_TO_DAGSTREE, so it has no catalog
+  // name attached) -- never through SPECFY_TO_CATALOGUS, so it has no catalog
   // row from deriveBaseCatalog above despite being real, detectable, and
-  // present in reference.dagstree.yaml (`role: ci`).
+  // present in reference.catalogus.yaml (`role: ci`).
   { slug: "github-actions", name: "GitHub Actions" },
   // Coding agents, added 2026-08-24 alongside the amendment that removed
   // project.coding_agents: a coding agent is now a service entry (`role:
   // coding-agent`), so it needs a display row like any other vendor. Never
-  // through SPECFY_TO_DAGSTREE either -- coding agents are a Dagstree-
+  // through SPECFY_TO_CATALOGUS either -- coding agents are a Catalogus-
   // specific detector (detectors/coding-agents.ts), not a stack-analyser
   // technology, so they have no MappingEntry to derive from. The four slugs
   // below are exactly detectCodingAgents' MARKERS table (agent-code.ts) --
@@ -399,7 +399,7 @@ const ICON_OVERLAY: Record<string, string> = {
 
 /**
  * Exported only for catalog.test.ts, so it can assert every key here landed
- * a row in DAGSTREE_CATALOG (see the build IIFE below) without duplicating
+ * a row in CATALOGUS_CATALOG (see the build IIFE below) without duplicating
  * this table or re-deriving it from the built catalog, which could not tell
  * "landed" from "never tried". Not part of this package's public API surface
  * -- packages/core/src/index.ts does not re-export it.
@@ -407,7 +407,7 @@ const ICON_OVERLAY: Record<string, string> = {
 export { ICON_OVERLAY };
 
 /**
- * The full Dagstree service catalog, keyed by dagstree slug: the derived
+ * The full Catalogus service catalog, keyed by catalogus slug: the derived
  * base (deriveBaseCatalog), overlaid with EXTRA_ROWS, overlaid with an
  * `icon` wherever ICON_OVERLAY has one. Built once at module load.
  *
@@ -425,9 +425,9 @@ export { ICON_OVERLAY };
  * hasOwnProperty, ...) is simply absent, same as any other slug nobody has
  * catalogued.
  */
-export const DAGSTREE_CATALOG: Record<string, CatalogEntry> = (() => {
+export const CATALOGUS_CATALOG: Record<string, CatalogEntry> = (() => {
   const catalog: Record<string, CatalogEntry> = Object.create(null) as Record<string, CatalogEntry>;
-  for (const [slug, base] of Object.entries(deriveBaseCatalog(SPECFY_TO_DAGSTREE))) {
+  for (const [slug, base] of Object.entries(deriveBaseCatalog(SPECFY_TO_CATALOGUS))) {
     catalog[slug] = { slug, name: base.name };
   }
   for (const row of EXTRA_ROWS) {
@@ -442,18 +442,18 @@ export const DAGSTREE_CATALOG: Record<string, CatalogEntry> = (() => {
 })();
 
 /**
- * Looks up a Dagstree slug's catalog entry. Returns undefined for a slug
+ * Looks up a Catalogus slug's catalog entry. Returns undefined for a slug
  * with no row -- not a synthesised placeholder -- because a manifest's
- * `service:` field is open vocabulary (@dagstree/schema accepts any slug
+ * `service:` field is open vocabulary (@catalogus/schema accepts any slug
  * matching its pattern) and the viewer must already render an unknown slug
  * with a generic fallback rather than a fabricated name.
  *
- * A plain property read (`DAGSTREE_CATALOG[slug]`), not `catalog[slug] ??
+ * A plain property read (`CATALOGUS_CATALOG[slug]`), not `catalog[slug] ??
  * undefined` or similar -- safe against Object.prototype keys precisely
- * because DAGSTREE_CATALOG itself is null-prototype (see its own doc
+ * because CATALOGUS_CATALOG itself is null-prototype (see its own doc
  * comment); there is nothing here to fix, the fix lives in how the table
  * was built.
  */
 export function getCatalogEntry(slug: string): CatalogEntry | undefined {
-  return DAGSTREE_CATALOG[slug];
+  return CATALOGUS_CATALOG[slug];
 }

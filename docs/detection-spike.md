@@ -138,7 +138,7 @@ the CLI's `graph`/`diff` output on top of this package later.
 
 ## Per-repo results
 
-| Repo | Scan time | stack-analyser detections | Dagstree-specific detections |
+| Repo | Scan time | stack-analyser detections | Catalogus-specific detections |
 |---|---|---|---|
 | Clapline | 155ms | flyio, github, nginx, slack, + 14 languages/frameworks in `src/frontend` | Claude Code, AGENTS.md; Fly.io (4 files → 1 detection); VCS github (remote), CI github-actions |
 | waymark | 10ms | nextjs, react, eslint, tailwind, typescript, vite, + languages | Claude Code, AGENTS.md; no hosting marker; VCS github (remote), no CI marker |
@@ -172,7 +172,7 @@ though Clapline has `fly.toml`, `fly.web.toml`, `fly.grafana.toml`, and
 `fly.loki.toml` at its root. stack-analyser's own `flyio` rule (`files:
 ['fly.toml']`) is an **exact filename match**, so it only ever sees the
 literal `fly.toml` — the three variants are invisible to it. That's exactly
-why HANDOFF.md §6 asks for a Dagstree-specific hosting detector rather than
+why HANDOFF.md §6 asks for a Catalogus-specific hosting detector rather than
 relying on stack-analyser alone: `packages/core/src/detectors/hosting.ts`
 globs for `/^fly[\w.-]*\.toml$/i` at the repo root and folds every match
 into one `Fly.io` detection with all four filenames as evidence —
@@ -325,7 +325,7 @@ doesn't actually exist in the library:
 | `supabase.postgres` | Supabase Postgres | db | yes → `supabase` / db |
 | `supabase.storage` | Supabase Storage | storage | yes → `supabase` / storage |
 | `supabase.functions` | Supabase Functions | hosting | yes → `supabase` / hosting |
-| `supabase.realtime` | Supabase Realtime | queue | yes → `supabase` / other (no `queue` category in Dagstree's enum) |
+| `supabase.realtime` | Supabase Realtime | queue | yes → `supabase` / other (no `queue` category in Catalogus's enum) |
 | `postgresql` | Postgres | db | yes → `postgresql` / db |
 | `vercel.postgres` | Vercel Postgres | db | yes → `vercel-postgres` / db |
 | `anthropic` | Anthropic | ai | yes → `anthropic` / ai |
@@ -356,7 +356,7 @@ doesn't actually exist in the library:
   directly would get the more specific `supabase.auth` → category `auth`.
 - Namecheap, and cost/billing/account data generally, cannot appear in
   `mapping.ts` — there is no stack-analyser slug to map *from*. That's
-  Layer 2 (manual `service: namecheap` entry in `dagstree.yaml`) and Layer
+  Layer 2 (manual `service: namecheap` entry in `catalogus.yaml`) and Layer
   3 (private overlay) territory, exactly as HANDOFF.md §6 says.
 - Everything stack-analyser detects that isn't in `mapping.ts` (languages,
   frameworks, build tools — `react`, `typescript`, `vite`, `docker`, `css`,

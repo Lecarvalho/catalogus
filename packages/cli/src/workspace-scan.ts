@@ -1,13 +1,13 @@
 // Workspace scanner: the data source behind Phase 3.7's viewer. Given an
 // absolute path to a directory that holds several repositories side by
-// side, finds every immediate child directory that carries a Dagstree
+// side, finds every immediate child directory that carries a Catalogus
 // manifest, loads and validates each one, and returns a stable report the
 // caller can render -- one broken manifest must not sink the scan (see
 // WorkspaceScanResult below).
 //
 // Depth 1 only -- immediate children of root, no recursion. Grounded, not
 // assumed: the owner's real workspace root holds repos as direct
-// subdirectories (18 of them, one carrying a dagstree.yaml, at the time
+// subdirectories (18 of them, one carrying a catalogus.yaml, at the time
 // this was written). Recursing would walk into node_modules and every
 // nested worktree inside each of those repos, which is both ruinously slow
 // and wrong -- a manifest sitting inside a dependency is not a project in
@@ -17,8 +17,8 @@ import type { Dirent } from "node:fs";
 import { readdir, readlink, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
-import { parseManifest } from "@dagstree/schema";
-import type { DagstreeManifestError, DagstreeManifestV1 } from "@dagstree/schema";
+import { parseManifest } from "@catalogus/schema";
+import type { CatalogusManifestError, CatalogusManifestV1 } from "@catalogus/schema";
 
 import { findManifestIn, readManifestText } from "./manifest-io.js";
 import type { ManifestLocation } from "./manifest-io.js";
@@ -51,7 +51,7 @@ async function assertValidWorkspaceRoot(root: string): Promise<void> {
 export interface WorkspaceRepoRef {
   /** Absolute path to the repo directory. */
   path: string;
-  /** The directory's own name -- e.g. "dagstree" for C:/repos/dagstree. */
+  /** The directory's own name -- e.g. "catalogus" for C:/repos/catalogus. */
   name: string;
 }
 
@@ -66,7 +66,7 @@ export interface WorkspaceRepoRef {
  * case is folded in here rather than getting a reason of its own.
  * "malformed-yaml" -- the file isn't valid YAML at all.
  * "invalid" -- it parses but fails schema/referential validation (the
- * same class of problem `dagstree validate` reports in full).
+ * same class of problem `catalogus validate` reports in full).
  */
 export type WorkspaceManifestFailureReason = "unreadable" | "malformed-yaml" | "invalid";
 
@@ -77,18 +77,18 @@ export interface WorkspaceManifestFailure extends WorkspaceRepoRef {
   /** Human-readable summary, always non-empty. */
   message: string;
   /**
-   * Structured detail from @dagstree/schema when available -- empty for
+   * Structured detail from @catalogus/schema when available -- empty for
    * "unreadable" (there was never anything to parse), one synthetic entry
    * for "malformed-yaml" (schema's own "Could not parse YAML: ..." error),
    * the full validation error list for "invalid".
    */
-  errors: readonly DagstreeManifestError[];
+  errors: readonly CatalogusManifestError[];
 }
 
 export interface WorkspaceManifestEntry extends WorkspaceRepoRef {
-  /** Which manifest file was found -- dagstree.yaml, or the stack.yaml fallback. */
+  /** Which manifest file was found -- catalogus.yaml, or the stack.yaml fallback. */
   location: ManifestLocation;
-  manifest: DagstreeManifestV1;
+  manifest: CatalogusManifestV1;
 }
 
 export interface WorkspaceScanResult {
@@ -99,8 +99,8 @@ export interface WorkspaceScanResult {
   /** Repos with a manifest file that could not be turned into a valid manifest. */
   failures: WorkspaceManifestFailure[];
   /**
-   * Immediate children with no dagstree.yaml or stack.yaml at all. Not an
-   * error -- most directories in a workspace root are not Dagstree
+   * Immediate children with no catalogus.yaml or stack.yaml at all. Not an
+   * error -- most directories in a workspace root are not Catalogus
    * projects -- kept separate from `failures` because "has no manifest"
    * and "has a broken manifest" are different facts a viewer renders
    * differently.
@@ -113,7 +113,7 @@ export interface WorkspaceScanResult {
  * `errors` describes an ordinary validation failure instead.
  *
  * parseManifest() (packages/schema/src/validate.ts) folds a YAML syntax
- * error into the same DagstreeValidationResult shape as a schema failure,
+ * error into the same CatalogusValidationResult shape as a schema failure,
  * distinguished only by this exact message prefix and by being the sole,
  * path-less error -- there's no separate discriminant to import instead,
  * so this mirrors validate.ts's own text. If that message ever changes,
@@ -121,7 +121,7 @@ export interface WorkspaceScanResult {
  * than "malformed-yaml" (still reported, just under the less specific
  * reason).
  */
-function malformedYamlError(errors: readonly DagstreeManifestError[]): DagstreeManifestError | null {
+function malformedYamlError(errors: readonly CatalogusManifestError[]): CatalogusManifestError | null {
   const only = errors.length === 1 ? errors[0] : undefined;
   if (!only) {
     return null;
@@ -129,7 +129,7 @@ function malformedYamlError(errors: readonly DagstreeManifestError[]): DagstreeM
   return only.instancePath === "" && only.message.startsWith("Could not parse YAML:") ? only : null;
 }
 
-function summarizeErrors(location: ManifestLocation, errors: readonly DagstreeManifestError[]): string {
+function summarizeErrors(location: ManifestLocation, errors: readonly CatalogusManifestError[]): string {
   const count = errors.length === 1 ? "1 error" : `${errors.length} errors`;
   return `${location.filePath} does not pass validation (${count}): ${errors.map((error) => error.message).join("; ")}`;
 }
@@ -189,7 +189,7 @@ async function classifyEntry(root: string, dirent: Dirent): Promise<ScanEntry | 
  * -- see WorkspaceManifestFailureReason's doc comment -- since "we could
  * not read what this entry names" is exactly true here, just one step
  * earlier than the usual case: `location` names the link itself, not a
- * guessed dagstree.yaml/stack.yaml filename, because the scan never got
+ * guessed catalogus.yaml/stack.yaml filename, because the scan never got
  * far enough to know which name would have applied inside it.
  */
 function brokenLinkFailure(ref: WorkspaceRepoRef): WorkspaceManifestFailure {
@@ -206,7 +206,7 @@ function brokenLinkFailure(ref: WorkspaceRepoRef): WorkspaceManifestFailure {
  * Scans an absolute workspace root and reports what its immediate child
  * directories hold. Read-only -- never writes anywhere. Rejects with
  * InvalidWorkspaceRootError for a missing root, a non-directory, or a
- * relative path, the same absolute-only contract @dagstree/core's
+ * relative path, the same absolute-only contract @catalogus/core's
  * detect() enforces for repoPath (see packages/core/src/index.ts) and for
  * the same reason: resolving a relative root against an unstated cwd is
  * guessing, and a bad root is a caller error, unlike a bad manifest inside

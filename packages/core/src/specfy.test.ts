@@ -8,7 +8,7 @@ function find(technologies: Awaited<ReturnType<typeof runStackAnalyser>>, specfy
 }
 
 describe("runStackAnalyser", () => {
-  it("maps a dependency-detected service into Dagstree's namespace with evidence", async () => {
+  it("maps a dependency-detected service into Catalogus's namespace with evidence", async () => {
     const technologies = await runStackAnalyser(fixturePath("stack-analyser", "supabase-project"));
 
     const supabase = find(technologies, "supabase");

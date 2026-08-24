@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /** A fresh temp directory per call, for tests that need a real filesystem project to point commands at. */
-export async function createTempDir(prefix = "dagstree-cli-test-"): Promise<string> {
+export async function createTempDir(prefix = "catalogus-cli-test-"): Promise<string> {
   return mkdtemp(join(tmpdir(), prefix));
 }
 

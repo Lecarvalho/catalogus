@@ -1,10 +1,10 @@
-// @dagstree/cli's public surface -- the offline command surface of the
-// `dagstree` binary (init, detect, diff, validate, graph, add). Every
+// @catalogus/cli's public surface -- the offline command surface of the
+// `catalogus` binary (init, detect, diff, validate, graph, add). Every
 // command is a plain async function returning a CommandResult rather than
 // printing/exiting itself, so it can be called directly in tests or from
 // another program; src/cli.ts is the only place that turns a CommandResult
 // into actual stdout/stderr output and a process exit code.
-export const CLI_PACKAGE_NAME = "dagstree";
+export const CLI_PACKAGE_NAME = "@catalogus/cli";
 
 export type { CommandResult } from "./types.js";
 

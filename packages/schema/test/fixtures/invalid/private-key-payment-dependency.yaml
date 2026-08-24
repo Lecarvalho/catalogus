@@ -1,6 +1,6 @@
 # Private-key family: payment/plan. Nested inside a dependency edge's
 # object form, with a compound word (plan_tier).
-dagstree: 1
+catalogus: 1
 project:
   name: Clapline
   slug: clapline

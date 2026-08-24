@@ -53,7 +53,7 @@ describe("runCli", () => {
     // a blanket-silenced writeErr, leaving only its internal
     // "(outputHelp)" placeholder to print.
     const printed = written(err);
-    expect(printed).toContain("Usage: dagstree");
+    expect(printed).toContain("Usage: catalogus");
     expect(printed).toContain("Commands:");
     expect(printed).not.toContain("(outputHelp)");
     expect(written(out)).toBe("");
@@ -67,7 +67,7 @@ describe("runCli", () => {
     expect(exitCode).toBe(0);
     expect(written(err)).toBe("");
     const printed = written(out);
-    expect(printed.match(/Usage: dagstree/g)).toHaveLength(1);
+    expect(printed.match(/Usage: catalogus/g)).toHaveLength(1);
   });
 
   it("prints help exactly once (not doubled) for the bare `help` subcommand", async () => {
@@ -77,7 +77,7 @@ describe("runCli", () => {
 
     expect(exitCode).toBe(0);
     const printed = written(out);
-    expect(printed.match(/Usage: dagstree/g)).toHaveLength(1);
+    expect(printed.match(/Usage: catalogus/g)).toHaveLength(1);
   });
 
   it("redirects an unrecognized private-looking flag to the private-overlay message, at exit 2", async () => {
@@ -130,14 +130,14 @@ describe("runCli", () => {
       try {
         await writeFixtureFile(
           dir,
-          "dagstree.yaml",
-          "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
+          "catalogus.yaml",
+          "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
         );
 
         const exitCode = await runCli(["add", "fly-io", dir, "--role", "hosting"]);
 
         expect(exitCode).toBe(0);
-        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
         expect(text).toContain("service: fly-io");
       } finally {
         await removeTempDir(dir);
@@ -153,8 +153,8 @@ describe("runCli", () => {
       try {
         await writeFixtureFile(
           dir,
-          "dagstree.yaml",
-          "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
+          "catalogus.yaml",
+          "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
         );
 
         // --version is the sharp one. commander registers `--version` on the
@@ -175,7 +175,7 @@ describe("runCli", () => {
         ]);
 
         expect(exitCode).toBe(0);
-        const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+        const parsed = parse(await readFile(join(dir, "catalogus.yaml"), "utf8"));
         expect(parsed.services).toHaveLength(1);
         expect(parsed.services[0]).toMatchObject({ service: "dotnet", kind: "stack", version: "10" });
       } finally {
@@ -189,8 +189,8 @@ describe("runCli", () => {
       try {
         await writeFixtureFile(
           dir,
-          "dagstree.yaml",
-          "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
+          "catalogus.yaml",
+          "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
         );
 
         // The action used to build its options object field by field and
@@ -199,7 +199,7 @@ describe("runCli", () => {
         const exitCode = await runCli(["add", "foo", dir, "--kind", "widget", "--role", "x"]);
 
         expect(exitCode).toBe(2);
-        const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+        const parsed = parse(await readFile(join(dir, "catalogus.yaml"), "utf8"));
         expect(parsed.services).toEqual([]);
       } finally {
         await removeTempDir(dir);
@@ -210,7 +210,7 @@ describe("runCli", () => {
       spyOnStreams();
       // The other half of the enablePositionalOptions change: scoping
       // options to the command they follow must not cost the conventional
-      // top-level `dagstree --version`.
+      // top-level `catalogus --version`.
       await expect(runCli(["--version"])).resolves.toBe(0);
     });
 
@@ -220,13 +220,13 @@ describe("runCli", () => {
       const dir = await createTempDir();
       const otherDir = await createTempDir();
       try {
-        const manifest = "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n";
-        await writeFixtureFile(dir, "dagstree.yaml", manifest);
+        const manifest = "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n";
+        await writeFixtureFile(dir, "catalogus.yaml", manifest);
 
         const exitCode = await runCli(["add", "fly-io", dir, "--role", "hosting", "--path", otherDir]);
 
         expect(exitCode).toBe(2);
-        const after = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        const after = await readFile(join(dir, "catalogus.yaml"), "utf8");
         expect(after).toBe(manifest);
       } finally {
         await removeTempDir(dir);
@@ -241,7 +241,7 @@ describe("runCli", () => {
   // where link and deprecate take a positional [path] -- and that is exactly
   // the kind of wiring a direct call to the command function cannot check.
   describe("the manifest-writing commands, driven through argv", () => {
-    const SCAFFOLD = ["dagstree: 1", "project:", "  name: X", "  slug: x", "services: []", "dependencies: []", ""].join(
+    const SCAFFOLD = ["catalogus: 1", "project:", "  name: X", "  slug: x", "services: []", "dependencies: []", ""].join(
       "\n"
     );
 
@@ -249,7 +249,7 @@ describe("runCli", () => {
       spyOnStreams();
       const dir = await createTempDir();
       try {
-        await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+        await writeFixtureFile(dir, "catalogus.yaml", SCAFFOLD);
 
         const exitCode = await runCli([
           "set",
@@ -262,7 +262,7 @@ describe("runCli", () => {
         ]);
 
         expect(exitCode).toBe(0);
-        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
         expect(text).toContain("architecture: two-tier");
         expect(text).toContain("visibility: private");
       } finally {
@@ -274,14 +274,14 @@ describe("runCli", () => {
       spyOnStreams();
       const dir = await createTempDir();
       try {
-        await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+        await writeFixtureFile(dir, "catalogus.yaml", SCAFFOLD);
         await runCli(["add", "fly-io", dir, "--role", "hosting"]);
         await runCli(["add", "supabase", dir, "--role", "database"]);
 
         const exitCode = await runCli(["link", "fly-io", "supabase", dir]);
 
         expect(exitCode).toBe(0);
-        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
         expect(text).toContain("[fly-io, supabase]");
       } finally {
         await removeTempDir(dir);
@@ -292,7 +292,7 @@ describe("runCli", () => {
       spyOnStreams();
       const dir = await createTempDir();
       try {
-        await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+        await writeFixtureFile(dir, "catalogus.yaml", SCAFFOLD);
         await runCli(["add", "heroku", dir, "--role", "hosting"]);
         await runCli(["add", "fly-io", dir, "--role", "hosting"]);
 
@@ -307,7 +307,7 @@ describe("runCli", () => {
         ]);
 
         expect(exitCode).toBe(0);
-        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
         expect(text).toContain("status: phasing_out");
         expect(text).toContain("replaced_by: fly-io");
       } finally {
@@ -319,7 +319,7 @@ describe("runCli", () => {
       spyOnStreams();
       const dir = await createTempDir();
       try {
-        await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+        await writeFixtureFile(dir, "catalogus.yaml", SCAFFOLD);
         await runCli(["add", "fly-io", dir, "--role", "hosting"]);
         await runCli(["add", "supabase", dir, "--role", "database"]);
         await runCli(["link", "fly-io", "supabase", dir]);
@@ -327,7 +327,7 @@ describe("runCli", () => {
         const exitCode = await runCli(["remove", "supabase", dir]);
 
         expect(exitCode).toBe(0);
-        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
         expect(text).not.toContain("supabase");
         expect(text).toContain("dependencies: []");
       } finally {
@@ -339,7 +339,7 @@ describe("runCli", () => {
       spyOnStreams();
       const dir = await createTempDir();
       try {
-        await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+        await writeFixtureFile(dir, "catalogus.yaml", SCAFFOLD);
         await runCli(["add", "fly-io", dir, "--role", "hosting"]);
         await runCli(["add", "supabase", dir, "--role", "database"]);
         await runCli(["link", "fly-io", "supabase", dir]);
@@ -350,7 +350,7 @@ describe("runCli", () => {
         const exitCode = await runCli(["rename", "supabase", "supabase-db", dir]);
 
         expect(exitCode).toBe(0);
-        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
         expect(text).toContain("id: supabase-db");
         expect(text).toContain("[fly-io, supabase-db]");
         expect(await runCli(["validate", dir])).toBe(0);

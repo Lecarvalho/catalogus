@@ -1,16 +1,16 @@
 ---
-name: dagstree
-description: Catalog a project's service providers, infrastructure and stack metadata into a dagstree.yaml manifest, using the `dagstree` CLI. Runs the scanner, then fills in what a scan can never reveal — dependency edges, registrar, PM tooling, architecture style, lifecycle — by asking the user the right questions and recording the answers. Use when the user asks to catalog, inventory or map this project's services, dependencies, infrastructure or stack; to create, fill in, audit or update a dagstree.yaml or stack.yaml; to answer "what does this project depend on"; or mentions Dagstree by name.
+name: catalogus
+description: Catalog a project's service providers, infrastructure and stack metadata into a catalogus.yaml manifest, using the `catalogus` CLI. Runs the scanner, then fills in what a scan can never reveal — dependency edges, registrar, PM tooling, architecture style, lifecycle — by asking the user the right questions and recording the answers. Use when the user asks to catalog, inventory or map this project's services, dependencies, infrastructure or stack; to create, fill in, audit or update a catalogus.yaml or stack.yaml; to answer "what does this project depend on"; or mentions Catalogus by name.
 ---
 
-# Dagstree — cataloging a project
+# Catalogus — cataloging a project
 
-Dagstree is a project operations registry. For each project it records the service providers,
+Catalogus is a project operations registry. For each project it records the service providers,
 infrastructure, dependencies and stack metadata behind it, so questions like "what does this
 project depend on", "which projects break if this vendor goes down", and "what am I paying for"
 have one answer instead of none.
 
-This skill covers one job: producing an accurate `dagstree.yaml` for the repository you are
+This skill covers one job: producing an accurate `catalogus.yaml` for the repository you are
 currently in.
 
 The scanner gets you perhaps two thirds of the way. The rest — which service talks to which, who
@@ -20,10 +20,10 @@ having.** A manifest containing only what a scanner found is a list with icons.
 
 ## The CLI does the writing
 
-**The `dagstree` CLI is required.** Check it first:
+**The `catalogus` CLI is required.** Check it first:
 
 ```
-dagstree --version
+catalogus --version
 ```
 
 If that fails, stop and tell the user the CLI is not installed. **Do not hand-write a manifest from
@@ -34,49 +34,49 @@ will drift from the schema the moment it changes.
 The commands you will use:
 
 ```
-dagstree detect            # what the scanner can see, grouped by category
-dagstree init --yes [--visibility <v>]   # create the manifest: project fields only, no service entries
-dagstree add <service> --role <r> [--kind <k>] [--version <v>] [--depends-on <id>...] [--id <id>]
-dagstree set <field> <value> [<field> <value> ...]   # project fields, or a service's role/kind/version
-dagstree link <from> <to>  # one edge between services that already exist
-dagstree deprecate <id> [--status phasing_out] [--replaced-by <id>]
-dagstree remove <id>       # delete a wrong entry, and every edge naming it
-dagstree rename <old> <new> # change a local id, moving its edges and replaced_by with it
-dagstree validate          # schema, referential integrity, acyclicity, private-data guard
-dagstree diff              # detected vs declared, both directions
-dagstree graph [--mermaid] # render the DAG
+catalogus detect           # what the scanner can see, grouped by category
+catalogus init --yes [--visibility <v>]  # create the manifest: project fields only, no service entries
+catalogus add <service> --role <r> [--kind <k>] [--version <v>] [--depends-on <id>...] [--id <id>]
+catalogus set <field> <value> [<field> <value> ...]  # project fields, or a service's role/kind/version
+catalogus link <from> <to> # one edge between services that already exist
+catalogus deprecate <id> [--status phasing_out] [--replaced-by <id>]
+catalogus remove <id>      # delete a wrong entry, and every edge naming it
+catalogus rename <old> <new> # change a local id, moving its edges and replaced_by with it
+catalogus validate         # schema, referential integrity, acyclicity, private-data guard
+catalogus diff             # detected vs declared, both directions
+catalogus graph [--mermaid] # render the DAG
 ```
 
-`dagstree add` is how services and edges get into the file. Do not append service entries by hand:
+`catalogus add` is how services and edges get into the file. Do not append service entries by hand:
 `add` derives the local id, rejects duplicates, validates before writing, and preserves the comments
 and `$schema` modeline that a parse-and-rewrite would destroy.
 
 ### There is no hand-edit exception
 
-Every Layer 2 field has a command behind it. Do not open `dagstree.yaml` in an editor:
+Every Layer 2 field has a command behind it. Do not open `catalogus.yaml` in an editor:
 
 ```
-dagstree set project.architecture "modular monolith (.NET 10, vertical slices)"
-dagstree set project.vcs.visibility private
-dagstree add trello --role pm
-dagstree add claude-code --role coding-agent
-dagstree add github --role vcs
-dagstree set project.name "Sluglin" project.slug sluglin
-dagstree set services.supabase-db.role database
-dagstree set services.dotnet.version 10
-dagstree link fly-api supabase-db
-dagstree deprecate vertex --status phasing_out --replaced-by anthropic-api
+catalogus set project.architecture "modular monolith (.NET 10, vertical slices)"
+catalogus set project.vcs.visibility private
+catalogus add trello --role pm
+catalogus add claude-code --role coding-agent
+catalogus add github --role vcs
+catalogus set project.name "Sluglin" project.slug sluglin
+catalogus set services.supabase-db.role database
+catalogus set services.dotnet.version 10
+catalogus link fly-api supabase-db
+catalogus deprecate vertex --status phasing_out --replaced-by anthropic-api
 ```
 
 `project.name` and `project.slug` are settable even though `init` writes them first: its `--yes`
 value is a directory name, which is a guess, and this is how you correct it once you know better.
 A service's `role` is settable the same way — a wrong role is a `set`, not a remove-and-re-add.
-A wrong *id* is a `dagstree rename <old> <new>`, not a remove-and-re-add either: it moves both
+A wrong *id* is a `catalogus rename <old> <new>`, not a remove-and-re-add either: it moves both
 endpoints of every edge and any other entry's `replaced_by` along with the entry, which is the part
 a delete-and-recreate loses.
 
 `project.vcs` carries only `visibility` now — the PM tool, the VCS provider and each coding agent
-are service entries (`role: pm`, `role: vcs`, `role: coding-agent`), added with `dagstree add`, not
+are service entries (`role: pm`, `role: vcs`, `role: coding-agent`), added with `catalogus add`, not
 project fields written with `set`. This is the 2026-08-24 change: the manifest used to state some
 things twice (`github` as both `project.vcs.provider` and a `role: vcs` service entry; Trello as
 both free-text `project.pm` and a `role: pm` service entry), and a project-level field can never be
@@ -94,7 +94,7 @@ If a field you need has no command, say so rather than working around it with an
 edit is how a manifest ends up failing a client's CI. The shape those commands produce, as a
 fragment, for reading rather than copying:
 
-<!-- dagstree:fragment -->
+<!-- catalogus:fragment -->
 ```yaml
 project:
   architecture: "modular monolith (.NET 10, vertical slices)"
@@ -111,7 +111,7 @@ services:
   - id: github                # VCS provider -- role: vcs, not project.vcs.provider
     service: github
     role: vcs
-  - id: vertex                # an entry dagstree add already created
+  - id: vertex                # an entry catalogus add already created
     status: phasing_out       # active | deprecated | phasing_out | removed
     replaced_by: anthropic-api
   - id: dotnet
@@ -120,11 +120,11 @@ services:
 ```
 
 Every one of those commands validates before it writes and preserves the comments and `$schema`
-modeline already in the file, so **run `dagstree validate` to confirm, not to repair.**
+modeline already in the file, so **run `catalogus validate` to confirm, not to repair.**
 
 ## The one rule that matters
 
-`dagstree.yaml` is **Layer 2**: committed to the repository, and it must stay safe to publish in a
+`catalogus.yaml` is **Layer 2**: committed to the repository, and it must stay safe to publish in a
 public repo.
 
 **Never write into it:** cost or price, billing details, plan tier, renewal dates, account
@@ -132,7 +132,7 @@ identifiers, usernames, email addresses, API keys, tokens, passwords, connection
 and tenant identifiers.
 
 That data is **Layer 3** and belongs in the private overlay, reachable only through
-`dagstree push --private`. If the user offers you cost or account information, do not put it in the
+`catalogus push --private`. If the user offers you cost or account information, do not put it in the
 file — say where it goes instead. The CLI will refuse it, but it should never get that far.
 
 The practical form of this rule while you work: **read configuration key names, never configuration
@@ -146,7 +146,7 @@ uses Supabase; never record which Supabase project.
 
 ## Procedure
 
-**Run `dagstree detect` before you read anything.** It is the first action, not a step you reach
+**Run `catalogus detect` before you read anything.** It is the first action, not a step you reach
 after orienting yourself. It reads dependency manifests and configuration key names across the tree
 and reports each finding with the file that proved it, which is most of a manual exploration pass
 already done — and its output tells you which files are worth opening. Exploring first means
@@ -166,14 +166,14 @@ not issuing twenty round trips for twenty independent questions. Only the CLI wr
 If your harness can delegate a read-only research pass to a separate context, that is better still —
 the reads are large and their answers are small, so delegating keeps your own context for step 5,
 which is the part that carries the value. Two conditions if you do. Seed it with what
-`dagstree detect` already found rather than sending it in blind, or it will re-derive by hand what
+`catalogus detect` already found rather than sending it in blind, or it will re-derive by hand what
 one command already produced. And give it the same rule you work under: key names and file paths,
 never configuration values, and evidence attached to every claim rather than conclusions.
 
 ### 1. Scan
 
 ```
-dagstree detect
+catalogus detect
 ```
 
 Read the output critically before using it.
@@ -189,7 +189,7 @@ noise, and the kind is a flag you pass straight to `add`:
   logs to Loki. `--kind component`.
 - **`stack`** — the language, runtime or framework the code is written in. .NET, React, Python,
   Angular. Attach it by an edge to whatever runs it (`--depends-on` from the API entry, or
-  `dagstree link fly-api dotnet`), and give it `--version` — that is the number a tile shows and
+  `catalogus link fly-api dotnet`), and give it `--version` — that is the number a tile shows and
   the one an end-of-life date keys off. `--kind stack`.
 - **noise** — ESLint, Prettier, Vitest, a build tool. Code a developer runs, not something the
   project depends on at runtime. `detect` collapses these under a count; they are not entries in
@@ -212,39 +212,39 @@ set up in a web console — none of it leaves a trace in the files.
 **When it cannot tell, it says so instead of picking.** `AGENTS.md` and `.agents/` prove a coding
 agent works in this repo without naming which one, so `detect` reports them as unidentified rather
 than inventing an agent. That is a question for the owner: ask, then
-`dagstree add <agent> --role coding-agent`. The same applies everywhere in this
+`catalogus add <agent> --role coding-agent`. The same applies everywhere in this
 procedure — an unanswered field is a question, never a plausible default. A guess that happens to
 be right is worse than a gap, because nobody goes back to check it.
 
 ### 2. Create the manifest
 
 ```
-dagstree init --yes
+catalogus init --yes
 ```
 
-This writes `dagstree.yaml` with the project name inferred from the directory and, if you pass
+This writes `catalogus.yaml` with the project name inferred from the directory and, if you pass
 `--visibility`, `project.vcs.visibility` — and **no service entries at all**, not even ones
 detection can name with confidence. A VCS provider and a coding agent are both service entries now
 (`role: vcs`, `role: coding-agent`), so `init` does not write them either: it tells you what
-detection found and the `dagstree add ... --role ...` command that records each one, the same way
+detection found and the `catalogus add ... --role ...` command that records each one, the same way
 it already does for every other detected service. It does not write `project.vcs` at all unless you
 pass `--visibility`, because visibility cannot be detected — see "Visibility is asked, never
 guessed" above. That is deliberate for services generally: a service entry needs a `role` — what
 this instance does here, `database`, `hosting-api` — and detection only knows a *category*
 (`db`, `ai`, `other`). Services go in one at a time in step 6, each with a role you decided on.
 
-`init` prints how many services detection found and tells you to run `dagstree diff` for the list.
+`init` prints how many services detection found and tells you to run `catalogus diff` for the list.
 
-If a manifest already exists, do not re-initialise it — run `dagstree diff` and work from what it
-reports as missing or stale. **Never delete `dagstree.yaml` to start over.** It is a committed file
+If a manifest already exists, do not re-initialise it — run `catalogus diff` and work from what it
+reports as missing or stale. **Never delete `catalogus.yaml` to start over.** It is a committed file
 that may hold answers a previous session got from the user, and nothing in this procedure requires
 a clean slate. If a wrong entry needs undoing — a typo'd role, a service that turns out not to be
-used — `dagstree remove <id>` takes it out, along with every dependency edge that named it; see
+used — `catalogus remove <id>` takes it out, along with every dependency edge that named it; see
 step 6.
 
 ### 3. Corroborate against configuration
 
-`dagstree detect` reads dependency manifests *and* configuration key names, so most of the table
+`catalogus detect` reads dependency manifests *and* configuration key names, so most of the table
 below is already covered — evidence lines reading `config key: Stripe` are that pass. Read the
 files yourself anyway: detection matches provider names it knows, and a provider outside its
 catalog leaves a key group nobody claimed. A settings key means someone actually wired the thing
@@ -280,7 +280,7 @@ provider and object storage, had no key in any committed settings file. **Code i
 gap**, which is why dependency registration, adapter classes and configuration-guard classes are in
 the table above — they name a provider whether or not a settings file does.
 
-The corollary matters when you read `dagstree diff`: an entry listed under **"declared in the
+The corollary matters when you read `catalogus diff`: an entry listed under **"declared in the
 manifest but not visible to detection here" is not automatically stale.** It may be a service
 configured only in a file detection cannot see, or one no scan could ever find. `diff` reports what
 detection can see, never what is true, and it says so under that list. Do not remove an entry on
@@ -381,7 +381,7 @@ this skill's job: the deliverable is the providers, the services, the external d
 relationships between them. Record the project name the owner uses and move on.
 
 If the project name does turn out to be wrong — `init --yes` derived it from the directory, which is
-a guess — `dagstree set project.name "<answer>"` corrects it, plus `project.slug` if that should
+a guess — `catalogus set project.name "<answer>"` corrects it, plus `project.slug` if that should
 change too.
 
 **Ask about lifecycle**, which is invisible to any scan and is half the point of the registry:
@@ -394,19 +394,19 @@ things like architecture style.
 
 ### 6. Record the answers
 
-`dagstree diff` is the work list: it prints every detected service not yet in the manifest. Add them
+`catalogus diff` is the work list: it prints every detected service not yet in the manifest. Add them
 one at a time, each with a real role, plus everything the user told you that detection could not see:
 
 ```
-dagstree diff
-dagstree add supabase --role database --id supabase-db
-dagstree add supabase --role auth --id supabase-auth --depends-on supabase-db
-dagstree add nginx --kind component --role ingress-proxy --depends-on fly-api
-dagstree add dotnet --kind stack --version 10 --role runtime-backend
-dagstree link fly-api dotnet
-dagstree add trello --role pm
-dagstree add claude-code --role coding-agent
-dagstree add github --role vcs
+catalogus diff
+catalogus add supabase --role database --id supabase-db
+catalogus add supabase --role auth --id supabase-auth --depends-on supabase-db
+catalogus add nginx --kind component --role ingress-proxy --depends-on fly-api
+catalogus add dotnet --kind stack --version 10 --role runtime-backend
+catalogus link fly-api dotnet
+catalogus add trello --role pm
+catalogus add claude-code --role coding-agent
+catalogus add github --role vcs
 ```
 
 The last three are the PM tool, a coding agent and the VCS provider — service entries like any
@@ -474,22 +474,22 @@ service genuinely does two jobs, that is two entries (which is the same rule as 
 `supabase-db` and `supabase-auth`).
 
 Project-level answers through the CLI too — architecture, VCS visibility, and a corrected project
-name or slug via `dagstree set`; PM tooling, the VCS provider and each coding agent via `dagstree
-add <slug> --role pm|vcs|coding-agent`; an edge you remember later via `dagstree link`; a phase-out
-via `dagstree deprecate`; a wrong `add` undone via `dagstree remove`; a wrong role corrected via
-`dagstree set services.<id>.role` rather than by removing and re-adding the entry. Nothing gets
+name or slug via `catalogus set`; PM tooling, the VCS provider and each coding agent via `catalogus
+add <slug> --role pm|vcs|coding-agent`; an edge you remember later via `catalogus link`; a phase-out
+via `catalogus deprecate`; a wrong `add` undone via `catalogus remove`; a wrong role corrected via
+`catalogus set services.<id>.role` rather than by removing and re-adding the entry. Nothing gets
 hand-edited.
 
 ### 7. Validate
 
 ```
-dagstree validate          # exit 0 valid, 1 invalid, 2 usage error such as no manifest found
-dagstree graph             # sanity-check the shape of what you built
+catalogus validate         # exit 0 valid, 1 invalid, 2 usage error such as no manifest found
+catalogus graph            # sanity-check the shape of what you built
 ```
 
 Run this after every change, not once at the end.
 
-Plain `dagstree validate` is the CI setting. `--strict` also exists and additionally fails the run
+Plain `catalogus validate` is the CI setting. `--strict` also exists and additionally fails the run
 on soft warnings, but those are word matches on terms like `billing`, `subscription` or `seat` —
 whether such a word is a leak or ordinary vocabulary depends entirely on what the project does, and
 a payment processor described honestly trips them every time. They are there for a person to read,
@@ -513,13 +513,13 @@ that pushes users into worse prose needs fixing rather than accommodating.
 - **Inventing `added` dates.** Check git, offer a default, or leave the field for the user.
 - **Guessing past a contradiction** instead of surfacing it.
 - **Rewording good prose to satisfy a validator.** Report the false positive instead.
-- **Deleting `dagstree.yaml` and starting over.** A wrong entry is undone with `dagstree remove
+- **Deleting `catalogus.yaml` and starting over.** A wrong entry is undone with `catalogus remove
   <id>`, not by clearing the file. It refuses (exit 1, nothing written) when another entry's
   `replaced_by` still names the one you're removing — re-point or clear that first with
-  `dagstree deprecate`.
+  `catalogus deprecate`.
 
 ## Layer 3
 
 Cost and account data needs the platform and never touches this file. If the user asks where
-spending information goes, tell them `dagstree push --private` once they are set up, and leave it
+spending information goes, tell them `catalogus push --private` once they are set up, and leave it
 out of the manifest either way.

@@ -1,4 +1,4 @@
-// `dagstree init [--yes]` -- scaffolds a dagstree.yaml. Interactive by
+// `catalogus init [--yes]` -- scaffolds a catalogus.yaml. Interactive by
 // default (prompts for project name, slug, architecture style, and repo
 // visibility); with --yes, infers the project-level fields it can (the
 // directory name as the project name) and writes without prompting. Never
@@ -22,18 +22,18 @@
 // both are service entries today (role: vcs, role: coding-agent) for the
 // reason recorded in HANDOFF.md's amendment log -- a project-level field can
 // never be an edge target, and `[github-actions, github]` is a real edge.
-// So `--yes` no longer writes either: it follows up with the `dagstree add`
+// So `--yes` no longer writes either: it follows up with the `catalogus add`
 // command that records what detection found, the same way it already does
 // for every other detected service.
 //
-// `dagstree diff` already reports every detected service missing from the
+// `catalogus diff` already reports every detected service missing from the
 // manifest, which is the same information as a work list rather than as
 // entries someone now has to correct.
 import { stat } from "node:fs/promises";
 import { basename } from "node:path";
 
-import { detect, InvalidRepoPathError } from "@dagstree/core";
-import { validateManifest } from "@dagstree/schema";
+import { detect, InvalidRepoPathError } from "@catalogus/core";
+import { validateManifest } from "@catalogus/schema";
 import prompts from "prompts";
 import { stringify } from "yaml";
 
@@ -61,7 +61,7 @@ export interface InitCommandOptions {
 // Mirrors the schema's vcs.visibility enum.
 const VALID_VISIBILITIES = new Set(["public", "private", "internal"]);
 
-const SCHEMA_MODELINE = "# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json";
+const SCHEMA_MODELINE = "# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json";
 
 export async function runInit(pathArg: string | undefined, options: InitCommandOptions = {}): Promise<CommandResult> {
   const targetDir = resolveTargetPath(pathArg);
@@ -137,7 +137,7 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
           // provider and visibility together, so this question was gated on
           // a provider having been given first. project.vcs carries only
           // visibility as of 2026-08-24 (the provider is a service entry,
-          // added with `dagstree add <provider> --role vcs`, not asked here
+          // added with `catalogus add <provider> --role vcs`, not asked here
           // -- init does not ask about services at all, see this module's
           // header), so there is no longer a shape to gate on.
           type: "select",
@@ -216,7 +216,7 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
       throw error;
     }
 
-    // Counted, not written: the summary points at `dagstree diff` for the
+    // Counted, not written: the summary points at `catalogus diff` for the
     // list, so nobody has to wonder whether detection found anything.
     detectedServiceCount = collectDetectedServices(detection).length;
 
@@ -229,13 +229,13 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
       const files = detection.unidentifiedCodingAgents.map((e) => e.file).join(", ");
       followUps.push(
         `${files} says a coding agent works in this repo but not which one -- ask the owner, then: ` +
-          "dagstree add <agent> --role coding-agent"
+          "catalogus add <agent> --role coding-agent"
       );
     } else if (detection.codingAgents.length > 0) {
       for (const agent of detection.codingAgents) {
         followUps.push(
           `coding agent detected (${agent.agent}) and not yet declared -- record it with: ` +
-            `dagstree add ${agent.agent} --role coding-agent`
+            `catalogus add ${agent.agent} --role coding-agent`
         );
       }
     }
@@ -243,7 +243,7 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
     if (detection.vcs) {
       followUps.push(
         `vcs provider detected (${detection.vcs.provider}) and not yet declared -- record it with: ` +
-          `dagstree add ${detection.vcs.provider} --role vcs`
+          `catalogus add ${detection.vcs.provider} --role vcs`
       );
     }
   }
@@ -277,7 +277,7 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
   if (options.yes && visibility === undefined) {
     followUps.push(
       "repo visibility was not given, so project.vcs is omitted -- set it with: " +
-        "dagstree set project.vcs.visibility <public|private|internal>"
+        "catalogus set project.vcs.visibility <public|private|internal>"
     );
   }
 
@@ -286,7 +286,7 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
   if (visibility) project.vcs = { visibility };
 
   const manifestObject = {
-    dagstree: 1,
+    catalogus: 1,
     project,
     services,
     dependencies: [],
@@ -309,16 +309,16 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
   const summary = [`Wrote ${filePath}`];
   if (detectedServiceCount > 0) {
     summary.push(
-      `  ${detectedServiceCount} service(s) detected and not yet declared -- run "dagstree diff" to list them,`
+      `  ${detectedServiceCount} service(s) detected and not yet declared -- run "catalogus diff" to list them,`
     );
-    summary.push('  then "dagstree add <service> --role <role>" for each one you want recorded.');
+    summary.push('  then "catalogus add <service> --role <role>" for each one you want recorded.');
   }
   for (const followUp of followUps) {
     summary.push(`  ${followUp}`);
   }
 
   // Same reasoning as add.ts: check.warnings is the SOFT-tier half of the
-  // exact scan `dagstree validate` runs, and a SOFT-only hit in any
+  // exact scan `catalogus validate` runs, and a SOFT-only hit in any
   // free-text field no longer blocks the write -- print it rather than
   // dropping it.
   return { exitCode: 0, stdout: summary, stderr: warningLines(check.warnings) };

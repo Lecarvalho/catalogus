@@ -4,17 +4,17 @@ import "@specfy/stack-analyser/dist/autoload.js";
 import { tech } from "@specfy/stack-analyser";
 import { describe, expect, it } from "vitest";
 
-import { mapSpecfySlug, SPECFY_TO_DAGSTREE } from "./mapping.js";
+import { mapSpecfySlug, SPECFY_TO_CATALOGUS } from "./mapping.js";
 import { DETECTION_KINDS, SERVICE_CATEGORIES } from "./types.js";
 
-// Mirrors @dagstree/schema's $defs.slug.pattern (packages/schema/src/schema.ts)
+// Mirrors @catalogus/schema's $defs.slug.pattern (packages/schema/src/schema.ts)
 // without a cross-package dependency — the CLI's `validate` command rejects
 // any manifest slug that fails this, so every slug detect() can emit must
 // satisfy it too.
-const DAGSTREE_SLUG_PATTERN = /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/;
+const CATALOGUS_SLUG_PATTERN = /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/;
 
 describe("mapSpecfySlug", () => {
-  it("maps a known specfy slug into Dagstree's namespace", () => {
+  it("maps a known specfy slug into Catalogus's namespace", () => {
     const result = mapSpecfySlug("flyio", "Flyio");
     expect(result).toEqual({ slug: "fly-io", category: "hosting", name: "Fly.io", kind: "service", unmapped: false });
   });
@@ -47,15 +47,15 @@ describe("mapSpecfySlug", () => {
     expect(result.category).toBe("other");
   });
 
-  it("normalises a dot-namespaced unmapped slug into the Dagstree schema's slug pattern", () => {
+  it("normalises a dot-namespaced unmapped slug into the Catalogus schema's slug pattern", () => {
     // azure.aks is a real, dot-namespaced stack-analyser key with no row of
-    // its own in SPECFY_TO_DAGSTREE (unlike aws.lambda, which mapping.ts's
+    // its own in SPECFY_TO_CATALOGUS (unlike aws.lambda, which mapping.ts's
     // breadth rows now cover) -- exactly the "still genuinely unmapped"
     // shape this test needs.
     const result = mapSpecfySlug("azure.aks", "Azure AKS");
     expect(result.unmapped).toBe(true);
     expect(result.slug).toBe("azure-aks");
-    expect(DAGSTREE_SLUG_PATTERN.test(result.slug)).toBe(true);
+    expect(CATALOGUS_SLUG_PATTERN.test(result.slug)).toBe(true);
   });
 
   it("converts a camelCase unmapped slug into kebab-case", () => {
@@ -70,16 +70,16 @@ describe("mapSpecfySlug", () => {
     expect(result.slug).toBe("some-vendor-tool");
   });
 
-  it("every real stack-analyser key maps to a slug satisfying @dagstree/schema's slug pattern", () => {
+  it("every real stack-analyser key maps to a slug satisfying @catalogus/schema's slug pattern", () => {
     // Exercises the live tech index, not just this table — this is exactly
     // what would have caught the ~165 offending keys (every aws.*,
     // atlassian.jira, atlassian.trello, adobe.*, camelCase keys like
     // apacheCordova, ...) before a diff/add flow ever tried writing one of
-    // them into dagstree.yaml.
+    // them into catalogus.yaml.
     const offenders: string[] = [];
     for (const key of tech.keys) {
       const mapped = mapSpecfySlug(key, key);
-      if (!DAGSTREE_SLUG_PATTERN.test(mapped.slug)) {
+      if (!CATALOGUS_SLUG_PATTERN.test(mapped.slug)) {
         offenders.push(`${key} -> ${mapped.slug}`);
       }
     }
@@ -95,7 +95,7 @@ describe("mapSpecfySlug", () => {
     // SERVICE_CATEGORIES: this was a hand-typed ["service", "library"] and
     // it stayed green while the union grew "component" and "stack".
     const kinds = new Set<string>(DETECTION_KINDS);
-    for (const [specfySlug, entry] of Object.entries(SPECFY_TO_DAGSTREE)) {
+    for (const [specfySlug, entry] of Object.entries(SPECFY_TO_CATALOGUS)) {
       expect(entry.slug.length, `slug for ${specfySlug}`).toBeGreaterThan(0);
       expect(entry.name.length, `name for ${specfySlug}`).toBeGreaterThan(0);
       expect(categories.has(entry.category), `category for ${specfySlug}`).toBe(true);
@@ -117,7 +117,7 @@ describe("classifyDetectionKind (via mapSpecfySlug's unmapped path)", () => {
   it("classifies an unmapped technology whose specfy type names a provider or running infrastructure as a service", () => {
     // The two questions are independent, and this is the test that they
     // are: "cdn" is not in LIBRARY_SPECFY_TYPES, so it is a service, and it
-    // is not in SPECFY_TYPE_TO_CATEGORY either, so it has no Dagstree
+    // is not in SPECFY_TYPE_TO_CATEGORY either, so it has no Catalogus
     // bucket and lands in "other". Having no category must never imply
     // being a library -- a CDN can go down and send an invoice exactly like
     // a database can.
@@ -133,7 +133,7 @@ describe("classifyDetectionKind (via mapSpecfySlug's unmapped path)", () => {
 
   // The counterpart to the above, and the case the widening created: a type
   // that now DOES have a bucket must land in it rather than in "other".
-  it("gives an unmapped technology the Dagstree category its specfy type maps to, when there is one", () => {
+  it("gives an unmapped technology the Catalogus category its specfy type maps to, when there is one", () => {
     expect(mapSpecfySlug("some-future-monitor", "Some Future Monitor", "monitoring").category).toBe("monitoring");
     expect(mapSpecfySlug("some-future-queue", "Some Future Queue", "queue").category).toBe("queue");
     expect(mapSpecfySlug("some-future-mailer", "Some Future Mailer", "notification").category).toBe("messaging");

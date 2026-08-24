@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { collectAllDetectedServices, collectDetectedServices, groupAllDetections } from "./detected-services.js";
-import type { DetectionResult } from "@dagstree/core";
+import type { DetectionResult } from "@catalogus/core";
 
 function baseResult(overrides: Partial<DetectionResult> = {}): DetectionResult {
   return {
@@ -55,11 +55,11 @@ describe("collectDetectedServices", () => {
   });
 
   it("de-duplicates evidence that reaches the same slug twice with an identical file+detail", () => {
-    // core's own hosting merge (mergeHosting in @dagstree/core) can already
+    // core's own hosting merge (mergeHosting in @catalogus/core) can already
     // fold a stack-analyser "hosting" detection into the same
     // HostingDetection it's about to be merged with here again via
     // `technologies` -- without de-duplication the same file prints
-    // multiple times in `dagstree detect`/`dagstree diff` output.
+    // multiple times in `catalogus detect`/`catalogus diff` output.
     const result = baseResult({
       technologies: [
         {

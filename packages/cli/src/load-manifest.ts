@@ -1,9 +1,9 @@
 // Common "find it, read it, it must already be schema-valid" precondition
 // shared by diff/graph/add -- each needs a manifest object to work with and
 // none of them is the place to report raw schema errors line-by-line
-// (that's `dagstree validate`'s job); they just point at it.
-import { parseManifest } from "@dagstree/schema";
-import type { DagstreeManifestV1 } from "@dagstree/schema";
+// (that's `catalogus validate`'s job); they just point at it.
+import { parseManifest } from "@catalogus/schema";
+import type { CatalogusManifestV1 } from "@catalogus/schema";
 
 import { findManifest, ManifestNotFoundError, readManifestText } from "./manifest-io.js";
 import type { ManifestLocation } from "./manifest-io.js";
@@ -13,7 +13,7 @@ import { errorMessage } from "./types.js";
 export interface LoadedManifest {
   location: ManifestLocation;
   text: string;
-  manifest: DagstreeManifestV1;
+  manifest: CatalogusManifestV1;
 }
 
 export type LoadOutcome = { ok: true; value: LoadedManifest } | { ok: false; error: CommandResult };
@@ -41,7 +41,7 @@ export async function loadValidManifest(targetDir: string): Promise<LoadOutcome>
       error: {
         exitCode: 2,
         stdout: [],
-        stderr: [`${location.filePath} does not currently pass validation; run "dagstree validate" for details.`],
+        stderr: [`${location.filePath} does not currently pass validation; run "catalogus validate" for details.`],
       },
     };
   }

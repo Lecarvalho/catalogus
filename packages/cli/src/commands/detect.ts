@@ -1,6 +1,6 @@
-// `dagstree detect` -- runs the Layer 1 scan and prints the detected stack
+// `catalogus detect` -- runs the Layer 1 scan and prints the detected stack
 // grouped by category, with the evidence file for each detection. --json
-// emits the raw DetectionResult (already JSON-clean, see @dagstree/core's
+// emits the raw DetectionResult (already JSON-clean, see @catalogus/core's
 // own round-trip test) for machine consumption.
 //
 // Text output leads with services and collapses libraries under a one-line
@@ -9,13 +9,13 @@
 // for every one or two actual services, so an undifferentiated category
 // dump buries the thing this command exists to surface -- see PLAN.md's
 // dogfooding notes, "detect output buries services among the libraries".
-// The governing test for the split (@dagstree/core's DetectionKind) is the
+// The governing test for the split (@catalogus/core's DetectionKind) is the
 // plan's own: a service is something that can have an outage and send an
 // invoice. `--all` prints the full library list inline for anyone who
 // wants it; `--json` always carries every detection regardless, kind
 // included, because it's the machine-readable surface and nothing here
 // should ever make it less complete than the underlying DetectionResult.
-import { detect } from "@dagstree/core";
+import { detect } from "@catalogus/core";
 
 import type { DetectedServiceCandidate } from "../detected-services.js";
 import { groupAllDetections } from "../detected-services.js";

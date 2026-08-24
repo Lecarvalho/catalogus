@@ -1,4 +1,4 @@
-// Dagstree-specific detector — stack-analyser has no notion of "coding
+// Catalogus-specific detector — stack-analyser has no notion of "coding
 // agents in use" (HANDOFF.md §6). Root-level marker files/dirs only;
 // monorepo-aware scanning is out of scope for v1 (HANDOFF.md §9.5).
 import { join } from "node:path";

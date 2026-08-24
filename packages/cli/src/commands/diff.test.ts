@@ -24,8 +24,8 @@ describe("runDiff", () => {
     await writeFixtureFile(dir, "fly.toml", 'app = "example"\n');
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -50,8 +50,8 @@ dependencies: []
   it("reports a clean match when nothing differs", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -67,8 +67,8 @@ dependencies: []
   it("does not report a role: dns / role: pm entry as stale -- it's undetectable by design", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -94,8 +94,8 @@ dependencies: []
   it("still exempts a genuinely undetectable service under a role word other than dns/pm -- exemption is by slug, not role text", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -119,14 +119,14 @@ dependencies: []
   });
 
   it("flags a mapped, detectable service as stale even under role: dns -- role alone doesn't grant the exemption", async () => {
-    // "cloudflare" is a real row in @dagstree/core's SPECFY_TO_DAGSTREE
+    // "cloudflare" is a real row in @catalogus/core's SPECFY_TO_CATALOGUS
     // (mapping.ts), so it's reachable by a scan; declaring it under
     // role: dns doesn't make it undetectable the way an actual DNS
     // registrar (namecheap) is.
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -154,8 +154,8 @@ dependencies: []
     await writeFixtureFile(dir, "package.json", JSON.stringify({ name: "probe", devDependencies: { typescript: "^5.6.0" } }));
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -177,10 +177,10 @@ dependencies: []
   it("exits 2 with a clear message when no manifest exists", async () => {
     const result = await runDiff(dir);
     expect(result.exitCode).toBe(2);
-    expect(result.stderr.join("\n")).toContain("dagstree init");
+    expect(result.stderr.join("\n")).toContain("catalogus init");
   });
 
-  // Same lead-with-services treatment as `dagstree detect` (see diff.ts's
+  // Same lead-with-services treatment as `catalogus detect` (see diff.ts's
   // pushServiceLines): collectDetectedServices already excludes most
   // library noise, but a known catalog row can itself be a library
   // (lucide-icons) rather than a service, and that shouldn't read as a
@@ -189,8 +189,8 @@ dependencies: []
     await writeFixtureFile(dir, "package.json", JSON.stringify({ name: "probe", dependencies: { "lucide-react": "^0.400.0" } }));
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -213,8 +213,8 @@ dependencies: []
   it("supports --json output", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -242,8 +242,8 @@ dependencies: []
       await writeFixtureFile(dir, "package.json", JSON.stringify({ name: "probe", dependencies: {} }));
       await writeFixtureFile(
         dir,
-        "dagstree.yaml",
-        `dagstree: 1
+        "catalogus.yaml",
+        `catalogus: 1
 project:
   name: X
   slug: x

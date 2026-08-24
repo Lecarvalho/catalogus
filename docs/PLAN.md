@@ -1,4 +1,4 @@
-# Dagstree — Implementation Plan & Progress
+# Catalogus — Implementation Plan & Progress
 
 Working plan and status board. `docs/HANDOFF.md` is the specification and the source of truth for
 design decisions; this file tracks *what has been built* against it and what remains.
@@ -15,7 +15,7 @@ design decisions; this file tracks *what has been built* against it and what rem
   **All five 3.6 follow-ups are now closed.** The two pre-existing holes every writer shared (an
   explicit path that holds no manifest no longer edits the ancestor's; a pre-existing cycle is
   reported against the file rather than blamed on the current edit); `diff`'s delete-list wording;
-  `dagstree rename`, the last missing writer, so **every correctable field now has a command behind
+  `catalogus rename`, the last missing writer, so **every correctable field now has a command behind
   it**; the `role` convention, settled by the owner as documentation rather than a schema
   constraint, with the viewer grouping on the segment before the first `-`; and the category enum,
   widened with `monitoring`, `queue` and `messaging` — **HANDOFF §4 was amended for that, and the
@@ -34,7 +34,7 @@ correction pass predate this at 549/38; the number moved a long way in one sessi
 
 ### Handoff — 2026-08-24, end of the viewer-foundations session
 
-**What happened.** Phase 3.7's foundation was built and merged: the `apps/web` viewer, `dagstree
+**What happened.** Phase 3.7's foundation was built and merged: the `apps/web` viewer, `catalogus
 view`, the service catalog, server-side icon resolution, the workspace scanner, and a breaking
 schema change. Four implementation slices, each attacked afterwards by a separate agent that did
 not write it. **Those validation passes found thirteen defects, four of them critical or high**,
@@ -42,15 +42,15 @@ and every single one of the criticals was invisible to a green test suite. That 
 this phase is trustworthy; do not drop it.
 
 **The owner's next action, and why this document may be behind.** The owner is running
-`dagstree view` from a real client repo and will come back with feedback. Nothing in this document
+`catalogus view` from a real client repo and will come back with feedback. Nothing in this document
 reflects that run. Treat first-hand feedback as outranking anything written here.
 
 **To run it from a client repo:**
 
 ```
 pnpm build && pnpm run link:cli     # in this repo, once
-cd <client repo>                    # the skill writes dagstree.yaml, then:
-dagstree view                       # serves 127.0.0.1:4180 and opens the browser
+cd <client repo>                    # the skill writes catalogus.yaml, then:
+catalogus view                       # serves 127.0.0.1:4180 and opens the browser
 ```
 
 `--no-open` suppresses the browser, `--port <n>` moves it. It refuses to start on a missing or
@@ -59,7 +59,7 @@ invalid manifest rather than serving a broken page.
 **Five decisions taken this session that supersede older text in this file.** Each was the owner's,
 each has reasoning, and none should be reversed without a new one:
 
-1. **`dagstree view` is single-repo, not workspace-root.** It takes `[path]` like every other
+1. **`catalogus view` is single-repo, not workspace-root.** It takes `[path]` like every other
    command and serves that repo's manifest. `scanWorkspace()` is built, tested and *dormant* — no
    caller until the portfolio page. Sections of Phase 3.7 below were written under the old design.
 2. **`simple-icons` is not bundled into the client.** `index.mjs` is 5.2 MB and manifest-driven
@@ -106,11 +106,11 @@ the bug, not an absence of it.
 **Read Phase 3.6.1 before touching the skill, the schema or a CLI flag.** It is the most recent
 work and it changed three things a fresh session would otherwise get wrong: entries now carry
 `kind` (`service` | `component` | `stack`) and an optional `version`; the rule for what earns a node
-is runtime topology rather than "can it send an invoice"; and **Dagstree asks rather than guessing**
+is runtime topology rather than "can it send an invoice"; and **Catalogus asks rather than guessing**
 wherever a fact is not in the repo. That last one is a standing rule, not a one-off fix — four of
 the six defects in that pass were a plausible default written in place of a question.
 
-The CLI is installed: `pnpm run link:cli` has been run, so `dagstree` is on `PATH` via shims in
+The CLI is installed: `pnpm run link:cli` has been run, so `catalogus` is on `PATH` via shims in
 npm's global bin directory pointing at this checkout. `pnpm build` updates what they run. If the
 repo is ever moved, re-run `pnpm run link:cli`.
 
@@ -124,17 +124,17 @@ It is unblocked. Build the single-project DAG first, against a real manifest, be
 part that is genuinely hard and it de-risks everything after it.
 
 **There is no real manifest, and this document said otherwise for a while.** Everything below used
-to read: the cold runs wrote `C:/Workspace/repos/Clapline/dagstree.yaml`, it holds 26 services and
+to read: the cold runs wrote `C:/Workspace/repos/Clapline/catalogus.yaml`, it holds 26 services and
 30 edges, `fly-api` has fourteen outgoing edges, and that file is the layout stress test the DAG
 should be judged against. **Checked directly on 2026-08-24: the directory exists, the manifest does
-not.** No `dagstree.yaml` and no `stack.yaml` anywhere under it. Nobody knows when it went, because
+not.** No `catalogus.yaml` and no `stack.yaml` anywhere under it. Nobody knows when it went, because
 nothing ever re-checked — this document warned that its own numbers had "already been stale once"
 and then went stale again in the same section, which is the argument for checking a claim before
 building on it rather than for writing the warning.
 
 Consequences, and they are real rather than bookkeeping:
 
-- **The only manifest that exists is `examples/reference.dagstree.yaml`**, which is synthetic and
+- **The only manifest that exists is `examples/reference.catalogus.yaml`**, which is synthetic and
   small — 14 entries, 14 edges. It covers every *shape* (`kind: component`, `kind: stack` with a
   version, `status: phasing_out` with `replaced_by`, one vendor under two roles, and since the
   2026-08-24 amendment a `role: coding-agent` entry) but it is not a layout stress test. Nothing on
@@ -152,13 +152,13 @@ interchangeable on screen: `service` is a vendor (brand icon, and the only kind 
 ever attach to), `component` is infrastructure the owner runs themselves (no vendor, no invoice —
 so a cost rollup must exclude it rather than show a zero), and `stack` is what the code is written
 in, carrying a `version` that is the number a tile shows and the key an end-of-life date would hang
-off. `dagstree graph` already renders all three as text — `nginx (ingress-proxy, component)`,
+off. `catalogus graph` already renders all three as text — `nginx (ingress-proxy, component)`,
 `dotnet (runtime-backend, stack, v10)` — which is the cheapest reference for what the web viewer
 has to say too.
 
 **Two things it does not exercise, and the viewer needs both.** It carries no `status`/`replaced_by`
 entries, so nothing on disk covers status colours or the migration view — use
-`examples/reference.dagstree.yaml`, which does. And it predates `kind`, so every node in it is a
+`examples/reference.catalogus.yaml`, which does. And it predates `kind`, so every node in it is a
 `service`: the component and stack rendering has no real input yet either. Check the counts above
 against the file before relying on them; the numbers in this document have already been stale once.
 
@@ -180,7 +180,7 @@ would cost if left alone. Each has its own section below.
 4. ~~**The category enum has no monitoring, queue or email bucket.**~~ Closed — HANDOFF §4 amended
    (with an amendment log) and both catalogs re-bucketed into `monitoring`, `queue` and `messaging`.
    See that section.
-5. ~~**`dagstree rename <old> <new>`** for service ids.~~ Closed — built, and the CLI now has a
+5. ~~**`catalogus rename <old> <new>`** for service ids.~~ Closed — built, and the CLI now has a
    command behind every correctable field. See the `remove` section for what it does and what the
    mutations found.
 
@@ -192,7 +192,7 @@ accurate. It was: all 26 services traced to evidence in the checkout, and the `a
 data. Four of the six were in **shipped guidance** — the skill and the handoff telling an agent to
 do the wrong thing, which it then did correctly.
 
-The through-line, and the rule that came out of it: **where Dagstree does not know, it asks. It
+The through-line, and the rule that came out of it: **where Catalogus does not know, it asks. It
 never guesses.** Every defect below is a variant of writing a plausible default instead of a
 question.
 
@@ -218,7 +218,7 @@ question.
       self-confirming because it sat beside the real agents on every repo that had any. They are now
       reported as *unidentified*: proof an agent works here, no claim about which. Separately there
       was no `.codex` marker at all, so a correctly-declared `codex` entry was reported as drift by
-      `dagstree diff` **on every run** — a permanent false positive against a correct manifest.
+      `catalogus diff` **on every run** — a permanent false positive against a correct manifest.
 - [x] **`detect` no longer hides the two new kinds.** Its grouping filter was `kind === "service"`,
       which dropped component- and stack-kind rows out of *both* the leading list and the collapsed
       library count. Detected, and invisible.
@@ -232,10 +232,10 @@ covered by argv-driven tests in `cli.test.ts`:
 
 - **`--version` was swallowed by commander.** `.version()` on the program registers `--version` on
   every subcommand by inheritance, and the inherited option beats a subcommand's own. So
-  `dagstree add dotnet --kind stack --version 10 --role runtime-backend` printed `0.0.1`, added
+  `catalogus add dotnet --kind stack --version 10 --role runtime-backend` printed `0.0.1`, added
   nothing, and **exited 0** — silent data loss, not an error. Fixed with
   `program.enablePositionalOptions()`, which scopes an option to the command it follows;
-  `dagstree --version` still reports the CLI version.
+  `catalogus --version` still reports the CLI version.
 - **`--kind` was silently discarded.** `add`'s commander action builds its options object field by
   field and the two new fields were never added to it, so `--kind widget` was not rejected — it was
   dropped, and the entry written without it. Validation in `runAdd` was correct and simply never ran.
@@ -248,10 +248,10 @@ like a flag that works.
 
 Verified by execution, not by reading: `pnpm build && pnpm test && pnpm typecheck` all green at
 **549 tests / 38 files**, and the built binary run against a scratch repo and against Clapline.
-`dagstree detect` on Clapline now reports `opentelemetry [component]`, `nginx [component]`, a
+`catalogus detect` on Clapline now reports `opentelemetry [component]`, `nginx [component]`, a
 `stack:` section (csharp, javascript, react, typescript), and `codex` — and no `agents-md`.
 
-**Not done, and left for the owner:** `C:/Workspace/repos/Clapline/dagstree.yaml` itself is
+**Not done, and left for the owner:** `C:/Workspace/repos/Clapline/catalogus.yaml` itself is
 unchanged. It still declares `agents-md`, carries no component or stack entries, and is missing five
 real edges found during validation (Fly's managed Prometheus scrapes `fly-api`; Supabase's custom
 SMTP sends through Resend; and `resend`, `cloudfront` and `supabase-auth` each need DNS records at
@@ -286,7 +286,9 @@ Current baseline: **549 tests, 38 files, zero skipped.** Build and typecheck bot
 - [x] Root config: `tsconfig.base.json`, `vitest.config.ts`, `pnpm-workspace.yaml`, `.gitignore`
 - [x] `CLAUDE.md` orientation file
 - [x] All dependencies installed in one pass
-- [x] Repository published — `github.com/Lecarvalho/dagstree`, branch `main`, initial commit `712a8a6`
+- [x] Repository published — published as `github.com/Lecarvalho/dagstree`, branch `main`, initial
+      commit `712a8a6`; renamed to `github.com/Lecarvalho/catalogus` on 2026-08-24, which GitHub
+      serves as a redirect from the old URL
 
 Note: pnpm 11's build-approval gate blocks esbuild's postinstall, which tsup needs for its
 platform-native binary. `pnpm-workspace.yaml` carries an `allowBuilds: { esbuild: true }` stanza to
@@ -297,7 +299,7 @@ permit it. Without that, tsup's build step silently lacks its native binary on W
 The manifest schema is both the contract every other package consumes and the security boundary that
 keeps Layer 3 data out of a public repo. Built first for that reason.
 
-- [x] JSON Schema 2020-12 for `dagstree.yaml` v1 at `packages/schema/schema/dagstree.v1.json`
+- [x] JSON Schema 2020-12 for `catalogus.yaml` v1 at `packages/schema/schema/catalogus.v1.json`
 - [x] TypeScript types derived from the schema, with a drift test
 - [x] `validateManifest` / `parseManifest`, Ajv 2020 dialect, `allErrors` on
 - [x] **Private key-name rejection** — every object closed with `additionalProperties: false`, plus a
@@ -339,25 +341,25 @@ Claude Code detected once, evidence lists each distinct file once.
 
 No network, no auth, no backend. This is the phase that makes the tool useful day to day.
 
-- [x] `dagstree init [path] [--yes] [--force]` — `--yes` fills project name, VCS provider and
+- [x] `catalogus init [path] [--yes] [--force]` — `--yes` fills project name, VCS provider and
       coding agents from detection and writes **no** service entries; see Phase 3.6's
       "init and add did not compose" for why that changed
-- [x] `dagstree detect [path] [--json]`
-- [x] `dagstree diff [path]` — reports both directions, and does not flag Layer 2 entries that are
+- [x] `catalogus detect [path] [--json]`
+- [x] `catalogus diff [path]` — reports both directions, and does not flag Layer 2 entries that are
       undetectable by design (a registrar, a PM tool) as stale
-- [x] `dagstree validate [path] [--strict]` — schema, referential integrity, private-value guard,
+- [x] `catalogus validate [path] [--strict]` — schema, referential integrity, private-value guard,
       and the acyclicity check
-- [x] `dagstree graph [path] [--mermaid]`
-- [x] `dagstree add <service> [path] --role <r> [--depends-on <id>...]` — edits via the `yaml`
+- [x] `catalogus graph [path] [--mermaid]`
+- [x] `catalogus add <service> [path] --role <r> [--depends-on <id>...]` — edits via the `yaml`
       Document API so comments and the `$schema` modeline survive
-- [x] `dagstree set`, `dagstree link`, `dagstree deprecate` — added in Phase 3.6 to close the
+- [x] `catalogus set`, `catalogus link`, `catalogus deprecate` — added in Phase 3.6 to close the
       hand-edit gap; see "CLI gaps the skill exposed" below
-- [x] `dagstree remove <id> [path]` — added in Phase 3.6; the only subtractive writer, and the one
+- [x] `catalogus remove <id> [path]` — added in Phase 3.6; the only subtractive writer, and the one
       that makes a wrong `add` recoverable. See its own section below
-- [x] `dagstree rename <old> <new> [path]` — the last writer, moving every edge and `replaced_by`
+- [x] `catalogus rename <old> <new> [path]` — the last writer, moving every edge and `replaced_by`
       that names the id along with the entry. See the `remove` section below
-- [x] Manifest resolution: walks up from the working directory, `dagstree.yaml` preferred,
-      `stack.yaml` accepted as a fallback on read, always writes `dagstree.yaml`
+- [x] Manifest resolution: walks up from the working directory, `catalogus.yaml` preferred,
+      `stack.yaml` accepted as a fallback on read, always writes `catalogus.yaml`
 - [x] Errors to stderr, data to stdout, so `--json` stays pipeable
 
 **Exit code contract** (verified by direct execution, all five):
@@ -381,7 +383,7 @@ Found by an independent verification pass over Phases 0–3 and fixed.
       cost amount, an email and a renewal date in `services[].notes` validated clean, exit 0. The
       guard existed but lived in the CLI and was only called on the `add` write path, so it vanished
       the moment anyone edited the YAML by hand — which is an entirely ordinary thing to ask an agent
-      to do. Moved into `@dagstree/schema` and called by `validateManifest` itself, so Phase 5 push
+      to do. Moved into `@catalogus/schema` and called by `validateManifest` itself, so Phase 5 push
       and Phase 6 MCP inherit the same boundary rather than each needing to remember it.
 - [x] Hosting evidence was not deduplicated by file when the custom detector and stack-analyser both
       flagged the same file
@@ -444,7 +446,7 @@ holes every writer shares" below — none of it blocks the viewer.
 Using the tool on real projects, which is the most honest test Phases 1–3 will get, and the source
 material for teaching an agent to do the same.
 
-- [x] Reference manifest at `examples/reference.dagstree.yaml` — deliberately **synthetic**, naming
+- [x] Reference manifest at `examples/reference.catalogus.yaml` — deliberately **synthetic**, naming
       no real project. It exists to give the drift test a complete document and the skill something
       to be judged against, and it covers the shapes that matter: one provider with an entry per
       deployed app, one service in two roles as two entries, a `phasing_out` entry with its
@@ -452,41 +454,41 @@ material for teaching an agent to do the same.
       It replaced a manifest derived from a real private project — publishing that project's whole
       service inventory and topology in a public repo is a different thing from publishing a schema
       example, and the example does its job without it.
-- [x] **Agent skill**, source of truth at `skills/dagstree/SKILL.md` in this repo. It is a shipped
+- [x] **Agent skill**, source of truth at `skills/catalogus/SKILL.md` in this repo. It is a shipped
       product artifact and is versioned next to the schema and CLI it documents. Teaches evidence
       gathering, the proven-versus-mentioned distinction, the gap catalog, how to ask the user well,
       the manifest format in full, and validation with or without the CLI. It must work in the harder
-      of its two environments: a client repo with no Dagstree checkout, no CLI on `PATH`, and no
+      of its two environments: a client repo with no Catalogus checkout, no CLI on `PATH`, and no
       backend account.
-- [x] Installation is a file copy into `.claude/skills/dagstree/SKILL.md`, project-level or
+- [x] Installation is a file copy into `.claude/skills/catalogus/SKILL.md`, project-level or
       user-level — see `skills/README.md`. A dedicated installer script was written and then removed:
       one file, one destination, no transformation, so it was ceremony around `cp`. It becomes a
-      `dagstree` subcommand once the CLI is published and there is a schema version worth checking
+      `catalogus` subcommand once the CLI is published and there is a schema version worth checking
       the skill against.
 - [x] **Drift check** — `packages/schema/src/skill-drift.test.ts`, 4 tests, green. Two checks,
       because a fragment and a full manifest drift differently. An unmarked ```yaml block in
       `SKILL.md` is treated as a complete manifest and run through `parseManifest` exactly as a
       client-repo agent would; none exist today (the skill is CLI-mandatory and deliberately does
       not invite hand-authoring), so the loop is a tripwire for the day one is added back. A block
-      marked `<!-- dagstree:fragment -->` is deliberately partial and can never pass full
+      marked `<!-- catalogus:fragment -->` is deliberately partial and can never pass full
       validation, so instead every field name and enum value it uses is walked against
-      `dagstreeSchemaV1`'s own definitions — a renamed field or a dropped enum value fails it. The
-      same file also validates every `examples/*.dagstree.yaml` end to end, with zero warnings
+      `catalogusSchemaV1`'s own definitions — a renamed field or a dropped enum value fails it. The
+      same file also validates every `examples/*.catalogus.yaml` end to end, with zero warnings
       required.
 - [x] **CLI installed and on `PATH`.** `pnpm run link:cli` (`scripts/link-cli.mjs`) writes
-      `dagstree`, `dagstree.cmd` and `dagstree.ps1` into npm's global bin directory — already on
+      `catalogus`, `catalogus.cmd` and `catalogus.ps1` into npm's global bin directory — already on
       `PATH` on a stock Node install — pointing at this checkout's `packages/cli/dist/cli.js`.
-      Verified in cmd, PowerShell and Git Bash: `dagstree --version` prints 0.0.1 at exit 0, and
-      `dagstree validate` with no manifest exits 2, so exit codes propagate through every shim.
+      Verified in cmd, PowerShell and Git Bash: `catalogus --version` prints 0.0.1 at exit 0, and
+      `catalogus validate` with no manifest exits 2, so exit codes propagate through every shim.
       `pnpm run unlink:cli` removes them.
 
-      *Why shims rather than a global install.* `packages/cli` reaches `@dagstree/core` and
-      `@dagstree/schema` through `workspace:*`, so `pnpm add --global ./packages/cli` tries to
+      *Why shims rather than a global install.* `packages/cli` reaches `@catalogus/core` and
+      `@catalogus/schema` through `workspace:*`, so `pnpm add --global ./packages/cli` tries to
       resolve two unpublished packages from the registry and fails; pnpm 11 has also dropped
       `pnpm link --global`. Running the built entrypoint in place resolves dependencies from this
       checkout's own `node_modules`. The shims therefore survive a rebuild without relinking, and
       nothing edits the user's `PATH`. This stops being the right answer once the package is
-      published — then it is `pnpm add --global dagstree` and this script is deleted.
+      published — then it is `pnpm add --global @catalogus/cli` and this script is deleted.
 - [x] **Cold test, first run** — done, from Clapline, in a separate session. See "What the first
       cold run produced" below for the result and the two defects it found.
 - [x] **Second cold run — done, and it is the best result the tool has produced.** Run by the owner
@@ -499,7 +501,7 @@ material for teaching an agent to do the same.
       roughly 18 for the rehearsal — with a richer result. The four things the skill was changed for
       all landed:
 
-      - **`dagstree detect` ran third**, after reading the skill and the `--version` prerequisite
+      - **`catalogus detect` ran third**, after reading the skill and the `--version` prerequisite
         check, with no exploration before it. That was the reported defect and it is fixed.
       - **Edges were derived, and modelled better than before**: logical services separated from
         where they run (`loki -> fly-loki`, `grafana -> fly-grafana`) rather than collapsed,
@@ -509,7 +511,7 @@ material for teaching an agent to do the same.
         answers came back into the file: the CloudFront note records "confirmed by owner, wired in
         the AWS console", and the lifecycle question produced the first `phasing_out` entry any cold
         run has generated, with its `replaced_by`.
-      - **`dagstree set project.name` was exercised**, an hour after it existed.
+      - **`catalogus set project.name` was exercised**, an hour after it existed.
 
       One instruction missed its target. The batching rule produced shell-level batching (`for f in
       ...`, chained `set -e` blocks) rather than concurrent tool calls — 33 calls across 33 turns,
@@ -530,20 +532,20 @@ public status board. What matters for this project is the shape of the result:
   target, a console-configured analytics beacon, the alert contact point, and one hosting provider
   correctly split into five entries by what each deployed app runs.
 - An architecture description in the owner's own words rather than inferred from directory names.
-- `dagstree validate` exits 0 on it.
+- `catalogus validate` exits 0 on it.
 
 So the question flow works. That was the thing most at risk, it is the part no test can check, and
 it needed a human to judge — the owner's assessment of the questions asked was "very accurate".
 
 - [x] **The reference example is now synthetic.** The cold-run manifest is richer, but it belongs to
-      the project it describes and stays there; `examples/reference.dagstree.yaml` covers the same
+      the project it describes and stays there; `examples/reference.catalogus.yaml` covers the same
       shapes without naming anything real. A future cold run is judged on whether it produces those
       shapes — entries per deployed app, one service split across roles, lifecycle, off-repo
       services, real edges — not on matching a fixed list of services.
 
 ### Second defect the cold run found — the soft guard fires on payment-service prose ✅ decided
 
-`dagstree validate` on the cold-run manifest exits 0 but prints two soft warnings, both on the
+`catalogus validate` on the cold-run manifest exits 0 but prints two soft warnings, both on the
 Stripe entry's notes: *"Checkout, Billing Portal, webhooks; subscription tiers plus credit packs"* —
 flagged for `billing` and for `subscription`.
 
@@ -579,7 +581,7 @@ for that whole class of project.
       known prefixes, never on the word "billing" — the same split, and we had wired the word tier
       to a failing exit code.
 
-      Changed in three places, docs only: `skills/dagstree/SKILL.md` no longer names `--strict` as
+      Changed in three places, docs only: `skills/catalogus/SKILL.md` no longer names `--strict` as
       the CI setting and says why; `README.md`'s CI line says to run without it; and
       `packages/cli/src/commands/validate.ts`'s module comment records the reversal with the
       payments-prose evidence, so the next reader does not re-recommend it. `--strict` still works
@@ -621,7 +623,7 @@ file is not one. Any repo whose backend is not Node hits this.
       settings file and key that proved it.
 
       Known ceiling: the catalog is brand names only. A provider it does not know leaves a key group
-      nobody claims, which is a `dagstree add` — deliberately, since admitting generic words
+      nobody claims, which is a `catalogus add` — deliberately, since admitting generic words
       (`Auth`, `Cdn`, `Database`) would turn every settings file into a wall of false detections.
       Loki is the live example: Clapline runs it, but only `fly.loki.toml` and Grafana provisioning
       name it, so it arrives as Fly.io hosting and the service entry stays human-supplied.
@@ -653,7 +655,7 @@ file is not one. Any repo whose backend is not Node hits this.
       Verified by execution against fixpic: three services shown by category, 12 libraries
       collapsed, and `--json` still carrying all 17 records.
 
-What no scanner can ever supply, by design (HANDOFF §3) — this is why `dagstree add` and the agent
+What no scanner can ever supply, by design (HANDOFF §3) — this is why `catalogus add` and the agent
 skill's question flow exist, and it does not shrink as detection improves:
 
 - **Roles.** That Supabase is used as database *and* auth, as two separate nodes.
@@ -669,13 +671,13 @@ Clapline-shaped fixture (`src/backend/Api/appsettings.json`, two `fly.*.toml`, `
 
 `init --yes` prefilled one service entry per detection, using the detection **category** where the
 schema wants a **role**: `role: db`, `role: vcs`, and for Resend the meaningless `role: other`. Step
-6 of the skill then says to run `dagstree add supabase --role database --id supabase-db`. Both
+6 of the skill then says to run `catalogus add supabase --role database --id supabase-db`. Both
 commands succeed, and the file ends up with three supabase entries — `supabase` (role `db`, from
 init), `supabase-db` and `supabase-auth`.
 
 There was no way back. `add` only appends, there is no `remove`, no command changes a role,
 `init --yes` a second time exits 2 ("already exists"), and plain `init` needs a TTY an agent does
-not have. Deleting `dagstree.yaml` and re-running `init` was the only move the CLI left, which is
+not have. Deleting `catalogus.yaml` and re-running `init` was the only move the CLI left, which is
 exactly what happened.
 
 Note the shape of this: `set`/`link`/`deprecate` were added and the skill was rewritten to say "there
@@ -684,23 +686,23 @@ the sequence did not.
 
 - [x] **`init --yes` no longer writes service entries.** It fills project name, VCS provider and
       coding agents, counts what detection found, and prints "N service(s) detected and not yet
-      declared — run `dagstree diff` to list them". `diff` was already the work list; it just was
+      declared — run `catalogus diff` to list them". `diff` was already the work list; it just was
       not being used as one. Chosen over keeping the prefill and adding `remove`, because the
       prefilled roles were wrong on every entry anyway, so the prefill created cleanup rather than
       saving it.
 - [x] Skill steps 2 and 6 rewritten to match: step 2 explains why the services list is empty
-      (category is not a role), step 6 starts from `dagstree diff`. Added an explicit
-      **never delete `dagstree.yaml` to start over** — it is a committed file that may hold answers
+      (category is not a role), step 6 starts from `catalogus diff`. Added an explicit
+      **never delete `catalogus.yaml` to start over** — it is a committed file that may hold answers
       an earlier session got from the user.
 - [x] Verified end to end on the fixture: `init --yes` → `diff` (6 detected, none declared) →
       seven `add`s with real roles (`hosting-api`, `hosting-web`, `database`, `auth`, `ai-models`,
       `payments`, `email`) → `link` → `set` → `validate` exit 0. No duplicates, no deletion.
 
-### `dagstree remove <id>` — the last unrecoverable state ✅ built and audited
+### `catalogus remove <id>` — the last unrecoverable state ✅ built and audited
 
 Every writing command is additive. Nothing takes anything out. So one wrong `add` — a typo'd role, a
 service the user turns out not to use, an entry created before a contradiction was resolved — cannot
-be undone by the CLI at all, and the only remaining move is to delete `dagstree.yaml` and start
+be undone by the CLI at all, and the only remaining move is to delete `catalogus.yaml` and start
 over. That is the exact loop the first cold run fell into, and removing the `init` prefill only
 removed the most common *cause*; it did not give anyone a way back.
 
@@ -708,7 +710,7 @@ removed the most common *cause*; it did not give anyone a way back.
 stopgap: it converts a silent corruption into a dead end. **Build this before the next cold run** —
 an agent that cannot recover from its own mistake will either freeze or do something worse.
 
-- [x] `dagstree remove <id> [path]` — delete one service entry from `services[]`.
+- [x] `catalogus remove <id> [path]` — delete one service entry from `services[]`.
 - [x] **Cascade the edges.** Every entry in `dependencies` naming the id, in *either* direction, goes
       with it. Leaving one behind is a dangling edge, which fails referential integrity on the next
       `validate` — so a `remove` that did not cascade would trade one unrecoverable state for
@@ -717,7 +719,7 @@ an agent that cannot recover from its own mistake will either freeze or do somet
       it. `replaced_by` is a lifecycle claim someone made deliberately ("this is what replaces it"),
       not a detail to clear silently, and clearing it would quietly erase the migration from the
       Phase 7 dashboard. The message should say what to do: re-point or clear it with
-      `dagstree deprecate` first, then remove. Reconsider a `--cascade` flag only if this turns out
+      `catalogus deprecate` first, then remove. Reconsider a `--cascade` flag only if this turns out
       to be common in practice.
 - [x] Route through `packages/cli/src/manifest-edit.ts` like every other writer, so the result is
       validated before it is written and the `$schema` modeline and comments survive.
@@ -779,7 +781,7 @@ treating the symptom.
 
 Then, for the same reason and once `remove` exists:
 
-- [x] **Correct a `role` on an existing entry.** Done: `dagstree set services.<id>.role <role>`. The
+- [x] **Correct a `role` on an existing entry.** Done: `catalogus set services.<id>.role <role>`. The
       field name is dynamic, so it is matched by pattern rather than listed in the static field
       table, and `SETTABLE_FIELDS` advertises the literal placeholder `services.<id>.role` — a list
       that cannot contain every id has to show the shape instead. Both the id's slug shape and the
@@ -800,9 +802,9 @@ Then, for the same reason and once `remove` exists:
       Whoever builds `push` decides what a slug change means then.
 - [x] **`init` no longer tells the user to hand-edit.** It wrote `# visibility below is a guess
       (private) -- edit if this repo is public` into the manifest, instructing the reader to do the
-      one thing the skill forbids. It now names the command: `dagstree set project.vcs.visibility
+      one thing the skill forbids. It now names the command: `catalogus set project.vcs.visibility
       public`.
-- [x] **Correct an `id`. Done: `dagstree rename <old> <new> [path]`.** Not a `set`: an id is
+- [x] **Correct an `id`. Done: `catalogus rename <old> <new> [path]`.** Not a `set`: an id is
       referenced from three places outside the entry carrying it — both endpoints of every
       dependency edge, and any other entry's `replaced_by` — so writing only the field leaves a
       manifest that fails referential integrity on the next `validate`. It shares `remove`'s
@@ -889,7 +891,7 @@ along with an optional delegated research pass for harnesses that can run one.
       of them in isolation, but Phase 7 makes `role` a facet and free-form granularity does not roll
       up.
 
-      **Owner's decision: a documented convention, no schema change.** `skills/dagstree/SKILL.md`
+      **Owner's decision: a documented convention, no schema change.** `skills/catalogus/SKILL.md`
       gained a "Naming a role" section under step 6 with three rules:
 
       - *Start from a base word* — a list of about twenty (`hosting`, `database`, `auth`, `storage`,
@@ -912,7 +914,7 @@ along with an optional delegated research pass for harnesses that can run one.
       category describes a provider in the global catalog and has to be wide enough to hold Twilio
       and Resend under `messaging`; a role describes what one instance does in one project, where
       `email` and `sms` are different jobs. The first draft of the base-word list used `messaging`
-      for both and contradicted `examples/reference.dagstree.yaml`, which uses `role: email` and is
+      for both and contradicted `examples/reference.catalogus.yaml`, which uses `role: email` and is
       right to.
 
       Reversible on purpose: nothing enforces it, so if the convention does not hold up in the next
@@ -938,7 +940,7 @@ along with an optional delegated research pass for harnesses that can run one.
       consumes the old key — the CLI is unpublished and `SKILL.md` never named it — so this was the
       cheap moment to fix it.
 
-      `skills/dagstree/SKILL.md` quotes the heading, so it changed in the same commit. Verified by
+      `skills/catalogus/SKILL.md` quotes the heading, so it changed in the same commit. Verified by
       execution against a scratch project carrying an unparseable `.mcp.json`, a `phasing_out` entry
       and an undetectable one: all four elements render, exit 1. 4 new tests, and the existing diff
       tests were updated to the new strings rather than left asserting the old ones.
@@ -948,7 +950,7 @@ along with an optional delegated research pass for harnesses that can run one.
 
       *Correction to what this item used to say.* It described widening the enum as "a schema change
       plus a skill change in the same commit, per the drift test". Checked: `category` is **not** a
-      field in `dagstree.yaml` and appears nowhere in `packages/schema` or in `SKILL.md`. It is
+      field in `catalogus.yaml` and appears nowhere in `packages/schema` or in `SKILL.md`. It is
       `ServiceCategory` in `packages/core/src/types.ts`, consumed by `mapping.ts` and by `detect`'s
       grouped output, and it was pinned by **HANDOFF §4**. So the change was core + HANDOFF, and the
       drift test was never involved.
@@ -1005,11 +1007,11 @@ only the command a shared hole was noticed on is how the next writer reintroduce
       back to an ancestor directory's manifest through `findManifest`'s upward walk. It delivered
       half of that: it rejected a path that did not exist, but an existing subdirectory with no
       manifest of its own fell straight through to the walk. Observed before the fix:
-      `dagstree remove fly-api <dir>/sub` removed the entry from `<dir>/dagstree.yaml` and exited 0.
+      `catalogus remove fly-api <dir>/sub` removed the entry from `<dir>/catalogus.yaml` and exited 0.
 
       Closed with `findManifestIn` in `manifest-io.ts` — the same "is there a manifest here" question
       `findManifest` already asks at each level of its walk, minus the walk, so the
-      dagstree.yaml-beats-stack.yaml precedence cannot drift between the two callers. An explicit
+      catalogus.yaml-beats-stack.yaml precedence cannot drift between the two callers. An explicit
       path with no manifest of its own now exits 2 and **names the ancestor that was found**: the
       likeliest cause is a path typed one level off, and a message that only says the directory is
       empty leaves the user to guess what to type instead.
@@ -1033,14 +1035,14 @@ only the command a shared hole was noticed on is how the next writer reintroduce
       and ends with what to do about it. `checkManifestObject`'s failure result now carries the
       cycles it found, because a rendered message line is the wrong thing to diff.
 
-      **The manifest is still opened**, deliberately. `dagstree remove` on one of the cycle's own
+      **The manifest is still opened**, deliberately. `catalogus remove` on one of the cycle's own
       services is the only thing in the CLI that breaks a cycle, so refusing to open a cyclic
       manifest would have traded a misattributed message for an unfixable file — the same shape of
       dead end the `remove` section above exists to prevent. A test pins that recovery path, and the
       mutation that refuses on open turns it red.
 
       Verified by direct execution: `remove` and `deprecate` aimed at the innocent entry both exit 1
-      naming the file, the manifest is byte-identical by checksum, `dagstree remove svc-c` — the
+      naming the file, the manifest is byte-identical by checksum, `catalogus remove svc-c` — the
       advice the message itself gives — then exits 0 with `validate` exiting 0 after it, while a
       `link` that genuinely closes a cycle still exits 1 under `Linking "..." -> "..." would make`.
 
@@ -1059,13 +1061,13 @@ rotation — which is why it is tested directly as a unit rather than through a 
 ### CLI gaps the skill exposed ✅ closed
 
 Writing the skill surfaced five Layer 2 fields with no command behind them, so the skill had to
-hand-edit them and then validate. All four items below are done, and `skills/dagstree/SKILL.md` no
+hand-edit them and then validate. All four items below are done, and `skills/catalogus/SKILL.md` no
 longer contains a hand-edit exception: **the CLI is now the only writer**, which is the property the
 whole design wants. Verified by direct execution — `init --yes`, `set` ×2, `add` ×3, `link`,
 `deprecate`, then `validate` exit 0 — on a scratch project, with the `$schema` modeline and comments
 intact afterwards.
 
-- [x] `dagstree set <field> <value> [<field> <value> ...]` — `project.architecture`,
+- [x] `catalogus set <field> <value> [<field> <value> ...]` — `project.architecture`,
       `project.vcs.visibility`, and the per-entry `services.<id>.role` / `.kind` / `.version`.
       **Superseded in part by the 2026-08-24 schema amendment** (HANDOFF §4 amendment log):
       `project.pm`, `project.vcs.provider` and `project.coding_agents` were settable when this was
@@ -1080,7 +1082,7 @@ intact afterwards.
       unwritten. Consequence of the variadic pair list: `set` takes `--path` where every other
       command takes a positional `[path]` — a trailing directory would be swallowed as a field name,
       the same shape of bug `--depends-on` hit in Phase 3.5.
-- [x] `dagstree link <from> <to> [path]` — one edge between two services that already exist. A
+- [x] `catalogus link <from> <to> [path]` — one edge between two services that already exist. A
       duplicate edge is a no-op at exit 0 rather than a second identical line; a self-edge is
       refused in its own words rather than as `cyclic dependency: a -> a`, which reads like a bug in
       the tool; an edge that would close a cycle is refused and nothing is written.
@@ -1089,7 +1091,7 @@ intact afterwards.
       explicit id `supabase-db` left `supabase` free, so a second `add supabase --role auth` took
       it — legal, but `supabase` beside `supabase-db` reads as though the two were different kinds
       of thing.
-- [x] `dagstree deprecate <id> [path] [--status <s>] [--replaced-by <id>]` — sets `status` and
+- [x] `catalogus deprecate <id> [path] [--status <s>] [--replaced-by <id>]` — sets `status` and
       `replaced_by` on an existing entry. `--status` takes `deprecated` (the default) or
       `phasing_out`, because those are different claims; `active` and `removed` are deliberately not
       offered, being the absence of a phase-out and a request to delete the entry respectively.
@@ -1150,16 +1152,16 @@ target is a rewrite of the storage layer, not a port.
 
 - [ ] Device flow authentication (the `gh auth login` pattern: show a code, approve in a browser)
 - [ ] Token stored in the OS keychain — use `@napi-rs/keyring`; `keytar` is unmaintained
-- [ ] `dagstree login`
-- [ ] `dagstree push` — manifest and detection upsert
-- [ ] `dagstree push --private key=value` — field allow-list, hard-reject anything outside
+- [ ] `catalogus login`
+- [ ] `catalogus push` — manifest and detection upsert
+- [ ] `catalogus push --private key=value` — field allow-list, hard-reject anything outside
       `account_ref`, `plan_tier`, `cost_amount`, `cost_currency`, `billing_cycle`, `renewal_date`,
       `started_at`, `notes_private`
 - [ ] Test proving the token never lands in a file an agent can read into context
 
 ## Phase 6 — MCP server mode ⬜
 
-The agent workflow, and the differentiator. `dagstree mcp` over stdio.
+The agent workflow, and the differentiator. `catalogus mcp` over stdio.
 
 - [ ] `detect_stack` — run detection, return a structured diff against the manifest
 - [ ] `read_manifest`
@@ -1171,7 +1173,7 @@ The agent workflow, and the differentiator. `dagstree mcp` over stdio.
 
 Decided: the viewer comes **before** Phase 4 and reads manifests directly. Layers 1 and 2 are the
 entire graph — nodes, edges, roles, status, `replaced_by`, architecture, coding agents all live in
-`dagstree.yaml`, which the CLI already parses and validates. Only Layer 3 (cost, account references)
+`catalogus.yaml`, which the CLI already parses and validates. Only Layer 3 (cost, account references)
 needs a store, and that is one panel. Cross-project queries do not need SQL at this scale either:
 roughly fifteen projects is an in-memory graph walk over N parsed manifests.
 
@@ -1183,10 +1185,10 @@ readable — none of which involve a database.
 
 The checkboxes below left one thing unstated that turns out to govern everything: a browser cannot
 read a filesystem, so *something* has to deliver scanned manifests to the app. Three answers were
-put to the owner — a Vite dev-server plugin, a `dagstree view` command serving them, or a
-`dagstree bundle` command writing one aggregate JSON file the app fetches.
+put to the owner — a Vite dev-server plugin, a `catalogus view` command serving them, or a
+`catalogus bundle` command writing one aggregate JSON file the app fetches.
 
-**Decided: `dagstree view` serves them.** The viewer is a shipped CLI feature rather than a
+**Decided: `catalogus view` serves them.** The viewer is a shipped CLI feature rather than a
 repo-local dev tool, so it works in any checkout the owner points it at, behind one entry point
 they already know. `bundle` was rejected on the owner's own criterion: it is the only one of the
 three that duplicates data — a second copy of every manifest on disk, stale until regenerated, and
@@ -1197,12 +1199,12 @@ Worth recording because it was asked and is easy to re-ask: **the transport does
 rendering at all.** `simple-icons` is an npm package bundled into the client; the work is identical
 under all three.
 
-**Decided: a service catalog in `@dagstree/core`, keyed by dagstree slug.** What actually decides
+**Decided: a service catalog in `@catalogus/core`, keyed by catalogus slug.** What actually decides
 whether icons render is a slug → (display name, category, icon ref) table, and nothing in the repo
-was one. `SPECFY_TO_DAGSTREE` is not it: that table is keyed by **specfy** slug and answers "what
+was one. `SPECFY_TO_CATALOGUS` is not it: that table is keyed by **specfy** slug and answers "what
 did stack-analyser just find?", and it only covers what detection can emit. Manifest slugs come
 from people too — `dotnet`, `opentelemetry`, `namecheap` and `trello` all appear in
-`examples/reference.dagstree.yaml` and had no row anywhere. So the catalog is a separate module
+`examples/reference.catalogus.yaml` and had no row anywhere. So the catalog is a separate module
 deriving its base rows from the mapping table (one source of truth for name and category) and
 layering verified icon refs plus the rows detection can never produce. It is the local seed for
 HANDOFF §4.1's eventual global catalog, and nothing more.
@@ -1218,7 +1220,7 @@ Measured directly against `simple-icons` 16.28.0 (3,453 icons) before any code w
 the checkbox below assumed brand icons with a fallback for the exceptions. It is the other way
 round.
 
-Of the 159 distinct dagstree slugs in `SPECFY_TO_DAGSTREE`, **77 match a simple-icons slug
+Of the 159 distinct catalogus slugs in `SPECFY_TO_CATALOGUS`, **77 match a simple-icons slug
 directly, a further 22 resolve by matching the catalog's display name against the icon's `title`,
 and 60 have no icon at all.** That last group is 38% of the catalog, and it is not a tail of
 obscure rows — **Slack, OpenAI, AWS (and S3, Lambda, EC2, Cognito, CloudFront, SQS), Heroku,
@@ -1231,8 +1233,8 @@ before the viewer exists. Consequences for the design:
 
 - **The category fallback has to look deliberate.** Two nodes in five will use it. A fallback
   styled as a missing-image placeholder makes a correct render look broken.
-- **A dagstree slug is not a simple-icons slug.** `fly-io` does not resolve; the icon is
-  `flydotio`. Any lookup that passes the dagstree slug straight through silently loses the owner's
+- **A catalogus slug is not a simple-icons slug.** `fly-io` does not resolve; the icon is
+  `flydotio`. Any lookup that passes the catalogus slug straight through silently loses the owner's
   primary host — a wrong render that looks like an absent one.
 - The catalog stores an explicit, verified `icon` ref precisely so these two facts live in one
   table with a test behind them rather than in the viewer's guesswork.
@@ -1261,7 +1263,7 @@ defects were in mechanisms whose whole purpose was to prevent the thing they fai
    slug pattern admits `constructor`, and a manifest with `service: constructor` validates clean
    under the real CLI. Now built on `Object.create(null)`.
 4. **`deriveBaseCatalog` had no fallback and its comment claimed one.** With no specfy key equal to
-   the dagstree slug, the winning row was decided by nothing but declaration order in `mapping.ts` —
+   the catalogus slug, the winning row was decided by nothing but declaration order in `mapping.ts` —
    proven by swapping two lines and watching the catalog row change. The comment called the rule
    "generic, not a supabase-specific special case". **Now a total three-rule order** (agree ->
    bare-key wins -> **throw**, naming the slug and the competing names), and the pin list is gone:
@@ -1269,7 +1271,7 @@ defects were in mechanisms whose whole purpose was to prevent the thing they fai
    an order-dependent row.
 
 Two claims came back *stronger* than reported. The malformed-YAML discriminator matches
-`@dagstree/schema`'s literal `"Could not parse YAML: "` prefix, which reads as fragile — but
+`@catalogus/schema`'s literal `"Could not parse YAML: "` prefix, which reads as fragile — but
 changing that wording and rebuilding showed the repo degrades to `reason: "invalid"` while staying
 in `failures`, and a `workspace-scan` test goes red, so the coupling cannot rot silently. And a
 20-directory adversarial workspace — malformed YAML, schema-invalid, empty manifest, a manifest
@@ -1323,8 +1325,8 @@ than solved:
 | --- | --- | --- | --- |
 | `role` | manifest entry (**required**) | the owner | what this project uses it for — `hosting-api`, `storage-media`. Rollup is the segment before the first `-`. **This is the grouping.** |
 | `kind` | manifest entry (optional, default `service`) | the owner | vendor (`service`) / infrastructure the project runs itself (`component`) / what the code is written in (`stack`). Decides rendering, and whether a Layer 3 cost can attach at all. |
-| `category` | core detection tables | Dagstree | bucket for *detection output* only. Never enters the manifest. |
-| `DetectionKind` | core mapping | Dagstree | whether a detected thing earns a node at all. |
+| `category` | core detection tables | Catalogus | bucket for *detection output* only. Never enters the manifest. |
+| `DetectionKind` | core mapping | Catalogus | whether a detected thing earns a node at all. |
 
 The viewer's category-icon fallback therefore keys off `role`, not off the catalog — which is the
 better source anyway, since a per-usage role is exactly what a generic icon should depict: the
@@ -1340,14 +1342,14 @@ database node gets a database icon whoever the vendor is.
   single row to render until more repos are onboarded, which is the reason they were already
   ranked last.
 
-- [x] Service catalog in `@dagstree/core`: dagstree slug -> display name and a verified
+- [x] Service catalog in `@catalogus/core`: catalogus slug -> display name and a verified
       `simple-icons` ref (**no category** — see the correction above). Names derived from
-      `SPECFY_TO_DAGSTREE` rather than copied from it. **164 rows, 115 with an icon, 49 without.**
+      `SPECFY_TO_CATALOGUS` rather than copied from it. **164 rows, 115 with an icon, 49 without.**
       A test fails when an icon ref does not resolve in the installed package, and a second one
       fails when an overlay key matches no row — both tripped deliberately and observed red before
       being trusted.
 - [x] Manifest source: `scanWorkspace(root)` scans a workspace root for repos holding
-      `dagstree.yaml` (or the `stack.yaml` fallback), depth 1, ordinal-sorted. Returns a three-way
+      `catalogus.yaml` (or the `stack.yaml` fallback), depth 1, ordinal-sorted. Returns a three-way
       split: `manifests`, `failures` (with a reason — `unreadable` / `malformed-yaml` / `invalid`)
       and `unmanaged`. A repo with a broken manifest is a reported entry, not a dropped one — a
       project that vanishes from the portfolio because of a typo is the worst available failure,
@@ -1357,7 +1359,7 @@ database node gets a database icon whoever the vendor is.
       a hosted viewer later reuses them as a file move rather than a rewrite. Client bundle is
       **161 KB** with zero `simple-icons` bytes in it — icons resolve server-side, because
       `simple-icons`' `index.mjs` is 5.2 MB and a manifest-driven lookup tree-shakes to nothing.
-- [x] **`dagstree view [path]`: serves one repo's manifest plus the built app, and opens the
+- [x] **`catalogus view [path]`: serves one repo's manifest plus the built app, and opens the
       browser.** Owner decision, superseding the workspace-root design this section was written
       under: the skill runs it in the client repo after writing the manifest. `scanWorkspace` stays
       built and tested but has no caller until the portfolio page. `GET /api/project` is the whole
@@ -1393,9 +1395,9 @@ database node gets a database icon whoever the vendor is.
       which resolves its own contradiction between "fixed two-word base word" and "group on the
       part before the first `-`".
 - [ ] **The skill-drift test does not cover what it now needs to.** Found by validating the schema
-      migration: `skill-drift.test.ts` walks only `SKILL.md`'s single `<!-- dagstree:fragment -->`
+      migration: `skill-drift.test.ts` walks only `SKILL.md`'s single `<!-- catalogus:fragment -->`
       yaml block, so a validator rewrote the skill's fenced *shell* blocks to teach
-      `dagstree set project.coding_agents ...` and `dagstree set project.vcs.provider ...` — both
+      `catalogus set project.coding_agents ...` and `catalogus set project.vcs.provider ...` — both
       removed commands, in the lines an agent copies — and **all 645 tests stayed green**. The hole
       is pre-existing; this migration made it bite, because `project.pm` used to be a yaml field the
       fragment covered and its replacement is a shell line nothing checks. `CLAUDE.md` names this
@@ -1417,7 +1419,7 @@ database node gets a database icon whoever the vendor is.
 - [x] **Unblocked, on the synthetic example only.** This box used to claim a real 26-service
       manifest existed alongside the reference example; it does not (see "There is no real
       manifest" above — checked 2026-08-24). What is actually available is
-      `examples/reference.dagstree.yaml`: 14 entries and 14 edges covering status, `replaced_by`,
+      `examples/reference.catalogus.yaml`: 14 entries and 14 edges covering status, `replaced_by`,
       `kind: component`, `kind: stack` and `role: coding-agent`. That is enough to build the
       per-project DAG, the status colours and the `replaced_by` rendering, because those are
       questions about *shape*, and every shape is present. It is **not** enough to judge whether
@@ -1451,13 +1453,19 @@ slug disappears.
 
 Names get taken. None of this blocks development, and all of it blocks launch.
 
-- [ ] Register `dagstree.com`, `dagstree.ca`, `dagstree.dev`
-- [ ] Register `dagstry.com`, 301 redirect (homophone)
-- [ ] Reserve the npm package name `dagstree`
-- [ ] Reserve the GitHub org `dagstree` — the repo currently lives at `github.com/Lecarvalho/dagstree`;
+- [x] Domains — **`catalogus.dev` registered 2026-08-24 and owned.** It is load-bearing: the schema
+      `$id` and the modeline the CLI writes both point at it. `catalogus.io` was *not* acquired —
+      the $20 aftermarket figure was a minimum-offer threshold, not a price, and a $20 offer via
+      Sedo drew a $7,500 counter, which was declined. `catalogus.com` was $12,000 and was declined
+      too. There is no homophone spelling to redirect, and nothing here is still pending.
+- [x] npm package name — `catalogus` cannot be reserved: verified against the registry on
+      2026-08-24, it is an npm-owned security holding package (maintainer `npm`, repo
+      `npm/security-holder`, version `0.0.1-security`). The CLI ships scoped as `@catalogus/cli`;
+      the binary it installs is still `catalogus`.
+- [ ] Reserve the GitHub org `catalogus` — the repo currently lives at `github.com/Lecarvalho/catalogus`;
       moving it to an org later is a redirect, not a break, so this is not urgent
 - [ ] CIPO/USPTO knock-out search, Nice Class 9 + 42
-- [ ] Publish the JSON Schema at `https://dagstree.dev/schema/v1.json` — the `$schema` modeline the
+- [ ] Publish the JSON Schema at `https://catalogus.dev/schema/v1.json` — the `$schema` modeline the
       CLI writes points there, so until it resolves, editor autocomplete does not work
 
 ---
@@ -1466,16 +1474,16 @@ Names get taken. None of this blocks development, and all of it blocks launch.
 
 From HANDOFF §9, plus decisions taken during implementation. Settled — reopen only with a reason.
 
-1. **Manifest filename** — `dagstree.yaml`. `stack.yaml` accepted as a fallback on read; writes are
-   always `dagstree.yaml`.
-2. **Slug taxonomy** — Dagstree's own namespace, with an explicit mapping table from the slugs
+1. **Manifest filename** — `catalogus.yaml`. `stack.yaml` accepted as a fallback on read; writes are
+   always `catalogus.yaml`.
+2. **Slug taxonomy** — Catalogus's own namespace, with an explicit mapping table from the slugs
    stack-analyser emits. Adopting specfy's slugs wholesale would couple the catalog to their release
    cycle.
 3. **Acyclicity enforcement** — CLI `validate` and the application layer. No database trigger.
 4. **One service, multiple roles** — two entries with distinct local ids (`supabase-db`,
    `supabase-auth`).
 5. **Monorepo handling inside a scanned project** — out of scope for v1.
-6. **Where the private-data guard lives** — `@dagstree/schema`, not the CLI. Phase 5 push and Phase 6
+6. **Where the private-data guard lives** — `@catalogus/schema`, not the CLI. Phase 5 push and Phase 6
    MCP both need the identical boundary, and a guard implemented in the CLI is bypassed by every other
    consumer. Exactly one copy of the patterns exists in the repo; two copies is how one of them stops
    catching things.

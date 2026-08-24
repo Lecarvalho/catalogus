@@ -4,7 +4,7 @@
 // vocabulary for inspecting a *value*, so a manifest with a perfectly
 // innocent-looking key (`notes`, `architecture`, `pm`) can still carry a
 // cost amount, an email address, or a renewal date typed straight into
-// that value by a human or an agent hand-editing the file. `dagstree
+// that value by a human or an agent hand-editing the file. `catalogus
 // validate` never caught this -- see the bug this module closes, described
 // in the module comment on validate.ts.
 //
@@ -24,7 +24,7 @@
 //   SOFT -- lower-precision *keyword* hits (billing, renewal, account, ...).
 //   These genuinely do show up in innocent prose ("renewal is automated via
 //   GitHub Actions"), so a hit is a warning, not a hard failure -- it's
-//   validateManifest()'s caller (dagstree validate --strict) that decides
+//   validateManifest()'s caller (catalogus validate --strict) that decides
 //   whether to promote soft hits to errors.
 //
 // The guard is applied as a generic walk over every string value anywhere
@@ -776,7 +776,7 @@ export function formatPrivateValueErrorMessage(finding: PrivateValueFinding): st
   const label = HARD_CATEGORY_LABELS[finding.category as PrivateValueHardCategory];
   return (
     `Value at "${finding.instancePath || "/"}" looks like ${label} ("${finding.redacted}"). ` +
-    'That belongs in the private overlay, not dagstree.yaml -- run "dagstree push --private" to store it instead.'
+    'That belongs in the private overlay, not catalogus.yaml -- run "catalogus push --private" to store it instead.'
   );
 }
 
@@ -785,7 +785,7 @@ export function formatPrivateValueWarningMessage(finding: PrivateValueFinding): 
   const label = SOFT_CATEGORY_LABELS[finding.category as PrivateValueSoftCategory];
   return (
     `Value at "${finding.instancePath || "/"}" mentions ${label}, which can be a sign of Layer 3 (private) data. ` +
-    "If this is actual cost, billing, or account information, it belongs in the private overlay, not dagstree.yaml -- " +
-    'run "dagstree push --private" instead. Run with --strict to treat this as an error.'
+    "If this is actual cost, billing, or account information, it belongs in the private overlay, not catalogus.yaml -- " +
+    'run "catalogus push --private" instead. Run with --strict to treat this as an error.'
   );
 }

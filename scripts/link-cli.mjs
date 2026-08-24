@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Puts `dagstree` on PATH by writing small shims into the directory the
+// Puts `catalogus` on PATH by writing small shims into the directory the
 // package manager already exposes, pointing them at this checkout's built
 // CLI.
 //
 // Why shims rather than a global install. `packages/cli` depends on
-// `@dagstree/core` and `@dagstree/schema` through the `workspace:*`
+// `@catalogus/core` and `@catalogus/schema` through the `workspace:*`
 // protocol, so `pnpm add --global ./packages/cli` tries to resolve those two
 // from the registry and fails -- they are not published. pnpm 11 also
 // dropped `pnpm link --global`. A shim sidesteps both: it runs the built
@@ -54,10 +54,10 @@ function globalBinDir() {
 }
 
 function shimFiles(targetDir) {
-  const files = [{ path: join(targetDir, "dagstree"), mode: 0o755, content: posixShim() }];
+  const files = [{ path: join(targetDir, "catalogus"), mode: 0o755, content: posixShim() }];
   if (isWindows) {
-    files.push({ path: join(targetDir, "dagstree.cmd"), content: cmdShim() });
-    files.push({ path: join(targetDir, "dagstree.ps1"), content: powershellShim() });
+    files.push({ path: join(targetDir, "catalogus.cmd"), content: cmdShim() });
+    files.push({ path: join(targetDir, "catalogus.ps1"), content: powershellShim() });
   }
   return files;
 }
@@ -108,7 +108,7 @@ async function main() {
     for (const file of files) {
       await rm(file.path, { force: true });
     }
-    console.log(`Removed the dagstree shims from ${targetDir}`);
+    console.log(`Removed the catalogus shims from ${targetDir}`);
     return;
   }
 
@@ -131,12 +131,12 @@ async function main() {
     }
   }
 
-  console.log(`Linked "dagstree" -> ${cliEntry}`);
+  console.log(`Linked "catalogus" -> ${cliEntry}`);
   console.log(`  shims written to ${targetDir}`);
   if (isOnPath(targetDir)) {
     // No PATH change happened -- only files appeared in a directory already
     // on it -- so an already-open shell finds them too. No restart needed.
-    console.log("  that directory is already on PATH; run: dagstree --version");
+    console.log("  that directory is already on PATH; run: catalogus --version");
   } else {
     console.log(`  WARNING: ${targetDir} is not on PATH. Add it, or run the CLI by full path.`);
   }

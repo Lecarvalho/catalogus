@@ -29,7 +29,7 @@ export default defineConfig({
   // (index.js, cli.js, their .d.ts/.map siblings) -- it is not scoped to
   // leave dist/web/ (scripts/bundle-web.mjs's copy of apps/web/dist,
   // placed there by the *root* build, never by this package's own "build"
-  // script) alone. Running `pnpm --filter dagstree build` in isolation, on
+  // script) alone. Running `pnpm --filter @catalogus/cli build` in isolation, on
   // a repo that already had a complete dist/web from an earlier root
   // build, wipes dist/web/index.html while leaving its now-empty assets/
   // subdirectory behind. createViewServer's own guard (commands/view.ts)
@@ -42,7 +42,7 @@ export default defineConfig({
   // hardening pass).
   //
   // This does not, and must not, rebuild dist/web itself -- doing that
-  // here would mean packages/cli depending on @dagstree/web at build time,
+  // here would mean packages/cli depending on @catalogus/web at build time,
   // the workspace cycle scripts/bundle-web.mjs's own comment already rules
   // out.
   //

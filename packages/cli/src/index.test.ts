@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import * as cli from "./index.js";
 
-describe("@dagstree/cli public API", () => {
+describe("@catalogus/cli public API", () => {
   it("exposes the package name", () => {
-    expect(cli.CLI_PACKAGE_NAME).toBe("dagstree");
+    expect(cli.CLI_PACKAGE_NAME).toBe("@catalogus/cli");
   });
 
   it("exposes every command function", () => {

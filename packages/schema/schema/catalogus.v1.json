@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dagstree.dev/schema/v1.json",
-  "title": "Dagstree manifest v1",
-  "description": "dagstree.yaml (Layer 2 of the Dagstree data model): project metadata and the service DAG for one project. Committed to the repo — safe in a public repo. Anything cost, billing, or account-shaped belongs in the private overlay instead (`dagstree push --private`), and this schema actively rejects it — see the patternProperties deny rule repeated on every object below.",
+  "$id": "https://catalogus.dev/schema/v1.json",
+  "title": "Catalogus manifest v1",
+  "description": "catalogus.yaml (Layer 2 of the Catalogus data model): project metadata and the service DAG for one project. Committed to the repo — safe in a public repo. Anything cost, billing, or account-shaped belongs in the private overlay instead (`catalogus push --private`), and this schema actively rejects it — see the patternProperties deny rule repeated on every object below.",
   "$defs": {
     "slug": {
       "type": "string",
@@ -75,7 +75,7 @@
         },
         "service": {
           "$ref": "#/$defs/slug",
-          "description": "Slug into the global Dagstree service catalog, e.g. \"supabase\", \"fly-io\". Not the same namespace as @specfy/stack-analyser's slugs — the CLI maps between them."
+          "description": "Slug into the global Catalogus service catalog, e.g. \"supabase\", \"fly-io\". Not the same namespace as @specfy/stack-analyser's slugs — the CLI maps between them."
         },
         "role": {
           "$ref": "#/$defs/slug",
@@ -109,7 +109,7 @@
         },
         "replaced_by": {
           "$ref": "#/$defs/slug",
-          "description": "Local id of the service instance that replaces this one when phasing out. Must name another entry's id — the schema can't express that; `dagstree validate` checks it."
+          "description": "Local id of the service instance that replaces this one when phasing out. Must name another entry's id — the schema can't express that; `catalogus validate` checks it."
         },
         "notes": {
           "type": "string",
@@ -160,7 +160,7 @@
       "additionalProperties": false
     },
     "dependencyEdge": {
-      "description": "One dependency edge (from -> to) in the project's service DAG. Accepts the compact array form or the object form; acyclicity is checked by `dagstree validate`, not by this schema.",
+      "description": "One dependency edge (from -> to) in the project's service DAG. Accepts the compact array form or the object form; acyclicity is checked by `catalogus validate`, not by this schema.",
       "oneOf": [
         {
           "$ref": "#/$defs/dependencyEdgeTuple"
@@ -176,7 +176,7 @@
     "(?:[cC][oO][sS][tT]|[pP][rR][iI][cC][eE]|[pP][rR][iI][cC][iI][nN][gG]|[aA][mM][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT][_-]?[iI][dD]|[uU][sS][eE][rR][nN][aA][mM][eE]|[uU][sS][eE][rR]|[eE][mM][aA][iI][lL]|[tT][oO][kK][eE][nN]|[aA][pP][iI][_-]?[kK][eE][yY]|[kK][eE][yY]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][sS]|[bB][iI][lL][lL][iI][nN][gG]|[iI][nN][vV][oO][iI][cC][eE]|[rR][eE][nN][eE][wW][aA][lL]|[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][_-]?[iI][dD]|[pP][aA][yY][mM][eE][nN][tT]|[cC][aA][rR][dD]|[pP][lL][aA][nN][_-]?[tT][iI][eE][rR]|[sS][eE][aA][tT]|[sS][pP][eE][nN][dD])": false
   },
   "properties": {
-    "dagstree": {
+    "catalogus": {
       "const": 1,
       "description": "Manifest format version. Always 1 for this schema."
     },
@@ -200,7 +200,7 @@
     }
   },
   "required": [
-    "dagstree",
+    "catalogus",
     "project",
     "services",
     "dependencies"

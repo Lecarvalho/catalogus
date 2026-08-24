@@ -6,7 +6,7 @@
 # would make this fixture fail for two independent reasons, and a fixture
 # that fails for a reason other than the one it is named after stops
 # proving anything about that reason.
-dagstree: 1
+catalogus: 1
 project:
   name: Clapline
   slug: clapline

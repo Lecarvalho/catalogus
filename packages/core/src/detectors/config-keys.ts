@@ -1,4 +1,4 @@
-// Dagstree-specific detector for services wired through CONFIGURATION rather
+// Catalogus-specific detector for services wired through CONFIGURATION rather
 // than through a dependency manifest.
 //
 // Why this exists. @specfy/stack-analyser reads dependency manifests
@@ -69,7 +69,7 @@ interface CatalogEntry {
 }
 
 /**
- * Configuration key group -> Dagstree catalog entry.
+ * Configuration key group -> Catalogus catalog entry.
  *
  * Every slug that also appears in mapping.ts uses that table's slug and
  * display name verbatim, so a provider caught by both stack-analyser and a

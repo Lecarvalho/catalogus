@@ -2,7 +2,7 @@
 // depends-on/depended-on-by rendering that now lives in
 // ServiceDetailPanel.tsx (it was ServiceCard.tsx until the compact-node
 // restructure removed that component).
-import type { ViewPayload } from "dagstree";
+import type { ViewPayload } from "@catalogus/cli";
 
 import styles from "./EdgesList.module.css";
 

@@ -1,7 +1,7 @@
 import type { DetectionKind, ServiceCategory } from "./types.js";
 
 export interface MappingEntry {
-  /** Dagstree catalog slug — Dagstree's own namespace, not stack-analyser's. */
+  /** Catalogus catalog slug — Catalogus's own namespace, not stack-analyser's. */
   slug: string;
   category: ServiceCategory;
   name: string;
@@ -19,7 +19,7 @@ export interface MappingEntry {
 }
 
 /**
- * specfySlug -> Dagstree catalog entry.
+ * specfySlug -> Catalogus catalog entry.
  *
  * Derived from a real spike run of @specfy/stack-analyser against Clapline,
  * waymark, Pomegr, fixpic and trello-cli — see docs/detection-spike.md for
@@ -49,7 +49,7 @@ export interface MappingEntry {
  * tools) still comes back from detect() as an `unmapped: true` pass-through
  * — see mapSpecfySlug — rather than being silently dropped.
  */
-export const SPECFY_TO_DAGSTREE: Record<string, MappingEntry> = {
+export const SPECFY_TO_CATALOGUS: Record<string, MappingEntry> = {
   // --- hosting ---------------------------------------------------------
   flyio: { slug: "fly-io", category: "hosting", name: "Fly.io", kind: "service" }, // observed: Clapline fly.toml
   vercel: { slug: "vercel", category: "hosting", name: "Vercel", kind: "service" }, // HANDOFF §6
@@ -150,7 +150,7 @@ export const SPECFY_TO_DAGSTREE: Record<string, MappingEntry> = {
   segment: { slug: "segment", category: "analytics", name: "Segment", kind: "service" }, // verified: rules/analytics/segment.js
   amplitude: { slug: "amplitude", category: "analytics", name: "Amplitude", kind: "service" }, // verified: rules/analytics/amplitude.js
 
-  // --- other (real services with no matching Dagstree category) --------
+  // --- other (real services with no matching Catalogus category) --------
   nginx: { slug: "nginx", category: "other", name: "Nginx", kind: "component" }, // observed: Clapline ops/nginx.conf -- serves the SPA and reverse-proxies; no account, no invoice
   lucideicons: { slug: "lucide-icons", category: "other", name: "Lucide Icons", kind: "library" }, // observed: fixpic
   mcp: { slug: "mcp", category: "other", name: "MCP SDK", kind: "library" }, // Model Context Protocol SDK dependency
@@ -200,7 +200,7 @@ export const SPECFY_TO_DAGSTREE: Record<string, MappingEntry> = {
   // service rows above. css, scss, jsx, glsl and bash are deliberately
   // omitted -- they are markers inside a stack, not a choice of one. Note
   // stack-analyser has no rule for Python, Go, Ruby, PHP or Node itself in
-  // 1.27.6, so those reach a manifest only through a manual `dagstree add`.
+  // 1.27.6, so those reach a manifest only through a manual `catalogus add`.
 
   // languages
   ada: { slug: "ada", category: "stack", name: "Ada", kind: "stack" }, // verified: rules/language/ada.js
@@ -298,7 +298,7 @@ export const SPECFY_TO_DAGSTREE: Record<string, MappingEntry> = {
 /**
  * Best-effort category for a specfySlug that has no row above. Stack-analyser
  * tags every tech with its own `type` (e.g. "db", "ai", "payment") — where
- * that type overlaps cleanly with Dagstree's category enum we reuse it
+ * that type overlaps cleanly with Catalogus's category enum we reuse it
  * instead of dumping every unmapped detection into "other". "cloud" and
  * "network" are stack-analyser's own umbrella types for top-level
  * cloud/PaaS providers (aws, gcp, railway, ...) and DNS records
@@ -316,7 +316,7 @@ const SPECFY_TYPE_TO_CATEGORY: Partial<Record<string, ServiceCategory>> = {
   storage: "storage",
   ci: "ci",
   network: "dns",
-  // Three of stack-analyser's own type directories that had no Dagstree
+  // Three of stack-analyser's own type directories that had no Catalogus
   // bucket until HANDOFF §4's enum was widened. Its "notification" type is
   // the transactional email/SMS providers, which is what `messaging` names.
   monitoring: "monitoring",
@@ -366,8 +366,8 @@ function classifyDetectionKind(specfyType: string | undefined): DetectionKind {
 
 /**
  * Normalises a raw stack-analyser key into a string that satisfies
- * @dagstree/schema's slug pattern (`^[a-z0-9]+(?:[_-][a-z0-9]+)*$`, the
- * same pattern the CLI's `validate` command enforces on dagstree.yaml).
+ * @catalogus/schema's slug pattern (`^[a-z0-9]+(?:[_-][a-z0-9]+)*$`, the
+ * same pattern the CLI's `validate` command enforces on catalogus.yaml).
  * stack-analyser's own namespace allows things that pattern rejects — dot
  * namespacing (`aws.lambda`) and camelCase (`apacheCordova`) among them; of
  * its 743 keys, roughly a fifth fail the schema's pattern as-is. Verified
@@ -375,7 +375,7 @@ function classifyDetectionKind(specfyType: string | undefined): DetectionKind {
  * collision-free slug for every one of them: camelCase boundaries and any
  * run of non-[a-z0-9] characters become a single `-`.
  */
-function normalizeToDagstreeSlug(specfySlug: string): string {
+function normalizeToCatalogusSlug(specfySlug: string): string {
   return specfySlug
     .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
     .toLowerCase()
@@ -384,13 +384,13 @@ function normalizeToDagstreeSlug(specfySlug: string): string {
 }
 
 /**
- * Maps a raw stack-analyser slug into Dagstree's namespace. Never discards —
+ * Maps a raw stack-analyser slug into Catalogus's namespace. Never discards —
  * an unrecognized slug survives as a pass-through entry flagged `unmapped`,
  * so a gap in this table shows up as "unknown service" rather than silently
  * vanishing from detect() output. The pass-through `slug` is normalised into
- * Dagstree's own namespace (see normalizeToDagstreeSlug) rather than reusing
+ * Catalogus's own namespace (see normalizeToCatalogusSlug) rather than reusing
  * the raw key verbatim, so every technology detect() emits — mapped or not —
- * is something the CLI could actually write into dagstree.yaml without its
+ * is something the CLI could actually write into catalogus.yaml without its
  * own `validate` command rejecting it; the untouched stack-analyser key is
  * still available separately as DetectedTechnology.specfySlug.
  */
@@ -399,13 +399,13 @@ export function mapSpecfySlug(
   fallbackName: string,
   specfyType?: string
 ): MappingEntry & { unmapped: boolean } {
-  const known = SPECFY_TO_DAGSTREE[specfySlug];
+  const known = SPECFY_TO_CATALOGUS[specfySlug];
   if (known) {
     return { ...known, unmapped: false };
   }
   const category = (specfyType && SPECFY_TYPE_TO_CATEGORY[specfyType]) || "other";
   return {
-    slug: normalizeToDagstreeSlug(specfySlug),
+    slug: normalizeToCatalogusSlug(specfySlug),
     category,
     name: fallbackName,
     kind: classifyDetectionKind(specfyType),

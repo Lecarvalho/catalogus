@@ -1,4 +1,4 @@
-// `dagstree deprecate <id> [path] [--status <s>] [--replaced-by <id>]` --
+// `catalogus deprecate <id> [path] [--status <s>] [--replaced-by <id>]` --
 // records that a service is on its way out.
 //
 // Lifecycle is one of the four things no scanner can ever supply (HANDOFF
@@ -37,7 +37,7 @@ export async function runDeprecate(
       stdout: [],
       stderr: [
         `--status must be one of: ${[...DEPRECATION_STATUSES].join(", ")}.`,
-        '  to mark an entry active again, or to remove it, edit the manifest and re-run "dagstree validate".',
+        '  to mark an entry active again, or to remove it, edit the manifest and re-run "catalogus validate".',
       ],
     };
   }
@@ -88,7 +88,7 @@ export async function runDeprecate(
         stderr: [
           `--replaced-by names unknown id "${options.replacedBy}" -- no service with this id exists in ${location.filePath}.`,
           `  known ids: ${known}`,
-          '  add the replacement first with "dagstree add", then deprecate the entry it replaces.',
+          '  add the replacement first with "catalogus add", then deprecate the entry it replaces.',
         ],
       };
     }

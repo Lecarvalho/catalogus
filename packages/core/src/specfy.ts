@@ -157,7 +157,7 @@ function walk(node: Payload, bucket: Map<string, Bucket>, componentKeys: Readonl
 
 /**
  * Runs stack-analyser against repoPath and returns every technology it
- * found, mapped into Dagstree's namespace with evidence attached.
+ * found, mapped into Catalogus's namespace with evidence attached.
  *
  * Deliberately does not use stack-analyser's own flatten() helper: flatten()
  * deduplicates repeated components across folders (which is what we want),

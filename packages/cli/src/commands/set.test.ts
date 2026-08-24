@@ -8,9 +8,9 @@ import { runSet, SETTABLE_FIELDS } from "./set.js";
 
 // Deliberately minimal: `project` carries only what init scaffolds, so
 // setting vcs has to build the block rather than edit one that exists.
-const SCAFFOLD = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+const SCAFFOLD = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
 # Hand-written header comment -- must survive every edit.
-dagstree: 1
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -20,9 +20,9 @@ dependencies: []
 
 // A second fixture, carrying real service entries, for services.<id>.role
 // -- the empty-services SCAFFOLD above can't exercise id resolution at all.
-const SCAFFOLD_WITH_SERVICES = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+const SCAFFOLD_WITH_SERVICES = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
 # Hand-written header comment -- must survive every edit.
-dagstree: 1
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -43,7 +43,7 @@ describe("runSet", () => {
 
   beforeEach(async () => {
     dir = await createTempDir();
-    await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+    await writeFixtureFile(dir, "catalogus.yaml", SCAFFOLD);
   });
 
   afterEach(async () => {
@@ -51,7 +51,7 @@ describe("runSet", () => {
   });
 
   async function manifestText(): Promise<string> {
-    return readFile(join(dir, "dagstree.yaml"), "utf8");
+    return readFile(join(dir, "catalogus.yaml"), "utf8");
   }
 
   it("sets a free-text field and leaves comments and the modeline intact", async () => {
@@ -65,7 +65,7 @@ describe("runSet", () => {
   });
 
   // project.vcs carries only visibility as of the 2026-08-24 amendment (the
-  // provider is a service entry now, added with `dagstree add <provider>
+  // provider is a service entry now, added with `catalogus add <provider>
   // --role vcs`) -- so setting visibility alone is enough; there is no
   // second half to write together, and no half-built state to refuse.
   it("writes project.vcs.visibility on its own", async () => {
@@ -77,11 +77,11 @@ describe("runSet", () => {
     expect(text).not.toContain("provider:");
   });
 
-  it("rejects project.pm, project.vcs.provider and project.coding_agents, naming the `dagstree add` command that replaced each", async () => {
+  it("rejects project.pm, project.vcs.provider and project.coding_agents, naming the `catalogus add` command that replaced each", async () => {
     const expectations: Array<[string, string]> = [
-      ["project.pm", "dagstree add trello --role pm"],
-      ["project.vcs.provider", "dagstree add github --role vcs"],
-      ["project.coding_agents", "dagstree add claude-code --role coding-agent"],
+      ["project.pm", "catalogus add trello --role pm"],
+      ["project.vcs.provider", "catalogus add github --role vcs"],
+      ["project.coding_agents", "catalogus add claude-code --role coding-agent"],
     ];
     for (const [field, hint] of expectations) {
       const result = await runSet(dir, [field, "github"]);
@@ -196,7 +196,7 @@ describe("runSet", () => {
 
   describe("services.<id>.role", () => {
     beforeEach(async () => {
-      await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD_WITH_SERVICES);
+      await writeFixtureFile(dir, "catalogus.yaml", SCAFFOLD_WITH_SERVICES);
     });
 
     it("changes the role on the named entry only", async () => {

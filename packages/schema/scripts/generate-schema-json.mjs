@@ -1,4 +1,4 @@
-// Regenerates schema/dagstree.v1.json from the built dist/index.js — see
+// Regenerates schema/catalogus.v1.json from the built dist/index.js — see
 // package.json's "build" script, which runs tsup before this. schema-
 // sync.test.ts double-checks the two agree even between builds.
 //
@@ -11,9 +11,9 @@
 // run it without a flag or an extra build-only tool.
 import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dagstreeSchemaV1 } from "../dist/index.js";
+import { catalogusSchemaV1 } from "../dist/index.js";
 
-const outPath = fileURLToPath(new URL("../schema/dagstree.v1.json", import.meta.url));
-const json = `${JSON.stringify(dagstreeSchemaV1, null, 2)}\n`;
+const outPath = fileURLToPath(new URL("../schema/catalogus.v1.json", import.meta.url));
+const json = `${JSON.stringify(catalogusSchemaV1, null, 2)}\n`;
 await writeFile(outPath, json, "utf8");
 console.log(`wrote ${outPath}`);

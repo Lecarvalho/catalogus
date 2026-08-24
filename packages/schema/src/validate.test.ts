@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { validateManifest, parseManifest, edgeEndpoints, edgePairs } from "./validate.js";
 import { listFixtures, readFixture } from "./test-utils.js";
-import type { DagstreeManifestError } from "./validate.js";
+import type { CatalogusManifestError } from "./validate.js";
 
-function invalidErrors(filename: string): DagstreeManifestError[] {
+function invalidErrors(filename: string): CatalogusManifestError[] {
   const result = parseManifest(readFixture("invalid", filename));
   if (result.valid) throw new Error(`expected ${filename} to be invalid`);
   return result.errors;
@@ -21,7 +21,7 @@ describe("private-key redirect errors", () => {
     const hit = errors.find((e) => e.kind === "private-key" && e.property === property);
     expect(hit, `expected a private-key error for "${property}" in ${errors.map((e) => e.property).join(",")}`).toBeDefined();
     expect(hit?.message).toMatch(/private overlay/i);
-    expect(hit?.message).toMatch(/dagstree push --private/);
+    expect(hit?.message).toMatch(/catalogus push --private/);
   });
 
   it("reports the private key nested inside a service entry with an instancePath under /services", () => {
@@ -47,7 +47,7 @@ describe("private-key redirect errors", () => {
 describe("a private key inside an object-form dependency edge", () => {
   it("reports only the private-key redirect, not a contradictory 'must be array'", () => {
     const result = validateManifest({
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [
         { id: "a", service: "b", role: "c", added: "2025-01-01" },
@@ -71,7 +71,7 @@ describe("a private key inside an object-form dependency edge", () => {
 
   it("still reports a genuinely missing required field alongside the private-key redirect", () => {
     const result = validateManifest({
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [{ id: "b", service: "b", role: "c", added: "2025-01-01" }],
       // Missing "from" *and* carrying a private key -- both are real
@@ -92,7 +92,7 @@ describe("a private key inside an object-form dependency edge", () => {
 describe("an unknown key that isn't private-shaped", () => {
   it("still gets rejected, but as an ordinary schema error, not a private-key redirect", () => {
     const result = validateManifest({
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [],
       dependencies: [],
@@ -154,7 +154,7 @@ describe("referential integrity (beyond what JSON Schema can express)", () => {
 
   it("accepts a replaced_by that correctly names another entry's id", () => {
     const result = validateManifest({
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [
         {
@@ -195,7 +195,7 @@ describe("ordinary schema errors", () => {
 
   it("reports every problem at once (allErrors), not just the first", () => {
     const result = validateManifest({
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [
         { id: "a", service: "b", role: "c", added: "nope", status: "bogus" },
@@ -212,7 +212,7 @@ describe("ordinary schema errors", () => {
 
 describe("parseManifest", () => {
   it("turns a YAML syntax error into an invalid result instead of throwing", () => {
-    const result = parseManifest("dagstree: 1\nproject: [not, closed\n");
+    const result = parseManifest("catalogus: 1\nproject: [not, closed\n");
     expect(result.valid).toBe(false);
     if (result.valid) return;
     expect(result.errors[0]?.message).toMatch(/yaml/i);
@@ -228,7 +228,7 @@ describe("parseManifest", () => {
 describe("free-text private-value guard, wired into validateManifest", () => {
   function withNotes(notes: string) {
     return {
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [{ id: "a", service: "b", role: "c", added: "2025-01-01", notes }],
       dependencies: [],
@@ -271,7 +271,7 @@ describe("free-text private-value guard, wired into validateManifest", () => {
 
   it("HARD and SOFT hits in the same document are reported on their own channels simultaneously", () => {
     const manifest = {
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [
         { id: "a", service: "b", role: "c", added: "2025-01-01", notes: "contact dsnk@example.com" },
@@ -288,7 +288,7 @@ describe("free-text private-value guard, wired into validateManifest", () => {
 
   it("catches a hard hit nested inside a dependency-edge object, not only at the top level", () => {
     const result = validateManifest({
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [
         { id: "a", service: "b", role: "c", added: "2025-01-01" },
@@ -316,7 +316,7 @@ describe("free-text private-value guard, wired into validateManifest", () => {
   // not given a bare "additional property" error -- see the test below.
   it("names what moved, not a bare additional-property error, for a manifest still in the old (pre-2026-08-24) shape", () => {
     const result = validateManifest({
-      dagstree: 1,
+      catalogus: 1,
       project: {
         name: "x",
         slug: "x",
@@ -356,7 +356,7 @@ describe("free-text private-value guard, wired into validateManifest", () => {
 
   it("a service id/slug containing a hyphen and digits is not mistaken for a card number", () => {
     const manifest = {
-      dagstree: 1,
+      catalogus: 1,
       project: { name: "x", slug: "x" },
       services: [{ id: "s3-bucket-2", service: "aws-s3", role: "storage", added: "2025-01-01" }],
       dependencies: [],
