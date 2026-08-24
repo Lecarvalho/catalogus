@@ -85,6 +85,32 @@ assumed, or not reported at all.
 running agents are touching, and says not to edit them. An audit of a file that changes underneath
 it produces a confident report about a version that no longer exists.
 
+## Hard rule: ask, never guess
+
+Where a fact is not in the repo, ask the owner — or record nothing and name the command that fills
+the gap. Never write a plausible default.
+
+This is not a style preference, it is the defect class this project keeps producing. `init`
+hardcoded `visibility: private` and wrote a comment into the manifest admitting the guess. It was
+*right* on the repo it was written against, which is the worst outcome available: a wrong default
+that looks correct is one nobody goes back and checks. In the same pass, a detector invented a
+coding agent named `agents-md` after the instruction file it found — a file convention answering a
+question about agents, and self-confirming, because it appeared beside the real agents on every repo
+that had any. Four of the six defects in Phase 3.6.1 were this same shape.
+
+Two corollaries, both learned the same way:
+
+- **Do not swap one guess for another.** `gh repo view` was rejected as the fix for visibility: it
+  answers only for GitHub and fails quietly for GitLab, Bitbucket, Azure DevOps or a plain origin,
+  which is a provider-shaped guess standing in for a visibility-shaped one. Prefer a
+  provider-agnostic question over a provider-specific inference.
+- **An absent field reads as "not answered yet"; a filled one reads as an answer.** When the CLI
+  cannot know, omitting the field and printing the `dagstree set ...` line that fills it is the
+  correct behaviour, not a degraded one.
+
+The same rule governs the agent skill: `skills/dagstree/SKILL.md` tells the agent to ask rather than
+infer, and `dagstree detect` reports what it cannot identify instead of naming it.
+
 ## Hard rule: no secrets, ever
 
 Dagstree must never store secrets, credentials, API keys or passwords anywhere. `dagstree.yaml`
