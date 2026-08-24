@@ -13,6 +13,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { parse } from "yaml";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { runCli } from "./cli.js";
@@ -143,6 +144,76 @@ describe("runCli", () => {
       }
     });
 
+    // Both of these were live bugs that every unit test in add.test.ts
+    // passed straight through, because both lived in the argv wiring rather
+    // than in runAdd. Found by running the built binary.
+    it("carries --kind and --version through commander into the written entry", async () => {
+      spyOnStreams();
+      const dir = await createTempDir();
+      try {
+        await writeFixtureFile(
+          dir,
+          "dagstree.yaml",
+          "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
+        );
+
+        // --version is the sharp one. commander registers `--version` on the
+        // program via .version(), every subcommand inherits it, and the
+        // inherited option beat add's own: this exact argv printed the CLI
+        // version, added nothing, and exited 0. Silent data loss, not an
+        // error. enablePositionalOptions() in cli.ts is what scopes it.
+        const exitCode = await runCli([
+          "add",
+          "dotnet",
+          dir,
+          "--kind",
+          "stack",
+          "--version",
+          "10",
+          "--role",
+          "runtime-backend",
+        ]);
+
+        expect(exitCode).toBe(0);
+        const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+        expect(parsed.services).toHaveLength(1);
+        expect(parsed.services[0]).toMatchObject({ service: "dotnet", kind: "stack", version: "10" });
+      } finally {
+        await removeTempDir(dir);
+      }
+    });
+
+    it("rejects an out-of-enum --kind rather than dropping it", async () => {
+      spyOnStreams();
+      const dir = await createTempDir();
+      try {
+        await writeFixtureFile(
+          dir,
+          "dagstree.yaml",
+          "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
+        );
+
+        // The action used to build its options object field by field and
+        // simply omitted kind/version, so a bogus --kind was not rejected --
+        // it was silently discarded and the entry written without it.
+        const exitCode = await runCli(["add", "foo", dir, "--kind", "widget", "--role", "x"]);
+
+        expect(exitCode).toBe(2);
+        const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+        expect(parsed.services).toEqual([]);
+      } finally {
+        await removeTempDir(dir);
+      }
+    });
+
+    it("still reports the CLI version for a bare --version", async () => {
+      spyOnStreams();
+      // The other half of the enablePositionalOptions change: scoping
+      // options to the command they follow must not cost the conventional
+      // top-level `dagstree --version`.
+      await expect(runCli(["--version"])).resolves.toBe(0);
+    });
+
     it("errors, without touching the manifest, when the positional path and --path disagree", async () => {
       spyOnStreams();
       vi.spyOn(console, "error").mockImplementation(() => {});
@@ -259,6 +330,30 @@ describe("runCli", () => {
         const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
         expect(text).not.toContain("supabase");
         expect(text).toContain("dependencies: []");
+      } finally {
+        await removeTempDir(dir);
+      }
+    });
+
+    it("rename takes <old> <new> and a positional [path]", async () => {
+      spyOnStreams();
+      const dir = await createTempDir();
+      try {
+        await writeFixtureFile(dir, "dagstree.yaml", SCAFFOLD);
+        await runCli(["add", "fly-io", dir, "--role", "hosting"]);
+        await runCli(["add", "supabase", dir, "--role", "database"]);
+        await runCli(["link", "fly-io", "supabase", dir]);
+
+        // Two positional ids ahead of the optional [path] is the shape most
+        // at risk of commander swallowing the directory as an argument --
+        // the bug `--depends-on` hit in Phase 3.5.
+        const exitCode = await runCli(["rename", "supabase", "supabase-db", dir]);
+
+        expect(exitCode).toBe(0);
+        const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+        expect(text).toContain("id: supabase-db");
+        expect(text).toContain("[fly-io, supabase-db]");
+        expect(await runCli(["validate", dir])).toBe(0);
       } finally {
         await removeTempDir(dir);
       }

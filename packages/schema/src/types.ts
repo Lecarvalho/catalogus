@@ -16,6 +16,7 @@ export type VcsVisibility = VcsInfo["visibility"];
 
 export type ServiceEntry = DagstreeManifestV1["services"][number];
 export type ServiceStatus = NonNullable<ServiceEntry["status"]>;
+export type ServiceKind = NonNullable<ServiceEntry["kind"]>;
 
 export type DependencyEdge = DagstreeManifestV1["dependencies"][number];
 // The oneOf's two branches: pull each back out of the union by shape.

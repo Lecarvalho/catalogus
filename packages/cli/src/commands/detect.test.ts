@@ -73,41 +73,51 @@ describe("runDetect", () => {
     await writeFixtureFile(
       dir,
       "package.json",
-      JSON.stringify({ name: "probe", dependencies: { react: "^18.0.0" }, devDependencies: { typescript: "^5.6.0" } })
+      JSON.stringify({ name: "probe", dependencies: { react: "^18.0.0" }, devDependencies: { prettier: "^3.0.0" } })
     );
 
     const text = (await runDetect(dir)).stdout.join("\n");
     expect(text).toContain("hosting:");
     expect(text).toContain("fly-io");
     expect(text).toMatch(/libraries: \d+ detected/);
-    // react/typescript are libraries (specfy type ui_framework/language) --
-    // their slugs must not appear as their own bullet lines in the default
-    // report, only folded into the collapsed count.
-    expect(text).not.toMatch(/^\s+react \(/m);
-    expect(text).not.toMatch(/^\s+typescript \(/m);
+    // A formatter is the library here. react used to be the example and is
+    // not one any more: as of 2026-08-23 what the project is written in is
+    // a node (kind "stack"), so it leads rather than being collapsed.
+    expect(text).not.toMatch(/^\s+prettier \(/m);
+  });
+
+  it("leads with stack and component nodes too, naming the kind so it can be added correctly", async () => {
+    // The regression this covers: the grouping filter was `kind === "service"`,
+    // which dropped component- and stack-kind detections out of *both* the
+    // leading list and the collapsed library count -- detected, and invisible.
+    await writeFixtureFile(dir, "package.json", JSON.stringify({ name: "probe", dependencies: { react: "^18.0.0" } }));
+
+    const text = (await runDetect(dir)).stdout.join("\n");
+    expect(text).toContain("stack:");
+    expect(text).toMatch(/^\s+react \(React\) \[stack\]/m);
   });
 
   it("prints every library inline when --all is passed, without dropping the service section", async () => {
     await writeFixtureFile(dir, "fly.toml", 'app = "example"\n');
-    await writeFixtureFile(dir, "package.json", JSON.stringify({ name: "probe", dependencies: { react: "^18.0.0" } }));
+    await writeFixtureFile(dir, "package.json", JSON.stringify({ name: "probe", devDependencies: { prettier: "^3.0.0" } }));
 
     const text = (await runDetect(dir, { all: true })).stdout.join("\n");
     expect(text).toContain("hosting:");
     expect(text).toContain("fly-io");
     expect(text).toMatch(/libraries \(\d+\):/);
-    expect(text).toMatch(/^\s+react \(/m);
+    expect(text).toMatch(/^\s+prettier \(/m);
   });
 
   // --json is the machine-readable surface and must never lose records
-  // the text report chooses not to print -- react shows up in the JSON
+  // the text report chooses not to print -- prettier shows up in the JSON
   // technologies array (kind: "library") even though the default text
   // report only summarizes it.
   it("--json still carries every technology, library-kind ones included", async () => {
-    await writeFixtureFile(dir, "package.json", JSON.stringify({ name: "probe", dependencies: { react: "^18.0.0" } }));
+    await writeFixtureFile(dir, "package.json", JSON.stringify({ name: "probe", devDependencies: { prettier: "^3.0.0" } }));
 
     const payload = JSON.parse((await runDetect(dir, { json: true })).stdout[0] as string);
-    const react = payload.technologies.find((t: { specfySlug: string }) => t.specfySlug === "react");
-    expect(react).toBeDefined();
-    expect(react.kind).toBe("library");
+    const prettier = payload.technologies.find((t: { specfySlug: string }) => t.specfySlug === "prettier");
+    expect(prettier).toBeDefined();
+    expect(prettier.kind).toBe("library");
   });
 });

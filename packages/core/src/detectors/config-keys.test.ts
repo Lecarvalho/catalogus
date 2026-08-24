@@ -19,15 +19,20 @@ describe("detectConfigKeys", () => {
     const result = await detectConfigKeys(fixturePath("config-keys", "dotnet-backend"));
 
     expect(result.warnings).toEqual([]);
+    // Ordered by category then slug, which detectConfigKeys promises and
+    // this list therefore encodes: ai, db, messaging, monitoring, payments,
+    // storage. Resend and OpenTelemetry moved out of `other`/`analytics`
+    // when HANDOFF §4's enum was widened on 2026-08-23, which is why they
+    // sit where they do rather than where they used to.
     expect(result.services.map((s) => s.slug)).toEqual([
       "anthropic",
       "elevenlabs",
       "google-vertex-ai",
       "openai",
       "xai",
-      "opentelemetry",
       "supabase",
       "resend",
+      "opentelemetry",
       "stripe",
       "aws-s3",
     ]);
@@ -103,7 +108,8 @@ describe("detectConfigKeys", () => {
 
   it("reads yaml under config/, where a bare filename says nothing on its own", async () => {
     const result = await detectConfigKeys(fixturePath("config-keys", "rails-config"));
-    expect(result.services.map((s) => s.slug)).toEqual(["algolia", "mailgun"]);
+    // messaging before other, per the category-then-slug ordering.
+    expect(result.services.map((s) => s.slug)).toEqual(["mailgun", "algolia"]);
   });
 
   it("returns nothing for a repo with no configuration files worth reading", async () => {

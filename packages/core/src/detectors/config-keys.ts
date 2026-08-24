@@ -27,7 +27,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import type { ConfigServiceDetection, Evidence, ServiceCategory } from "../types.js";
+import type { ConfigServiceDetection, DetectionKind, Evidence, ServiceCategory } from "../types.js";
 
 export interface ConfigKeyDetectionResult {
   services: ConfigServiceDetection[];
@@ -52,6 +52,12 @@ interface CatalogEntry {
   slug: string;
   category: ServiceCategory;
   name: string;
+  /**
+   * Omitted on the vendor rows, which are the overwhelming majority and
+   * default to "service". Set only where the key group proves something the
+   * project runs itself rather than buys — see the opentelemetry row.
+   */
+  kind?: DetectionKind;
   /**
    * Normalised spellings that select this entry: lowercase, letters and
    * digits only, because a key name is matched after being tokenised and
@@ -147,19 +153,35 @@ const CATALOG: CatalogEntry[] = [
   { slug: "railway", category: "hosting", name: "Railway", aliases: ["railway"] },
   { slug: "cloudflare", category: "hosting", name: "Cloudflare", aliases: ["cloudflare"] },
 
-  // --- analytics / observability -------------------------------------------
+  // --- monitoring / observability ------------------------------------------
+  // These were all "analytics" until HANDOFF §4's enum gained `monitoring`
+  // on 2026-08-23. The split is what the thing is *for*: observability that
+  // tells you the system is broken is monitoring, product/usage measurement
+  // is analytics. PostHog stays behind on that test.
+  //
+  // It also closed a real inconsistency: sentry and datadog were "analytics"
+  // here and "other" in mapping.ts, so the same service arrived under a
+  // different category depending on which detector found it.
   {
+    // A wire protocol and an SDK, not a vendor: there is no OpenTelemetry
+    // account and no OpenTelemetry invoice, but an `Otlp__Endpoint` group
+    // proves a real transport sitting between the app and wherever its logs
+    // and traces land. That makes it a node with an edge, not a library --
+    // see DetectionKind's "component".
     slug: "opentelemetry",
-    category: "analytics",
+    category: "monitoring",
     name: "OpenTelemetry",
     aliases: ["otlp", "otel", "opentelemetry"],
+    kind: "component",
   },
-  { slug: "grafana", category: "analytics", name: "Grafana", aliases: ["grafana"] },
-  { slug: "grafana-loki", category: "analytics", name: "Grafana Loki", aliases: ["loki"] },
-  { slug: "sentry", category: "analytics", name: "Sentry", aliases: ["sentry"] },
+  { slug: "grafana", category: "monitoring", name: "Grafana", aliases: ["grafana"] },
+  { slug: "grafana-loki", category: "monitoring", name: "Grafana Loki", aliases: ["loki"] },
+  { slug: "sentry", category: "monitoring", name: "Sentry", aliases: ["sentry"] },
+  { slug: "datadog", category: "monitoring", name: "Datadog", aliases: ["datadog"] },
+  { slug: "prometheus", category: "monitoring", name: "Prometheus", aliases: ["prometheus"] },
+
+  // --- analytics -----------------------------------------------------------
   { slug: "posthog", category: "analytics", name: "PostHog", aliases: ["posthog"] },
-  { slug: "datadog", category: "analytics", name: "Datadog", aliases: ["datadog"] },
-  { slug: "prometheus", category: "analytics", name: "Prometheus", aliases: ["prometheus"] },
 
   // --- pm ------------------------------------------------------------------
   { slug: "trello", category: "pm", name: "Trello", aliases: ["trello"] },
@@ -184,17 +206,24 @@ const CATALOG: CatalogEntry[] = [
       { whenChildKey: ["bucket", "buckets", "bucketname"], slug: "aws-s3", category: "storage", name: "Amazon S3" },
     ],
   },
-  { slug: "resend", category: "other", name: "Resend", aliases: ["resend"] },
-  { slug: "sendgrid", category: "other", name: "SendGrid", aliases: ["sendgrid"] },
-  { slug: "postmark", category: "other", name: "Postmark", aliases: ["postmark"] },
-  { slug: "mailgun", category: "other", name: "Mailgun", aliases: ["mailgun"] },
-  { slug: "twilio", category: "other", name: "Twilio", aliases: ["twilio"] },
-  { slug: "slack", category: "other", name: "Slack", aliases: ["slack"] },
-  { slug: "discord", category: "other", name: "Discord", aliases: ["discord"] },
   { slug: "algolia", category: "other", name: "Algolia", aliases: ["algolia"] },
   { slug: "meilisearch", category: "other", name: "Meilisearch", aliases: ["meilisearch"] },
   { slug: "firebase", category: "other", name: "Firebase", aliases: ["firebase"] },
-  { slug: "rabbitmq", category: "other", name: "RabbitMQ", aliases: ["rabbitmq"] },
+
+  // --- messaging -----------------------------------------------------------
+  // Transactional email, SMS and voice, plus the chat platforms a project
+  // posts alerts into. `messaging` rather than `email` because Twilio is SMS
+  // and voice and Slack is neither.
+  { slug: "resend", category: "messaging", name: "Resend", aliases: ["resend"] },
+  { slug: "sendgrid", category: "messaging", name: "SendGrid", aliases: ["sendgrid"] },
+  { slug: "postmark", category: "messaging", name: "Postmark", aliases: ["postmark"] },
+  { slug: "mailgun", category: "messaging", name: "Mailgun", aliases: ["mailgun"] },
+  { slug: "twilio", category: "messaging", name: "Twilio", aliases: ["twilio"] },
+  { slug: "slack", category: "messaging", name: "Slack", aliases: ["slack"] },
+  { slug: "discord", category: "messaging", name: "Discord", aliases: ["discord"] },
+
+  // --- queue ---------------------------------------------------------------
+  { slug: "rabbitmq", category: "queue", name: "RabbitMQ", aliases: ["rabbitmq"] },
 ];
 
 const BY_ALIAS = new Map<string, CatalogEntry>();
@@ -262,14 +291,14 @@ function lookup(name: string): CatalogEntry | undefined {
 }
 
 /** The catalog entry a hit resolves to, after any child-key refinement. */
-function resolve(entry: CatalogEntry, childKeys: readonly string[]): Pick<CatalogEntry, "slug" | "category" | "name"> {
+function resolve(entry: CatalogEntry, childKeys: readonly string[]): Pick<CatalogEntry, "slug" | "category" | "name" | "kind"> {
   const normalizedChildren = childKeys.map(normalizeKey);
   for (const rule of entry.refine ?? []) {
     if (rule.whenChildKey.some((wanted) => normalizedChildren.includes(wanted))) {
       return { slug: rule.slug, category: rule.category, name: rule.name };
     }
   }
-  return { slug: entry.slug, category: entry.category, name: entry.name };
+  return { slug: entry.slug, category: entry.category, name: entry.name, kind: entry.kind };
 }
 
 /**

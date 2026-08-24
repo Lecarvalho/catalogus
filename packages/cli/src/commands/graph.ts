@@ -46,6 +46,19 @@ export async function runGraph(pathArg: string | undefined, options: GraphComman
   return { exitCode: 0, stdout, stderr: [] };
 }
 
+/**
+ * The parenthesised label after the catalog slug: role, plus kind and
+ * version where they say something. `kind` is omitted for "service" because
+ * that is the default and printing it on every vendor row would drown the
+ * two that are not vendors -- the same rule `dagstree diff` uses.
+ */
+function descriptorText(entry: ServiceEntry): string {
+  const parts = [entry.role];
+  if (entry.kind && entry.kind !== "service") parts.push(entry.kind);
+  if (entry.version) parts.push(`v${entry.version}`);
+  return parts.join(", ");
+}
+
 function statusText(entry: ServiceEntry): string {
   const status = entry.status ?? "active";
   if (status === "phasing_out" && entry.replaced_by) {
@@ -92,7 +105,7 @@ function renderAscii(manifest: DagstreeManifestV1): string[] {
   }
 
   for (const service of manifest.services) {
-    lines.push(`[${service.id}] ${service.service} (${service.role}) - ${colorStatus(service, color)}`);
+    lines.push(`[${service.id}] ${service.service} (${descriptorText(service)}) - ${colorStatus(service, color)}`);
     const deps = dependsOn.get(service.id) ?? [];
     if (deps.length > 0) {
       lines.push(`    depends on: ${deps.join(", ")}`);
@@ -121,7 +134,7 @@ function renderMermaid(manifest: DagstreeManifestV1): string[] {
   lines.push("flowchart LR");
 
   for (const service of manifest.services) {
-    const label = `${service.id}: ${service.service} (${service.role})`;
+    const label = `${service.id}: ${service.service} (${descriptorText(service)})`;
     lines.push(`  ${mermaidId(service.id)}["${label}"]`);
   }
 

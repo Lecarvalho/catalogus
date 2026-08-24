@@ -19,10 +19,10 @@ pnpm workspace monorepo, ESM throughout, TypeScript strict.
 - `packages/schema` (`@dagstree/schema`) — the JSON Schema for `dagstree.yaml` and its validator.
 - `packages/core` (`@dagstree/core`) — the detection engine, built on `@specfy/stack-analyser`.
 - `packages/cli` (`dagstree`) — the offline CLI: `init`, `detect`, `diff`, `add`, `set`, `link`,
-  `deprecate`, `remove`, `validate`, `graph`. Depends on `@dagstree/schema` and `@dagstree/core`. Every
-  command that writes goes through `src/manifest-edit.ts`, which edits the parsed YAML Document
-  (comments and the `$schema` modeline survive) and refuses to write anything that would fail
-  `validate`. The CLI is the only writer: there is no supported hand-edit path.
+  `deprecate`, `remove`, `rename`, `validate`, `graph`. Depends on `@dagstree/schema` and
+  `@dagstree/core`. Every command that writes goes through `src/manifest-edit.ts`, which edits the
+  parsed YAML Document (comments and the `$schema` modeline survive) and refuses to write anything
+  that would fail `validate`. The CLI is the only writer: there is no supported hand-edit path.
 - `skills/dagstree` — the agent skill, a shipped artifact installed into client repos by copying
   `SKILL.md` to `.claude/skills/dagstree/SKILL.md`. It treats the CLI as a hard prerequisite and
   documents the manifest format, so it changes in the same commit as the schema. A drift test

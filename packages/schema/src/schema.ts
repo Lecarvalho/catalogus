@@ -127,6 +127,16 @@ export const dagstreeSchemaV1 = {
           description:
             "The role this instance plays in the project, e.g. \"database\", \"auth\", \"hosting\".",
         },
+        kind: {
+          enum: ["service", "component", "stack"],
+          description:
+            "What this node is. \"service\" — a vendor relationship: it has an account, it can bill, someone else's outage takes it down (Supabase, Stripe, Fly.io). \"component\" — runtime infrastructure the project runs itself: no invoice, but on the request path and able to fail (nginx in the web image, the OpenTelemetry transport to Loki). \"stack\" — the language, runtime or framework the code is written in, attached by an edge to whatever runs it (`[fly-api, dotnet]`) so an end-of-life date answers the same impact question a vendor sunset does. Treated as \"service\" when omitted, so manifests written before this field keep their meaning. Only nodes belong here at all: a build-time library the project merely imports (ESLint, Vitest) is not an entry in any kind.",
+        },
+        version: {
+          type: "string",
+          description:
+            "The version in use, as the owner would say it — \"10\", \"19.2\", \"13.1.3\". Free-form on purpose: this is the number a tile displays and an end-of-life date keys off, not something to resolve or compare. Most useful on `kind: stack` entries, but allowed on any: a self-hosted component has a version too. Never a build identifier or a private tenant reference.",
+        },
         added: {
           type: "string",
           format: "date",

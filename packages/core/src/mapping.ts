@@ -109,7 +109,9 @@ export const SPECFY_TO_DAGSTREE: Record<string, MappingEntry> = {
     name: "Supabase Functions",
     kind: "service",
   },
-  "supabase.realtime": { slug: "supabase", category: "other", name: "Supabase Realtime", kind: "service" },
+  // Realtime is a message channel, not a database read -- the enum gained a
+  // `queue` bucket on 2026-08-23 and this is what it is for.
+  "supabase.realtime": { slug: "supabase", category: "queue", name: "Supabase Realtime", kind: "service" },
 
   // --- ai ------------------------------------------------------------------
   anthropic: { slug: "anthropic", category: "ai", name: "Anthropic", kind: "service" }, // HANDOFF §5 example
@@ -149,27 +151,148 @@ export const SPECFY_TO_DAGSTREE: Record<string, MappingEntry> = {
   amplitude: { slug: "amplitude", category: "analytics", name: "Amplitude", kind: "service" }, // verified: rules/analytics/amplitude.js
 
   // --- other (real services with no matching Dagstree category) --------
-  nginx: { slug: "nginx", category: "other", name: "Nginx", kind: "service" }, // observed: Clapline ops/nginx.conf
-  slack: { slug: "slack", category: "other", name: "Slack", kind: "service" }, // observed: Clapline SLACK_ env
-  // Monitoring/error-tracking — Dagstree's category enum (HANDOFF.md §4) has
-  // no "monitoring" bucket, so these land in "other". Still a service by the
-  // plan's own test: an uptime check or an error tracker can go down and
-  // send an invoice just as much as a database can.
-  sentry: { slug: "sentry", category: "other", name: "Sentry", kind: "service" }, // verified: rules/monitoring/sentry.js
-  datadog: { slug: "datadog", category: "other", name: "Datadog", kind: "service" }, // verified: rules/monitoring/datadog.js
-  newrelic: { slug: "new-relic", category: "other", name: "New Relic", kind: "service" }, // verified: rules/monitoring/newrelic.js
-  // Message queues — same reasoning, no "queue" category in the enum
-  // (supabase.realtime above hits the identical gap).
-  "aws.sqs": { slug: "aws-sqs", category: "other", name: "AWS SQS", kind: "service" }, // verified: rules/queue/aws.sqs.js
-  rabbitmq: { slug: "rabbitmq", category: "other", name: "RabbitMQ", kind: "service" }, // verified: rules/queue/rabbitmq.js
-  // Transactional email / SMS — no "email" or "communication" category
-  // either, but these are exactly the accounts a real project pays for.
-  resend: { slug: "resend", category: "other", name: "Resend", kind: "service" }, // verified: rules/notification/resend.js
-  sendgrid: { slug: "sendgrid", category: "other", name: "SendGrid", kind: "service" }, // verified: rules/notification/sendgrid.js
-  mailgun: { slug: "mailgun", category: "other", name: "Mailgun", kind: "service" }, // verified: rules/notification/mailgun.js
-  twilio: { slug: "twilio", category: "other", name: "Twilio", kind: "service" }, // verified: rules/notification/twilio.js
+  nginx: { slug: "nginx", category: "other", name: "Nginx", kind: "component" }, // observed: Clapline ops/nginx.conf -- serves the SPA and reverse-proxies; no account, no invoice
   lucideicons: { slug: "lucide-icons", category: "other", name: "Lucide Icons", kind: "library" }, // observed: fixpic
   mcp: { slug: "mcp", category: "other", name: "MCP SDK", kind: "library" }, // Model Context Protocol SDK dependency
+
+  // --- monitoring ----------------------------------------------------------
+  // Observability that exists to tell you the system is broken, as opposed
+  // to `analytics`, which tells you how it is being used. Every row here was
+  // in "other" until HANDOFF §4's enum was widened on 2026-08-23; they are
+  // services by that document's own test -- an error tracker or an uptime
+  // check can go down and send an invoice just as much as a database can.
+  sentry: { slug: "sentry", category: "monitoring", name: "Sentry", kind: "service" }, // verified: rules/monitoring/sentry.js
+  datadog: { slug: "datadog", category: "monitoring", name: "Datadog", kind: "service" }, // verified: rules/monitoring/datadog.js
+  newrelic: { slug: "new-relic", category: "monitoring", name: "New Relic", kind: "service" }, // verified: rules/monitoring/newrelic.js
+
+  // --- queue ---------------------------------------------------------------
+  "aws.sqs": { slug: "aws-sqs", category: "queue", name: "AWS SQS", kind: "service" }, // verified: rules/queue/aws.sqs.js
+  rabbitmq: { slug: "rabbitmq", category: "queue", name: "RabbitMQ", kind: "service" }, // verified: rules/queue/rabbitmq.js
+
+  // --- messaging -----------------------------------------------------------
+  // Transactional email, SMS and voice, plus the chat platform a project
+  // posts alerts into. `messaging` rather than `email` because Twilio is SMS
+  // and voice and Slack is neither -- a bucket that cannot hold them would
+  // have left the same gap one row further along. Kept identical to
+  // detectors/config-keys.ts's rows for the same slugs: the same service
+  // arriving under a different category depending on which detector found it
+  // is a bug this widening was partly done to close.
+  slack: { slug: "slack", category: "messaging", name: "Slack", kind: "service" }, // observed: Clapline SLACK_ env
+  resend: { slug: "resend", category: "messaging", name: "Resend", kind: "service" }, // verified: rules/notification/resend.js
+  sendgrid: { slug: "sendgrid", category: "messaging", name: "SendGrid", kind: "service" }, // verified: rules/notification/sendgrid.js
+  mailgun: { slug: "mailgun", category: "messaging", name: "Mailgun", kind: "service" }, // verified: rules/notification/mailgun.js
+  twilio: { slug: "twilio", category: "messaging", name: "Twilio", kind: "service" }, // verified: rules/notification/twilio.js
+
+  // --- stack ---------------------------------------------------------------
+  // Languages, frameworks and runtimes: what the code is written in, as
+  // opposed to what it talks to. These were deliberately absent until
+  // 2026-08-23 -- the rule was that a language "belongs in the architecture
+  // description, if anywhere" -- and that was wrong twice over. It put the
+  // stack in free text where nothing can render a tile or key an
+  // end-of-life date off it, and it conflated two different questions:
+  // `architecture` is the shape (modular monolith, vertical slices), which
+  // is not the stack. A runtime reaching EOL is the same impact-analysis
+  // question a vendor sunset is, so these are nodes, attached by an edge to
+  // whatever runs them (`[fly-api, dotnet]`).
+  //
+  // Curated, not exhaustive: every row below was read out of the installed
+  // @specfy/stack-analyser and cites its rule file, same discipline as the
+  // service rows above. css, scss, jsx, glsl and bash are deliberately
+  // omitted -- they are markers inside a stack, not a choice of one. Note
+  // stack-analyser has no rule for Python, Go, Ruby, PHP or Node itself in
+  // 1.27.6, so those reach a manifest only through a manual `dagstree add`.
+
+  // languages
+  ada: { slug: "ada", category: "stack", name: "Ada", kind: "stack" }, // verified: rules/language/ada.js
+  aspnet: { slug: "aspnet", category: "stack", name: "ASP.NET", kind: "stack" }, // verified: rules/language/aspnet.js
+  c: { slug: "c", category: "stack", name: "C", kind: "stack" }, // verified: rules/language/c.js
+  clojure: { slug: "clojure", category: "stack", name: "Clojure", kind: "stack" }, // verified: rules/language/clojure.js
+  cobol: { slug: "cobol", category: "stack", name: "COBOL", kind: "stack" }, // verified: rules/language/cobol.js
+  coffeescript: { slug: "coffeescript", category: "stack", name: "CoffeeScript", kind: "stack" }, // verified: rules/language/coffeescript.js
+  cplusplus: { slug: "cpp", category: "stack", name: "C++", kind: "stack" }, // verified: rules/language/cplusplus.js
+  csharp: { slug: "csharp", category: "stack", name: "C#", kind: "stack" }, // verified: rules/language/csharp.js
+  dart: { slug: "dart", category: "stack", name: "Dart", kind: "stack" }, // verified: rules/language/dart.js
+  elixir: { slug: "elixir", category: "stack", name: "Elixir", kind: "stack" }, // verified: rules/language/elixir.js
+  haskell: { slug: "haskell", category: "stack", name: "Haskell", kind: "stack" }, // verified: rules/language/haskell.js
+  java: { slug: "java", category: "stack", name: "Java", kind: "stack" }, // verified: rules/language/java.js
+  javascript: { slug: "javascript", category: "stack", name: "JavaScript", kind: "stack" }, // verified: rules/language/javascript.js
+  kotlin: { slug: "kotlin", category: "stack", name: "Kotlin", kind: "stack" }, // verified: rules/language/kotlin.js
+  lua: { slug: "lua", category: "stack", name: "Lua", kind: "stack" }, // verified: rules/language/lua.js
+  matlab: { slug: "matlab", category: "stack", name: "MATLAB", kind: "stack" }, // verified: rules/language/matlab.js
+  objectivec: { slug: "objectivec", category: "stack", name: "Objective-C", kind: "stack" }, // verified: rules/language/objectivec.js
+  perl: { slug: "perl", category: "stack", name: "Perl", kind: "stack" }, // verified: rules/language/perl.js
+  r: { slug: "r", category: "stack", name: "R", kind: "stack" }, // verified: rules/language/r.js
+  scala: { slug: "scala", category: "stack", name: "Scala", kind: "stack" }, // verified: rules/language/scala.js
+  swift: { slug: "swift", category: "stack", name: "Swift", kind: "stack" }, // verified: rules/language/swift.js
+  typescript: { slug: "typescript", category: "stack", name: "TypeScript", kind: "stack" }, // verified: rules/language/typescript.js
+  visualbasicnet: { slug: "visualbasicnet", category: "stack", name: "Visual Basic .NET", kind: "stack" }, // verified: rules/language/visualbasicnet.js
+  vuejs: { slug: "vue", category: "stack", name: "Vue.js", kind: "stack" }, // verified: rules/language/vue.js
+
+  // frameworks (server-side)
+  apiplatform: { slug: "apiplatform", category: "stack", name: "Api Platform", kind: "stack" }, // verified: rules/framework/apiplatform.js
+  blitzjs: { slug: "blitzjs", category: "stack", name: "Blitzjs", kind: "stack" }, // verified: rules/framework/blitzjs.js
+  dioxus: { slug: "dioxus", category: "stack", name: "Dioxus", kind: "stack" }, // verified: rules/framework/dioxus.js
+  django: { slug: "django", category: "stack", name: "Django", kind: "stack" }, // verified: rules/framework/django.js
+  laravel: { slug: "laravel", category: "stack", name: "Laravel", kind: "stack" }, // verified: rules/framework/laravel.js
+  meteorjs: { slug: "meteorjs", category: "stack", name: "Meteor", kind: "stack" }, // verified: rules/framework/meteorjs.js
+  nestjs: { slug: "nestjs", category: "stack", name: "NestJS", kind: "stack" }, // verified: rules/framework/nestjs.js
+  nextjs: { slug: "nextjs", category: "stack", name: "Next.js", kind: "stack" }, // verified: rules/framework/nextjs.js
+  nuxtjs: { slug: "nuxtjs", category: "stack", name: "Nuxt.js", kind: "stack" }, // verified: rules/framework/nuxtjs.js
+  rails: { slug: "rails", category: "stack", name: "Rails", kind: "stack" }, // verified: rules/framework/rails.js
+  redwoodjs: { slug: "redwoodjs", category: "stack", name: "RedwoodJs", kind: "stack" }, // verified: rules/framework/redwoodjs.js
+  remixrun: { slug: "remixrun", category: "stack", name: "Remix", kind: "stack" }, // verified: rules/framework/remixrun.js
+  remult: { slug: "remult", category: "stack", name: "Remult", kind: "stack" }, // verified: rules/framework/remult.js
+  sveltekit: { slug: "sveltekit", category: "stack", name: "SvelteKit", kind: "stack" }, // verified: rules/framework/sveltekit.js
+  symfony: { slug: "symfony", category: "stack", name: "Symfony", kind: "stack" }, // verified: rules/framework/symfony.js
+  tanstackstart: { slug: "tanstackstart", category: "stack", name: "Tanstack Start", kind: "stack" }, // verified: rules/framework/tanstackstart.js
+  tauri: { slug: "tauri", category: "stack", name: "Tauri", kind: "stack" }, // verified: rules/framework/tauri.js
+  wasp: { slug: "wasp", category: "stack", name: "Wasp", kind: "stack" }, // verified: rules/framework/wasp.js
+  yii2: { slug: "yii2", category: "stack", name: "Yii2", kind: "stack" }, // verified: rules/framework/yii2.js
+
+  // ui frameworks
+  alpinejs: { slug: "alpinejs", category: "stack", name: "Alpine.js", kind: "stack" }, // verified: rules/ui_framework/alpinejs.js
+  angular: { slug: "angular", category: "stack", name: "Angular", kind: "stack" }, // verified: rules/ui_framework/angular.js
+  emberjs: { slug: "emberjs", category: "stack", name: "Ember", kind: "stack" }, // verified: rules/ui_framework/emberjs.js
+  expojs: { slug: "expojs", category: "stack", name: "ExpoJS", kind: "stack" }, // verified: rules/ui_framework/expojs.js
+  htmx: { slug: "htmx", category: "stack", name: "HTMX", kind: "stack" }, // verified: rules/ui_framework/htmx.js
+  infernojs: { slug: "infernojs", category: "stack", name: "Inferno", kind: "stack" }, // verified: rules/ui_framework/infernojs.js
+  ionic: { slug: "ionic", category: "stack", name: "Ionic", kind: "stack" }, // verified: rules/ui_framework/ionic.js
+  litjs: { slug: "litjs", category: "stack", name: "Lit", kind: "stack" }, // verified: rules/ui_framework/litjs.js
+  mithriljs: { slug: "mithriljs", category: "stack", name: "Mithril", kind: "stack" }, // verified: rules/ui_framework/mithriljs.js
+  preactjs: { slug: "preactjs", category: "stack", name: "Preact", kind: "stack" }, // verified: rules/ui_framework/preactjs.js
+  qwikjs: { slug: "qwikjs", category: "stack", name: "Qwik", kind: "stack" }, // verified: rules/ui_framework/qwikjs.js
+  react: { slug: "react", category: "stack", name: "React", kind: "stack" }, // verified: rules/ui_framework/react.js
+  solidjs: { slug: "solidjs", category: "stack", name: "SolidJS", kind: "stack" }, // verified: rules/ui_framework/solidjs.js
+  stenciljs: { slug: "stenciljs", category: "stack", name: "Stencil", kind: "stack" }, // verified: rules/ui_framework/stenciljs.js
+  sveltejs: { slug: "sveltejs", category: "stack", name: "Svelte", kind: "stack" }, // verified: rules/ui_framework/sveltejs.js
+  umijs: { slug: "umijs", category: "stack", name: "UmiJS", kind: "stack" }, // verified: rules/ui_framework/umijs.js
+  vue: { slug: "vue", category: "stack", name: "Vue.js", kind: "stack" }, // verified: rules/ui_framework/vue.js
+
+  // static site generators
+  assemble: { slug: "assemble", category: "stack", name: "Assemble", kind: "stack" }, // verified: rules/ssg/assemble.js
+  astro: { slug: "astro", category: "stack", name: "Astro", kind: "stack" }, // verified: rules/ssg/astro.js
+  docsify: { slug: "docsify", category: "stack", name: "Docsify", kind: "stack" }, // verified: rules/ssg/docsify.js
+  docusaurus: { slug: "docusaurus", category: "stack", name: "Docusaurus", kind: "stack" }, // verified: rules/ssg/docusaurus.js
+  eleventy: { slug: "eleventy", category: "stack", name: "Eleventy", kind: "stack" }, // verified: rules/ssg/eleventy.js
+  builtwithfern: { slug: "fern", category: "stack", name: "Fern", kind: "stack" }, // verified: rules/ssg/fern.js
+  fumadocs: { slug: "fumadocs", category: "stack", name: "FumaDocs", kind: "stack" }, // verified: rules/ssg/fumadocs.js
+  gatsby: { slug: "gatsby", category: "stack", name: "Gatsby", kind: "stack" }, // verified: rules/ssg/gatsby.js
+  gridsome: { slug: "gridsome", category: "stack", name: "Gridsome", kind: "stack" }, // verified: rules/ssg/gridsome.js
+  hexojs: { slug: "hexojs", category: "stack", name: "HexoJS", kind: "stack" }, // verified: rules/ssg/hexojs.js
+  hugo: { slug: "hugo", category: "stack", name: "Hugo", kind: "stack" }, // verified: rules/ssg/hugo.js
+  jekyll: { slug: "jekyll", category: "stack", name: "Jekyll", kind: "stack" }, // verified: rules/ssg/jekyll.js
+  mintlify: { slug: "mintlify", category: "stack", name: "Mintlify", kind: "stack" }, // verified: rules/ssg/mintlify.js
+  mkdocs: { slug: "mkdocs", category: "stack", name: "MkDocs", kind: "stack" }, // verified: rules/ssg/mkdocs.js
+  readthedocs: { slug: "readthedocs", category: "stack", name: "Read The Docs", kind: "stack" }, // verified: rules/ssg/readthedocs.js
+  slatedocs: { slug: "slatedocs", category: "stack", name: "Slate", kind: "stack" }, // verified: rules/ssg/slatedocs.js
+  vitepress: { slug: "vitepress", category: "stack", name: "VitePress", kind: "stack" }, // verified: rules/ssg/vitepress.js
+  vuepress: { slug: "vuepress", category: "stack", name: "VuePress", kind: "stack" }, // verified: rules/ssg/vuepress.js
+
+  // runtimes / shells
+  apacheCordova: { slug: "cordova", category: "stack", name: "Cordova", kind: "stack" }, // verified: rules/runtime/apacheCordova.js
+  bunsh: { slug: "bun", category: "stack", name: "Bun", kind: "stack" }, // verified: rules/runtime/bunsh.js
+  capacitorjs: { slug: "capacitorjs", category: "stack", name: "Capacitor", kind: "stack" }, // verified: rules/runtime/capacitorjs.js
+  electron: { slug: "electron", category: "stack", name: "Electron", kind: "stack" }, // verified: rules/runtime/electron.js
 };
 
 /**
@@ -193,6 +316,12 @@ const SPECFY_TYPE_TO_CATEGORY: Partial<Record<string, ServiceCategory>> = {
   storage: "storage",
   ci: "ci",
   network: "dns",
+  // Three of stack-analyser's own type directories that had no Dagstree
+  // bucket until HANDOFF §4's enum was widened. Its "notification" type is
+  // the transactional email/SMS providers, which is what `messaging` names.
+  monitoring: "monitoring",
+  queue: "queue",
+  notification: "messaging",
 };
 
 /**

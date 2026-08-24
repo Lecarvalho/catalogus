@@ -6,6 +6,53 @@
 > **Date:** 2026-08-22
 > **Working name:** Dagstree (DAG + registry; homophone spelling "dagstry" should also be registered and redirected)
 
+**Amendments since 2026-08-22.** This document is the source of truth, so a change to it is recorded
+here rather than made silently.
+
+- *2026-08-23, §4* — the `services.category` enum gained `monitoring`, `queue` and `messaging`.
+  Dogfooding put Sentry, Datadog, New Relic, SQS, RabbitMQ, Resend, SendGrid, Mailgun and Twilio all
+  in `other` despite every one of them being a service by this document's own test: it can go down,
+  and it sends an invoice. `messaging` rather than `email` because Twilio is SMS and voice, so an
+  email-only bucket does not hold it. Approved by the owner.
+
+- *2026-08-23, §4 and §5* — `project_services` / `services[]` gained **`kind`**
+  (`service` | `component` | `stack`, treated as `service` when absent) and **`version`**
+  (free-form string). The catalog gained a `stack` category.
+
+  The rule this replaces was "if it cannot have an outage and cannot send an invoice, it is not a
+  service entry; languages and frameworks belong in the architecture description". Dogfooding
+  showed it wrong in both halves. It excluded nginx and OpenTelemetry — both on the request path,
+  both able to fail, neither with a vendor behind it — so a real project's topology was missing
+  its ingress and its log transport. And it put the stack in free text, where nothing can render a
+  tile or key an end-of-life date off it; `project.architecture` is the *shape* (modular monolith,
+  vertical slices), which is not the stack. A runtime reaching EOL is the same impact-analysis
+  question §4.2 already asks about a vendor sunset, so stack entries are nodes, attached by an
+  ordinary edge to whatever runs them (`[fly-api, dotnet]`).
+
+  The dividing line is now **runtime topology, not vendor relationship**: on the request path, or
+  what the code is written in, is a node; build-time and developer-machine tooling (ESLint,
+  Prettier, Vitest) is not an entry in any kind. `kind` remains the axis Layer 3 needs — only
+  `service` rows can carry a cost or an account reference. Approved by the owner.
+
+- *2026-08-23, §5 and §6* — **Dagstree does not guess.** Where a fact is not in the repo, the
+  CLI asks, or records nothing and names the command that fills the gap. It does not write a
+  plausible default.
+
+  Two defects motivated this, both found by validating a manifest the skill had just written.
+  `init` hardcoded `visibility: private` with a comment in the output owning up to the guess —
+  right on the repo it was written against, which is the worst case, because a wrong default that
+  looks correct is never revisited. Detection cannot help here (nothing in a checkout says whether
+  its remote is public) and shelling out to `gh` would answer only for GitHub while failing quietly
+  for GitLab, Bitbucket, Azure DevOps or a plain origin. So `init` prompts, `init --yes` takes
+  `--visibility`, and with neither it omits `project.vcs` entirely rather than filling it in.
+
+  Separately, `AGENTS.md` / `.agents/` used to be reported as a coding agent literally named
+  `agents-md` — a file convention in a field that names agents, and self-confirming because it
+  appeared beside the real agents on every repo that had any. Those markers are now reported as
+  *unidentified*: they prove an agent works here and not which one, which is a question for the
+  owner. A `.codex` marker was added at the same time; without it a correctly-declared `codex`
+  entry was reported as drift by `dagstree diff` on every single run. Approved by the owner.
+
 ---
 
 ## 1. What This Is
@@ -88,7 +135,7 @@ projects
   id, owner_id, name, slug, repo_url, description, created_at
 
 services            -- GLOBAL catalog (see §4.1)
-  id, name, slug, icon_ref, category,        -- category: db|auth|ai|hosting|dns|payments|analytics|storage|ci|agent|pm|vcs|other
+  id, name, slug, icon_ref, category,        -- category: db|auth|ai|hosting|dns|payments|analytics|monitoring|queue|messaging|storage|ci|agent|pm|vcs|stack|other
   pricing_model,                              -- free|freemium|subscription|usage|one_time
   vendor_url, status,                         -- active|deprecated|sunset
   sunset_date, successor_service_id           -- vendor-level deprecation ("service X is sunsetting")
@@ -96,6 +143,8 @@ services            -- GLOBAL catalog (see §4.1)
 project_services    -- a service *instance* inside a project (node in the DAG)
   id, project_id, service_id,
   role,                                       -- e.g. "db", "auth" (Supabase can appear twice with different roles)
+  kind,                                       -- service|component|stack (default service; see the amendment log)
+  version,                                    -- free-form, e.g. "10", "19.2" -- what a tile shows, what an EOL date keys off
   added_at, status,                           -- active|deprecated|phasing_out|removed
   replaced_by_project_service_id,             -- project-level phase-out plan
   detected | manual,                          -- provenance flag (Layer 1 vs Layer 2)
@@ -176,11 +225,24 @@ services:
     service: namecheap
     role: dns
     added: 2025-11-02
+  - id: nginx
+    service: nginx
+    kind: component        # runs on our own box; no account, no invoice
+    role: ingress-proxy
+    added: 2025-11-02
+  - id: dotnet
+    service: dotnet
+    kind: stack            # what the code is written in
+    version: "10"
+    role: runtime-backend
+    added: 2025-11-02
 
 dependencies:              # edges, from → to
   - [supabase-auth, supabase-db]
   - [fly, supabase-db]
   - [fly, anthropic-api]
+  - [nginx, fly]
+  - [fly, dotnet]          # "what breaks when .NET 10 goes EOL?"
 ```
 
 ### Schema guardrail (critical)

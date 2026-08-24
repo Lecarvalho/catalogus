@@ -37,6 +37,26 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 /**
+ * Looks for a manifest in exactly one directory, with no upward walk.
+ *
+ * Split out from findManifest rather than inlined into it because callers
+ * that were handed an explicit directory need the "is it *here*" question
+ * answered without the walk (see manifest-edit.ts's openManifestForEdit),
+ * and the dagstree.yaml-beats-stack.yaml precedence has to be the same
+ * answer for both questions or the two disagree about which file a
+ * directory holds.
+ */
+export async function findManifestIn(dir: string): Promise<ManifestLocation | null> {
+  for (const filename of [MANIFEST_FILENAME, MANIFEST_FILENAME_FALLBACK]) {
+    const filePath = join(dir, filename);
+    if (await fileExists(filePath)) {
+      return { dir, filePath, filename };
+    }
+  }
+  return null;
+}
+
+/**
  * Walks upward from startDir (inclusive), the way git locates .git/,
  * looking for dagstree.yaml and falling back to stack.yaml at each level.
  * dagstree.yaml wins over stack.yaml within the same directory. Returns
@@ -45,11 +65,9 @@ async function fileExists(path: string): Promise<boolean> {
 export async function findManifest(startDir: string): Promise<ManifestLocation | null> {
   let dir = startDir;
   for (;;) {
-    for (const filename of [MANIFEST_FILENAME, MANIFEST_FILENAME_FALLBACK]) {
-      const filePath = join(dir, filename);
-      if (await fileExists(filePath)) {
-        return { dir, filePath, filename };
-      }
+    const here = await findManifestIn(dir);
+    if (here) {
+      return here;
     }
     const parent = dirname(dir);
     if (parent === dir) {

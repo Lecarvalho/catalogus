@@ -18,29 +18,35 @@ export interface DetectedServiceCandidate {
   name: string;
   evidence: Evidence[];
   /**
-   * "service" or "library" -- see @dagstree/core's DetectionKind. Only
-   * DetectedTechnology can be "library" (an unmapped pass-through, or a
-   * catalog row like lucide-icons/mcp that's worth naming but isn't a
-   * dependency of the business); a HostingDetection or
-   * ConfigServiceDetection is always "service" by construction, so those
-   * two merge passes below set it outright rather than reading a field
-   * that doesn't exist on either source type.
+   * "service", "component", "stack" or "library" -- see @dagstree/core's
+   * DetectionKind. Everything except "library" is manifest-worthy and is
+   * offered as a candidate; "library" is what gets collapsed under a count.
+   * A HostingDetection is a vendor by construction so that pass sets
+   * "service" outright, while a ConfigServiceDetection carries an optional
+   * kind (opentelemetry is a component) and falls back to "service".
    */
   kind: DetectionKind;
 }
 
 /**
- * "service" wins over "library" when the same slug is reached by more than
- * one source with different kinds. Hosting and config-key detections are
- * always "service", so this only matters if a slug's mapping.ts row is
- * marked "library" (mcp, lucide-icons today) and some other signal also
- * resolves to the same slug -- an edge case nothing in the table currently
- * produces, but silently downgrading a confirmed service to "library"
- * because a library-kind row happened to be merged first would be exactly
- * the kind of bug this feature exists to avoid.
+ * The strongest claim wins when the same slug is reached by more than one
+ * source with different kinds: service > component > stack > library.
+ *
+ * The bias is deliberate and it runs one way -- upward. Hosting detections
+ * are always "service" and a config-key group is a vendor unless its row
+ * says otherwise, so the case this guards is a slug whose mapping.ts row is
+ * the weaker claim (mcp and lucide-icons are "library"; every language and
+ * framework row is "stack") while some other signal independently resolves
+ * to the same slug. Silently downgrading a confirmed vendor to "library"
+ * because a weaker row happened to merge first is exactly the bug this
+ * ordering exists to prevent, and the reverse mistake -- showing something
+ * as a service candidate that turns out to be a library -- costs the owner
+ * one glance, not a missing node.
  */
+const KIND_RANK: Record<DetectionKind, number> = { service: 3, component: 2, stack: 1, library: 0 };
+
 function mergeKind(existing: DetectionKind, incoming: DetectionKind): DetectionKind {
-  return existing === "service" || incoming === "service" ? "service" : "library";
+  return KIND_RANK[incoming] > KIND_RANK[existing] ? incoming : existing;
 }
 
 /** True when `e` is already present in `existing` (same file and same detail). */
@@ -110,7 +116,7 @@ function mergeBySlug(
     const existing = bySlug.get(service.slug);
     if (existing) {
       mergeEvidence(existing.evidence, service.evidence);
-      existing.kind = mergeKind(existing.kind, "service");
+      existing.kind = mergeKind(existing.kind, service.kind ?? "service");
     } else {
       const evidence: Evidence[] = [];
       mergeEvidence(evidence, service.evidence);
@@ -119,7 +125,7 @@ function mergeBySlug(
         category: service.category,
         name: service.name,
         evidence,
-        kind: "service",
+        kind: service.kind ?? "service",
       });
     }
   }

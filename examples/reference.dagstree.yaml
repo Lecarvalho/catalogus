@@ -75,6 +75,35 @@ services:
     role: pm
     added: 2025-11-02
 
+  # Not vendors. `kind: component` is infrastructure the project runs itself
+  # -- no account and no invoice, but on the request path and able to fail.
+  # `kind: stack` is what the code is written in: not on the request path,
+  # but a real dependency with a real end-of-life date, which is the same
+  # impact question a vendor sunset asks. Both are ordinary edge targets.
+  - id: ingress
+    service: nginx
+    kind: component
+    role: ingress-proxy
+    added: 2025-11-02
+    notes: "terminates public traffic inside the web image and proxies to the API"
+  - id: otel
+    service: opentelemetry
+    kind: component
+    role: telemetry-transport
+    added: 2026-02-01
+  - id: dotnet
+    service: dotnet
+    kind: stack
+    version: "10"
+    role: runtime-backend
+    added: 2025-11-02
+  - id: react
+    service: react
+    kind: stack
+    version: "19"
+    role: ui-framework
+    added: 2025-11-02
+
   - id: github
     service: github
     role: vcs
@@ -96,3 +125,10 @@ dependencies:
   - [github-actions, github]
   - [github-actions, host-api]
   - [github-actions, host-web]
+  # A component sits in the path; a stack entry hangs off whatever runs it,
+  # so "what breaks when .NET 10 goes EOL" is a graph walk rather than a
+  # text match.
+  - [ingress, host-api]
+  - [host-api, otel]
+  - [host-api, dotnet]
+  - [host-web, react]

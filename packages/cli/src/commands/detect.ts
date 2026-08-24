@@ -71,19 +71,25 @@ export async function runDetect(pathArg: string | undefined, options: DetectComm
 
   for (const category of categories) {
     const entries = grouped.get(category) ?? [];
-    const services = entries.filter((e) => e.kind === "service");
+    // Everything that is not a library leads: services, the components the
+    // project runs itself, and the stack it is written in are all nodes
+    // someone has to decide about. Filtering to kind === "service" here
+    // used to drop the other two out of *both* lists -- neither led nor
+    // counted among the libraries -- so a detected component was invisible.
+    const nodes = entries.filter((e) => e.kind !== "library");
     for (const entry of entries) {
       if (entry.kind === "library") {
         libraries.push(entry);
       }
     }
-    if (services.length === 0) {
+    if (nodes.length === 0) {
       continue;
     }
     sawService = true;
     lines.push(`${category}:`);
-    for (const entry of services) {
-      lines.push(`  ${entry.slug} (${entry.name})${evidenceSuffix(entry.evidence)}`);
+    for (const entry of nodes) {
+      const kindSuffix = entry.kind === "service" ? "" : ` [${entry.kind}]`;
+      lines.push(`  ${entry.slug} (${entry.name})${kindSuffix}${evidenceSuffix(entry.evidence)}`);
     }
     lines.push("");
   }
@@ -102,7 +108,7 @@ export async function runDetect(pathArg: string | undefined, options: DetectComm
       }
     } else {
       lines.push(
-        `libraries: ${libraries.length} detected, not shown -- languages, frameworks and build tools rather than services; rerun with --all to list them`
+        `libraries: ${libraries.length} detected, not shown -- linters, test runners and build tooling, none of which is a node; rerun with --all to list them`
       );
     }
     lines.push("");

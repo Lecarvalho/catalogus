@@ -91,37 +91,43 @@ const FIELDS: Record<string, SettableField> = {
 };
 
 /**
- * `services.<id>.role` is the one settable field whose name is not static:
+ * The per-entry settable fields are the ones whose name is not static:
  * `<id>` is a local id chosen when that entry was added, not a fixed
- * vocabulary FIELDS can enumerate. Its value's shape -- a slug, same as the
- * schema's `role` -- is known up front and checked the same way every other
- * value is, before the manifest is even opened. Whether `<id>` actually
- * names an entry in *this* manifest can only be known once the manifest is
- * open, so that half of the check waits for the resolution pass in runSet
- * below, the same way `link`, `deprecate` and `remove` can only check a
- * known id after opening.
+ * vocabulary FIELDS can enumerate. Each value's shape is known up front and
+ * checked the same way every other value is, before the manifest is even
+ * opened. Whether `<id>` actually names an entry in *this* manifest can only
+ * be known once the manifest is open, so that half of the check waits for
+ * the resolution pass in runSet below, the same way `link`, `deprecate` and
+ * `remove` can only check a known id after opening.
  */
-const SERVICE_ROLE_FIELD = /^services\.([^.]+)\.role$/;
+const SERVICE_FIELD = /^services\.([^.]+)\.(role|kind|version)$/;
 
-/** Shown in place of a literal field name in usage/error text -- see SETTABLE_FIELDS. */
-const SERVICE_ROLE_PLACEHOLDER = "services.<id>.role";
-
-const SERVICE_ROLE_SPEC: SettableField = {
-  // Never read: services.<id>.role has no fixed path until <id> resolves to
-  // a real index, which only happens once the manifest is open. Kept here
-  // only so prepareValue can be reused unchanged for both the static and
-  // the dynamic field.
-  path: [],
-  kind: "slug",
-  hint: "e.g. database, hosting-api, auth",
+const SERVICE_FIELD_SPECS: Record<string, SettableField> = {
+  // `path` is never read on any of these: a per-entry field has no fixed
+  // path until <id> resolves to a real index, which only happens once the
+  // manifest is open. Kept so prepareValue can be reused unchanged for both
+  // the static and the dynamic fields.
+  role: { path: [], kind: "slug", hint: "e.g. database, hosting-api, auth" },
+  kind: { path: [], kind: "slug", hint: "service | component | stack" },
+  // Free text, not a slug: "13.1.3" and "19.2" both have dots in them, and
+  // a version is a label to display rather than an identifier to resolve.
+  version: { path: [], kind: "text", hint: 'e.g. 10, 19.2, 13.1.3' },
 };
 
-// The static field names, sorted, with the one pattern appended rather than
-// interleaved. Sorting it in alphabetically would bury it among the
-// project.* names, where a scanning eye reads it as one more literal and
-// tries to type "services.<id>.role" verbatim as a field name instead of a
-// shape to fill in.
-export const SETTABLE_FIELDS = [...Object.keys(FIELDS).sort(), SERVICE_ROLE_PLACEHOLDER];
+/** Shown in place of a literal field name in usage/error text -- see SETTABLE_FIELDS. */
+const SERVICE_FIELD_PLACEHOLDERS = Object.keys(SERVICE_FIELD_SPECS).map((name) => `services.<id>.${name}`);
+
+// The static field names, sorted, with the patterns appended rather than
+// interleaved. Sorting them in alphabetically would bury them among the
+// project.* names, where a scanning eye reads them as literals and tries to
+// type "services.<id>.role" verbatim as a field name instead of as a shape
+// to fill in.
+export const SETTABLE_FIELDS = [...Object.keys(FIELDS).sort(), ...SERVICE_FIELD_PLACEHOLDERS];
+
+// Mirrors the schema's serviceEntry.kind enum. Checked here rather than left
+// to the post-write validate so the message names the three words the caller
+// can actually type.
+const VALID_KINDS = new Set(["service", "component", "stack"]);
 
 function usageError(lines: string[]): CommandResult {
   return { exitCode: 2, stdout: [], stderr: lines };
@@ -193,15 +199,17 @@ interface PreparedEdit {
    * -- see the resolution pass in runSet.
    */
   path: Array<string | number>;
-  /** Set only for a services.<id>.role edit; undefined for every static field. */
+  /** Set only for a per-entry services.<id>.* edit; undefined for every static field. */
   serviceId?: string;
+  /** Which per-entry field: "role", "kind" or "version". Set with serviceId. */
+  serviceField?: string;
 }
 
 /**
  * `tokens` is the flat positional list: field, value, field, value, ...
  * Every value's shape is checked before the manifest is opened, so a typo
  * in the second pair never leaves the first one half-written. What cannot
- * be checked this early is whether a services.<id>.role edit names a real
+ * be checked this early is whether a services.<id>.* edit names a real
  * id -- that needs the manifest open -- so runSet checks all of those
  * before writing any of them too, in a second pass below.
  */
@@ -238,8 +246,8 @@ export async function runSet(pathArg: string | undefined, tokens: string[]): Pro
       continue;
     }
 
-    const serviceRoleMatch = SERVICE_ROLE_FIELD.exec(field);
-    if (!serviceRoleMatch) {
+    const serviceFieldMatch = SERVICE_FIELD.exec(field);
+    if (!serviceFieldMatch) {
       return usageError([`Unknown field "${field}".`, `  settable fields: ${SETTABLE_FIELDS.join(", ")}`]);
     }
     if (seen.has(field)) {
@@ -247,18 +255,23 @@ export async function runSet(pathArg: string | undefined, tokens: string[]): Pro
     }
     seen.add(field);
 
-    const serviceId = serviceRoleMatch[1] as string;
+    const serviceId = serviceFieldMatch[1] as string;
+    const serviceField = serviceFieldMatch[2] as string;
     if (!isValidSlug(serviceId)) {
       return usageError([
         `"${serviceId}" is not a valid local id in "${field}" (lowercase letters, digits, single - or _ separators).`,
       ]);
     }
 
-    const prepared = prepareValue(field, SERVICE_ROLE_SPEC, value);
+    if (serviceField === "kind" && !VALID_KINDS.has(value)) {
+      return usageError([`"${field}" must be one of: ${[...VALID_KINDS].join(", ")}`]);
+    }
+
+    const prepared = prepareValue(field, SERVICE_FIELD_SPECS[serviceField] as SettableField, value);
     if (!prepared.ok) {
       return prepared.error;
     }
-    edits.push({ field, node: prepared.node, shown: prepared.shown, path: [], serviceId });
+    edits.push({ field, node: prepared.node, shown: prepared.shown, path: [], serviceId, serviceField });
   }
 
   const opened = await openManifestForEdit(pathArg);
@@ -267,8 +280,8 @@ export async function runSet(pathArg: string | undefined, tokens: string[]): Pro
   }
   const { location, manifest, doc } = opened.value;
 
-  // services.<id>.role edits could not be checked against real ids until
-  // the manifest was open. Resolve and check every one of them now, before
+  // Per-entry services.<id>.* edits could not be checked against real ids
+  // until the manifest was open. Resolve and check every one of them now, before
   // any doc.setIn runs, so an unknown id in a later pair still leaves an
   // earlier, valid pair unwritten -- the same property the field-shape
   // checks above already give every other kind of mistake.
@@ -286,7 +299,7 @@ export async function runSet(pathArg: string | undefined, tokens: string[]): Pro
         stderr: [`no service with id "${edit.serviceId}" exists in ${location.filePath}.`, `  known ids: ${known}`],
       };
     }
-    edit.path = ["services", index, "role"];
+    edit.path = ["services", index, edit.serviceField as string];
   }
 
   for (const edit of edits) {
@@ -298,7 +311,7 @@ export async function runSet(pathArg: string | undefined, tokens: string[]): Pro
   }
 
   const described = edits.map((edit) => `${edit.field} = ${edit.shown}`);
-  return commitManifestEdit(doc, location, {
+  return commitManifestEdit(opened.value, {
     failurePrefix: `Setting ${edits.map((edit) => edit.field).join(", ")} would make`,
     successLines: (filePath) => [`Updated ${filePath}`, ...described.map((line) => `  ${line}`)],
   });

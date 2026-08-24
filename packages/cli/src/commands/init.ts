@@ -39,9 +39,18 @@ import type { CommandResult } from "../types.js";
 export interface InitCommandOptions {
   yes?: boolean;
   force?: boolean;
+  /**
+   * Repo visibility, when the caller already knows it. The only way a value
+   * reaches `project.vcs.visibility` under --yes -- see the visibility note
+   * further down for why nothing is inferred there.
+   */
+  visibility?: string;
   /** Injectable for tests; defaults to the real `prompts` package. */
   promptFn?: typeof prompts;
 }
+
+// Mirrors the schema's vcs.visibility enum.
+const VALID_VISIBILITIES = new Set(["public", "private", "internal"]);
 
 const SCHEMA_MODELINE = "# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json";
 
@@ -76,6 +85,12 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
   let architecture: string | undefined;
   let pm: string | undefined;
   let vcsProvider: string | undefined;
+  let visibility: string | undefined = options.visibility?.trim() || undefined;
+  // Things the owner still has to answer, printed after the summary. A
+  // follow-up is what this command emits instead of a guess: it names the
+  // exact command that fills the gap, so an unanswered field costs one line
+  // of output rather than a wrong value in a committed file.
+  const followUps: string[] = [];
 
   if (!options.yes) {
     const ask = options.promptFn ?? prompts;
@@ -111,6 +126,20 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
         { type: "text", name: "architecture", message: "Architecture style (optional)" },
         { type: "text", name: "pm", message: "PM methodology (optional)" },
         { type: "text", name: "vcsProvider", message: "VCS provider (optional, e.g. github)" },
+        {
+          // Asked, never inferred -- see the visibility note further down.
+          // Skipped outright when no provider was named: visibility without
+          // a provider is not a shape the schema accepts.
+          type: (prev) => (typeof prev === "string" && prev.trim() ? "select" : null),
+          name: "visibility",
+          message: "Repo visibility",
+          choices: [
+            { title: "private", value: "private" },
+            { title: "public", value: "public" },
+            { title: "internal (org-visible only)", value: "internal" },
+          ],
+          initial: 0,
+        },
       ],
       {
         onCancel: () => {
@@ -129,6 +158,9 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
     architecture = typeof answers.architecture === "string" ? answers.architecture.trim() || undefined : undefined;
     pm = typeof answers.pm === "string" ? answers.pm.trim() || undefined : undefined;
     vcsProvider = typeof answers.vcsProvider === "string" ? answers.vcsProvider.trim() || undefined : undefined;
+    if (typeof answers.visibility === "string" && answers.visibility.trim()) {
+      visibility = answers.visibility.trim();
+    }
   }
 
   if (!isValidSlug(slug)) {
@@ -181,18 +213,62 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
 
     codingAgents = detection.codingAgents.map((a) => a.agent);
 
-    if (detection.vcs) {
-      vcsProvider = detection.vcs.provider;
-      fileComments.push(
-        'visibility below is a guess (private) -- if this repo is public, run "dagstree set project.vcs.visibility public"'
+    // An AGENTS.md with no vendor-specific marker beside it proves an agent
+    // reads this repo without saying which. That is a question for the
+    // owner, not a value to invent -- the previous behaviour was to write a
+    // pseudo-agent called `agents-md`, which named a file convention in a
+    // field that names agents.
+    if (codingAgents.length === 0 && detection.unidentifiedCodingAgents.length > 0) {
+      const files = detection.unidentifiedCodingAgents.map((e) => e.file).join(", ");
+      followUps.push(
+        `${files} says a coding agent works in this repo but not which one -- ` +
+          "set it with: dagstree set project.coding_agents <agent>[,<agent>]"
       );
     }
+
+    if (detection.vcs) {
+      vcsProvider = detection.vcs.provider;
+    }
+  }
+
+  // Visibility is never inferred and never defaulted.
+  //
+  // It used to be hardcoded to "private" with a comment in the file owning
+  // up to the guess. The guess happened to be right on the repo it was
+  // written against, which is the worst outcome -- a wrong default that
+  // looks correct is one nobody goes back and checks. And the fact is
+  // cheap: whoever runs this knows whether their own repo is public.
+  //
+  // Detection does not help here either. Nothing in a checkout says whether
+  // its remote is public, and shelling out to `gh` would answer only for
+  // GitHub while quietly failing for GitLab, Bitbucket, Azure DevOps or a
+  // plain origin -- a provider-shaped guess in place of a visibility-shaped
+  // one.
+  //
+  // So: the interactive path asks. The --yes path takes --visibility if it
+  // was given, and otherwise omits `project.vcs` entirely rather than
+  // filling it in -- the block is optional in the schema, an absent field
+  // reads as "not yet answered", and a wrong one reads as an answer.
+  if (visibility !== undefined && !VALID_VISIBILITIES.has(visibility)) {
+    return {
+      exitCode: 2,
+      stdout: [],
+      stderr: [`--visibility must be one of: ${[...VALID_VISIBILITIES].join(", ")}`],
+    };
+  }
+
+  if (vcsProvider && visibility === undefined) {
+    followUps.push(
+      `repo visibility was not given, so project.vcs is omitted -- set both with: ` +
+        `dagstree set project.vcs.provider ${vcsProvider} project.vcs.visibility <public|private|internal>`
+    );
+    vcsProvider = undefined;
   }
 
   const project: Record<string, unknown> = { name, slug };
   if (architecture) project.architecture = architecture;
   if (pm) project.pm = pm;
-  if (vcsProvider) project.vcs = { provider: vcsProvider, visibility: "private" };
+  if (vcsProvider && visibility) project.vcs = { provider: vcsProvider, visibility };
   if (codingAgents.length > 0) project.coding_agents = codingAgents;
 
   const manifestObject = {
@@ -225,6 +301,9 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
       `  ${detectedServiceCount} service(s) detected and not yet declared -- run "dagstree diff" to list them,`
     );
     summary.push('  then "dagstree add <service> --role <role>" for each one you want recorded.');
+  }
+  for (const followUp of followUps) {
+    summary.push(`  ${followUp}`);
   }
 
   // Same reasoning as add.ts: check.warnings is the SOFT-tier half of the

@@ -175,26 +175,19 @@ export async function runRemove(pathArg: string | undefined, id: string): Promis
   // "comment attachment" suite for both hazards, measured and pinned
   // rather than assumed.
 
-  return commitManifestEdit(doc, location, {
+  return commitManifestEdit(opened.value, {
     // Nothing this command does to a valid manifest reaches this branch:
     // replaced_by conflicts are refused above before the document is
     // touched, cascading the edges first means removal cannot leave a
     // dangling reference, and removing entries and edges can neither create
     // a cycle nor introduce a private-value hit.
     //
-    // It is reachable anyway, and not through anything remove does wrong.
-    // The two validators are not the same check: openManifestForEdit ->
-    // loadValidManifest runs parseManifest -- schema, referential
-    // integrity, the private-value guard -- while commitManifestEdit runs
-    // checkManifestObject, which additionally runs checkAcyclic. So a
-    // manifest carrying a pre-existing cycle opens cleanly and fails here,
-    // even when the entry being removed has nothing to do with the cycle.
-    // Every writer in this package shares that gap (`link` fails
-    // identically on the same file), which is why closing it belongs in
-    // manifest-edit.ts rather than here -- see docs/PLAN.md. The behaviour
-    // is safe either way: exit 1, nothing written. What it is not is
-    // well-attributed, because failurePrefix names this removal as the
-    // cause of a cycle that predates it.
+    // A manifest carrying a pre-existing cycle still fails the pre-write
+    // check when this removal does not break the cycle -- exit 1, nothing
+    // written -- but it no longer fails under this prefix: commitManifestEdit
+    // compares the cycles against the ones the file already had and reports
+    // that case in the file's name rather than this command's. What is left
+    // here is the genuinely-caused case, which removal cannot reach.
     failurePrefix: `Removing "${id}" would make`,
     successLines: (filePath) => {
       const lines = [`Removed service "${id}" from ${filePath}`];

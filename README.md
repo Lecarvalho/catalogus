@@ -2,8 +2,6 @@
 
 Dagstree is a project operations registry: a CLI that catalogs, for every project you run, the services it depends on, how those services depend on each other, and what you pay for them.
 
-A DAG is not a tree. Nodes have several parents, which is exactly why the data model is a DAG — the name is a joke you are welcome to hold against it.
-
 ## Install
 
 Not published yet. Build from source with Node.js 22 or newer and pnpm:
@@ -59,6 +57,7 @@ dagstree link fly-api supabase-db                    # an edge you remember late
 dagstree set project.vcs.provider github project.vcs.visibility private
 dagstree deprecate heroku-api --status phasing_out --replaced-by fly-api
 dagstree remove old-entry                            # undo a wrong add, edges included
+dagstree rename fly-api fly-backend                  # change an id, edges and replaced_by follow
 dagstree validate          # schema, referential integrity, acyclicity
 dagstree graph --mermaid   # render the dependency graph
 ```

@@ -9,6 +9,7 @@ function baseResult(overrides: Partial<DetectionResult> = {}): DetectionResult {
     scannedAt: new Date().toISOString(),
     technologies: [],
     codingAgents: [],
+    unidentifiedCodingAgents: [],
     mcpServers: [],
     hosting: [],
     configServices: [],

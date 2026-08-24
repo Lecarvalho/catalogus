@@ -3,21 +3,48 @@
 // round-trips through JSON.stringify without loss, which matters because the
 // CLI and (later) MCP server ship it over stdout/stdio verbatim.
 
-/** Matches services.category in HANDOFF.md §4. */
-export type ServiceCategory =
-  | "db"
-  | "auth"
-  | "ai"
-  | "hosting"
-  | "dns"
-  | "payments"
-  | "analytics"
-  | "storage"
-  | "ci"
-  | "agent"
-  | "pm"
-  | "vcs"
-  | "other";
+/**
+ * Matches services.category in HANDOFF.md §4.
+ *
+ * `monitoring`, `queue` and `messaging` were added on 2026-08-23 (see that
+ * document's amendment log). Before them, Sentry, Datadog, New Relic, SQS,
+ * RabbitMQ, Resend, SendGrid, Mailgun and Twilio all landed in `other`
+ * despite passing HANDOFF's own test for a service: it can go down, and it
+ * sends an invoice. `messaging` rather than `email` because Twilio is SMS
+ * and voice, so an email-only bucket does not hold it.
+ *
+ * `analytics` stays what it always was -- product and usage analytics
+ * (PostHog, Plausible, GA). Observability that exists to tell you the
+ * system is broken is `monitoring`, which is why Grafana, Loki,
+ * OpenTelemetry and Prometheus moved out of `analytics` when this landed.
+ *
+ * A runtime array rather than a bare union, with the type derived from it,
+ * because the union alone is erased at build time and every consumer that
+ * needs to *check* a category -- the mapping table's own invariant test was
+ * the first -- ends up writing a second copy of the list. Two copies of an
+ * enum is how one of them stops matching the spec.
+ */
+export const SERVICE_CATEGORIES = [
+  "db",
+  "auth",
+  "ai",
+  "hosting",
+  "dns",
+  "payments",
+  "analytics",
+  "monitoring",
+  "queue",
+  "messaging",
+  "storage",
+  "ci",
+  "agent",
+  "pm",
+  "vcs",
+  "stack",
+  "other",
+] as const;
+
+export type ServiceCategory = (typeof SERVICE_CATEGORIES)[number];
 
 /**
  * A single piece of proof behind a detection. `file` is the human-readable
@@ -31,16 +58,43 @@ export interface Evidence {
 }
 
 /**
- * Whether a Layer 1 detection is a service — an owner-facing dependency
- * that can have an outage and send an invoice — or a library the project's
- * code merely imports, or a tool a developer runs locally. Only
- * DetectedTechnology carries this ambiguity: a ConfigServiceDetection,
- * HostingDetection or coding-agent/MCP detection is never a library by
- * construction (see each type's own doc comment), so none of them need the
- * field — a caller that folds several detection kinds into one shape (see
- * the CLI's DetectedServiceCandidate) treats those as "service" outright.
+ * What a Layer 1 detection is, on the axis that decides whether it earns a
+ * node in the manifest:
+ *
+ * - "service" — a vendor relationship. It has an account, it can bill, and
+ *   someone else's outage takes it down. Supabase, Stripe, Fly.io.
+ * - "component" — runtime infrastructure the project runs itself. No
+ *   account, no invoice, but it is on the request path and it can fail:
+ *   nginx inside the web image, the OpenTelemetry transport between the API
+ *   and Loki. A node, and an edge target.
+ * - "stack" — the language, runtime or framework the project is written in.
+ *   Not on the request path, but a real dependency with a real end-of-life
+ *   date, which is the same impact-analysis question a vendor sunset asks
+ *   ("what breaks when .NET 10 goes EOL?"). Attached to the node that runs
+ *   it, e.g. `[fly-api, dotnet]`.
+ * - "library" — code the project merely imports, or a tool a developer runs
+ *   locally. ESLint, Vitest, Prettier. Never a node; reported by `detect`
+ *   under a count so it does not bury the three kinds above.
+ *
+ * The first three are all manifest-worthy and all appear in `diff`'s
+ * missing-services list; only "library" is filtered out. Note this is a
+ * superset of the manifest's own `kind` field, which has no "library" value
+ * because a library never becomes an entry in the first place.
+ *
+ * Exported as a list, not just a union, for the same reason
+ * SERVICE_CATEGORIES is: the mapping table's invariant test kept a second,
+ * hand-typed copy of the values, and that copy passed green while this
+ * union grew "component" and "stack" underneath it.
+ *
+ * Only DetectedTechnology and ConfigServiceDetection carry this: a
+ * HostingDetection or coding-agent/MCP detection is a service by
+ * construction (see each type's own doc comment), so those need no field —
+ * a caller that folds several detection kinds into one shape (see the CLI's
+ * DetectedServiceCandidate) treats them as "service" outright.
  */
-export type DetectionKind = "service" | "library";
+export const DETECTION_KINDS = ["service", "component", "stack", "library"] as const;
+
+export type DetectionKind = (typeof DETECTION_KINDS)[number];
 
 export interface DetectedTechnology {
   /** Dagstree catalog slug. Equal to specfySlug when unmapped. */
@@ -70,6 +124,19 @@ export interface CodingAgentDetection {
   evidence: Evidence[];
 }
 
+export interface CodingAgentDetectionResult {
+  /** Agents a marker names outright: Claude Code, Codex, Cursor, Copilot. */
+  agents: CodingAgentDetection[];
+  /**
+   * Files proving an agent reads this repo without naming which one --
+   * AGENTS.md, .agents/. Reported so a caller can ask the owner instead of
+   * inventing an agent id for a vendor-neutral convention file. Empty on
+   * most repos, and routinely non-empty *alongside* a full `agents` list,
+   * where it says nothing new and can be ignored.
+   */
+  unidentified: Evidence[];
+}
+
 export interface McpServerDetection {
   name: string;
   evidence: Evidence[];
@@ -94,6 +161,13 @@ export interface ConfigServiceDetection {
   category: ServiceCategory;
   name: string;
   evidence: Evidence[];
+  /**
+   * Omitted for the overwhelming majority of rows, which are vendors and so
+   * "service" by default. Set explicitly only where a configuration key
+   * proves something the project runs itself — `Otlp__Endpoint` proves
+   * OpenTelemetry, which is a wire protocol with no account behind it.
+   */
+  kind?: DetectionKind;
 }
 
 export interface VcsDetection {
@@ -111,6 +185,13 @@ export interface DetectionResult {
   scannedAt: string;
   technologies: DetectedTechnology[];
   codingAgents: CodingAgentDetection[];
+  /**
+   * Evidence that some coding agent is in use here that no marker names --
+   * see CodingAgentDetectionResult.unidentified. Worth surfacing only when
+   * `codingAgents` is empty; otherwise the specific markers already
+   * answered the question.
+   */
+  unidentifiedCodingAgents: Evidence[];
   mcpServers: McpServerDetection[];
   hosting: HostingDetection[];
   /**
