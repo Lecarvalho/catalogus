@@ -1,0 +1,30 @@
+.pill {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-bg);
+}
+
+/* One rule per schema status value, named identically to it (see
+   StatusPill.tsx's LABELS map and @dagstree/schema's ServiceStatus) --
+   this file has no vocabulary of its own to drift from that one. */
+.active {
+  background: var(--status-active);
+}
+
+.phasing_out {
+  background: var(--status-phasing_out);
+}
+
+.deprecated {
+  background: var(--status-deprecated);
+}
+
+.removed {
+  background: var(--status-removed);
+}

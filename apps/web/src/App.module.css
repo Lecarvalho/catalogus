@@ -1,0 +1,29 @@
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* The list and the detail panel side by side -- the list never disappears
+   or gets covered when a node is selected (docs/PLAN.md's Phase 3.7
+   restructure: "the graph/list stays visible and the selected node stays
+   visibly selected"). `.groups` (ServiceList.module.css) is the flexible
+   side; the panel (ServiceDetailPanel.module.css) is a fixed-ish column
+   that keeps its own width regardless of how the list wraps. */
+.body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+
+/* Same breakpoint ServiceDetailPanel.module.css switches its own
+   position:sticky off at -- the two rules describe one layout decision and
+   have to move together. */
+@media (max-width: 720px) {
+  .body {
+    flex-direction: column;
+  }
+}

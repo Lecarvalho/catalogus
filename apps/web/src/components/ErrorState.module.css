@@ -1,0 +1,14 @@
+.state {
+  padding: var(--space-6) 0;
+  color: var(--status-deprecated);
+}
+
+.heading {
+  margin: 0 0 var(--space-1);
+  font-weight: 700;
+}
+
+.message {
+  margin: 0;
+  color: var(--color-text-muted);
+}

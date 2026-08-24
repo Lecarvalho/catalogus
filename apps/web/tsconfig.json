@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Overrides tsconfig.base.json's NodeNext pairing: this is a browser
+    // bundle built by Vite/esbuild, not a Node package with its own exports
+    // map, and it never emits -- Vite does the actual bundling, tsc here is
+    // typecheck-only (see the "typecheck" script and noEmit below).
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"],
+    "noEmit": true,
+    "declaration": false
+  },
+  "include": ["src", "vite.config.ts"]
+}

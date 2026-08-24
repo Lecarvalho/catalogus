@@ -1,0 +1,28 @@
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.heading {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+/* Wrapping flex, not the previous grid-of-cards: a compact node's width is
+   its own content (icon + name), not a column width every other node in
+   the row has to share, so a row of short names and one long uncatalogued
+   slug should wrap around each other rather than all stretch to match the
+   widest. */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}

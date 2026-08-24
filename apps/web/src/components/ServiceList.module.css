@@ -1,0 +1,15 @@
+/* flex: 1 / min-width: 0 make this the flexible side of App.module.css's
+   `.body` (list + detail panel side by side) -- this file owns that rule
+   rather than App.module.css reaching in from outside, since a CSS-module
+   class name isn't reachable from another module's stylesheet. */
+.groups {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.empty {
+  color: var(--color-text-muted);
+}
