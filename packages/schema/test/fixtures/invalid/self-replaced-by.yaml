@@ -1,6 +1,6 @@
 # A service can't replace itself -- replaced_by must name a different
 # entry's id.
-dagstree: 1
+catalogus: 1
 project:
   name: Clapline
   slug: clapline

@@ -1,4 +1,4 @@
-// Dagstree-specific detector for MCP servers configured in a repo
+// Catalogus-specific detector for MCP servers configured in a repo
 // (HANDOFF.md §6). Reads only server *names* out of these files — never
 // their command, args, env, or any other field, since those can carry
 // tokens or paths that shouldn't be echoed into a detection result.

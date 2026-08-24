@@ -2,13 +2,13 @@
 // `icon` field on a CatalogEntry, see catalog.ts), returns the SVG path
 // data the viewer draws it with. This exists as a separate module from
 // catalog.ts because catalog.ts only ever answers "is there a verified
-// icon ref for this dagstree slug" -- a synchronous, in-memory lookup -- and
+// icon ref for this catalogus slug" -- a synchronous, in-memory lookup -- and
 // turning that ref into actual path data means reading a file, which is an
 // I/O concern the catalog itself has no reason to carry.
 //
 // Why this runs server-side rather than shipping simple-icons to the
 // browser: the installed package's own bundle
-// (simple-icons/index.mjs, v16.28.0) is 5.2 MB, and a dagstree.yaml's
+// (simple-icons/index.mjs, v16.28.0) is 5.2 MB, and a catalogus.yaml's
 // service slugs are only known at runtime, so nothing about the way the
 // viewer's bundle is built could ever tree-shake that down -- every icon
 // the manifest might name would have to ship. docs/PLAN.md's Phase 3.7

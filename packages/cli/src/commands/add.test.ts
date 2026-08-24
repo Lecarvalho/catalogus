@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTempDir, removeTempDir, writeFixtureFile } from "../test-support/temp-dir.js";
 import { resolveAddPathArg, runAdd } from "./add.js";
 
-const COMMENTED_MANIFEST = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+const COMMENTED_MANIFEST = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
 # Example App's manifest -- hand annotated, do not clobber these comments.
-dagstree: 1
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -26,7 +26,7 @@ describe("runAdd", () => {
 
   beforeEach(async () => {
     dir = await createTempDir();
-    await writeFixtureFile(dir, "dagstree.yaml", COMMENTED_MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", COMMENTED_MANIFEST);
   });
 
   afterEach(async () => {
@@ -37,8 +37,8 @@ describe("runAdd", () => {
     const result = await runAdd(dir, "fly-io", { role: "hosting" });
     expect(result.exitCode).toBe(0);
 
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
-    expect(text).toContain("# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
+    expect(text).toContain("# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json");
     expect(text).toContain("# Example App's manifest -- hand annotated, do not clobber these comments.");
     expect(text).toContain("# primary datastore");
     // flowCollectionPadding:false (chosen to match HANDOFF.md's compact
@@ -76,18 +76,18 @@ describe("runAdd", () => {
   });
 
   it("refuses a duplicate id and writes nothing", async () => {
-    const before = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const result = await runAdd(dir, "supabase", { role: "storage", id: "supabase-db" });
     expect(result.exitCode).toBe(1);
     expect(result.stderr.join("\n")).toContain("Duplicate service id");
-    const after = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const after = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(after).toBe(before);
   });
 
   it("adds dependency edges for --depends-on, in compact tuple form", async () => {
     const result = await runAdd(dir, "fly-io", { role: "hosting", dependsOn: ["supabase-db"] });
     expect(result.exitCode).toBe(0);
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(text).toContain("[fly-io, supabase-db]");
   });
 
@@ -95,30 +95,30 @@ describe("runAdd", () => {
     // FIX 4: this is the id-clearly-not-a-service-id case a swallowed
     // positional path lands in -- the message must name the actual bad
     // value rather than surfacing as an opaque schema/reference error.
-    const before = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const result = await runAdd(dir, "fly-io", { role: "hosting", dependsOn: ["does-not-exist"] });
     expect(result.exitCode).toBe(1);
     const text = result.stderr.join("\n");
     expect(text).toContain("does-not-exist");
     expect(text).toContain("supabase-db");
-    const after = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const after = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(after).toBe(before);
   });
 
   it("refuses a new entry that depends on itself (a self-edge) and writes nothing", async () => {
-    const before = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const result = await runAdd(dir, "fly-io", { role: "hosting", id: "loopy", dependsOn: ["loopy"] });
     expect(result.exitCode).toBe(1);
     expect(result.stderr.join("\n")).toContain("cyclic dependency");
-    const after = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const after = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(after).toBe(before);
   });
 
   it("rejects a --role that is not a valid slug before touching the file", async () => {
-    const before = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const result = await runAdd(dir, "fly-io", { role: "Not A Slug" });
     expect(result.exitCode).toBe(2);
-    const after = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const after = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(after).toBe(before);
   });
 
@@ -128,7 +128,7 @@ describe("runAdd", () => {
   });
 
   it("refuses --notes that looks like Layer 3 data and writes nothing", async () => {
-    const before = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const result = await runAdd(dir, "namecheap", {
       role: "dns",
       notes: "billing account dsnk@example.com, cost 42 USD/month, plan tier pro, renewal 2027-01-01",
@@ -136,7 +136,7 @@ describe("runAdd", () => {
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("--notes");
     expect(result.stderr.join("\n")).toContain("push --private");
-    const after = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const after = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(after).toBe(before);
   });
 
@@ -146,13 +146,13 @@ describe("runAdd", () => {
       notes: "primary domain for the marketing site",
     });
     expect(result.exitCode).toBe(0);
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(text).toContain("notes: primary domain for the marketing site");
   });
 
   it("accepts --notes with a bare soft keyword and writes it, with a warning rather than a refusal", async () => {
     // FIX (write-time gate over-blocking): a soft-only hit used to be
-    // refused outright, with no override -- the same string `dagstree
+    // refused outright, with no override -- the same string `catalogus
     // validate` accepts at exit 0. Now it's written, and the warning
     // `checkManifestObject` already produces for it is surfaced instead of
     // silently dropped.
@@ -161,36 +161,36 @@ describe("runAdd", () => {
       notes: "renewal is automated via GitHub Actions",
     });
     expect(result.exitCode).toBe(0);
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(text).toContain("notes: renewal is automated via GitHub Actions");
     expect(result.stderr.join("\n")).toContain("warning:");
     expect(result.stderr.join("\n")).toContain("renewal");
   });
 
   it("rejects a --depends-on value that isn't a valid slug, naming it as a likely swallowed path, before touching the file", async () => {
-    // FIX 4 follow-up: --depends-on is variadic, so `dagstree add supabase
+    // FIX 4 follow-up: --depends-on is variadic, so `catalogus add supabase
     // --role=database --depends-on fly ./somewhere` swallows "./somewhere"
     // into dependsOn instead of reading it as the positional [path] --
     // this must be caught by shape, not left to surface as an opaque
     // manifest-not-found error naming the wrong directory.
-    const before = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const result = await runAdd(dir, "supabase", { role: "database", dependsOn: ["fly", "./somewhere"] });
     expect(result.exitCode).toBe(2);
     const text = result.stderr.join("\n");
     expect(text).toContain("--depends-on");
     expect(text).toContain("./somewhere");
     expect(text).toContain("looks like a path");
-    const after = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const after = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(after).toBe(before);
   });
 
   it("exits 2 when an explicitly given target directory does not exist, rather than silently editing an ancestor manifest", async () => {
-    const before = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const missing = join(dir, "does-not-exist");
     const result = await runAdd(missing, "fly-io", { role: "hosting" });
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("does not exist");
-    const after = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const after = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(after).toBe(before);
   });
 
@@ -199,28 +199,28 @@ describe("runAdd", () => {
     try {
       const result = await runAdd(empty, "fly-io", { role: "hosting" });
       expect(result.exitCode).toBe(2);
-      expect(result.stderr.join("\n")).toContain("dagstree init");
+      expect(result.stderr.join("\n")).toContain("catalogus init");
     } finally {
       await removeTempDir(empty);
     }
   });
 
-  it("reports a stack.yaml -> dagstree.yaml migration when adding to a fallback-named manifest", async () => {
+  it("reports a stack.yaml -> catalogus.yaml migration when adding to a fallback-named manifest", async () => {
     const stackDir = await createTempDir();
     try {
       await writeFixtureFile(
         stackDir,
         "stack.yaml",
-        "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
+        "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
       );
       const result = await runAdd(stackDir, "fly-io", { role: "hosting" });
       expect(result.exitCode).toBe(0);
       const summary = result.stdout.join("\n");
       expect(summary).toContain("migrated");
       expect(summary).toContain("stack.yaml");
-      expect(summary).toContain("dagstree.yaml");
+      expect(summary).toContain("catalogus.yaml");
 
-      const newText = await readFile(join(stackDir, "dagstree.yaml"), "utf8");
+      const newText = await readFile(join(stackDir, "catalogus.yaml"), "utf8");
       expect(newText).toContain("service: fly-io");
 
       // the original stack.yaml is left in place, unmodified -- the message

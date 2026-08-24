@@ -1,5 +1,5 @@
 {
-  "name": "@dagstree/web",
+  "name": "@catalogus/web",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "dagstree": "workspace:*",
+    "@catalogus/cli": "workspace:*",
     "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.3"

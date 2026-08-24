@@ -1,5 +1,5 @@
 # "on_hold" is not one of active | deprecated | phasing_out | removed.
-dagstree: 1
+catalogus: 1
 project:
   name: Clapline
   slug: clapline

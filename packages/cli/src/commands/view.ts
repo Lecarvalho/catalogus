@@ -1,4 +1,4 @@
-// `dagstree view [path] [--port <port>] [--no-open]` -- the viewer's one
+// `catalogus view [path] [--port <port>] [--no-open]` -- the viewer's one
 // entry point (docs/PLAN.md, Phase 3.7). Serves the built web app plus this
 // repo's manifest, as one JSON endpoint (GET /api/project) and static
 // files, then opens a browser onto it.
@@ -50,9 +50,9 @@ export interface ViewServerHandle {
 export type CreateViewServerOutcome = { ok: true; value: ViewServerHandle } | { ok: false; error: CommandResult };
 
 /**
- * Finds @dagstree/cli's own package.json by walking upward from `startDir`,
+ * Finds @catalogus/cli's own package.json by walking upward from `startDir`,
  * the same upward-walk shape manifest-io.ts's findManifest() uses for
- * dagstree.yaml -- for an analogous reason. This module's compiled location
+ * catalogus.yaml -- for an analogous reason. This module's compiled location
  * differs between a vitest run (packages/cli/src/commands/view.ts) and the
  * tsup-bundled binary (a file sitting directly under packages/cli/dist/),
  * so no single hardcoded relative offset from import.meta.url is correct in
@@ -69,7 +69,7 @@ async function findPackageRoot(startDir: string): Promise<string> {
     }
     const parent = dirname(dir);
     if (parent === dir) {
-      throw new Error(`could not find @dagstree/cli's package.json above ${startDir}`);
+      throw new Error(`could not find @catalogus/cli's package.json above ${startDir}`);
     }
     dir = parent;
   }
@@ -199,7 +199,7 @@ async function pickStaticFile(resolved: string, root: string, pathname: string):
  * means the shell is already known-good; no request can hit a failure
  * mode here that startup didn't already rule out.
  *
- * The tradeoff: a build that runs while `dagstree view` is still serving
+ * The tradeoff: a build that runs while `catalogus view` is still serving
  * requests replaces dist/web/index.html on disk, but this server keeps
  * answering with the copy it cached at startup until the process is
  * restarted -- a stale shell, not a transient 500. That is consistent
@@ -375,7 +375,7 @@ function hasDuplicateHostHeader(rawHeaders: string[]): boolean {
  * identical precomputed bytes and identical allow-list without re-reading
  * or re-validating anything per request. The read-once payload is
  * deliberate: the viewer is a snapshot of the manifest at the moment
- * `dagstree view` started, not a live tail of the file (see PLAN.md's
+ * `catalogus view` started, not a live tail of the file (see PLAN.md's
  * non-goals -- no file watching, no hot reload; see also createViewServer's
  * own comment on this).
  */
@@ -479,7 +479,7 @@ function listen(server: Server, port: number): Promise<void> {
  * `options.port` may be 0, which asks the OS for any free ephemeral port --
  * real Node http server behaviour, not a fallback this module invented. It
  * exists for tests that need an isolated server without guessing at a free
- * port or colliding with a `dagstree view` a developer already has running;
+ * port or colliding with a `catalogus view` a developer already has running;
  * it is never what the CLI passes on a user's behalf (runView always passes
  * DEFAULT_VIEW_PORT or the user's own explicit --port, so "the port you
  * asked for is busy" still fails hard rather than silently picking another
@@ -491,7 +491,7 @@ export async function createViewServer(targetDir: string, options: { port: numbe
   // webRoot exists as a directory or that index.html stat()s as a file.
   //
   // The directory-only version of this check let an isolated `pnpm
-  // --filter dagstree build` (tsup's own `clean: true` -- see
+  // --filter @catalogus/cli build` (tsup's own `clean: true` -- see
   // tsup.config.ts), which can leave dist/web behind with an empty
   // assets/ subdirectory but no index.html, pass straight through to a
   // listening server that then 500'd on every request, GET / included
@@ -529,7 +529,7 @@ export async function createViewServer(targetDir: string, options: { port: numbe
         stdout: [],
         stderr: [
           `Built web assets not found at ${webRoot}.`,
-          '  run "pnpm build" from the repo root, then "dagstree view" again.',
+          '  run "pnpm build" from the repo root, then "catalogus view" again.',
         ],
       },
     };
@@ -543,7 +543,7 @@ export async function createViewServer(targetDir: string, options: { port: numbe
   // "Read once" is the deliberate choice (see createRequestHandler's own
   // comment): the manifest is read here, at server start, and never again
   // for the life of this process. That's also the safe choice -- an edit
-  // that makes dagstree.yaml malformed or empty mid-session can't crash a
+  // that makes catalogus.yaml malformed or empty mid-session can't crash a
   // server that never looks at it again. `readAt` records the one moment
   // this snapshot was taken so a viewer can tell it's a snapshot at all
   // (G2, Phase 3.7 hardening pass); rendering that value is the web UI's

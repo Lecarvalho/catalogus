@@ -32,8 +32,8 @@ describe("Icon", () => {
   });
 
   // Regression. `rollup` is the segment of `role` before the first "-", and
-  // the schema's slug pattern admits "constructor" -- `dagstree validate`
-  // passes it and `dagstree graph` prints it. While the glyph table was a
+  // the schema's slug pattern admits "constructor" -- `catalogus validate`
+  // passes it and `catalogus graph` prints it. While the glyph table was a
   // plain object literal, this lookup resolved through Object.prototype to
   // the `Object` function: truthy and callable, so React rendered it as a
   // component, threw error #31, and took the *entire page* down -- one bad

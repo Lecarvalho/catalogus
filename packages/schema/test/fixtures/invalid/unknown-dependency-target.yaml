@@ -1,6 +1,6 @@
 # The edge names "vertex", but no services[] entry has that id — also
 # referential integrity, not expressible in JSON Schema.
-dagstree: 1
+catalogus: 1
 project:
   name: Clapline
   slug: clapline

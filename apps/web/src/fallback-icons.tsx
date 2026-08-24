@@ -28,14 +28,14 @@ export interface FallbackGlyphProps {
  * list is at most a few dozen rows; there is nothing here worth optimizing.
  *
  * Built on a null-prototype record, not a plain `{}` literal, for the same
- * reason DAGSTREE_CATALOG is (packages/core/src/catalog.ts -- read its doc
+ * reason CATALOGUS_CATALOG is (packages/core/src/catalog.ts -- read its doc
  * comment for the full account). `rollup` is the segment of `role` before
  * the first "-", and the schema's slug pattern
  * (`^[a-z0-9]+(?:[_-][a-z0-9]+)*$`) admits "constructor". On a plain
  * literal, `GLYPHS["constructor"]` resolves through Object.prototype to the
  * `Object` function -- truthy, and a function, so it is rendered as a
  * component. That is not a theoretical hazard: a manifest carrying
- * `role: constructor` validates clean, `dagstree graph` prints it fine, and
+ * `role: constructor` validates clean, `catalogus graph` prints it fine, and
  * the served page went entirely blank (React error #31, no error UI at all,
  * because one bad node takes the whole tree down). Fixing it here rather
  * than at the lookup is deliberate: the defect is that the table was

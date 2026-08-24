@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTempDir, removeTempDir, writeFixtureFile } from "../test-support/temp-dir.js";
 import { runGraph } from "./graph.js";
 
-const MANIFEST = `dagstree: 1
+const MANIFEST = `catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -36,7 +36,7 @@ describe("runGraph", () => {
 
   beforeEach(async () => {
     dir = await createTempDir();
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
   });
 
   afterEach(async () => {
@@ -88,8 +88,8 @@ describe("runGraph", () => {
     // edges into one.
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -159,8 +159,8 @@ dependencies:
   it("handles a manifest with no services", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
+      "catalogus.yaml",
+      "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n"
     );
     const result = await runGraph(dir);
     expect(result.exitCode).toBe(0);
@@ -172,7 +172,7 @@ dependencies:
     try {
       const result = await runGraph(empty);
       expect(result.exitCode).toBe(2);
-      expect(result.stderr.join("\n")).toContain("dagstree init");
+      expect(result.stderr.join("\n")).toContain("catalogus init");
     } finally {
       await removeTempDir(empty);
     }
@@ -186,9 +186,9 @@ dependencies:
     try {
       await writeFixtureFile(
         dir,
-        "dagstree.yaml",
+        "catalogus.yaml",
         [
-          "dagstree: 1",
+          "catalogus: 1",
           "project:",
           "  name: X",
           "  slug: x",

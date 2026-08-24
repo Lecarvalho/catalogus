@@ -1,5 +1,5 @@
-# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Clapline
   slug: clapline

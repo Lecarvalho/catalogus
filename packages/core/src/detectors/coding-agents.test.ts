@@ -18,7 +18,7 @@ describe("detectCodingAgents", () => {
   it("detects Codex from a .codex/ directory", async () => {
     // The marker that did not exist until 2026-08-23. Its absence was not
     // silent: a manifest that correctly declared `codex` was reported by
-    // `dagstree diff` as "declared but no longer detected" on every run,
+    // `catalogus diff` as "declared but no longer detected" on every run,
     // which reads as drift and is not.
     const result = await detectCodingAgents(fixturePath("coding-agents", "codex-dir"));
     expect(result.agents).toEqual([{ agent: "codex", name: "Codex", evidence: [{ file: ".codex" }] }]);

@@ -1,4 +1,4 @@
-// `dagstree link <from> <to> [path]` -- adds one dependency edge between two
+// `catalogus link <from> <to> [path]` -- adds one dependency edge between two
 // services that already exist.
 //
 // Edges are the product. They are also the one thing no scanner can supply
@@ -6,7 +6,7 @@
 // and before this, the only way to record one was to re-run `add`, which
 // wants to create a service entry, or to hand-edit the file. Both are worse
 // than a command that does exactly this.
-import { edgePairs } from "@dagstree/schema";
+import { edgePairs } from "@catalogus/schema";
 import type { YAMLSeq } from "yaml";
 
 import { commitManifestEdit, openManifestForEdit, preferBlockStyleWhenEmpty } from "../manifest-edit.js";
@@ -60,7 +60,7 @@ export async function runLink(
       stderr: [
         `no service with id ${unknown.map((id) => `"${id}"`).join(" or ")} exists in ${location.filePath}.`,
         `  known ids: ${known}`,
-        "  add the service first with \"dagstree add\", then link it.",
+        "  add the service first with \"catalogus add\", then link it.",
       ],
     };
   }

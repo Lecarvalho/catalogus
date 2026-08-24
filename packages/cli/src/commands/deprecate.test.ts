@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTempDir, removeTempDir, writeFixtureFile } from "../test-support/temp-dir.js";
 import { runDeprecate } from "./deprecate.js";
 
-const MANIFEST = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+const MANIFEST = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
 # Hand-written header comment -- must survive every edit.
-dagstree: 1
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -30,7 +30,7 @@ describe("runDeprecate", () => {
 
   beforeEach(async () => {
     dir = await createTempDir();
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
   });
 
   afterEach(async () => {
@@ -38,7 +38,7 @@ describe("runDeprecate", () => {
   });
 
   async function manifestText(): Promise<string> {
-    return readFile(join(dir, "dagstree.yaml"), "utf8");
+    return readFile(join(dir, "catalogus.yaml"), "utf8");
   }
 
   it("adds status: deprecated to an entry that had none, keeping its inline comment", async () => {

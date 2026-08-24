@@ -1,6 +1,6 @@
 # Two entries share the local id "fly" — not expressible in JSON Schema,
 # checked as referential integrity by validateManifest().
-dagstree: 1
+catalogus: 1
 project:
   name: Clapline
   slug: clapline

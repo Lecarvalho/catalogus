@@ -1,12 +1,12 @@
 {
-  "name": "dagstree",
+  "name": "@catalogus/cli",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "dagstree": "./dist/cli.js"
+    "catalogus": "./dist/cli.js"
   },
   "exports": {
     ".": {
@@ -23,8 +23,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dagstree/core": "workspace:*",
-    "@dagstree/schema": "workspace:*",
+    "@catalogus/core": "workspace:*",
+    "@catalogus/schema": "workspace:*",
     "commander": "^12.1.0",
     "picocolors": "^1.1.1",
     "prompts": "^2.4.2",

@@ -30,6 +30,9 @@ importers:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
     devDependencies:
+      '@catalogus/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@testing-library/react':
         specifier: ^16.0.1
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -45,9 +48,6 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^4.3.4
         version: 4.7.0(vite@6.4.3(@types/node@24.13.3)(yaml@2.9.0))
-      dagstree:
-        specifier: workspace:*
-        version: link:../../packages/cli
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1
@@ -60,10 +60,10 @@ importers:
 
   packages/cli:
     dependencies:
-      '@dagstree/core':
+      '@catalogus/core':
         specifier: workspace:*
         version: link:../core
-      '@dagstree/schema':
+      '@catalogus/schema':
         specifier: workspace:*
         version: link:../schema
       commander:

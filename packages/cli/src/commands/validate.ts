@@ -1,11 +1,11 @@
-// `dagstree validate` -- the CI entrypoint. Exit codes are the contract:
+// `catalogus validate` -- the CI entrypoint. Exit codes are the contract:
 // 0 valid, 1 a validation failure (schema, referential integrity, a
 // dependency cycle, or -- with --strict -- a soft private-value warning),
 // 2 a usage error (no manifest, or it can't be read). Prints every error at
 // once (ajv is configured with allErrors, and cycle detection reports every
 // disjoint cycle it finds), never just the first.
 //
-// Soft private-value hits (see @dagstree/schema's free-text-guard.ts) are
+// Soft private-value hits (see @catalogus/schema's free-text-guard.ts) are
 // warnings, not errors: a manifest carrying one is still `valid` and still
 // exits 0, but the warning is always printed to stderr so it's never
 // missed, and never to stdout -- --json-style pipelines on other commands,

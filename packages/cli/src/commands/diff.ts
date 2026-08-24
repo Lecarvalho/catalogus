@@ -1,4 +1,4 @@
-// `dagstree diff` -- compares detection output against the manifest and
+// `catalogus diff` -- compares detection output against the manifest and
 // reports both directions: detected but missing from the manifest, and
 // declared in the manifest but not visible to detection. The second
 // direction is how a stale manifest gets noticed, so it's not
@@ -40,16 +40,16 @@
 // unlisted role word (role: registrar) or wrongly exempted a genuinely
 // stale entry that happened to use "dns"/"pm" (role: dns on a *mapped,
 // detectable* provider like cloudflare). What actually determines
-// detectability is the *slug*: @dagstree/core's SPECFY_TO_DAGSTREE is the
-// complete, closed set of Dagstree slugs any scan can ever produce (every
-// mapped technology, and every Dagstree-specific hosting detector's own
+// detectability is the *slug*: @catalogus/core's SPECFY_TO_CATALOGUS is the
+// complete, closed set of Catalogus slugs any scan can ever produce (every
+// mapped technology, and every Catalogus-specific hosting detector's own
 // slug -- see mapping.ts's own comment; core/src/detectors/hosting.ts's
 // output slugs are already a subset of it). A declared slug outside that
 // set can never come back from detect() -- mapped or as an unmapped
 // pass-through, since pass-through slugs are derived from stack-analyser's
 // own tech keys, which have no notion of a DNS registrar or a PM tool at
 // all -- so it's undetectable by design, not stale.
-import { detect, SPECFY_TO_DAGSTREE } from "@dagstree/core";
+import { detect, SPECFY_TO_CATALOGUS } from "@catalogus/core";
 
 import { collectAllDetectedServices, collectDetectedServices } from "../detected-services.js";
 import type { DetectedServiceCandidate } from "../detected-services.js";
@@ -58,7 +58,7 @@ import { resolveTargetPath } from "../paths.js";
 import type { CommandResult } from "../types.js";
 import { errorMessage } from "../types.js";
 
-const REACHABLE_SLUGS = new Set(Object.values(SPECFY_TO_DAGSTREE).map((entry) => entry.slug));
+const REACHABLE_SLUGS = new Set(Object.values(SPECFY_TO_CATALOGUS).map((entry) => entry.slug));
 
 function isUndetectableByDesign(slug: string): boolean {
   return !REACHABLE_SLUGS.has(slug);
@@ -136,7 +136,7 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
       // Structured the same way notDetectedServices is above -- these are
       // manifest service entries (role: coding-agent) now, not raw strings
       // from a project.coding_agents list, so a program acting on this has
-      // the id to hand to `dagstree remove`, not just a bare slug.
+      // the id to hand to `catalogus remove`, not just a bare slug.
       staleCodingAgents: staleAgents.map((s) => ({ id: s.id, service: s.service, role: s.role })),
     };
     return { exitCode: hasDiff ? 1 : 0, stdout: [JSON.stringify(payload, null, 2)], stderr: [] };
@@ -165,7 +165,7 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
     lines.push("");
     lines.push("  Not a delete list. Detection reports what this checkout shows, not what is true:");
     lines.push("  a service configured in a gitignored file or wired in a web console looks exactly");
-    lines.push("  like one that was removed. Confirm with the owner before \"dagstree remove\".");
+    lines.push("  like one that was removed. Confirm with the owner before \"catalogus remove\".");
   }
   lines.push("");
 
@@ -186,7 +186,7 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
       lines.push("  (none)");
     } else {
       for (const agent of missingAgents) {
-        lines.push(`  + ${agent.agent} (${agent.name}) -- dagstree add ${agent.agent} --role coding-agent`);
+        lines.push(`  + ${agent.agent} (${agent.name}) -- catalogus add ${agent.agent} --role coding-agent`);
       }
     }
     lines.push("");
@@ -206,7 +206,7 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
     const files = [...new Set(unidentifiedAgents.map((e) => e.file))].join(", ");
     lines.push("Coding agent in use but not identified:");
     lines.push(`  ${files} says an agent works in this repo without naming which one.`);
-    lines.push("  Ask the owner, then: dagstree add <agent> --role coding-agent");
+    lines.push("  Ask the owner, then: catalogus add <agent> --role coding-agent");
     lines.push("");
   }
 
@@ -217,7 +217,7 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
   return { exitCode: hasDiff ? 1 : 0, stdout: lines, stderr: [] };
 }
 
-// Same lead-with-services treatment as `dagstree detect` (see that module's
+// Same lead-with-services treatment as `catalogus detect` (see that module's
 // header): collectDetectedServices already excludes most library noise by
 // only offering catalog-known slugs, but a handful of known rows are
 // libraries worth cataloging by name (mcp, lucide-icons) rather than by
@@ -240,7 +240,7 @@ function pushServiceLines(lines: string[], services: readonly DetectedServiceCan
     // Printed as the flag rather than as prose, and only when it isn't the
     // default -- the line stays short for the vendor rows that are most of
     // this list, and where it does appear it can be copied straight into
-    // `dagstree add nginx --kind component --role ingress-proxy`.
+    // `catalogus add nginx --kind component --role ingress-proxy`.
     const kindFlag = s.kind === "service" ? "" : ` --kind ${s.kind}`;
     lines.push(`  ${marker} ${s.slug} (${s.name}) [${s.category}]${kindFlag}${files ? ` - ${files}` : ""}`);
   }

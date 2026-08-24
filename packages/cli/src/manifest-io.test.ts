@@ -17,28 +17,28 @@ describe("findManifest / readManifestText / writeManifestText", () => {
     await removeTempDir(dir);
   });
 
-  it("finds dagstree.yaml in the given directory", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", "dagstree: 1\n");
+  it("finds catalogus.yaml in the given directory", async () => {
+    await writeFixtureFile(dir, "catalogus.yaml", "catalogus: 1\n");
     const found = await findManifest(dir);
-    expect(found?.filename).toBe("dagstree.yaml");
+    expect(found?.filename).toBe("catalogus.yaml");
     expect(found?.dir).toBe(dir);
   });
 
-  it("falls back to stack.yaml when dagstree.yaml is absent", async () => {
-    await writeFixtureFile(dir, "stack.yaml", "dagstree: 1\n");
+  it("falls back to stack.yaml when catalogus.yaml is absent", async () => {
+    await writeFixtureFile(dir, "stack.yaml", "catalogus: 1\n");
     const found = await findManifest(dir);
     expect(found?.filename).toBe("stack.yaml");
   });
 
-  it("prefers dagstree.yaml over stack.yaml in the same directory", async () => {
+  it("prefers catalogus.yaml over stack.yaml in the same directory", async () => {
     await writeFixtureFile(dir, "stack.yaml", "# old\n");
-    await writeFixtureFile(dir, "dagstree.yaml", "# new\n");
+    await writeFixtureFile(dir, "catalogus.yaml", "# new\n");
     const found = await findManifest(dir);
-    expect(found?.filename).toBe("dagstree.yaml");
+    expect(found?.filename).toBe("catalogus.yaml");
   });
 
   it("walks upward from a subdirectory, the way git finds its root", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", "dagstree: 1\n");
+    await writeFixtureFile(dir, "catalogus.yaml", "catalogus: 1\n");
     const sub = join(dir, "a", "b", "c");
     await mkdir(sub, { recursive: true });
     const found = await findManifest(sub);
@@ -52,16 +52,16 @@ describe("findManifest / readManifestText / writeManifestText", () => {
 
   it("ManifestNotFoundError names the command that creates one", () => {
     const error = new ManifestNotFoundError(dir);
-    expect(error.message).toContain("dagstree init");
+    expect(error.message).toContain("catalogus init");
   });
 
-  it("always writes dagstree.yaml, never stack.yaml", async () => {
-    const filePath = await writeManifestText(dir, "dagstree: 1\n");
-    expect(filePath).toBe(join(dir, "dagstree.yaml"));
+  it("always writes catalogus.yaml, never stack.yaml", async () => {
+    const filePath = await writeManifestText(dir, "catalogus: 1\n");
+    expect(filePath).toBe(join(dir, "catalogus.yaml"));
   });
 
   it("round-trips text through write and read", async () => {
-    const text = "dagstree: 1\nproject:\n  name: X\n  slug: x\n";
+    const text = "catalogus: 1\nproject:\n  name: X\n  slug: x\n";
     await writeManifestText(dir, text);
     const found = await findManifest(dir);
     expect(found).not.toBeNull();

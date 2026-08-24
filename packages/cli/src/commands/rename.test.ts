@@ -13,9 +13,9 @@ import { runValidate } from "./validate.js";
 // use would leave the other one dangling. `heroku-api` carries a
 // replaced_by pointing at `fly-api`, which is the reference most easily
 // forgotten -- it lives on a different entry than the one being renamed.
-const MANIFEST = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+const MANIFEST = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
 # Hand-written header comment -- must survive every edit.
-dagstree: 1
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -51,7 +51,7 @@ describe("runRename", () => {
 
   beforeEach(async () => {
     dir = await createTempDir();
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
   });
 
   afterEach(async () => {
@@ -59,7 +59,7 @@ describe("runRename", () => {
   });
 
   async function manifestText(): Promise<string> {
-    return readFile(join(dir, "dagstree.yaml"), "utf8");
+    return readFile(join(dir, "catalogus.yaml"), "utf8");
   }
 
   it("renames the entry and every reference to it, leaving the manifest valid", async () => {
@@ -104,8 +104,8 @@ describe("runRename", () => {
   it("says so rather than reporting nothing when the entry had no references", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -175,10 +175,10 @@ dependencies: []
   it("preserves the $schema modeline, header comments and inline comments", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+      "catalogus.yaml",
+      `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
 # Hand-written header comment.
-dagstree: 1
+catalogus: 1
 project:
   name: X
   slug: x
@@ -201,7 +201,7 @@ dependencies:
     expect(result.exitCode).toBe(0);
 
     const text = await manifestText();
-    expect(text).toContain("# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json");
+    expect(text).toContain("# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json");
     expect(text).toContain("# Hand-written header comment.");
     expect(text).toContain("# Services this project runs.");
     // The inline comment rode along with the scalar it annotates, because
@@ -217,8 +217,8 @@ dependencies:
   it("renames an id that is a prefix of another id without touching the other", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x

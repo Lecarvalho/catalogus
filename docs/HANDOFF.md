@@ -1,10 +1,10 @@
-# DAGSTREE — Project Operations Registry
+# CATALOGUS — Project Operations Registry
 ## Handoff Document for Claude Code
 
 > **Status:** Concept fully designed, ready for implementation planning.
 > **Owner:** Dsnk
 > **Date:** 2026-08-22
-> **Working name:** Dagstree (DAG + registry; homophone spelling "dagstry" should also be registered and redirected)
+> **Working name:** Catalogus (the intact Latin word for "catalog", which is what the product does; one stable spelling, so there is no homophone to register)
 
 **Amendments since 2026-08-22.** This document is the source of truth, so a change to it is recorded
 here rather than made silently.
@@ -34,7 +34,7 @@ here rather than made silently.
   Prettier, Vitest) is not an entry in any kind. `kind` remains the axis Layer 3 needs — only
   `service` rows can carry a cost or an account reference. Approved by the owner.
 
-- *2026-08-23, §5 and §6* — **Dagstree does not guess.** Where a fact is not in the repo, the
+- *2026-08-23, §5 and §6* — **Catalogus does not guess.** Where a fact is not in the repo, the
   CLI asks, or records nothing and names the command that fills the gap. It does not write a
   plausible default.
 
@@ -51,7 +51,7 @@ here rather than made silently.
   appeared beside the real agents on every repo that had any. Those markers are now reported as
   *unidentified*: they prove an agent works here and not which one, which is a question for the
   owner. A `.codex` marker was added at the same time; without it a correctly-declared `codex`
-  entry was reported as drift by `dagstree diff` on every single run. Approved by the owner.
+  entry was reported as drift by `catalogus diff` on every single run. Approved by the owner.
 
 - *2026-08-24, §4, §5, §6 and Appendix A* — `project.pm`, `project.coding_agents` and
   `project.vcs.provider` are removed. **Anything with an identity and an icon is a service entry; `role` gives its section.**
@@ -59,7 +59,7 @@ here rather than made silently.
   (`id: board, service: trello, role: pm`) — and so was GitHub — `project.vcs.provider` *and*
   `id: github, service: github, role: vcs`. The governing constraint is that **a project-level
   field can never be an edge target**: `[github-actions, github]` is a real edge in
-  `examples/reference.dagstree.yaml`, so the VCS provider has to be a service entry to be one of
+  `examples/reference.catalogus.yaml`, so the VCS provider has to be a service entry to be one of
   its endpoints, and the same reasoning now extends to the PM tool and to coding agents, which were
   never expressible as service entries before this change.
 
@@ -72,19 +72,36 @@ here rather than made silently.
   way one attaches to Fly.io or Supabase). `project.vcs.provider` is dropped; `project.vcs` keeps
   only `visibility`, which has no identity and is never an edge target, so it stays a project field.
 
-  `dagstree: 1` is unchanged — this amends v1 in place rather than bumping to v2. The schema URL
-  the modeline points at (`https://dagstree.dev/schema/v1.json`) does not resolve yet, and no
+  `catalogus: 1` is unchanged — this amends v1 in place rather than bumping to v2. The schema URL
+  the modeline points at (`https://catalogus.dev/schema/v1.json`) does not resolve yet, and no
   manifest outside this repo is known to exist at the time of this amendment: the one this project
-  had been reasoning about, `C:/Workspace/repos/Clapline/dagstree.yaml`, was checked directly
+  had been reasoning about, `C:/Workspace/repos/Clapline/catalogus.yaml`, was checked directly
   while writing this entry and is not there — the directory is, the manifest is not. So there is
   nothing to migrate, and bumping a version nobody can fetch buys nothing. Recorded rather than
   left implicit because the earlier "exactly one real manifest exists" phrasing was inherited from
   a stale note rather than verified, which is the defect class the 2026-08-23 amendment above
-  exists to stop. `dagstree validate` names what moved
+  exists to stop. `catalogus validate` names what moved
   (`MOVED_FIELD_HINTS` in `packages/schema/src/validate.ts`; `set` carries its own,
   differently-shaped table in `packages/cli/src/commands/set.ts` for the same three names) rather
   than reporting a bare "additional property" error on a manifest still in the old shape. Approved
   by the owner.
+
+- *2026-08-24, §2 and throughout* — **the product is renamed from Dagstree to Catalogus.** Decided
+  by the owner after a name search; §2 records the reasoning. The rename is total, and several
+  parts of it are format changes rather than cosmetics: the manifest filename becomes
+  `catalogus.yaml`, its required top-level key becomes `catalogus: 1` (the schema sets
+  `additionalProperties: false`, so a manifest in the old shape is now rejected outright), the
+  schema file becomes `catalogus.v1.json` and its `$id` becomes
+  `https://catalogus.dev/schema/v1.json`, and the shipped skill moves to `skills/catalogus/`,
+  installing to `.claude/skills/catalogus/SKILL.md`. The CLI ships **scoped** as `@catalogus/cli`
+  because the unscoped npm name is an npm-owned security holding package; the binary it installs is
+  still plain `catalogus`, so every command line in this document is unchanged apart from the word
+  itself. **No migration path from `dagstree.yaml` was written, and none is needed:** the owner
+  confirmed on 2026-08-24 that no manifest exists outside this repo and that nothing consumes the
+  old name anywhere. `findManifest` (`packages/cli/src/manifest-io.ts`) therefore looks only for
+  `catalogus.yaml` and `stack.yaml`, and a stray `dagstree.yaml` is correctly invisible to it rather
+  than silently honoured. This is recorded because it is a deliberate decision with a confirmed
+  basis, not an oversight — if the assumption ever turns out to be wrong, the fallback goes there.
 
 ---
 
@@ -117,18 +134,18 @@ A **project operations registry**: an app + CLI that catalogs, for every one of 
 
 ## 2. Name & Brand
 
-- **Product:** Dagstree — pronounced "DAG-stree". Chosen over `platef` (vague), `gustry` (food connotation), `dagstry` (fails dictation test — homophone loses to self-spelling "tree"), `dagst` (unpronounceable cluster, "1 taken" in domain family).
-- **Why it wins:** self-spelling ("tree" is a real word), semantically exact (registry of dependency graphs), whole TLD family available at time of search (0 taken: .com .ca .net .org .ai .io .xyz .app .online .info .co .store), insider appeal for the dev audience.
-- **Known pedantry:** a DAG is not a tree (nodes can have multiple parents — which is exactly why the data model is a DAG). Accepted; same as Git users saying "commit tree." Lean into the joke if useful.
-- **Logo concept:** a small tree whose branches reconnect — literally a DAG.
-- **CLI binary:** `dagstree`. Optional short alias `dagst` reserved but not primary.
+- **Product:** Catalogus — the intact Latin word for "catalog", which is exactly what the product does: it catalogs each project's service providers, infrastructure, dependencies and stack metadata.
+- **Why it wins:** one stable spelling — there is no second plausible way to write it, which the previous name and most of the alternatives considered could not claim.
+- **Why the earlier name was dropped:** the owner decided to rename on 2026-08-24. Two concerns were raised in that discussion and are recorded here as the reasoning behind the call, not as findings: that `Dagstree` admits two readings (`dag-stree` and `dags-tree`), which §2 had previously settled by fiat rather than by the spelling; and that `dag` is crowded in developer tooling, where Dagster is an established orchestrator and Airflow has made "DAG" read as "pipeline step graph" to that audience. Whether either would have cost anything in practice was not measured.
+- **Known collision:** `catalogus` is also the ordinary Dutch word for catalogue. The owner accepted this on 2026-08-24. How much Dutch-language search traffic it actually competes with has not been measured.
+- **Logo concept:** open. The reconnecting-tree mark was a pun on the old name and does not carry over; nothing has been chosen to replace it.
+- **CLI binary:** `catalogus`. The npm name is not claimable (see action items), so the package ships scoped as `@catalogus/cli` while the binary it installs is plain `catalogus`. No short alias has been settled.
 
 ### Action items (do before/alongside dev)
-- [ ] Register `dagstree.com`, `dagstree.ca`, `dagstree.dev` (dev-tool credibility)
-- [ ] Register homophone `dagstry.com` → 301 redirect
-- [ ] Reserve npm package name `dagstree`
-- [ ] Reserve GitHub org `dagstree`
-- [ ] Quick CIPO/USPTO knock-out search, Nice Class 9 + 42 (same drill as CLAPLINE — word mark, coined term)
+- [x] Domains — **`catalogus.dev` was registered on 2026-08-24 and is owned.** It is the load-bearing one: the schema `$id` and the `$schema` modeline the CLI writes into every manifest both point at it. `catalogus.io` was **not** acquired — its $20 aftermarket figure was a minimum-offer threshold rather than a price, and a $20 offer through Sedo drew a $7,500 counter, which was declined. `catalogus.com` was listed at $12,000 and was declined for the same reason. Nothing further is pending; a dev tool on `.dev` does not need the others.
+- [x] npm package name — `catalogus` cannot be claimed: verified against the registry on 2026-08-24, it is an npm-owned security holding package (maintainer `npm`, repo `npm/security-holder`, version `0.0.1-security`, 2 downloads/month). The CLI therefore ships as `@catalogus/cli`, binary `catalogus`.
+- [ ] Reserve GitHub org `catalogus`
+- [ ] Quick CIPO/USPTO knock-out search, Nice Class 9 + 42 (same drill as CLAPLINE — word mark. Unlike CLAPLINE this is not a coined term: `catalogus` is an existing word in Latin and in Dutch, so the distinctiveness question is a different one and is not answered yet.)
 
 ---
 
@@ -195,7 +212,7 @@ user_service_accounts -- PRIVATE overlay (RLS: owner only)
   plan_tier, cost_amount, cost_currency, billing_cycle,   -- monthly|yearly|usage
   renewal_date, started_at, notes_private
 
-project_meta        -- Layer 2 mirror in DB (synced from dagstree.yaml)
+project_meta        -- Layer 2 mirror in DB (synced from catalogus.yaml)
   project_id, architecture_style, vcs_visibility,
   -- pm_method, vcs_provider and coding_agents[] are gone (2026-08-24
   -- amendment below): the PM tool, the VCS provider and each coding agent
@@ -224,8 +241,8 @@ The `services` table is **global and community-maintainable**, not per-user. Thi
 Lives at repo root. Draft shape (v1 — iterate in implementation):
 
 ```yaml
-# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Clapline
   slug: clapline
@@ -304,40 +321,40 @@ The published JSON Schema **must reject private-looking keys** in this file: `co
 
 ---
 
-## 6. CLI — `dagstree`
+## 6. CLI — `catalogus`
 
 ### Commands (v1 surface)
 ```
-dagstree init                 # scaffold stack.yaml (interactive or --yes)
-dagstree detect               # scan repo, print detected stack (Layer 1)
-dagstree diff                 # detected vs stack.yaml — what's missing/stale
-dagstree add <service> --role=<r> [--depends-on=<id>...]   # edit stack.yaml
-dagstree validate             # schema + acyclicity check (CI-friendly, exit codes)
-dagstree graph                # ASCII/mermaid render of the project DAG
-dagstree push                 # sync stack.yaml + detection to platform
-dagstree push --private key=value ...   # write to private overlay (authenticated)
-dagstree login                # device flow auth (see below)
-dagstree mcp                  # run as MCP server (stdio)
+catalogus init                 # scaffold stack.yaml (interactive or --yes)
+catalogus detect               # scan repo, print detected stack (Layer 1)
+catalogus diff                 # detected vs stack.yaml — what's missing/stale
+catalogus add <service> --role=<r> [--depends-on=<id>...]   # edit stack.yaml
+catalogus validate             # schema + acyclicity check (CI-friendly, exit codes)
+catalogus graph                # ASCII/mermaid render of the project DAG
+catalogus push                 # sync stack.yaml + detection to platform
+catalogus push --private key=value ...   # write to private overlay (authenticated)
+catalogus login                # device flow auth (see below)
+catalogus mcp                  # run as MCP server (stdio)
 ```
 
 ### Auth design (decided)
 - CLI gets **its own scoped token** via device flow (`gh auth login` pattern: show code, user approves in browser).
 - Token stored in **OS keychain** (Windows Credential Manager / macOS Keychain / libsecret) — **never in any file an agent can read into context**.
-- The agent invokes `dagstree push --private cost=...`; the **CLI holds the credential, the agent never sees it**.
+- The agent invokes `catalogus push --private cost=...`; the **CLI holds the credential, the agent never sees it**.
 - Supabase Auth can back this (device-flow-style exchange, or PKCE + local callback as fallback).
 
 ### MCP server mode (the agent workflow — this is the differentiator)
-`dagstree mcp` exposes tools so Claude Code (and other agents) can:
+`catalogus mcp` exposes tools so Claude Code (and other agents) can:
 - `detect_stack` → run detection, return structured diff vs manifest
 - `read_manifest` / `propose_manifest_edit` → agent infers Layer 2 facts mid-session ("this repo has CLAUDE.md and .mcp.json → a service entry `claude-code` with `role: coding-agent`; MCP servers: X, Y") and proposes edits
 - `push_private` → routes through the CLI's credential; input validated so no secrets are accepted, only the allowed private-overlay fields
 
-Typical loop: during any coding session, the agent runs detect → diff → proposes "I see you added the Anthropic SDK — add it to stack.yaml?" → on approval, edits the manifest → `dagstree push`.
+Typical loop: during any coding session, the agent runs detect → diff → proposes "I see you added the Anthropic SDK — add it to stack.yaml?" → on approval, edits the manifest → `catalogus push`.
 
 ### Detection engine
 - Reference/foundation: **`@specfy/stack-analyser`** (MIT, TypeScript, npm: `@specfy/stack-analyser`, still maintained as of Jan 2026). Detects 500–700+ technologies from `package.json`, `docker-compose.yml`, `go.mod`, lockfiles, config files. Usable via `npx` or programmatically (`analyser({ provider: new FSProvider({...}) })`, `flatten(result)`).
-- Options: (a) depend on it directly and map its output slugs → Dagstree catalog slugs; (b) vendor the rules; (c) reimplement a smaller ruleset. **Recommend (a) for v1** — mapping table `specfy_slug → dagstree_service_slug`.
-- Add Dagstree-specific detectors stack-analyser won't have: `CLAUDE.md` / `.claude/` / `.agents/` → coding agents; `.mcp.json` → MCP servers; `fly.toml`, `vercel.json`, `netlify.toml` → hosting; `.github/` vs `.gitlab-ci.yml` → VCS/CI provider.
+- Options: (a) depend on it directly and map its output slugs → Catalogus catalog slugs; (b) vendor the rules; (c) reimplement a smaller ruleset. **Recommend (a) for v1** — mapping table `specfy_slug → catalogus_service_slug`.
+- Add Catalogus-specific detectors stack-analyser won't have: `CLAUDE.md` / `.claude/` / `.agents/` → coding agents; `.mcp.json` → MCP servers; `fly.toml`, `vercel.json`, `netlify.toml` → hosting; `.github/` vs `.gitlab-ci.yml` → VCS/CI provider.
 - Known ceiling: domain registrar (Namecheap), PM tool, costs are **not detectable** — that's Layers 2/3 by design.
 
 ---
@@ -378,7 +395,7 @@ Typical loop: during any coding session, the agent runs detect → diff → prop
 ### v2 / later
 - Community catalog contributions + moderation.
 - Vendor sunset feed (catalog-level `status`/`sunset_date` updates).
-- GitHub Action (`dagstree validate` + `push` in CI).
+- GitHub Action (`catalogus validate` + `push` in CI).
 - Multi-user / team sharing.
 - Public profile pages (opt-in, Layer 1+2 only — never Layer 3).
 
@@ -393,9 +410,9 @@ Typical loop: during any coding session, the agent runs detect → diff → prop
 
 1. **Catalog slug taxonomy** — adopt specfy's slugs wholesale vs own namespace with mapping table. (Leaning: own slugs + mapping.)
 2. **Acyclicity enforcement point** — CLI validate only, or also DB trigger? (Leaning: CLI + app layer; DB trigger later.)
-3. **`stack.yaml` vs `dagstree.yaml`** filename. (`stack.yaml` is generic/collision-prone; `dagstree.yaml` is unambiguous and brand-reinforcing. Leaning: `dagstree.yaml`, accept `stack.yaml` as fallback read.)
+3. **`stack.yaml` vs `catalogus.yaml`** filename. (`stack.yaml` is generic/collision-prone; `catalogus.yaml` is unambiguous and brand-reinforcing. Leaning: `catalogus.yaml`, accept `stack.yaml` as fallback read.)
 4. **Same service, multiple roles**: modeled as two `project_services` rows (supabase-db, supabase-auth) — confirm this holds up in UI grouping.
-5. **Monorepo handling**: one `dagstree.yaml` at root with per-app sections, or one per app dir? (Punt to v1.5 unless it bites immediately.)
+5. **Monorepo handling**: one `catalogus.yaml` at root with per-app sections, or one per app dir? (Punt to v1.5 unless it bites immediately.)
 6. **Auth provider for the platform itself**: Supabase Auth with GitHub OAuth is the obvious fit for the audience.
 
 ---
@@ -403,9 +420,9 @@ Typical loop: during any coding session, the agent runs detect → diff → prop
 ## 10. Suggested First Claude Code Session
 
 1. `npm create` a monorepo (pnpm workspaces): `packages/cli`, `packages/schema`, `apps/web`, `supabase/`.
-2. Write the JSON Schema for `dagstree.yaml` v1 **first** (it's the contract everything else consumes) — include the private-key rejection patterns and acyclicity note.
+2. Write the JSON Schema for `catalogus.yaml` v1 **first** (it's the contract everything else consumes) — include the private-key rejection patterns and acyclicity note.
 3. Spike: run `@specfy/stack-analyser` programmatically against 2–3 real repos (Clapline, Sluglin), inspect `flatten(result)` output, draft the slug mapping table from real data.
-4. Implement `dagstree detect` + `dagstree validate` + `dagstree graph --mermaid`.
+4. Implement `catalogus detect` + `catalogus validate` + `catalogus graph --mermaid`.
 5. Supabase migration files for §4 schema + RLS policies.
 6. Then MCP mode, then viewer.
 
@@ -433,14 +450,14 @@ Recommended model split (per owner's established practice): Sonnet for ~80% of i
       change") has no Layer 2 field and never did more than sit in a comment
 - [x] Brand icons per service → `services.icon_ref` (simple-icons)
 - [x] Multi-project portfolio view → portfolio page + cross-project queries
-- [x] Easy out-of-the-box / CLI setup → `dagstree init` + agent-assisted population via MCP
+- [x] Easy out-of-the-box / CLI setup → `catalogus init` + agent-assisted population via MCP
 
 ## Appendix B — Provenance rules (agent trust model)
 
 | Layer | Written by | Validated by | Lives in | Visible to |
 |---|---|---|---|---|
 | 1 Auto-detected | CLI scanner | detection rules | scan output / DB cache | anyone with repo access |
-| 2 Manifest | human or agent (approved) | JSON Schema (rejects private keys) | repo (`dagstree.yaml`) | anyone with repo access |
+| 2 Manifest | human or agent (approved) | JSON Schema (rejects private keys) | repo (`catalogus.yaml`) | anyone with repo access |
 | 3 Private overlay | human or agent via authed CLI | field allow-list, no secrets | Supabase (RLS) | owner only |
 
 Credential rule: CLI token in OS keychain via device flow; agents invoke commands but never read the credential.

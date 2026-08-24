@@ -7,7 +7,7 @@ describe("rollupLabel", () => {
     expect(rollupLabel("coding")).toBe("Coding agent");
   });
 
-  it("labels a rollup examples/reference.dagstree.yaml and SKILL.md's vocabulary both name", () => {
+  it("labels a rollup examples/reference.catalogus.yaml and SKILL.md's vocabulary both name", () => {
     expect(rollupLabel("hosting")).toBe("Hosting");
     expect(rollupLabel("database")).toBe("Database");
     expect(rollupLabel("dns")).toBe("DNS");

@@ -1,6 +1,6 @@
 # Covers the object form of a dependency edge (from/to/notes), alongside
 # the compact tuple form, in the same dependencies[] array.
-dagstree: 1
+catalogus: 1
 project:
   name: Lookout
   slug: lookout

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTempDir, removeTempDir, writeFixtureFile } from "../test-support/temp-dir.js";
 import { runValidate } from "./validate.js";
 
-const VALID_MANIFEST = `dagstree: 1
+const VALID_MANIFEST = `catalogus: 1
 project:
   name: X
   slug: x
@@ -35,7 +35,7 @@ describe("runValidate", () => {
   });
 
   it("exits 0 for a valid manifest", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", VALID_MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", VALID_MANIFEST);
     const result = await runValidate(dir);
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toEqual([]);
@@ -45,8 +45,8 @@ describe("runValidate", () => {
   it("exits 1 with every schema error printed for an invalid manifest", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices:\n  - id: a\ndependencies: []\n"
+      "catalogus.yaml",
+      "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices:\n  - id: a\ndependencies: []\n"
     );
     const result = await runValidate(dir);
     expect(result.exitCode).toBe(1);
@@ -61,14 +61,14 @@ describe("runValidate", () => {
     const result = await runValidate(dir);
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toEqual([]);
-    expect(result.stderr.join("\n")).toContain("dagstree init");
+    expect(result.stderr.join("\n")).toContain("catalogus init");
   });
 
   it("exits 1 and prints the actual cycle path, not just 'a cycle exists'", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -100,8 +100,8 @@ dependencies:
   it("catches a self-edge (a node depending on itself) as a cycle", async () => {
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: X
   slug: x
@@ -120,19 +120,19 @@ dependencies:
   });
 
   it("finds the manifest walking up from a subdirectory", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", VALID_MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", VALID_MANIFEST);
     const sub = join(dir, "nested", "deep");
     await mkdir(sub, { recursive: true });
     const result = await runValidate(sub);
     expect(result.exitCode).toBe(0);
   });
 
-  // FIX 1b -- wiring the value-level guard (now living in @dagstree/schema)
-  // into `dagstree validate`: hard hits are errors (exit 1), soft hits are
+  // FIX 1b -- wiring the value-level guard (now living in @catalogus/schema)
+  // into `catalogus validate`: hard hits are errors (exit 1), soft hits are
   // warnings on stderr (exit 0 unless --strict), and pipelines stay clean
   // because warnings never touch stdout.
   describe("the free-text private-value guard", () => {
-    const HARD_HIT_MANIFEST = `dagstree: 1
+    const HARD_HIT_MANIFEST = `catalogus: 1
 project:
   name: X
   slug: x
@@ -145,7 +145,7 @@ services:
 dependencies: []
 `;
 
-    const SOFT_HIT_MANIFEST = `dagstree: 1
+    const SOFT_HIT_MANIFEST = `catalogus: 1
 project:
   name: X
   slug: x
@@ -155,7 +155,7 @@ dependencies: []
 `;
 
     it("a hard hit (e.g. an email address) is a validation error, exit 1, with the raw value never echoed", async () => {
-      await writeFixtureFile(dir, "dagstree.yaml", HARD_HIT_MANIFEST);
+      await writeFixtureFile(dir, "catalogus.yaml", HARD_HIT_MANIFEST);
       const result = await runValidate(dir);
       expect(result.exitCode).toBe(1);
       const text = result.stderr.join("\n");
@@ -164,7 +164,7 @@ dependencies: []
     });
 
     it("a soft hit (a bare billing-adjacent keyword) is a warning on stderr, exit 0, and never touches stdout", async () => {
-      await writeFixtureFile(dir, "dagstree.yaml", SOFT_HIT_MANIFEST);
+      await writeFixtureFile(dir, "catalogus.yaml", SOFT_HIT_MANIFEST);
       const result = await runValidate(dir);
       expect(result.exitCode).toBe(0);
       expect(result.stdout.join("\n")).not.toContain("renewal");
@@ -174,7 +174,7 @@ dependencies: []
     });
 
     it("--strict promotes the same soft hit to a hard error, exit 1", async () => {
-      await writeFixtureFile(dir, "dagstree.yaml", SOFT_HIT_MANIFEST);
+      await writeFixtureFile(dir, "catalogus.yaml", SOFT_HIT_MANIFEST);
       const result = await runValidate(dir, { strict: true });
       expect(result.exitCode).toBe(1);
       expect(result.stderr.join("\n")).toContain("renewal");
@@ -187,8 +187,8 @@ dependencies: []
     ])("%s: %j produces no error and no warning (false-positive guard)", async (field, value) => {
       await writeFixtureFile(
         dir,
-        "dagstree.yaml",
-        `dagstree: 1\nproject:\n  name: X\n  slug: x\n  ${field}: ${JSON.stringify(value)}\nservices: []\ndependencies: []\n`
+        "catalogus.yaml",
+        `catalogus: 1\nproject:\n  name: X\n  slug: x\n  ${field}: ${JSON.stringify(value)}\nservices: []\ndependencies: []\n`
       );
       const result = await runValidate(dir);
       expect(result.exitCode).toBe(0);
@@ -203,8 +203,8 @@ dependencies: []
     ])("notes: %j produces no error and no warning (false-positive guard)", async (notes) => {
       await writeFixtureFile(
         dir,
-        "dagstree.yaml",
-        `dagstree: 1
+        "catalogus.yaml",
+        `catalogus: 1
 project:
   name: X
   slug: x
@@ -225,8 +225,8 @@ dependencies: []
     it("a service id with a hyphen and digits (e.g. s3-bucket-2) is not mistaken for private data", async () => {
       await writeFixtureFile(
         dir,
-        "dagstree.yaml",
-        `dagstree: 1
+        "catalogus.yaml",
+        `catalogus: 1
 project:
   name: X
   slug: x

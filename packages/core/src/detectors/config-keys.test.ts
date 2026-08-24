@@ -141,7 +141,7 @@ describe("detectConfigKeys", () => {
     // the cheapest way to never leak a secret is to never open the file, and
     // this pins that it doesn't.
     it("never opens a bare .env, only .env.example-style templates", async () => {
-      const dir = await mkdtemp(join(tmpdir(), "dagstree-config-keys-"));
+      const dir = await mkdtemp(join(tmpdir(), "catalogus-config-keys-"));
       try {
         await writeFile(join(dir, ".env"), `STRIPE_SECRET_KEY=${SENTINEL}\nSUPABASE_URL=\n`, "utf8");
         const result = await detectConfigKeys(dir);
@@ -181,7 +181,7 @@ describe("detectConfigKeys", () => {
     });
 
     // The manifest schema's slug pattern. A detection the CLI cannot write
-    // into dagstree.yaml is a detection that dead-ends.
+    // into catalogus.yaml is a detection that dead-ends.
     it("emits only slugs the manifest schema accepts", () => {
       const pattern = /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/;
       const bad = CONFIG_KEY_CATALOG.flatMap((entry) =>

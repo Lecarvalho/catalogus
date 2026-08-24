@@ -11,7 +11,7 @@
 }
 
 /* One rule per schema status value, named identically to it (see
-   StatusPill.tsx's LABELS map and @dagstree/schema's ServiceStatus) --
+   StatusPill.tsx's LABELS map and @catalogus/schema's ServiceStatus) --
    this file has no vocabulary of its own to drift from that one. */
 .active {
   background: var(--status-active);

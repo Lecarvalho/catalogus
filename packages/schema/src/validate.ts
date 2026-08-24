@@ -21,7 +21,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import type { ErrorObject } from "ajv";
 import * as ajvFormatsNs from "ajv-formats";
 import { parse as parseYaml } from "yaml";
-import { dagstreeSchemaV1 } from "./schema.js";
+import { catalogusSchemaV1 } from "./schema.js";
 import { looksLikePrivateKey } from "./private-key-pattern.js";
 import {
   formatPrivateValueErrorMessage,
@@ -30,7 +30,7 @@ import {
 } from "./free-text-guard.js";
 import type { PrivateValueFinding } from "./free-text-guard.js";
 import type {
-  DagstreeManifestV1,
+  CatalogusManifestV1,
   DependencyEdge,
   DependencyEdgeObject,
 } from "./types.js";
@@ -47,11 +47,11 @@ const addFormats = (
 ).default;
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 addFormats(ajv);
-const validateSchema = ajv.compile<DagstreeManifestV1>(dagstreeSchemaV1);
+const validateSchema = ajv.compile<CatalogusManifestV1>(catalogusSchemaV1);
 
-export type DagstreeManifestErrorKind = "schema" | "private-key" | "private-value" | "reference" | "moved-field";
+export type CatalogusManifestErrorKind = "schema" | "private-key" | "private-value" | "reference" | "moved-field";
 
-export interface DagstreeManifestError {
+export interface CatalogusManifestError {
   /**
    * "schema" — an ordinary JSON Schema failure (wrong type, missing
    * required field, bad enum value, ...).
@@ -73,7 +73,7 @@ export interface DagstreeManifestError {
    * useless to whoever hits it on an old-shape manifest. See
    * MOVED_FIELD_HINTS below.
    */
-  kind: DagstreeManifestErrorKind;
+  kind: CatalogusManifestErrorKind;
   instancePath: string;
   message: string;
   /** Set only for kind "private-key": the offending property name. */
@@ -86,24 +86,24 @@ export interface DagstreeManifestError {
  * A lower-precision "this might be Layer 3 data" signal (free-text keyword
  * hits like "billing" or "renewal") -- never blocks validation on its own.
  * Kept as its own channel, not folded into `errors`, precisely so a caller
- * can choose an exit code: `dagstree validate` prints these to stderr and
- * still exits 0, `dagstree validate --strict` promotes them to errors.
+ * can choose an exit code: `catalogus validate` prints these to stderr and
+ * still exits 0, `catalogus validate --strict` promotes them to errors.
  */
-export interface DagstreeManifestWarning {
+export interface CatalogusManifestWarning {
   instancePath: string;
   category: string;
   message: string;
 }
 
-export type DagstreeValidationResult =
-  | { valid: true; manifest: DagstreeManifestV1; warnings: DagstreeManifestWarning[] }
-  | { valid: false; errors: DagstreeManifestError[]; warnings: DagstreeManifestWarning[] };
+export type CatalogusValidationResult =
+  | { valid: true; manifest: CatalogusManifestV1; warnings: CatalogusManifestWarning[] }
+  | { valid: false; errors: CatalogusManifestError[]; warnings: CatalogusManifestWarning[] };
 
 function privateKeyMessage(property: string, instancePath: string): string {
   return (
     `Property "${property}" at "${instancePath}" looks like private data ` +
     "(cost, billing, account, or credential info). That belongs in the " +
-    'private overlay, not dagstree.yaml — run "dagstree push --private" ' +
+    'private overlay, not catalogus.yaml — run "catalogus push --private" ' +
     "to store it instead."
   );
 }
@@ -142,7 +142,7 @@ const MOVED_FIELD_HINTS: ReadonlyArray<{ parentPath: string; property: string; m
     property: "pm",
     message:
       'project.pm was removed -- PM tooling is a service entry now, not a project field: record it with, ' +
-      'e.g., "dagstree add trello --role pm" (the methodology text itself, e.g. "kanban board, one card per ' +
+      'e.g., "catalogus add trello --role pm" (the methodology text itself, e.g. "kanban board, one card per ' +
       'shipped change", has no Layer 2 home; it was never more than a comment).',
   },
   {
@@ -150,14 +150,14 @@ const MOVED_FIELD_HINTS: ReadonlyArray<{ parentPath: string; property: string; m
     property: "coding_agents",
     message:
       'project.coding_agents was removed -- coding agents are service entries now, one per agent, with ' +
-      '"role: coding-agent": record each with, e.g., "dagstree add claude-code --role coding-agent".',
+      '"role: coding-agent": record each with, e.g., "catalogus add claude-code --role coding-agent".',
   },
   {
     parentPath: "/project/vcs",
     property: "provider",
     message:
       'project.vcs.provider was removed -- the VCS provider is a service entry now, with "role: vcs": ' +
-      'record it with, e.g., "dagstree add github --role vcs". project.vcs keeps only "visibility".',
+      'record it with, e.g., "catalogus add github --role vcs". project.vcs keeps only "visibility".',
   },
 ];
 
@@ -165,9 +165,9 @@ function movedFieldMessage(instancePath: string, property: string): string | und
   return MOVED_FIELD_HINTS.find((hint) => hint.parentPath === instancePath && hint.property === property)?.message;
 }
 
-function classifyAjvErrors(rawErrors: readonly ErrorObject[]): DagstreeManifestError[] {
-  const privateByPath = new Map<string, DagstreeManifestError>();
-  const movedByPath = new Map<string, DagstreeManifestError>();
+function classifyAjvErrors(rawErrors: readonly ErrorObject[]): CatalogusManifestError[] {
+  const privateByPath = new Map<string, CatalogusManifestError>();
+  const movedByPath = new Map<string, CatalogusManifestError>();
   // Parent object paths where a private-key or moved-field hit already
   // explains the failure, so the oneOf branch's "must match exactly one
   // schema" noise (dependency edges try both the tuple and object shape)
@@ -217,7 +217,7 @@ function classifyAjvErrors(rawErrors: readonly ErrorObject[]): DagstreeManifestE
     }
   }
 
-  const others: DagstreeManifestError[] = [];
+  const others: CatalogusManifestError[] = [];
   for (const err of rawErrors) {
     if (isPrivateKeyDenyError(err)) continue;
     const property = additionalPropertyName(err);
@@ -237,7 +237,7 @@ function classifyAjvErrors(rawErrors: readonly ErrorObject[]): DagstreeManifestE
     others.push({
       kind: "schema",
       instancePath: err.instancePath,
-      message: err.message ?? "does not match the dagstree.yaml schema",
+      message: err.message ?? "does not match the catalogus.yaml schema",
     });
   }
 
@@ -263,7 +263,7 @@ export function edgeEndpoints(edge: DependencyEdge): { from: string; to: string 
 
 /** Every dependency edge normalized to {from, to, notes?}, in file order. */
 export function edgePairs(
-  manifest: Pick<DagstreeManifestV1, "dependencies">,
+  manifest: Pick<CatalogusManifestV1, "dependencies">,
 ): Array<{ from: string; to: string; notes?: string }> {
   return manifest.dependencies.map((edge) => {
     const { from, to } = edgeEndpoints(edge);
@@ -276,11 +276,11 @@ export function edgePairs(
 // of an id across services[], dependency edges naming ids that exist, and
 // replaced_by naming another entry's id (the serviceEntry schema's own
 // description promises this check happens here — see schema.ts).
-// Acyclicity is deliberately not checked here — that's `dagstree validate`
+// Acyclicity is deliberately not checked here — that's `catalogus validate`
 // (see HANDOFF.md section 6); edgePairs() above is what it needs to run a
 // toposort without re-parsing the manifest.
-function checkReferentialIntegrity(manifest: DagstreeManifestV1): DagstreeManifestError[] {
-  const errors: DagstreeManifestError[] = [];
+function checkReferentialIntegrity(manifest: CatalogusManifestV1): CatalogusManifestError[] {
+  const errors: CatalogusManifestError[] = [];
   const firstIndexById = new Map<string, number>();
 
   manifest.services.forEach((service, index) => {
@@ -334,7 +334,7 @@ function checkReferentialIntegrity(manifest: DagstreeManifestV1): DagstreeManife
   return errors;
 }
 
-function toPrivateValueError(finding: PrivateValueFinding): DagstreeManifestError {
+function toPrivateValueError(finding: PrivateValueFinding): CatalogusManifestError {
   return {
     kind: "private-value",
     instancePath: finding.instancePath,
@@ -343,7 +343,7 @@ function toPrivateValueError(finding: PrivateValueFinding): DagstreeManifestErro
   };
 }
 
-function toWarning(finding: PrivateValueFinding): DagstreeManifestWarning {
+function toWarning(finding: PrivateValueFinding): CatalogusManifestWarning {
   return {
     instancePath: finding.instancePath,
     category: finding.category,
@@ -352,7 +352,7 @@ function toWarning(finding: PrivateValueFinding): DagstreeManifestWarning {
 }
 
 /**
- * Validates a parsed manifest object against the dagstree.yaml v1 schema,
+ * Validates a parsed manifest object against the catalogus.yaml v1 schema,
  * then (only once the shape is confirmed sound) runs the referential
  * integrity checks JSON Schema can't express, plus the free-text guard's
  * generic walk over every string value in the document (property *names*
@@ -362,13 +362,13 @@ function toWarning(finding: PrivateValueFinding): DagstreeManifestWarning {
  * free-text walk likewise collects every hit rather than stopping at the
  * first one.
  */
-export function validateManifest(candidate: unknown): DagstreeValidationResult {
+export function validateManifest(candidate: unknown): CatalogusValidationResult {
   const schemaOk = validateSchema(candidate);
   if (!schemaOk) {
     return { valid: false, errors: classifyAjvErrors(validateSchema.errors ?? []), warnings: [] };
   }
 
-  const manifest = candidate as DagstreeManifestV1;
+  const manifest = candidate as CatalogusManifestV1;
 
   const { hard, soft } = scanManifestForPrivateValues(candidate);
   const warnings = soft.map(toWarning);
@@ -381,11 +381,11 @@ export function validateManifest(candidate: unknown): DagstreeValidationResult {
 }
 
 /**
- * Parses dagstree.yaml text and validates it in one step, so a caller can
+ * Parses catalogus.yaml text and validates it in one step, so a caller can
  * never forget the validate half — a YAML syntax error comes back as an
  * ordinary invalid result instead of a thrown exception.
  */
-export function parseManifest(yamlText: string): DagstreeValidationResult {
+export function parseManifest(yamlText: string): CatalogusValidationResult {
   let candidate: unknown;
   try {
     candidate = parseYaml(yamlText);

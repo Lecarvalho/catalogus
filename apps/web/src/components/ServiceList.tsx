@@ -5,7 +5,7 @@
 // resolves them only for whichever one service is selected (see
 // ServiceDetailPanel.tsx) rather than threading them through every node in
 // the list.
-import type { ViewService } from "dagstree";
+import type { ViewService } from "@catalogus/cli";
 
 import { groupByRollup } from "../group-services.js";
 import { ServiceGroup } from "./ServiceGroup.js";

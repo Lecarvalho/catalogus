@@ -13,7 +13,7 @@
 // canvas-portable prop shape rather than one tied to how App.tsx happens
 // to store the graph today.
 import type { Ref } from "react";
-import type { ViewService } from "dagstree";
+import type { ViewService } from "@catalogus/cli";
 
 import { Icon } from "./Icon.js";
 import { StatusPill } from "./StatusPill.js";

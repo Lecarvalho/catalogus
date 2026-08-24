@@ -1,4 +1,4 @@
-// Pure. `dagstree view` only starts once the manifest has already passed
+// Pure. `catalogus view` only starts once the manifest has already passed
 // validation (createViewServer's own loadValidManifest check), so this is
 // never a schema-invalid manifest reaching the browser -- it's the server
 // being unreachable after the page loaded, which is why the message names

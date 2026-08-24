@@ -24,17 +24,17 @@ describe("runInit", () => {
     const result = await runInit(dir, { yes: true });
     expect(result.exitCode).toBe(0);
 
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(text).toContain("# yaml-language-server: $schema=");
     const parsed = parse(text);
-    expect(parsed.dagstree).toBe(1);
+    expect(parsed.catalogus).toBe(1);
     expect(parsed.project.name).toBeTruthy();
     expect(parsed.project.slug).toMatch(/^[a-z0-9]+(?:[_-][a-z0-9]+)*$/);
     // Coding agents are service entries now (role: coding-agent), not
     // project.coding_agents -- init never writes them, it follows up with
-    // the `dagstree add` command that records the one detection found.
+    // the `catalogus add` command that records the one detection found.
     expect(parsed.project.coding_agents).toBeUndefined();
-    expect(result.stdout.join("\n")).toContain("dagstree add claude-code --role coding-agent");
+    expect(result.stdout.join("\n")).toContain("catalogus add claude-code --role coding-agent");
   });
 
   // init used to write one entry per detected service, with the detection
@@ -48,7 +48,7 @@ describe("runInit", () => {
     await writeFixtureFile(dir, "fly.toml", 'app = "example"\n');
     const result = await runInit(dir, { yes: true });
 
-    const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+    const parsed = parse(await readFile(join(dir, "catalogus.yaml"), "utf8"));
     expect(parsed.services).toEqual([]);
     expect(parsed.dependencies).toEqual([]);
   });
@@ -59,22 +59,22 @@ describe("runInit", () => {
 
     const summary = result.stdout.join("\n");
     expect(summary).toMatch(/\d+ service\(s\) detected and not yet declared/);
-    expect(summary).toContain("dagstree diff");
-    expect(summary).toContain("dagstree add");
+    expect(summary).toContain("catalogus diff");
+    expect(summary).toContain("catalogus add");
   });
 
   it("never overwrites an existing manifest without --force", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n");
+    await writeFixtureFile(dir, "catalogus.yaml", "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n");
     const result = await runInit(dir, { yes: true });
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("--force");
   });
 
   it("overwrites with --force", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", "dagstree: 1\nproject:\n  name: Old\n  slug: old\nservices: []\ndependencies: []\n");
+    await writeFixtureFile(dir, "catalogus.yaml", "catalogus: 1\nproject:\n  name: Old\n  slug: old\nservices: []\ndependencies: []\n");
     const result = await runInit(dir, { yes: true, force: true });
     expect(result.exitCode).toBe(0);
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const parsed = parse(text);
     expect(parsed.project.slug).not.toBe("old");
   });
@@ -88,7 +88,7 @@ describe("runInit", () => {
     });
     const result = await runInit(dir, { promptFn: promptFn as never });
     expect(result.exitCode).toBe(0);
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const parsed = parse(text);
     expect(parsed.project.name).toBe("Custom Name");
     expect(parsed.project.slug).toBe("custom-name");
@@ -115,7 +115,7 @@ describe("runInit", () => {
     });
     const result = await runInit(dir, { promptFn: promptFn as never });
     expect(result.exitCode).toBe(0);
-    const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+    const parsed = parse(await readFile(join(dir, "catalogus.yaml"), "utf8"));
     expect(parsed.project.pm).toBeUndefined();
     expect(parsed.project.vcs).toEqual({ visibility: "public" });
   });
@@ -133,15 +133,15 @@ describe("runInit", () => {
     const result = await runInit(dir, { yes: true });
     expect(result.exitCode).toBe(0);
 
-    const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+    const parsed = parse(await readFile(join(dir, "catalogus.yaml"), "utf8"));
     expect(parsed.project.vcs).toBeUndefined();
 
     const stdout = result.stdout.join("!!");
     expect(stdout).toContain("visibility was not given");
-    expect(stdout).toContain("dagstree set project.vcs.visibility");
+    expect(stdout).toContain("catalogus set project.vcs.visibility");
     // The detected VCS provider is a service entry now, not a project
     // field -- init never writes it, it follows up with the `add` command.
-    expect(stdout).toContain("dagstree add gitlab --role vcs");
+    expect(stdout).toContain("catalogus add gitlab --role vcs");
   });
 
   it("writes project.vcs.visibility when --yes is given an explicit visibility, and separately follows up on the detected provider", async () => {
@@ -149,11 +149,11 @@ describe("runInit", () => {
     const result = await runInit(dir, { yes: true, visibility: "internal" });
     expect(result.exitCode).toBe(0);
 
-    const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+    const parsed = parse(await readFile(join(dir, "catalogus.yaml"), "utf8"));
     // No provider alongside it: the VCS provider is a service entry
     // (role: vcs), not written into project.vcs.
     expect(parsed.project.vcs).toEqual({ visibility: "internal" });
-    expect(result.stdout.join("\n")).toContain("dagstree add gitlab --role vcs");
+    expect(result.stdout.join("\n")).toContain("catalogus add gitlab --role vcs");
   });
 
   it("refuses a visibility outside the schema enum", async () => {
@@ -178,7 +178,7 @@ describe("runInit", () => {
     const result = await runInit(dir, { promptFn: promptFn as never });
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("push --private");
-    await expect(readFile(join(dir, "dagstree.yaml"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(dir, "catalogus.yaml"), "utf8")).rejects.toThrow();
   });
 
   it("refuses an interactive architecture answer that looks like Layer 3 data (a hard hit), and writes nothing", async () => {
@@ -190,7 +190,7 @@ describe("runInit", () => {
     const result = await runInit(dir, { promptFn: promptFn as never });
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("push --private");
-    await expect(readFile(join(dir, "dagstree.yaml"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(dir, "catalogus.yaml"), "utf8")).rejects.toThrow();
   });
 
   it("refuses an interactive name answer that looks like Layer 3 data, and writes nothing", async () => {
@@ -203,19 +203,19 @@ describe("runInit", () => {
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("push --private");
     expect(result.stderr.join("\n")).not.toContain("this is a bug");
-    await expect(readFile(join(dir, "dagstree.yaml"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(dir, "catalogus.yaml"), "utf8")).rejects.toThrow();
   });
 
   it("accepts an architecture answer with a bare soft keyword and writes it, with a warning rather than a refusal", async () => {
     // FIX (write-time gate over-blocking): a soft-only hit ("renewal" with
     // no email/currency/card/API-key nearby) used to be refused outright,
-    // with no override -- the exact string `dagstree validate` accepts at
+    // with no override -- the exact string `catalogus validate` accepts at
     // exit 0. Now it's written, with the warning surfaced instead of
     // dropped.
     const promptFn = async () => ({ name: "X", slug: "x", architecture: "renewal is automated via GitHub Actions" });
     const result = await runInit(dir, { promptFn: promptFn as never });
     expect(result.exitCode).toBe(0);
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(text).toContain("architecture: renewal is automated via GitHub Actions");
     expect(result.stderr.join("\n")).toContain("warning:");
   });
@@ -232,7 +232,7 @@ describe("runInit", () => {
     }) as never;
     const result = await runInit(dir, { promptFn });
     expect(result.exitCode).not.toBe(0);
-    await expect(readFile(join(dir, "dagstree.yaml"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(dir, "catalogus.yaml"), "utf8")).rejects.toThrow();
   });
 
   it("refuses to prompt when stdin is not a TTY, naming --yes instead of hanging silently", async () => {
@@ -242,7 +242,7 @@ describe("runInit", () => {
       const result = await runInit(dir, {});
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr.join("\n")).toContain("--yes");
-      await expect(readFile(join(dir, "dagstree.yaml"), "utf8")).rejects.toThrow();
+      await expect(readFile(join(dir, "catalogus.yaml"), "utf8")).rejects.toThrow();
     } finally {
       process.stdin.isTTY = originalIsTTY;
     }

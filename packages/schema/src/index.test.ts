@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  dagstreeSchemaV1,
+  catalogusSchemaV1,
   parseManifest,
   validateManifest,
   edgeEndpoints,
@@ -10,10 +10,10 @@ import {
   MANIFEST_FILENAME_FALLBACK,
 } from "./index.js";
 
-describe("@dagstree/schema public API", () => {
+describe("@catalogus/schema public API", () => {
   it("exports the raw schema object", () => {
-    expect(dagstreeSchemaV1.$id).toBe("https://dagstree.dev/schema/v1.json");
-    expect(dagstreeSchemaV1.properties.dagstree.const).toBe(1);
+    expect(catalogusSchemaV1.$id).toBe("https://catalogus.dev/schema/v1.json");
+    expect(catalogusSchemaV1.properties.catalogus.const).toBe(1);
   });
 
   it("exports validate/parse, the edge helpers, and the private-key check", () => {
@@ -25,13 +25,13 @@ describe("@dagstree/schema public API", () => {
   });
 
   it("exports the manifest filename contract", () => {
-    expect(MANIFEST_FILENAME).toBe("dagstree.yaml");
+    expect(MANIFEST_FILENAME).toBe("catalogus.yaml");
     expect(MANIFEST_FILENAME_FALLBACK).toBe("stack.yaml");
   });
 
   it("parses and validates a minimal manifest end to end", () => {
     const result = parseManifest(
-      "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n",
+      "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n",
     );
     expect(result.valid).toBe(true);
   });

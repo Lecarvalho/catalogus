@@ -1,7 +1,7 @@
 // Pure. Renders one rollup group's heading and its compact nodes, already
 // sorted by group-services.ts before this component ever sees them -- it
 // does not re-sort or re-group anything itself.
-import type { ViewService } from "dagstree";
+import type { ViewService } from "@catalogus/cli";
 
 import { rollupLabel } from "../rollup-labels.js";
 import { ServiceNode } from "./ServiceNode.js";

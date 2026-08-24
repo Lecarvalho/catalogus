@@ -10,7 +10,7 @@ import { createTempDir, removeTempDir, writeFixtureFile } from "../test-support/
 import type { ViewServerHandle } from "./view.js";
 import { createViewServer, parsePortOption } from "./view.js";
 
-const MANIFEST = `dagstree: 1
+const MANIFEST = `catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -167,13 +167,13 @@ describe("createViewServer", () => {
   });
 
   // port: 0 everywhere below -- an OS-assigned ephemeral port, so these
-  // tests never collide with each other or with a real `dagstree view`
+  // tests never collide with each other or with a real `catalogus view`
   // that might already be running on the default 4180. See view.ts's own
   // comment on createViewServer's `port` option for why this is not the
   // same thing as the CLI silently working around a busy user-chosen port.
 
   it("serves the view payload at GET /api/project", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -189,7 +189,7 @@ describe("createViewServer", () => {
   });
 
   it("serves the built index.html at GET /", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -201,7 +201,7 @@ describe("createViewServer", () => {
   });
 
   it("falls back to the SPA shell for a client-side route with no file of its own", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -219,7 +219,7 @@ describe("createViewServer", () => {
   // not the SPA shell -- unlike the extensionless client-side route above,
   // which still falls back to index.html.
   it("404s a request for a missing file that carries an extension, rather than serving the SPA shell for it", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -234,7 +234,7 @@ describe("createViewServer", () => {
   });
 
   it("404s an unknown /api/* route rather than falling through to the SPA shell", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -250,7 +250,7 @@ describe("createViewServer", () => {
   // served index.html -- HTML where JSON was expected, with no 404 to
   // flag the typo.
   it("matches the /api namespace after collapsing a doubled leading slash and normalizing case", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -269,42 +269,42 @@ describe("createViewServer", () => {
   });
 
   it("refuses a literal path-traversal attempt without leaking file content", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
 
     const result = await rawGet(outcome.value.port, "/../../package.json");
     expect(result.status).toBe(403);
-    expect(result.body).not.toContain('"name": "dagstree-monorepo"');
+    expect(result.body).not.toContain('"name": "catalogus-monorepo"');
   });
 
   it("refuses a percent-encoded path-traversal attempt the same way", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
 
     const result = await rawGet(outcome.value.port, "/%2e%2e%2f%2e%2e%2fpackage.json");
     expect(result.status).toBe(403);
-    expect(result.body).not.toContain('"name": "dagstree-monorepo"');
+    expect(result.body).not.toContain('"name": "catalogus-monorepo"');
   });
 
   it("fails cleanly, with no server, when the target directory has no manifest", async () => {
-    // dir is a real, empty directory -- no dagstree.yaml or stack.yaml.
+    // dir is a real, empty directory -- no catalogus.yaml or stack.yaml.
     const outcome = await createViewServer(dir, { port: 0 });
     expect(outcome.ok).toBe(false);
     if (outcome.ok) throw new Error("unreachable");
     expect(outcome.error.exitCode).toBe(2);
-    expect(outcome.error.stderr.join("\n")).toContain("dagstree init");
+    expect(outcome.error.stderr.join("\n")).toContain("catalogus init");
   });
 
   it("fails cleanly, with no server, when the manifest fails validation", async () => {
     // Missing project.slug -- schema-invalid.
     await writeFixtureFile(
       dir,
-      "dagstree.yaml",
-      `dagstree: 1
+      "catalogus.yaml",
+      `catalogus: 1
 project:
   name: Missing Slug
 services: []
@@ -318,7 +318,7 @@ dependencies: []
   });
 
   it("fails with a message naming --port when the requested port is already in use", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const first = await createViewServer(dir, { port: 0 });
     if (!first.ok) throw new Error(`expected success, got: ${first.error.stderr.join("\n")}`);
     servers.push(first.value);
@@ -330,7 +330,7 @@ dependencies: []
     expect(second.error.stderr.join("\n")).toContain("--port");
   });
 
-  // D2, Phase 3.7 hardening pass: an isolated `pnpm --filter dagstree
+  // D2, Phase 3.7 hardening pass: an isolated `pnpm --filter @catalogus/cli
   // build` (tsup's own `clean: true`) can leave dist/web/ behind with an
   // empty assets/ subdirectory but no index.html. This test reproduces
   // exactly that half-built state against this package's *real* dist/web
@@ -344,7 +344,7 @@ dependencies: []
     const backupPath = `${indexHtmlPath}.d2-test-backup`;
     await rename(indexHtmlPath, backupPath);
     try {
-      await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+      await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
       const outcome = await createViewServer(dir, { port: 0 });
       expect(outcome.ok).toBe(false);
       if (outcome.ok) throw new Error("unreachable");
@@ -359,7 +359,7 @@ dependencies: []
   // GET and HEAD are the only methods that mean anything -- everything
   // else is a 405 naming its Allow list, never a silent 200.
   it("answers a non-GET/HEAD method with 405 and an Allow header, while GET and HEAD keep working", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -394,7 +394,7 @@ dependencies: []
   // real Host header. Requests are only honoured when Host names this
   // loopback address (or "localhost") at the port actually bound.
   it("rejects a request whose Host header doesn't name 127.0.0.1 or localhost at the bound port", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -423,7 +423,7 @@ dependencies: []
   // that found this measured it: count actual JSON.stringify calls across
   // several concurrent requests after the server is already up.
   it("builds the request handler and serializes the payload once per server, not once per request", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const originalStringify = JSON.stringify;
     let calls = 0;
     JSON.stringify = ((...args: Parameters<typeof JSON.stringify>) => {
@@ -454,13 +454,13 @@ dependencies: []
   // G5, Phase 3.7 hardening pass. Corrected (Defect 4, second round): the
   // real rule isn't "writers differ from readers" -- `detect` is a reader
   // too and rejects a file path outright (`detect(): invalid repoPath
-  // "...\dagstree.yaml"`, exit 2), so citing "add differs because it
+  // "...\catalogus.yaml"`, exit 2), so citing "add differs because it
   // writes" as the dividing line cites its own counterexample as support.
   // The actual rule, confirmed directly against the built CLI: a command
   // built on loadValidManifest's upward walk -- validate, graph, diff, and
   // view itself -- tolerates a file path by walking up past it to the
-  // manifest in its containing directory (`dagstree validate
-  // <path>\dagstree.yaml` exits 0). A command that instead takes a repo
+  // manifest in its containing directory (`catalogus validate
+  // <path>\catalogus.yaml` exits 0). A command that instead takes a repo
   // root and hands it straight to something that requires a real
   // directory does not: `detect` passes its target straight through to
   // the stack analyser as a repoPath (exit 2, "is not a directory" in
@@ -471,7 +471,7 @@ dependencies: []
   // access") the old comment claimed. Matching view's real sibling group
   // (validate/graph/diff) means a file path here should keep working.
   it("accepts a path to the manifest file itself, matching validate/graph's convention rather than add's", async () => {
-    const manifestPath = await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    const manifestPath = await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(manifestPath, { port: 0 });
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) throw new Error("unreachable");
@@ -496,7 +496,7 @@ dependencies: []
   // Skype, ...) -- skip rather than fail when that's the case, since it
   // says nothing about whether the fix itself is correct.
   it("accepts a bare-authority Host header (no :port) when bound to port 80, and still rejects an unrelated host", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 80 });
     if (!outcome.ok) {
       console.warn(`skipping port-80 test -- could not bind port 80 in this environment: ${outcome.error.stderr.join(" ")}`);
@@ -529,7 +529,7 @@ dependencies: []
   // it and fell through to static serving, which answered with the SPA
   // shell instead of the JSON payload.
   it("routes an absolute-form request target to /api/project instead of falling through to the SPA shell", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -555,7 +555,7 @@ dependencies: []
   });
 
   it("resolves a leading ./ segment so /./api/project reaches the API route", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -569,7 +569,7 @@ dependencies: []
   // never resolved outside the traversal guard, so this keeps 404ing
   // after the D2 fix exactly as it did before it.
   it("still 404s /api/../api/project -- '..' segments are left for the traversal guard alone, not resolved here", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -579,14 +579,14 @@ dependencies: []
   });
 
   it("still refuses absolute-form path traversal without leaking file content", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
 
     const result = await rawGet(outcome.value.port, "http://evil.example.com/../../package.json");
     expect(result.status).toBe(403);
-    expect(result.body).not.toContain('"name": "dagstree-monorepo"');
+    expect(result.body).not.toContain('"name": "catalogus-monorepo"');
   });
 
   // Defect 3, Phase 3.7 hardening pass, second round: a present-but-empty
@@ -604,7 +604,7 @@ dependencies: []
     const originalContent = await readFile(indexHtmlPath);
     await writeFile(indexHtmlPath, "");
     try {
-      await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+      await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
       const outcome = await createViewServer(dir, { port: 0 });
       expect(outcome.ok).toBe(false);
       if (outcome.ok) throw new Error("unreachable");
@@ -620,7 +620,7 @@ dependencies: []
   // socket that never sends a request never does -- measured hanging
   // past 90 seconds before this fix. closeIdleConnections() bounds it.
   it("resolves close() promptly even while a bare, request-less TCP socket is still open", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     const { port, close } = outcome.value;
@@ -648,7 +648,7 @@ dependencies: []
   // back 200 with the real payload -- the second, attacker-controlled
   // Host line was never rejected, just quietly ignored.
   it("rejects a request with a duplicate Host header, in both orders", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);
@@ -677,7 +677,7 @@ dependencies: []
   // browser both JSON and HTML from the same origin -- nosniff is cheap
   // insurance against either being interpreted as the other.
   it("sends X-Content-Type-Options: nosniff on both a JSON and an HTML response", async () => {
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
     const outcome = await createViewServer(dir, { port: 0 });
     if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
     servers.push(outcome.value);

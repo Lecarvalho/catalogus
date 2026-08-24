@@ -59,7 +59,7 @@ function randomToken(rand: () => number, alphabet: string, length: number): stri
   return out;
 }
 
-// "Passes clean" means what it means for `dagstree validate`: no HARD hit.
+// "Passes clean" means what it means for `catalogus validate`: no HARD hit.
 // A stray SOFT keyword hit is not the thing under test here (and is
 // essentially impossible for a random base64-alphabet string to produce by
 // chance) -- see free-text-guard.test.ts for tier coverage generally.

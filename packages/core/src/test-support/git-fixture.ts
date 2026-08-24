@@ -17,7 +17,7 @@ export interface GitFixture {
 }
 
 export async function materializeGitFixture(fixtureDir: string): Promise<GitFixture> {
-  const repoPath = await mkdtemp(join(tmpdir(), "dagstree-git-fixture-"));
+  const repoPath = await mkdtemp(join(tmpdir(), "catalogus-git-fixture-"));
   await cp(join(fixtureDir, "dotgit"), join(repoPath, ".git"), { recursive: true });
   return {
     repoPath,

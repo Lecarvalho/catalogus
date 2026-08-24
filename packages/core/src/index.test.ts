@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { CORE_PACKAGE_NAME, detect, InvalidRepoPathError } from "./index.js";
 import { fixturePath } from "./test-support/fixture-path.js";
 
-describe("@dagstree/core", () => {
+describe("@catalogus/core", () => {
   it("exposes its package name", () => {
-    expect(CORE_PACKAGE_NAME).toBe("@dagstree/core");
+    expect(CORE_PACKAGE_NAME).toBe("@catalogus/core");
   });
 });
 
@@ -30,7 +30,7 @@ describe("detect", () => {
     expect(result.vcs?.provider).toBe("github");
     expect(result.ci).toEqual({ provider: "github-actions", evidence: [{ file: ".github/workflows" }] });
 
-    // Fly.io was caught by both Dagstree's own hosting.ts and stack-analyser's
+    // Fly.io was caught by both Catalogus's own hosting.ts and stack-analyser's
     // flyio rule; detect() merges them into one entry rather than two
     // competing hosting detections. kitchen-sink has a single fly.toml, so
     // the merge should also dedupe the two evidence entries the two
@@ -94,7 +94,7 @@ describe("detect", () => {
   });
 
   it("dedupes hosting evidence by file when both detectors flag the same file", async () => {
-    // fly.toml is caught by both Dagstree's own fly*.toml pattern detector
+    // fly.toml is caught by both Catalogus's own fly*.toml pattern detector
     // and stack-analyser's exact-filename flyio rule; the other three
     // variants (fly.grafana.toml, fly.loki.toml, fly.web.toml) are only
     // caught by the pattern detector. A naive concatenation would list

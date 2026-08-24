@@ -1,4 +1,4 @@
-// Dagstree-specific VCS/CI detector (HANDOFF.md §6): .github/ vs
+// Catalogus-specific VCS/CI detector (HANDOFF.md §6): .github/ vs
 // .gitlab-ci.yml, refined by the git remote when one is present. The git
 // remote is read as a plain text file — this never shells out to `git`.
 import { readFile } from "node:fs/promises";

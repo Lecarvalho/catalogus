@@ -4,7 +4,7 @@
 // redirect-message classifier in validate.ts compile a regex from this exact
 // word list, so the two can never independently drift apart. A test
 // (schema-sync.test.ts) checks the regex source embedded in
-// schema/dagstree.v1.json against the string built here.
+// schema/catalogus.v1.json against the string built here.
 //
 // JSON Schema `pattern` regexes have no inline case-insensitive flag that
 // every implementation honors, so instead of relying on one, each letter is

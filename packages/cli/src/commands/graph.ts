@@ -1,12 +1,12 @@
-// `dagstree graph` -- renders the project DAG. Default output is readable
+// `catalogus graph` -- renders the project DAG. Default output is readable
 // ASCII (no Unicode box-drawing, so it's legible in a plain Windows
 // console); --mermaid emits a mermaid flowchart definition for pasting into
 // a markdown document. Status is always shown as plain text (active /
 // phasing_out -> target / deprecated / removed) so it's distinguishable
 // even without colour; a Colors object built from colorSupported() below
 // adds colour on top where the terminal supports it.
-import { edgeEndpoints } from "@dagstree/schema";
-import type { DagstreeManifestV1, ServiceEntry } from "@dagstree/schema";
+import { edgeEndpoints } from "@catalogus/schema";
+import type { CatalogusManifestV1, ServiceEntry } from "@catalogus/schema";
 import pc from "picocolors";
 
 import { loadValidManifest } from "../load-manifest.js";
@@ -24,7 +24,7 @@ export interface GraphCommandOptions {
  * `pc.green(...)` etc. exports use) special-cases `process.platform ===
  * "win32"` to true *before* it ever checks `stdout.isTTY` -- on the Windows
  * dev machine this repo targets, that means colour would be emitted
- * unconditionally, including into `dagstree graph . > file.txt`
+ * unconditionally, including into `catalogus graph . > file.txt`
  * redirection. Building our own `Colors` via `createColors` with an
  * explicit TTY check sidesteps that platform special-case; FORCE_COLOR and
  * NO_COLOR are still honoured, matching picocolors' own conventions.
@@ -50,7 +50,7 @@ export async function runGraph(pathArg: string | undefined, options: GraphComman
  * The parenthesised label after the catalog slug: role, plus kind and
  * version where they say something. `kind` is omitted for "service" because
  * that is the default and printing it on every vendor row would drown the
- * two that are not vendors -- the same rule `dagstree diff` uses.
+ * two that are not vendors -- the same rule `catalogus diff` uses.
  */
 function descriptorText(entry: ServiceEntry): string {
   const parts = [entry.role];
@@ -84,7 +84,7 @@ function colorStatus(entry: ServiceEntry, color: Colors): string {
   }
 }
 
-function renderAscii(manifest: DagstreeManifestV1): string[] {
+function renderAscii(manifest: CatalogusManifestV1): string[] {
   const lines: string[] = [];
   lines.push(`Dependency graph: ${manifest.project.name} (${manifest.project.slug})`);
   lines.push("");
@@ -116,7 +116,7 @@ function renderAscii(manifest: DagstreeManifestV1): string[] {
 }
 
 /**
- * Mermaid node ids allow only [A-Za-z0-9_]. Every dagstree id already
+ * Mermaid node ids allow only [A-Za-z0-9_]. Every catalogus id already
  * satisfies the slug pattern (lowercase letters, digits, single - or _
  * separators, HANDOFF.md section 5), so the only translation needed is "-"
  * -> "__": that pattern forbids doubled separators, so no valid id can
@@ -129,7 +129,7 @@ function mermaidId(id: string): string {
   return id.replace(/-/g, "__");
 }
 
-function renderMermaid(manifest: DagstreeManifestV1): string[] {
+function renderMermaid(manifest: CatalogusManifestV1): string[] {
   const lines: string[] = [];
   lines.push("flowchart LR");
 

@@ -22,11 +22,11 @@ import ts from "typescript";
 // dependency, because `pnpm install` at the workspace root installs every
 // workspace package's devDependencies too — so the bug is invisible to any
 // check that stays inside the repo's own install. A real external consumer
-// (`npm install @dagstree/schema` from the registry) only gets
+// (`npm install @catalogus/schema` from the registry) only gets
 // "dependencies" installed transitively; "devDependencies" never ships.
 //
 // This test reproduces that boundary without any network access: it
-// symlinks only the packages @dagstree/schema's package.json currently
+// symlinks only the packages @catalogus/schema's package.json currently
 // lists under "dependencies" (read from the file, so this can't drift from
 // the real manifest) into a scratch node_modules, copies in the built dist
 // the same way `npm pack`'s "files" field would, and then type-checks a
@@ -44,10 +44,10 @@ describe.skipIf(!distExists)("a consumer with only the declared dependencies ins
       dependencies?: Record<string, string>;
     };
     const deps = Object.keys(pkg.dependencies ?? {});
-    expect(deps.length, "expected @dagstree/schema to declare at least one dependency").toBeGreaterThan(0);
+    expect(deps.length, "expected @catalogus/schema to declare at least one dependency").toBeGreaterThan(0);
 
     const requireFromSchema = createRequire(join(schemaDir, "package.json"));
-    const consumerDir = mkdtempSync(join(tmpdir(), "dagstree-schema-consumer-"));
+    const consumerDir = mkdtempSync(join(tmpdir(), "catalogus-schema-consumer-"));
 
     try {
       const nodeModules = join(consumerDir, "node_modules");
@@ -62,7 +62,7 @@ describe.skipIf(!distExists)("a consumer with only the declared dependencies ins
         symlinkSync(dirname(depPackageJson), join(nodeModules, dep), "junction");
       }
 
-      const scopedDir = join(nodeModules, "@dagstree");
+      const scopedDir = join(nodeModules, "@catalogus");
       mkdirSync(scopedDir, { recursive: true });
       const pkgDir = join(scopedDir, "schema");
       mkdirSync(pkgDir, { recursive: true });
@@ -84,9 +84,9 @@ describe.skipIf(!distExists)("a consumer with only the declared dependencies ins
       writeFileSync(
         probePath,
         [
-          'import type { DagstreeManifestV1 } from "@dagstree/schema";',
+          'import type { CatalogusManifestV1 } from "@catalogus/schema";',
           "",
-          "declare const manifest: DagstreeManifestV1;",
+          "declare const manifest: CatalogusManifestV1;",
           "const nameAsNumber: number = manifest.project.name;",
           "void nameAsNumber;",
         ].join("\n"),
@@ -113,7 +113,7 @@ describe.skipIf(!distExists)("a consumer with only the declared dependencies ins
         getNewLine: () => "\n",
       });
       // A real `string` assigned to `number` must fail to compile. If this
-      // comes back empty, `DagstreeManifestV1["project"]["name"]` silently
+      // comes back empty, `CatalogusManifestV1["project"]["name"]` silently
       // degraded to `any` for this consumer -- exactly the bug being
       // guarded against.
       expect(diagnostics.length, `expected a type error; got none:\n${formatted}`).toBeGreaterThan(0);

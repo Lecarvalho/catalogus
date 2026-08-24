@@ -1,7 +1,7 @@
-// `dagstree rename <old> <new> [path]` -- changes one service entry's local
+// `catalogus rename <old> <new> [path]` -- changes one service entry's local
 // id, and moves every reference to it along with the entry.
 //
-// This is not a `dagstree set services.<id>.id`, and the difference is the
+// This is not a `catalogus set services.<id>.id`, and the difference is the
 // whole command. `set` writes one field and is done; an id is referenced
 // from three places outside the entry that carries it -- both endpoints of
 // every dependency edge, and any other entry's `replaced_by` -- so writing
@@ -26,7 +26,7 @@
 // `setIn` cannot: `setIn` writes the new id whether or not the old one was
 // there, and a rename that quietly wrote over the wrong thing is the
 // failure this command is least able to afford.
-import { edgePairs } from "@dagstree/schema";
+import { edgePairs } from "@catalogus/schema";
 import { isMap, isSeq } from "yaml";
 import type { Scalar, YAMLSeq } from "yaml";
 

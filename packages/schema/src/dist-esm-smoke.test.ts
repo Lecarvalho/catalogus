@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 // require(...)` into a literal `require(...)` call inside a pure-ESM output
 // file — passes every test that imports from "./validate.js" while breaking
 // the instant a real ESM consumer (packages/cli, or any ".mjs"/"type":
-// "module" file) does `import { parseManifest } from "@dagstree/schema"`.
+// "module" file) does `import { parseManifest } from "@catalogus/schema"`.
 // This test loads the actual built artifact instead of the TS source, so
 // that class of bug fails the suite instead of shipping.
 //
@@ -26,7 +26,7 @@ describe.skipIf(!distExists)("the built dist/index.js loads under native ESM", (
     expect(typeof dist.parseManifest).toBe("function");
 
     const result = dist.parseManifest(
-      "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n",
+      "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices: []\ndependencies: []\n",
     );
     expect(result.valid).toBe(true);
   });
@@ -34,7 +34,7 @@ describe.skipIf(!distExists)("the built dist/index.js loads under native ESM", (
   it("still enforces the private-key deny rule after bundling", async () => {
     const dist = await import(/* @vite-ignore */ distIndexUrl.href);
     const result = dist.parseManifest(
-      "dagstree: 1\nproject:\n  name: X\n  slug: x\n  monthly_cost: 5\nservices: []\ndependencies: []\n",
+      "catalogus: 1\nproject:\n  name: X\n  slug: x\n  monthly_cost: 5\nservices: []\ndependencies: []\n",
     );
     expect(result.valid).toBe(false);
     expect(
@@ -45,7 +45,7 @@ describe.skipIf(!distExists)("the built dist/index.js loads under native ESM", (
   it("still enforces the date format check (proves ajv-formats registered correctly)", async () => {
     const dist = await import(/* @vite-ignore */ distIndexUrl.href);
     const result = dist.parseManifest(
-      "dagstree: 1\nproject:\n  name: X\n  slug: x\nservices:\n  - id: a\n    service: b\n    role: c\n    added: not-a-date\ndependencies: []\n",
+      "catalogus: 1\nproject:\n  name: X\n  slug: x\nservices:\n  - id: a\n    service: b\n    role: c\n    added: not-a-date\ndependencies: []\n",
     );
     expect(result.valid).toBe(false);
   });

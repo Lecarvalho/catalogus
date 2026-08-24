@@ -1,7 +1,7 @@
 # "vertex" (a typo for "anthropic-api") names no services[] entry — also
 # referential integrity, not expressible in JSON Schema. Matches the
 # scenario in the serviceEntry schema's own replaced_by description.
-dagstree: 1
+catalogus: 1
 project:
   name: Clapline
   slug: clapline

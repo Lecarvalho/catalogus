@@ -1,11 +1,11 @@
-// @dagstree/core — the Layer 1 detection engine. Wraps @specfy/stack-analyser
-// for general-purpose tech detection and adds the Dagstree-specific
+// @catalogus/core — the Layer 1 detection engine. Wraps @specfy/stack-analyser
+// for general-purpose tech detection and adds the Catalogus-specific
 // detectors HANDOFF.md §6 calls for (coding agents, MCP servers, hosting
 // config files, VCS/CI provider), plus a config-key detector for the
 // services stack-analyser structurally cannot see — anything wired through
 // a settings file rather than a dependency manifest — then merges them into
 // one JSON-serialisable DetectionResult with evidence on every entry.
-export const CORE_PACKAGE_NAME = "@dagstree/core";
+export const CORE_PACKAGE_NAME = "@catalogus/core";
 
 import { stat } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
@@ -34,9 +34,9 @@ export type {
   VcsDetection,
 } from "./types.js";
 export { DETECTION_KINDS, SERVICE_CATEGORIES } from "./types.js";
-export { mapSpecfySlug, SPECFY_TO_DAGSTREE } from "./mapping.js";
+export { mapSpecfySlug, SPECFY_TO_CATALOGUS } from "./mapping.js";
 export type { MappingEntry } from "./mapping.js";
-export { DAGSTREE_CATALOG, getCatalogEntry } from "./catalog.js";
+export { CATALOGUS_CATALOG, getCatalogEntry } from "./catalog.js";
 export type { CatalogEntry } from "./catalog.js";
 export { resolveIconPath } from "./icons.js";
 
@@ -66,7 +66,7 @@ async function assertValidRepoPath(repoPath: string): Promise<void> {
 /**
  * Scans an absolute repository path and returns everything Layer 1 can
  * learn about it: detected technologies (stack-analyser, mapped into
- * Dagstree's namespace), coding agents, MCP servers, hosting providers, and
+ * Catalogus's namespace), coding agents, MCP servers, hosting providers, and
  * VCS/CI provider. Every entry carries the evidence that produced it.
  *
  * Read-only — never writes into repoPath. Rejects with InvalidRepoPathError
@@ -77,7 +77,7 @@ async function assertValidRepoPath(repoPath: string): Promise<void> {
 export async function detect(repoPath: string): Promise<DetectionResult> {
   await assertValidRepoPath(repoPath);
 
-  const [technologies, codingAgents, mcp, dagstreeHosting, configKeys, vcs, ci] = await Promise.all([
+  const [technologies, codingAgents, mcp, catalogusHosting, configKeys, vcs, ci] = await Promise.all([
     runStackAnalyser(repoPath),
     detectCodingAgents(repoPath),
     detectMcpServers(repoPath),
@@ -87,7 +87,7 @@ export async function detect(repoPath: string): Promise<DetectionResult> {
     detectCi(repoPath),
   ]);
 
-  const hosting = await mergeHosting(repoPath, dagstreeHosting, technologies);
+  const hosting = await mergeHosting(repoPath, catalogusHosting, technologies);
 
   return {
     repoPath,
@@ -106,7 +106,7 @@ export async function detect(repoPath: string): Promise<DetectionResult> {
 
 /**
  * Merges `incoming` evidence onto `target`, keyed by `file`. The same
- * config file routinely satisfies both Dagstree's own pattern detector and
+ * config file routinely satisfies both Catalogus's own pattern detector and
  * stack-analyser's independent file-based rule for the same provider (Fly's
  * multi-app `fly.toml` is the case that surfaced this), so a plain
  * concatenation of the two evidence arrays carries that file twice. When
@@ -130,7 +130,7 @@ function mergeEvidenceByFile(target: readonly Evidence[], incoming: readonly Evi
 }
 
 /**
- * Folds Dagstree's own filename-pattern hosting detections together with
+ * Folds Catalogus's own filename-pattern hosting detections together with
  * anything stack-analyser separately concluded was hosting-category, so a
  * provider caught only by stack-analyser's dependency rules (no config file
  * on disk) still shows up in `hosting` rather than only in `technologies`.
@@ -147,10 +147,10 @@ function mergeEvidenceByFile(target: readonly Evidence[], incoming: readonly Evi
  */
 async function mergeHosting(
   repoPath: string,
-  dagstreeHosting: HostingDetection[],
+  catalogusHosting: HostingDetection[],
   technologies: DetectionResult["technologies"]
 ): Promise<HostingDetection[]> {
-  const bySlug = new Map(dagstreeHosting.map((entry) => [entry.slug, { ...entry, evidence: [...entry.evidence] }]));
+  const bySlug = new Map(catalogusHosting.map((entry) => [entry.slug, { ...entry, evidence: [...entry.evidence] }]));
 
   for (const techEntry of technologies) {
     if (techEntry.category !== "hosting") {

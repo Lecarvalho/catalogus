@@ -97,7 +97,7 @@ export const DETECTION_KINDS = ["service", "component", "stack", "library"] as c
 export type DetectionKind = (typeof DETECTION_KINDS)[number];
 
 export interface DetectedTechnology {
-  /** Dagstree catalog slug. Equal to specfySlug when unmapped. */
+  /** Catalogus catalog slug. Equal to specfySlug when unmapped. */
   slug: string;
   category: ServiceCategory;
   name: string;
@@ -110,7 +110,7 @@ export interface DetectedTechnology {
    * "service" or "library" — see DetectionKind. Derived in mapping.ts:
    * explicit for every known catalog row, and from stack-analyser's own
    * `type` field for an unmapped pass-through (classifyDetectionKind).
-   * This is what lets `dagstree detect` lead with services instead of
+   * This is what lets `catalogus detect` lead with services instead of
    * burying them among the languages, frameworks and build tools
    * stack-analyser reports in equal volume — see PLAN.md's dogfooding
    * notes, "detect output buries services among the libraries".

@@ -1,9 +1,9 @@
-import { parseManifest } from "@dagstree/schema";
+import { parseManifest } from "@catalogus/schema";
 import { describe, expect, it } from "vitest";
 
 import { buildViewPayload } from "./view-payload.js";
 
-const MANIFEST = `dagstree: 1
+const MANIFEST = `catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -73,8 +73,8 @@ function findService(payload: Awaited<ReturnType<typeof buildViewPayload>>, id: 
 
 describe("buildViewPayload", () => {
   it("carries the manifest path and project fields through unchanged", async () => {
-    const payload = await buildViewPayload("/repo/dagstree.yaml", await parsedManifest(), READ_AT);
-    expect(payload.manifestPath).toBe("/repo/dagstree.yaml");
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
+    expect(payload.manifestPath).toBe("/repo/catalogus.yaml");
     expect(payload.readAt).toBe(READ_AT);
     expect(payload.project).toEqual({
       name: "Example App",
@@ -85,7 +85,7 @@ describe("buildViewPayload", () => {
   });
 
   it("omits project fields the manifest never set, rather than inventing a placeholder", async () => {
-    const minimal = parseManifest(`dagstree: 1
+    const minimal = parseManifest(`catalogus: 1
 project:
   name: Minimal
   slug: minimal
@@ -93,48 +93,48 @@ services: []
 dependencies: []
 `);
     if (!minimal.valid) throw new Error("fixture should parse");
-    const payload = await buildViewPayload("/repo/dagstree.yaml", minimal.manifest, READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", minimal.manifest, READ_AT);
     expect(payload.project.architecture).toBeUndefined();
     expect(payload.project.vcs).toBeUndefined();
     expect(Object.keys(JSON.parse(JSON.stringify(payload.project))).sort()).toEqual(["name", "slug"]);
   });
 
   it("defaults kind to 'service' and status to 'active' when the entry omits them", async () => {
-    const payload = await buildViewPayload("/repo/dagstree.yaml", await parsedManifest(), READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     const hostApi = findService(payload, "host-api");
     expect(hostApi.kind).toBe("service");
     expect(hostApi.status).toBe("active");
   });
 
   it("carries an explicit kind and version through for a stack entry", async () => {
-    const payload = await buildViewPayload("/repo/dagstree.yaml", await parsedManifest(), READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     const dotnet = findService(payload, "dotnet");
     expect(dotnet.kind).toBe("stack");
     expect(dotnet.version).toBe("10");
   });
 
   it("carries kind: component through for a non-vendor infrastructure entry", async () => {
-    const payload = await buildViewPayload("/repo/dagstree.yaml", await parsedManifest(), READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     const ingress = findService(payload, "ingress");
     expect(ingress.kind).toBe("component");
   });
 
   it("carries phasing_out status and replaced_by through together", async () => {
-    const payload = await buildViewPayload("/repo/dagstree.yaml", await parsedManifest(), READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     const legacy = findService(payload, "legacy-mailer");
     expect(legacy.status).toBe("phasing_out");
     expect(legacy.replaced_by).toBe("mailer");
   });
 
   it("derives rollup as the segment of role before the first '-'", async () => {
-    const payload = await buildViewPayload("/repo/dagstree.yaml", await parsedManifest(), READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     expect(findService(payload, "host-api").rollup).toBe("hosting");
     expect(findService(payload, "ingress").rollup).toBe("ingress");
     expect(findService(payload, "dotnet").rollup).toBe("runtime");
   });
 
   it("rolls up a role with no '-' at all to itself", async () => {
-    const noHyphen = parseManifest(`dagstree: 1
+    const noHyphen = parseManifest(`catalogus: 1
 project:
   name: X
   slug: x
@@ -146,12 +146,12 @@ services:
 dependencies: []
 `);
     if (!noHyphen.valid) throw new Error("fixture should parse");
-    const payload = await buildViewPayload("/repo/dagstree.yaml", noHyphen.manifest, READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", noHyphen.manifest, READ_AT);
     expect(findService(payload, "svc").rollup).toBe("hosting");
   });
 
   it("marks a catalogued slug known, with its display name and a non-null icon when one is verified", async () => {
-    const payload = await buildViewPayload("/repo/dagstree.yaml", await parsedManifest(), READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     const ingress = findService(payload, "ingress");
     expect(ingress.known).toBe(true);
     expect(ingress.name).toBe("Nginx");
@@ -159,7 +159,7 @@ dependencies: []
   });
 
   it("marks an uncatalogued slug unknown and renders the raw slug rather than a fabricated name", async () => {
-    const payload = await buildViewPayload("/repo/dagstree.yaml", await parsedManifest(), READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     const mystery = findService(payload, "mystery");
     expect(mystery.known).toBe(false);
     expect(mystery.name).toBe("some-slug-nobody-has-catalogued");
@@ -167,7 +167,7 @@ dependencies: []
   });
 
   // G7, Phase 3.7 hardening pass: docs/PLAN.md measured real catalog-icon
-  // coverage at ~38%, but examples/reference.dagstree.yaml -- deliberately
+  // coverage at ~38%, but examples/reference.catalogus.yaml -- deliberately
   // a showcase of good practice, not a stress fixture -- happens to name
   // only slugs that all resolve to a verified icon. Nothing committed
   // exercised the actual majority path (a catalogued slug with no icon)
@@ -177,7 +177,7 @@ dependencies: []
   // OpenAI mark, only an unrelated retired "OpenAI Gym" one), so it is
   // known but iconless by construction, not by omission.
   it("marks a catalogued slug with no verified icon known, with its display name and a null icon -- the majority real-world path", async () => {
-    const payload = await buildViewPayload("/repo/dagstree.yaml", await parsedManifest(), READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     const llm = findService(payload, "llm");
     expect(llm.known).toBe(true);
     expect(llm.name).toBe("OpenAI");
@@ -185,7 +185,7 @@ dependencies: []
   });
 
   it("normalizes both edge forms (tuple and object) to plain {from, to}", async () => {
-    const payload = await buildViewPayload("/repo/dagstree.yaml", await parsedManifest(), READ_AT);
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     expect(payload.edges).toEqual([
       { from: "host-api", to: "ingress" },
       { from: "host-api", to: "dotnet" },

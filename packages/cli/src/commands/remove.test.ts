@@ -11,9 +11,9 @@ import { runValidate } from "./validate.js";
 // the object form with a `notes` annotation -- so the cascade is exercised
 // against both, not just the tuple form every other fixture in this file
 // happens to use.
-const MANIFEST = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+const MANIFEST = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
 # Hand-written header comment -- must survive every edit.
-dagstree: 1
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -49,7 +49,7 @@ describe("runRemove", () => {
 
   beforeEach(async () => {
     dir = await createTempDir();
-    await writeFixtureFile(dir, "dagstree.yaml", MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
   });
 
   afterEach(async () => {
@@ -57,7 +57,7 @@ describe("runRemove", () => {
   });
 
   async function manifestText(): Promise<string> {
-    return readFile(join(dir, "dagstree.yaml"), "utf8");
+    return readFile(join(dir, "catalogus.yaml"), "utf8");
   }
 
   it("deletes the entry and every edge naming it in either direction, reporting each by name", async () => {
@@ -77,7 +77,7 @@ describe("runRemove", () => {
     expect(text).not.toContain("auth reads session state directly from the users table");
     expect(text).toContain("[fly-api, supabase-db]");
     expect(text).toContain("Hand-written header comment");
-    expect(text).toContain("$schema=https://dagstree.dev/schema/v1.json");
+    expect(text).toContain("$schema=https://catalogus.dev/schema/v1.json");
   });
 
   it("leaves an entry with no edges to cascade with a clean report", async () => {
@@ -89,12 +89,12 @@ describe("runRemove", () => {
     expect(text).not.toContain("heroku-api");
   });
 
-  it("leaves the manifest valid after a cascading remove -- dagstree validate actually passes", async () => {
+  it("leaves the manifest valid after a cascading remove -- catalogus validate actually passes", async () => {
     const removed = await runRemove(dir, "supabase-auth");
     expect(removed.exitCode).toBe(0);
 
     // The spec's stated worst case is a dangling edge failing referential
-    // integrity on the next `dagstree validate` -- so this test has to
+    // integrity on the next `catalogus validate` -- so this test has to
     // call the real validator, not just eyeball the written text.
     const validated = await runValidate(dir);
     expect(validated.exitCode).toBe(0);
@@ -109,15 +109,15 @@ describe("runRemove", () => {
     const err = result.stderr.join("\n");
     expect(err).toContain('"heroku-api"');
     expect(err).toContain("replaced_by");
-    expect(err).toContain("dagstree deprecate");
+    expect(err).toContain("catalogus deprecate");
     expect(await manifestText()).toBe(before);
   });
 
   it("refuses when more than one entry's replaced_by names the target, listing every one of them", async () => {
     const dir2 = await createTempDir();
     try {
-      const manifest = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+      const manifest = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -140,8 +140,8 @@ services:
     added: 2025-01-01
 dependencies: []
 `;
-      await writeFixtureFile(dir2, "dagstree.yaml", manifest);
-      const before = await readFile(join(dir2, "dagstree.yaml"), "utf8");
+      await writeFixtureFile(dir2, "catalogus.yaml", manifest);
+      const before = await readFile(join(dir2, "catalogus.yaml"), "utf8");
 
       const result = await runRemove(dir2, "consolidated");
       expect(result.exitCode).toBe(1);
@@ -153,7 +153,7 @@ dependencies: []
       // nothing exercised it until now.
       expect(err).toContain("name it");
       expect(err).toContain("them");
-      expect(await readFile(join(dir2, "dagstree.yaml"), "utf8")).toBe(before);
+      expect(await readFile(join(dir2, "catalogus.yaml"), "utf8")).toBe(before);
     } finally {
       await removeTempDir(dir2);
     }
@@ -171,8 +171,8 @@ dependencies: []
   it("matches ids exactly -- removing a short id does not also touch one that merely starts with it", async () => {
     const dir2 = await createTempDir();
     try {
-      const manifest = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+      const manifest = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -193,7 +193,7 @@ dependencies:
   - [api, queue]
   - [api-worker, queue]
 `;
-      await writeFixtureFile(dir2, "dagstree.yaml", manifest);
+      await writeFixtureFile(dir2, "catalogus.yaml", manifest);
 
       const result = await runRemove(dir2, "api");
       expect(result.exitCode).toBe(0);
@@ -201,7 +201,7 @@ dependencies:
       expect(out).toContain("api -> queue");
       expect(out).not.toContain("api-worker -> queue");
 
-      const text = await readFile(join(dir2, "dagstree.yaml"), "utf8");
+      const text = await readFile(join(dir2, "catalogus.yaml"), "utf8");
       expect(text).not.toMatch(/- id: api$/m);
       expect(text).toMatch(/- id: api-worker$/m);
       expect(text).toContain("[api-worker, queue]");
@@ -219,8 +219,8 @@ dependencies:
   it("matches ids exactly on the entry lookup too, even when the longer id is listed first", async () => {
     const dir2 = await createTempDir();
     try {
-      const manifest = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+      const manifest = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -235,12 +235,12 @@ services:
     added: 2025-01-02
 dependencies: []
 `;
-      await writeFixtureFile(dir2, "dagstree.yaml", manifest);
+      await writeFixtureFile(dir2, "catalogus.yaml", manifest);
 
       const result = await runRemove(dir2, "api");
       expect(result.exitCode).toBe(0);
 
-      const text = await readFile(join(dir2, "dagstree.yaml"), "utf8");
+      const text = await readFile(join(dir2, "catalogus.yaml"), "utf8");
       expect(text).toMatch(/- id: api-worker$/m);
       expect(text).not.toMatch(/- id: api$/m);
     } finally {
@@ -251,8 +251,8 @@ dependencies: []
   it("removes the only remaining service, leaving an empty services list", async () => {
     const dir2 = await createTempDir();
     try {
-      const manifest = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+      const manifest = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -263,12 +263,12 @@ services:
     added: 2025-01-01
 dependencies: []
 `;
-      await writeFixtureFile(dir2, "dagstree.yaml", manifest);
+      await writeFixtureFile(dir2, "catalogus.yaml", manifest);
 
       const result = await runRemove(dir2, "solo");
       expect(result.exitCode).toBe(0);
 
-      const text = await readFile(join(dir2, "dagstree.yaml"), "utf8");
+      const text = await readFile(join(dir2, "catalogus.yaml"), "utf8");
       expect(text).toContain("services: []");
 
       const validated = await runValidate(dir2);
@@ -281,8 +281,8 @@ dependencies: []
   it("cascades edges out of a flow-style dependencies list the same way as a block-style one", async () => {
     const dir2 = await createTempDir();
     try {
-      const manifest = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+      const manifest = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -305,7 +305,7 @@ services:
     added: 2025-01-04
 dependencies: [[svc-w, svc-x], [svc-x, svc-y], [svc-y, svc-z]]
 `;
-      await writeFixtureFile(dir2, "dagstree.yaml", manifest);
+      await writeFixtureFile(dir2, "catalogus.yaml", manifest);
 
       const result = await runRemove(dir2, "svc-y");
       expect(result.exitCode).toBe(0);
@@ -313,7 +313,7 @@ dependencies: [[svc-w, svc-x], [svc-x, svc-y], [svc-y, svc-z]]
       expect(out).toContain("svc-x -> svc-y");
       expect(out).toContain("svc-y -> svc-z");
 
-      const text = await readFile(join(dir2, "dagstree.yaml"), "utf8");
+      const text = await readFile(join(dir2, "catalogus.yaml"), "utf8");
       expect(text).not.toContain("svc-y");
       expect(text).toMatch(/svc-w,\s*svc-x/);
 
@@ -334,8 +334,8 @@ dependencies: [[svc-w, svc-x], [svc-x, svc-y], [svc-y, svc-z]]
   it("refuses to write when the manifest already carried a cycle the removal does not touch", async () => {
     const dir2 = await createTempDir();
     try {
-      const manifest = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+      const manifest = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -356,14 +356,14 @@ dependencies:
   - [svc-b, svc-c]
   - [svc-c, svc-b]
 `;
-      await writeFixtureFile(dir2, "dagstree.yaml", manifest);
-      const before = await readFile(join(dir2, "dagstree.yaml"), "utf8");
+      await writeFixtureFile(dir2, "catalogus.yaml", manifest);
+      const before = await readFile(join(dir2, "catalogus.yaml"), "utf8");
 
       const result = await runRemove(dir2, "svc-a");
       expect(result.exitCode).toBe(1);
       expect(result.stderr.join(" ")).toContain("cyclic dependency");
 
-      const after = await readFile(join(dir2, "dagstree.yaml"), "utf8");
+      const after = await readFile(join(dir2, "catalogus.yaml"), "utf8");
       expect(after).toBe(before);
     } finally {
       await removeTempDir(dir2);
@@ -407,8 +407,8 @@ describe("runRemove -- comment attachment", () => {
   // each comment unambiguously belongs to the entry immediately below it,
   // and is part of that entry's own node -- see the sibling describe
   // below for why the first entry is a different mechanism entirely.
-  const CLEAN_MANIFEST = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+  const CLEAN_MANIFEST = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -432,7 +432,7 @@ dependencies: []
 
   it("(a)/(b) on a non-first entry: a comment line directly above it, and an inline comment on its id, both vanish with it", async () => {
     dir = await createTempDir();
-    await writeFixtureFile(dir, "dagstree.yaml", CLEAN_MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", CLEAN_MANIFEST);
 
     // svc-b is index 1, not index 0 -- deliberately, since a comment
     // directly above a non-first entry belongs to that entry's own node,
@@ -441,19 +441,19 @@ dependencies: []
     const result = await runRemove(dir, "svc-b");
     expect(result.exitCode).toBe(0);
 
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(text).not.toContain("note about svc-b specifically");
     expect(text).not.toContain("inline comment on svc-b's id");
   });
 
   it("(c) a comment written between the removed entry and its successor stays exactly where it was, attached to the successor", async () => {
     dir = await createTempDir();
-    await writeFixtureFile(dir, "dagstree.yaml", CLEAN_MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", CLEAN_MANIFEST);
 
     const result = await runRemove(dir, "svc-b");
     expect(result.exitCode).toBe(0);
 
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const lines = text.split("\n");
     const commentLine = lines.findIndex((line) => line.includes("note sitting between svc-b and svc-c"));
     const idLine = lines.findIndex((line) => line.trim().startsWith("- id: svc-c"));
@@ -475,8 +475,8 @@ dependencies: []
   // looks like. This is measured, not assumed, and `remove` reports it
   // rather than staying silent about it.
   describe("the first entry", () => {
-    const FIRST_ITEM_MANIFEST = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+    const FIRST_ITEM_MANIFEST = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -499,7 +499,7 @@ dependencies: []
 
     it("a comment above the first entry survives its removal, ends up heading the entry that follows, and is reported", async () => {
       dir = await createTempDir();
-      await writeFixtureFile(dir, "dagstree.yaml", FIRST_ITEM_MANIFEST);
+      await writeFixtureFile(dir, "catalogus.yaml", FIRST_ITEM_MANIFEST);
 
       const result = await runRemove(dir, "svc-a");
       expect(result.exitCode).toBe(0);
@@ -507,7 +507,7 @@ dependencies: []
       // The inline comment on svc-a's own id key IS part of svc-a's own
       // node (unlike the header comment above it), so it goes with svc-a
       // exactly like the non-first case.
-      const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+      const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
       expect(text).not.toContain("inline comment on svc-a's id");
       expect(text).not.toMatch(/- id: svc-a\b/);
 
@@ -528,8 +528,8 @@ dependencies: []
 
     it("the same hazard applies to the first dependency edge, and is reported the same way", async () => {
       dir = await createTempDir();
-      const manifest = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+      const manifest = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -551,13 +551,13 @@ dependencies:
   - [svc-a, svc-b]
   - [svc-b, svc-c]
 `;
-      await writeFixtureFile(dir, "dagstree.yaml", manifest);
+      await writeFixtureFile(dir, "catalogus.yaml", manifest);
 
       const result = await runRemove(dir, "svc-a");
       expect(result.exitCode).toBe(0);
       expect(result.stdout.join("\n")).toContain("svc-a -> svc-b");
 
-      const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+      const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
       const lines = text.split("\n");
       const commentLine = lines.findIndex((line) => line.includes("header comment directly above the first edge"));
       const edgeLine = lines.findIndex((line) => line.includes("[svc-b, svc-c]"));
@@ -576,7 +576,7 @@ dependencies:
     // firing case can catch it.
     it("says nothing about the services list when the entry removed was not the first one", async () => {
       dir = await createTempDir();
-      await writeFixtureFile(dir, "dagstree.yaml", FIRST_ITEM_MANIFEST);
+      await writeFixtureFile(dir, "catalogus.yaml", FIRST_ITEM_MANIFEST);
 
       const result = await runRemove(dir, "svc-b");
       expect(result.exitCode).toBe(0);
@@ -584,7 +584,7 @@ dependencies:
 
       // ...and the header comment is still doing its original job, sitting
       // above the entry it was actually written above.
-      const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+      const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
       const lines = text.split("\n");
       const commentLine = lines.findIndex((line) => line.includes("header comment directly above the first entry"));
       expect(lines[commentLine + 1]).toContain("- id: svc-a");
@@ -594,9 +594,9 @@ dependencies:
       dir = await createTempDir();
       await writeFixtureFile(
         dir,
-        "dagstree.yaml",
-        `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+        "catalogus.yaml",
+        `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -622,9 +622,9 @@ dependencies: []
       dir = await createTempDir();
       await writeFixtureFile(
         dir,
-        "dagstree.yaml",
-        `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+        "catalogus.yaml",
+        `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -654,7 +654,7 @@ dependencies:
       expect(result.stdout.join("\n")).not.toContain("dependencies list itself");
 
       // The first edge, and the comment heading it, are both untouched.
-      const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+      const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
       const lines = text.split("\n");
       const commentLine = lines.findIndex((line) => line.includes("header comment directly above the first edge"));
       expect(lines[commentLine + 1]).toContain("[svc-a, svc-b]");
@@ -669,9 +669,9 @@ dependencies:
       dir = await createTempDir();
       await writeFixtureFile(
         dir,
-        "dagstree.yaml",
-        `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+        "catalogus.yaml",
+        `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -718,8 +718,8 @@ dependencies: []
   // measured behaviour rather than papering over it.
   it("pins the trailing-comment hazard: a deep-indented note meant for the removed entry survives on its predecessor", async () => {
     dir = await createTempDir();
-    const HAZARD_MANIFEST = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+    const HAZARD_MANIFEST = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -739,15 +739,15 @@ services:
     added: 2025-01-03
 dependencies: []
 `;
-    await writeFixtureFile(dir, "dagstree.yaml", HAZARD_MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", HAZARD_MANIFEST);
 
-    const before = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(before).toContain("meant to introduce svc-b, but indented like a continuation of svc-a");
 
     const result = await runRemove(dir, "svc-b");
     expect(result.exitCode).toBe(0);
 
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     const lines = text.split("\n");
     const commentLine = lines.findIndex((line) => line.includes("meant to introduce svc-b"));
     const idLine = lines.findIndex((line) => line.trim().startsWith("- id: svc-c"));
@@ -767,8 +767,8 @@ dependencies: []
   // that comes next.
   it("a deep-indented note written after the removed entry's own properties is part of its node and is deleted with it", async () => {
     dir = await createTempDir();
-    const MIRROR_MANIFEST = `# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
-dagstree: 1
+    const MIRROR_MANIFEST = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
 project:
   name: Example App
   slug: example-app
@@ -788,12 +788,12 @@ services:
     added: 2025-01-03
 dependencies: []
 `;
-    await writeFixtureFile(dir, "dagstree.yaml", MIRROR_MANIFEST);
+    await writeFixtureFile(dir, "catalogus.yaml", MIRROR_MANIFEST);
 
     const result = await runRemove(dir, "svc-b");
     expect(result.exitCode).toBe(0);
 
-    const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(text).not.toContain("meant to introduce svc-c, but indented like a continuation of svc-b");
   });
 });

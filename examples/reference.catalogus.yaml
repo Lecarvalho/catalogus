@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://dagstree.dev/schema/v1.json
+# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
 #
 # A reference manifest, deliberately synthetic. It names no real project.
 #
@@ -12,7 +12,7 @@
 # Layer 2 only, and safe to commit. Cost, billing and account references are
 # Layer 3: they live in the private overlay, never here.
 
-dagstree: 1
+catalogus: 1
 
 project:
   name: Example App

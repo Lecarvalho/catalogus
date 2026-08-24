@@ -2,17 +2,17 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 // See validate.ts's import comment for why this isn't a normal `import`.
 import ajvFormatsNs = require("ajv-formats");
 import { describe, expect, it } from "vitest";
-import { dagstreeSchemaV1 } from "./schema.js";
+import { catalogusSchemaV1 } from "./schema.js";
 import { parseManifest } from "./validate.js";
 import { fixturePath, listFixtures, readFixture } from "./test-utils.js";
 
 const addFormats = ajvFormatsNs.default;
 
-describe("dagstreeSchemaV1", () => {
+describe("catalogusSchemaV1", () => {
   it("compiles under Ajv strict mode for the 2020-12 dialect", () => {
     const ajv = new Ajv2020({ allErrors: true, strict: true });
     addFormats(ajv);
-    expect(() => ajv.compile(dagstreeSchemaV1)).not.toThrow();
+    expect(() => ajv.compile(catalogusSchemaV1)).not.toThrow();
   });
 });
 
@@ -25,7 +25,7 @@ describe("every fixture in test/fixtures/valid parses and validates", () => {
           `expected ${filename} to be valid, got errors: ${JSON.stringify(result.errors, null, 2)}`,
         );
       }
-      expect(result.manifest.dagstree).toBe(1);
+      expect(result.manifest.catalogus).toBe(1);
     });
   }
 
@@ -76,7 +76,7 @@ describe("every fixture in test/fixtures/invalid fails validation", () => {
 describe("private-key rejection targets property names, not free-text content", () => {
   it("allows a notes string that happens to mention cost", () => {
     const yamlText = [
-      "dagstree: 1",
+      "catalogus: 1",
       "project:",
       "  name: Example App",
       "  slug: example-app",

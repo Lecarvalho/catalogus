@@ -1,4 +1,4 @@
-// Mirrors @dagstree/schema's $defs/slug pattern exactly (schema.ts:
+// Mirrors @catalogus/schema's $defs/slug pattern exactly (schema.ts:
 // "^[a-z0-9]+(?:[_-][a-z0-9]+)*$") so the CLI can reject a bad --id/--role/
 // --service value before ever touching the manifest, with a message that
 // names the actual rule instead of waiting for ajv's generic one.
@@ -12,7 +12,7 @@ const COMBINING_DIACRITICS = /[̀-ͯ]/g;
 
 /**
  * Best-effort slug for human text -- a directory name becoming a project
- * slug candidate under `dagstree init --yes`. Not guaranteed to satisfy
+ * slug candidate under `catalogus init --yes`. Not guaranteed to satisfy
  * isValidSlug for every possible input (e.g. an all-symbol directory name);
  * callers still validate the result.
  */

@@ -1,6 +1,6 @@
 // Shared test-only builders. Not a *.test.ts file itself, so it is never
 // collected as a test suite on its own -- only imported by ones that are.
-import type { ViewService } from "dagstree";
+import type { ViewService } from "@catalogus/cli";
 
 export function makeViewService(overrides: Partial<ViewService> & Pick<ViewService, "id" | "role">): ViewService {
   return {

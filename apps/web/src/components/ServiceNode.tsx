@@ -30,7 +30,7 @@
 // on a `<div>` or `<li>`. `aria-pressed` conveys the selected state to
 // assistive tech -- the visual `.selected` styling is never the only signal
 // for it.
-import type { ViewService } from "dagstree";
+import type { ViewService } from "@catalogus/cli";
 
 import { Icon } from "./Icon.js";
 import styles from "./ServiceNode.module.css";

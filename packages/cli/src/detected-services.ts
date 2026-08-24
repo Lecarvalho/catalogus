@@ -1,8 +1,8 @@
-// Turns a raw DetectionResult (from @dagstree/core) into the shapes the CLI
-// actually renders: everything (for `dagstree detect`'s full Layer 1 report
-// and `dagstree diff`'s staleness check) and just the catalog-known subset
-// worth offering as manifest service candidates (for `dagstree diff`'s
-// missing-service check and `dagstree init --yes`).
+// Turns a raw DetectionResult (from @catalogus/core) into the shapes the CLI
+// actually renders: everything (for `catalogus detect`'s full Layer 1 report
+// and `catalogus diff`'s staleness check) and just the catalog-known subset
+// worth offering as manifest service candidates (for `catalogus diff`'s
+// missing-service check and `catalogus init --yes`).
 import type {
   ConfigServiceDetection,
   DetectedTechnology,
@@ -10,7 +10,7 @@ import type {
   DetectionResult,
   Evidence,
   HostingDetection,
-} from "@dagstree/core";
+} from "@catalogus/core";
 
 export interface DetectedServiceCandidate {
   slug: string;
@@ -18,7 +18,7 @@ export interface DetectedServiceCandidate {
   name: string;
   evidence: Evidence[];
   /**
-   * "service", "component", "stack" or "library" -- see @dagstree/core's
+   * "service", "component", "stack" or "library" -- see @catalogus/core's
    * DetectionKind. Everything except "library" is manifest-worthy and is
    * offered as a candidate; "library" is what gets collapsed under a count.
    * A HostingDetection is a vendor by construction so that pass sets
@@ -57,8 +57,8 @@ function hasEvidence(existing: readonly Evidence[], e: Evidence): boolean {
 /**
  * Appends `incoming` onto `target` in place, skipping anything already
  * present. The same evidence legitimately reaches a slug's entry twice --
- * @dagstree/core's own hosting merge already folds a stack-analyser
- * "hosting" detection into the Dagstree-detector HostingDetection for the
+ * @catalogus/core's own hosting merge already folds a stack-analyser
+ * "hosting" detection into the Catalogus-detector HostingDetection for the
  * same provider (see core's mergeHosting), and this module's own merge
  * below then folds `technologies` on top of that -- so without this check a
  * single file like fly.toml ends up listed two or three times over.
@@ -136,7 +136,7 @@ function mergeBySlug(
 /**
  * The subset of detect()'s output worth offering as manifest service
  * candidates: catalog-known (`unmapped: false`) technologies, plus every
- * Dagstree-specific hosting detection (config-file based; HostingDetection
+ * Catalogus-specific hosting detection (config-file based; HostingDetection
  * carries no `unmapped` flag because it's never a raw pass-through).
  * Deliberately excludes unmapped technologies -- HANDOFF.md's example
  * manifest (section 5) lists actual providers and infrastructure, not every
@@ -157,7 +157,7 @@ export function collectDetectedServices(result: DetectionResult): DetectedServic
  * hosting list by slug so a provider caught by both isn't shown twice. Flat
  * (not grouped by category); see groupAllDetections below for `detect`'s
  * own grouped report, and collectDetectedServices above for the
- * catalog-known-only subset. `dagstree diff` uses this for its staleness
+ * catalog-known-only subset. `catalogus diff` uses this for its staleness
  * check specifically because a manifest entry can name an unmapped
  * technology's own slug (declared by hand, or by a stale `init --yes`
  * scaffold from before a mapping.ts entry existed for it) -- comparing
@@ -171,7 +171,7 @@ export function collectAllDetectedServices(result: DetectionResult): DetectedSer
 
 /**
  * groupAllDetections's flat detections, grouped by category and sorted
- * within each group. This is `dagstree detect`'s full report.
+ * within each group. This is `catalogus detect`'s full report.
  */
 export function groupAllDetections(result: DetectionResult): Map<string, DetectedServiceCandidate[]> {
   const grouped = new Map<string, DetectedServiceCandidate[]>();

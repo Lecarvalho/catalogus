@@ -1,12 +1,12 @@
 /*
  * Token layer: every component below reads these custom properties rather
- * than a literal colour/size, so a future rebrand (dagstree.com, Phase 4)
+ * than a literal colour/size, so a future rebrand (catalogus.com, Phase 4)
  * overrides this file at runtime and every component follows without a
  * fork. Plain CSS on purpose -- no CSS-in-JS, no Tailwind config to keep in
  * sync with it (see docs/PLAN.md's Phase 3.7 styling decisions).
  *
  * Status colours are keyed by the exact ServiceStatus values the schema
- * defines (@dagstree/schema's ServiceEntry.status) so a component can build
+ * defines (@catalogus/schema's ServiceEntry.status) so a component can build
  * a variable name directly from the field (`var(--status-${status})`)
  * instead of a switch statement mapping one vocabulary onto another.
  */

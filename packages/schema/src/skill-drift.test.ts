@@ -1,21 +1,21 @@
 // Drift check between `packages/schema` and the two artifacts that show a
-// human or an agent what a valid dagstree.yaml looks like:
+// human or an agent what a valid catalogus.yaml looks like:
 //
-//   - skills/dagstree/SKILL.md — a shipped product artifact, installed into
+//   - skills/catalogus/SKILL.md — a shipped product artifact, installed into
 //     client repos, that teaches a coding agent the manifest format via
 //     fenced ```yaml blocks. As of this writing the skill is CLI-mandatory
-//     (`dagstree add` etc.) and deliberately does NOT embed a full worked
+//     (`catalogus add` etc.) and deliberately does NOT embed a full worked
 //     manifest, to avoid inviting hand-authoring. It does embed one
 //     ```yaml FRAGMENT — the shape of the handful of Layer 2 fields that
 //     have no CLI command and still get hand-edited (project.architecture,
 //     project.vcs, status/replaced_by).
-//     That fragment is marked with an `<!-- dagstree:fragment -->` HTML
+//     That fragment is marked with an `<!-- catalogus:fragment -->` HTML
 //     comment immediately above its fence.
-//   - examples/*.dagstree.yaml — reference manifests the skill's output is
+//   - examples/*.catalogus.yaml — reference manifests the skill's output is
 //     judged against. Deliberately synthetic: an example derived from a real
 //     project would publish that project's whole service inventory and
 //     topology in a public repo, which is a different thing from publishing
-//     a schema example. `reference.dagstree.yaml` is the only one today.
+//     a schema example. `reference.catalogus.yaml` is the only one today.
 //
 // Nothing else connects the schema to either artifact. If the schema
 // changes and one of these doesn't, the artifact starts teaching (or
@@ -32,14 +32,14 @@
 //     the file it just wrote. None exist right now (see above), but if one
 //     is added later it must validate fully — see the `manifestBlocks`
 //     loop below.
-//   - A block marked `<!-- dagstree:fragment -->` is intentionally partial
-//     (missing top-level `dagstree`/`dependencies`, and its `services[]`
+//   - A block marked `<!-- catalogus:fragment -->` is intentionally partial
+//     (missing top-level `catalogus`/`dependencies`, and its `services[]`
 //     entry is missing `service`/`role`/`added`) and can never pass
 //     `parseManifest` as a whole document. Running it through the full
 //     validator would only ever report "missing required property", which
 //     tells nobody anything about real drift. Instead it's checked the way
 //     the coordinator asked: walk the actual field names and enum values
-//     the fragment uses against `dagstreeSchemaV1`'s own definitions
+//     the fragment uses against `catalogusSchemaV1`'s own definitions
 //     (`checkFragmentAgainstSchemaFields` below) — every property the
 //     fragment names must still exist in the schema at that path, and every
 //     value at an `enum` field must still be a legal member of that enum.
@@ -51,27 +51,27 @@ import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { describe, expect, it } from "vitest";
 import { parseManifest } from "./validate.js";
-import type { DagstreeManifestError } from "./validate.js";
-import { dagstreeSchemaV1 } from "./schema.js";
+import type { CatalogusManifestError } from "./validate.js";
+import { catalogusSchemaV1 } from "./schema.js";
 import { findRepoRoot } from "./test-utils.js";
 
 const repoRoot = findRepoRoot(fileURLToPath(new URL(".", import.meta.url)));
-const skillPath = join(repoRoot, "skills", "dagstree", "SKILL.md");
+const skillPath = join(repoRoot, "skills", "catalogus", "SKILL.md");
 const examplesDir = join(repoRoot, "examples");
 
 interface YamlBlock {
   /** 1-based position among all ```yaml blocks found in the file, for error messages. */
   index: number;
-  /** True when the fence is immediately preceded by <!-- dagstree:fragment -->. */
+  /** True when the fence is immediately preceded by <!-- catalogus:fragment -->. */
   isFragment: boolean;
   content: string;
 }
 
 // Matches ```yaml\n<content>\n``` blocks, optionally preceded on the line
-// directly above by the <!-- dagstree:fragment --> marker comment. The
+// directly above by the <!-- catalogus:fragment --> marker comment. The
 // shell-command blocks elsewhere in SKILL.md are fenced with no language
 // tag and are ignored by this pattern.
-const YAML_FENCE_RE = /(<!--\s*dagstree:fragment\s*-->\s*\r?\n)?```yaml\r?\n([\s\S]*?)\r?\n```/g;
+const YAML_FENCE_RE = /(<!--\s*catalogus:fragment\s*-->\s*\r?\n)?```yaml\r?\n([\s\S]*?)\r?\n```/g;
 
 function extractYamlBlocks(markdown: string): YamlBlock[] {
   const blocks: YamlBlock[] = [];
@@ -85,16 +85,16 @@ function extractYamlBlocks(markdown: string): YamlBlock[] {
   return blocks;
 }
 
-function formatErrors(errors: DagstreeManifestError[]): string {
+function formatErrors(errors: CatalogusManifestError[]): string {
   return errors.map((e) => `  [${e.kind}] ${e.instancePath || "(root)"}: ${e.message}`).join("\n");
 }
 
 // --- schema-field-and-enum walk, for fragments -----------------------------
 //
-// A deliberately loose structural view of dagstreeSchemaV1 -- just enough
+// A deliberately loose structural view of catalogusSchemaV1 -- just enough
 // JSON Schema vocabulary to answer "does this property still exist here,
 // and if it's an enum, is this value still a member" for an arbitrary
-// (possibly incomplete) document. `dagstreeSchemaV1` is authored as a
+// (possibly incomplete) document. `catalogusSchemaV1` is authored as a
 // TypeScript `as const` literal (see schema.ts's module comment) whose
 // precise structural type doesn't line up with an index-signature-bearing
 // interface, so the entry point casts once; schema.test.ts and
@@ -208,9 +208,9 @@ function checkFragmentAgainstSchemaFields(schema: SchemaNode, fragment: unknown)
   return problems;
 }
 
-const schemaRoot = dagstreeSchemaV1 as unknown as SchemaNode;
+const schemaRoot = catalogusSchemaV1 as unknown as SchemaNode;
 
-describe("skills/dagstree/SKILL.md's ```yaml examples vs. packages/schema", () => {
+describe("skills/catalogus/SKILL.md's ```yaml examples vs. packages/schema", () => {
   const skillMarkdown = readFileSync(skillPath, "utf8");
   const allBlocks = extractYamlBlocks(skillMarkdown);
   const manifestBlocks = allBlocks.filter((b) => !b.isFragment);
@@ -237,11 +237,11 @@ describe("skills/dagstree/SKILL.md's ```yaml examples vs. packages/schema", () =
       const detail = result.valid ? "" : `\n${formatErrors(result.errors)}`;
       expect(
         result.valid,
-        `skills/dagstree/SKILL.md's embedded example manifest (yaml block #${block.index} of ` +
+        `skills/catalogus/SKILL.md's embedded example manifest (yaml block #${block.index} of ` +
           `${allBlocks.length}) has drifted from packages/schema and no longer validates. The skill is a ` +
           "shipped artifact installed into client repos — as written, it now teaches an agent to write a " +
-          "dagstree.yaml the validator rejects, which makes the agent look broken to the client. Update " +
-          "skills/dagstree/SKILL.md and packages/schema together so they agree again (see " +
+          "catalogus.yaml the validator rejects, which makes the agent look broken to the client. Update " +
+          "skills/catalogus/SKILL.md and packages/schema together so they agree again (see " +
           `skills/README.md, "Keeping it honest").${detail}`,
       ).toBe(true);
       if (!result.valid) return;
@@ -261,7 +261,7 @@ describe("skills/dagstree/SKILL.md's ```yaml examples vs. packages/schema", () =
   // value getting dropped (e.g. `phasing_out` removed from the status
   // enum) without demanding the fragment pretend to be a full document.
   it.each(fragmentBlocks)(
-    "SKILL.md yaml block #$index (marked <!-- dagstree:fragment -->) uses only field names and enum values the schema still recognizes",
+    "SKILL.md yaml block #$index (marked <!-- catalogus:fragment -->) uses only field names and enum values the schema still recognizes",
     (block) => {
       let parsed: unknown;
       try {
@@ -269,34 +269,34 @@ describe("skills/dagstree/SKILL.md's ```yaml examples vs. packages/schema", () =
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(
-          `skills/dagstree/SKILL.md's yaml block #${block.index}, marked as a fragment, does not even ` +
+          `skills/catalogus/SKILL.md's yaml block #${block.index}, marked as a fragment, does not even ` +
             `parse as YAML: ${message}`,
         );
       }
       const problems = checkFragmentAgainstSchemaFields(schemaRoot, parsed);
       expect(
         problems,
-        `skills/dagstree/SKILL.md's fragment example (yaml block #${block.index} of ${allBlocks.length}) ` +
+        `skills/catalogus/SKILL.md's fragment example (yaml block #${block.index} of ${allBlocks.length}) ` +
           "uses field names or enum values that packages/schema no longer recognizes. The " +
-          "<!-- dagstree:fragment --> marker means this snippet is deliberately not a full manifest, but " +
+          "<!-- catalogus:fragment --> marker means this snippet is deliberately not a full manifest, but " +
           "its field names and enum values still have to match the schema — update " +
-          `skills/dagstree/SKILL.md and packages/schema together so they agree again.\n` +
+          `skills/catalogus/SKILL.md and packages/schema together so they agree again.\n` +
           problems.map((p) => `  - ${p}`).join("\n"),
       ).toEqual([]);
     },
   );
 });
 
-describe("examples/*.dagstree.yaml vs. packages/schema", () => {
+describe("examples/*.catalogus.yaml vs. packages/schema", () => {
   const files = readdirSync(examplesDir)
-    .filter((name) => name.endsWith(".dagstree.yaml"))
+    .filter((name) => name.endsWith(".catalogus.yaml"))
     .sort();
 
-  it("finds at least one examples/*.dagstree.yaml file to check", () => {
+  it("finds at least one examples/*.catalogus.yaml file to check", () => {
     expect(
       files.length,
-      `found no *.dagstree.yaml files directly under ${examplesDir} — expected at least ` +
-        "examples/reference.dagstree.yaml. Either it was moved/renamed, or findRepoRoot() resolved the " +
+      `found no *.catalogus.yaml files directly under ${examplesDir} — expected at least ` +
+        "examples/reference.catalogus.yaml. Either it was moved/renamed, or findRepoRoot() resolved the " +
         "wrong directory.",
     ).toBeGreaterThan(0);
   });

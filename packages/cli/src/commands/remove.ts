@@ -1,4 +1,4 @@
-// `dagstree remove <id> [path]` -- deletes one service entry from
+// `catalogus remove <id> [path]` -- deletes one service entry from
 // `services[]`, along with every dependency edge that names it.
 //
 // Every other writer in this package is additive: `add` appends, `link`
@@ -6,12 +6,12 @@
 // Nothing takes anything out, so a wrong `add` -- a typo'd role, a service
 // that turns out not to be used, an entry created before a contradiction
 // with the user was resolved -- could not be undone by the CLI at all; the
-// only move left was deleting dagstree.yaml and starting over, which is
+// only move left was deleting catalogus.yaml and starting over, which is
 // exactly the loop the first dogfooding run fell into (see docs/PLAN.md,
 // Phase 3.6). This command exists to close that gap, and it is deliberately
 // narrow: it deletes one entry and the edges that would otherwise dangle
 // from deleting it, nothing more.
-import { edgePairs } from "@dagstree/schema";
+import { edgePairs } from "@catalogus/schema";
 import type { YAMLSeq } from "yaml";
 
 import { commitManifestEdit, openManifestForEdit } from "../manifest-edit.js";
@@ -64,7 +64,7 @@ export async function runRemove(pathArg: string | undefined, id: string): Promis
       stderr: [
         `"${id}" cannot be removed: replaced_by on ${list} still ${verb} it.`,
         `  replaced_by records a deliberate migration claim, not a detail to clear silently -- re-point ` +
-          `${pronoun} to another id, or clear ${pronoun}, with "dagstree deprecate", then remove "${id}".`,
+          `${pronoun} to another id, or clear ${pronoun}, with "catalogus deprecate", then remove "${id}".`,
       ],
     };
   }
@@ -72,7 +72,7 @@ export async function runRemove(pathArg: string | undefined, id: string): Promis
   // Cascade the edges before touching services[]: once the entry is gone,
   // any edge still naming it on either end is a dangling reference, and a
   // dangling edge fails the referential-integrity check the very next
-  // `dagstree validate` runs -- so a remove that left one behind would
+  // `catalogus validate` runs -- so a remove that left one behind would
   // trade one unrecoverable state for another. edgePairs() normalizes both
   // legal edge shapes (a [from, to] tuple or a {from, to, notes} object) to
   // {from, to}, in the same order as manifest.dependencies -- which is the
