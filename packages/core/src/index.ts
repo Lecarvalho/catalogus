@@ -36,6 +36,9 @@ export type {
 export { DETECTION_KINDS, SERVICE_CATEGORIES } from "./types.js";
 export { mapSpecfySlug, SPECFY_TO_DAGSTREE } from "./mapping.js";
 export type { MappingEntry } from "./mapping.js";
+export { DAGSTREE_CATALOG, getCatalogEntry } from "./catalog.js";
+export type { CatalogEntry } from "./catalog.js";
+export { resolveIconPath } from "./icons.js";
 
 /** Thrown by detect() when repoPath doesn't name a real, absolute directory. */
 export class InvalidRepoPathError extends Error {
