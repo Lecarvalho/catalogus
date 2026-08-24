@@ -11,6 +11,7 @@ export type {
   VcsInfo,
   VcsVisibility,
   ServiceEntry,
+  ServiceKind,
   ServiceStatus,
   DependencyEdge,
   DependencyEdgeTuple,

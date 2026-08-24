@@ -221,6 +221,32 @@ describe("runSet", () => {
       expect(text).toMatch(/id: fly-api[\s\S]*?role: database/);
     });
 
+    it("sets kind and version, the two per-entry fields added on 2026-08-23", async () => {
+      const result = await runSet(dir, ["services.fly-api.kind", "component", "services.fly-api.version", "15.4"]);
+      expect(result.exitCode).toBe(0);
+
+      const text = await manifestText();
+      expect(text).toMatch(/id: fly-api[\s\S]*?kind: component/);
+      expect(text).toMatch(/id: fly-api[\s\S]*?version: "?15\.4"?/);
+    });
+
+    it("refuses a kind outside the schema enum, naming the three legal values", async () => {
+      const before = await manifestText();
+      const result = await runSet(dir, ["services.fly-api.kind", "vendor"]);
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr.join("!!")).toContain("service, component, stack");
+      expect(await manifestText()).toBe(before);
+    });
+
+    // version is text, not a slug: "13.1.3" has dots in it, and the slug
+    // check every other per-entry field uses would reject the most ordinary
+    // version string there is.
+    it("accepts a dotted version string", async () => {
+      const result = await runSet(dir, ["services.fly-api.version", "13.1.3"]);
+      expect(result.exitCode).toBe(0);
+      expect(await manifestText()).toMatch(/version: "?13\.1\.3"?/);
+    });
+
     it("rejects an unknown id, exit 1, with known ids listed, and writes nothing", async () => {
       const before = await manifestText();
       const result = await runSet(dir, ["services.nonexistent.role", "database"]);

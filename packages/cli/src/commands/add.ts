@@ -20,12 +20,19 @@ export interface AddCommandOptions {
   id?: string;
   dependsOn?: string[];
   status?: string;
+  kind?: string;
+  version?: string;
   replacedBy?: string;
   added?: string;
   notes?: string;
 }
 
 const VALID_STATUSES = new Set(["active", "deprecated", "phasing_out", "removed"]);
+
+// Mirrors the schema's serviceEntry.kind enum. "service" is the default and
+// is written out only when asked for explicitly -- see the entry build
+// below for why an omitted kind stays omitted rather than being filled in.
+const VALID_KINDS = new Set(["service", "component", "stack"]);
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -77,6 +84,22 @@ export async function runAdd(
       stdout: [],
       stderr: [`--status must be one of: ${[...VALID_STATUSES].join(", ")}`],
     };
+  }
+
+  if (options.kind && !VALID_KINDS.has(options.kind)) {
+    return {
+      exitCode: 2,
+      stdout: [],
+      stderr: [
+        `--kind must be one of: ${[...VALID_KINDS].join(", ")}`,
+        '  service = a vendor (it bills, its outage is yours); component = infrastructure you run',
+        '  yourself (nginx, an OTLP transport); stack = the language or framework the code is in.',
+      ],
+    };
+  }
+
+  if (options.version && hasBlockingPrivateFreeText(options.version)) {
+    return { exitCode: 2, stdout: [], stderr: [privateFlagRefusalMessage("--version")] };
   }
 
   if (options.notes && hasBlockingPrivateFreeText(options.notes)) {
@@ -160,7 +183,20 @@ export async function runAdd(
   const servicesSeq = doc.get("services", true) as YAMLSeq;
   preferBlockStyleWhenEmpty(servicesSeq);
 
-  const entry: Record<string, unknown> = { id, service, role: options.role, added: options.added ?? today() };
+  // Key order matches examples/reference.dagstree.yaml and SKILL.md's
+  // fragment: identity (id, service, kind, version), then what it does here
+  // (role), then when and what state (added, status, ...). A file whose
+  // shape differs from the one the skill teaches invites hand-editing to
+  // "fix" it.
+  const entry: Record<string, unknown> = { id, service };
+  // Written only when the caller asked for something other than the
+  // default. The schema treats an absent kind as "service", so filling it
+  // in unprompted would add a line to every vendor entry in every manifest
+  // to say the thing that was already true.
+  if (options.kind && options.kind !== "service") entry.kind = options.kind;
+  if (options.version) entry.version = options.version;
+  entry.role = options.role;
+  entry.added = options.added ?? today();
   if (options.status) entry.status = options.status;
   if (options.replacedBy) entry.replaced_by = options.replacedBy;
   if (options.notes) entry.notes = options.notes;
@@ -177,7 +213,7 @@ export async function runAdd(
     }
   }
 
-  return commitManifestEdit(doc, location, {
+  return commitManifestEdit(opened.value, {
     failurePrefix: `Adding "${id}" would make`,
     successLines: (filePath) => {
       const lines = [`Added service "${id}" (${service}, role: ${options.role}) to ${filePath}`];

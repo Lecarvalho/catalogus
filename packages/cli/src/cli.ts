@@ -19,6 +19,7 @@ import { runGraph } from "./commands/graph.js";
 import { runInit } from "./commands/init.js";
 import { runLink } from "./commands/link.js";
 import { runRemove } from "./commands/remove.js";
+import { runRename } from "./commands/rename.js";
 import { runSet, SETTABLE_FIELDS } from "./commands/set.js";
 import { runValidate } from "./commands/validate.js";
 import { looksLikePrivateFlagName, privateFlagRefusalMessage } from "./private-guard.js";
@@ -58,6 +59,14 @@ function createProgram(): Command {
     .name("dagstree")
     .description("Dagstree -- a project operations registry (offline commands)")
     .version(packageVersion())
+    // Without this, commander's own `--version` (registered on the program by
+    // .version() above) is inherited by every subcommand and beats a
+    // subcommand's identically-named option -- so `dagstree add dotnet
+    // --kind stack --version 10` printed "0.0.1" and added nothing, exit 0.
+    // Silent data loss, not an error. enablePositionalOptions scopes an
+    // option to the command it follows: `dagstree --version` still reports
+    // the CLI version, `dagstree add ... --version 10` reaches `add`.
+    .enablePositionalOptions()
     .exitOverride()
     .configureOutput({
       // Commander writes every one of its own error/usage messages (a bare
@@ -96,8 +105,9 @@ function createProgram(): Command {
     .description("scaffold a dagstree.yaml in the target directory")
     .argument("[path]", "target directory (defaults to the current directory)")
     .option("--yes", "infer everything possible from detection and write without prompting")
+    .option("--visibility <visibility>", "repo visibility: public | private | internal (never inferred)")
     .option("--force", "overwrite an existing manifest")
-    .action(async (path: string | undefined, opts: { yes?: boolean; force?: boolean }) => {
+    .action(async (path: string | undefined, opts: { yes?: boolean; visibility?: string; force?: boolean }) => {
       emit(await runInit(path, opts));
     });
 
@@ -147,6 +157,8 @@ function createProgram(): Command {
     .option("--id <id>", "local id (derived from service+role when omitted)")
     .option("--depends-on <ids...>", "local ids this new entry depends on")
     .option("--status <status>", "active | deprecated | phasing_out | removed")
+    .option("--kind <kind>", "service (default) | component | stack")
+    .option("--version <version>", "version in use, e.g. 10, 19.2 -- mostly for --kind stack")
     .option("--replaced-by <id>", "local id of the entry that replaces this one")
     .option("--added <date>", "ISO date this dependency was added (defaults to today)")
     .option("--notes <text>", "free-text annotation")
@@ -160,6 +172,8 @@ function createProgram(): Command {
           id?: string;
           dependsOn?: string[];
           status?: string;
+          kind?: string;
+          version?: string;
           replacedBy?: string;
           added?: string;
           notes?: string;
@@ -177,6 +191,8 @@ function createProgram(): Command {
             id: opts.id,
             dependsOn: opts.dependsOn,
             status: opts.status,
+            kind: opts.kind,
+            version: opts.version,
             replacedBy: opts.replacedBy,
             added: opts.added,
             notes: opts.notes,
@@ -228,6 +244,16 @@ function createProgram(): Command {
     .argument("[path]", "target directory (defaults to the current directory)")
     .action(async (id: string, path: string | undefined) => {
       emit(await runRemove(path, id));
+    });
+
+  program
+    .command("rename")
+    .description("change a service entry's local id, moving every edge and replaced_by with it")
+    .argument("<old>", "the local id as it is now")
+    .argument("<new>", "the local id it should have")
+    .argument("[path]", "target directory (defaults to the current directory)")
+    .action(async (oldId: string, newId: string, path: string | undefined) => {
+      emit(await runRename(path, oldId, newId));
     });
 
   return program;

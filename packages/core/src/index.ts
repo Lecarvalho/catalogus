@@ -22,6 +22,7 @@ import type { DetectionResult, Evidence, HostingDetection } from "./types.js";
 export type {
   CiDetection,
   CodingAgentDetection,
+  CodingAgentDetectionResult,
   ConfigServiceDetection,
   DetectedTechnology,
   DetectionKind,
@@ -32,6 +33,7 @@ export type {
   ServiceCategory,
   VcsDetection,
 } from "./types.js";
+export { DETECTION_KINDS, SERVICE_CATEGORIES } from "./types.js";
 export { mapSpecfySlug, SPECFY_TO_DAGSTREE } from "./mapping.js";
 export type { MappingEntry } from "./mapping.js";
 
@@ -88,7 +90,8 @@ export async function detect(repoPath: string): Promise<DetectionResult> {
     repoPath,
     scannedAt: new Date().toISOString(),
     technologies,
-    codingAgents,
+    codingAgents: codingAgents.agents,
+    unidentifiedCodingAgents: codingAgents.unidentified,
     mcpServers: mcp.servers,
     hosting,
     configServices: configKeys.services,

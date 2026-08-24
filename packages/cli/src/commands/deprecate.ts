@@ -102,7 +102,7 @@ export async function runDeprecate(
     doc.setIn(["services", index, "replaced_by"], options.replacedBy);
   }
 
-  return commitManifestEdit(doc, location, {
+  return commitManifestEdit(opened.value, {
     failurePrefix: `Deprecating "${id}" would make`,
     successLines: (filePath) => {
       const lines = [`Marked "${id}" ${status} in ${filePath}`];

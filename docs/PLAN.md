@@ -3,23 +3,40 @@
 Working plan and status board. `docs/HANDOFF.md` is the specification and the source of truth for
 design decisions; this file tracks *what has been built* against it and what remains.
 
-- **Status:** Phases 0–3.6 complete. The second cold run produced **25 services and 31 edges** on a
-  real project, validating clean under `--strict`, in 10 minutes and 33 tool calls — accepted by the
-  owner as good enough for v1. The CLI has no unrecoverable state left (`remove`) and no
+- **Status:** Phases 0–3.6 complete, plus a **3.6.1 correction pass** (see its own section below):
+  validating a manifest the skill had just written found six defects, four of them in shipped
+  guidance rather than in code. The third cold run produced **26 services and 30 edges** on a real
+  project, validating clean under `--strict`. The CLI has no unrecoverable state left (`remove`) and no
   uncorrectable field left (`set` now covers `project.name`, `project.slug` and
-  `services.<id>.role`). `--strict` is settled, detection separates services from libraries, and the
-  catalog carries 57 more rows.
+  `services.<id>.role`, `.kind` and `.version`). `--strict` is settled, detection sorts findings into
+  four kinds (`service` / `component` / `stack` / `library`), and the catalog carries 57 service rows
+  plus 82 stack rows on top of the original table.
 
-  **Next is Phase 3.7, the viewer on manifests** — now unblocked, since a real manifest exists.
-  Phase 4 stays deferred by owner decision. The open follow-ups from 3.6 (role vocabulary, `diff`
-  wording, the category enum, the two shared writer holes, `dagstree rename`) are tracked in their
-  own sections and none of them block the viewer.
-- **Last updated:** 2026-08-23
+  **All five 3.6 follow-ups are now closed.** The two pre-existing holes every writer shared (an
+  explicit path that holds no manifest no longer edits the ancestor's; a pre-existing cycle is
+  reported against the file rather than blamed on the current edit); `diff`'s delete-list wording;
+  `dagstree rename`, the last missing writer, so **every correctable field now has a command behind
+  it**; the `role` convention, settled by the owner as documentation rather than a schema
+  constraint, with the viewer grouping on the segment before the first `-`; and the category enum,
+  widened with `monitoring`, `queue` and `messaging` — **HANDOFF §4 was amended for that, and the
+  document now carries an amendment log**.
+
+  **Next is Phase 3.7, the viewer on manifests**, with nothing left in front of it: a real manifest
+  exists, the role convention it groups on is settled, and every category it renders has a real
+  bucket. Phase 4 stays deferred by owner decision.
+- **Last updated:** 2026-08-24
 
 ## Start here on a fresh session
 
-Phases 0 through 3.6 are complete. Nothing is broken. Run the verify command first and confirm
-**500 tests / 36 files** before trusting anything below.
+Phases 0 through 3.6 are complete, plus the 3.6.1 correction pass. Nothing is broken. Run the verify
+command first and confirm **549 tests / 38 files** before trusting anything below.
+
+**Read Phase 3.6.1 before touching the skill, the schema or a CLI flag.** It is the most recent
+work and it changed three things a fresh session would otherwise get wrong: entries now carry
+`kind` (`service` | `component` | `stack`) and an optional `version`; the rule for what earns a node
+is runtime topology rather than "can it send an invoice"; and **Dagstree asks rather than guessing**
+wherever a fact is not in the repo. That last one is a standing rule, not a one-off fix — four of
+the six defects in that pass were a plausible default written in place of a question.
 
 The CLI is installed: `pnpm run link:cli` has been run, so `dagstree` is on `PATH` via shims in
 npm's global bin directory pointing at this checkout. `pnpm build` updates what they run. If the
@@ -34,9 +51,10 @@ pass by an agent that did not write the code. Every substantial item below assum
 It is unblocked. Build the single-project DAG first, against a real manifest, because layout is the
 part that is genuinely hard and it de-risks everything after it.
 
-**Where the real manifest is, and why it is not in this repo.** The second cold run wrote
-`C:/Workspace/repos/Clapline/dagstree.yaml` — 25 services, 31 edges, lifecycle entries, off-repo
-services, notes. It stays there. Copying it in would publish a private project's entire service
+**Where the real manifest is, and why it is not in this repo.** The cold runs wrote
+`C:/Workspace/repos/Clapline/dagstree.yaml`. As of the third run it holds **26 services and 30
+edges**, all `kind: service`, with off-repo entries — and, unlike the second run's file, **no
+lifecycle entries and no notes**. It stays there. Copying it in would publish a private project's entire service
 inventory and topology in a public repo, which is the same reasoning that made
 `examples/reference.dagstree.yaml` synthetic (see Phase 3.6). So:
 
@@ -45,32 +63,121 @@ inventory and topology in a public repo, which is the same reasoning that made
 - **Tests and fixtures use synthetic manifests only.** Anything committed here is public.
 
 **What makes that manifest a good layout stress test**, and worth checking before declaring the DAG
-done: `fly-api` has thirteen outgoing edges, `grafana` has five, and `supabase-db` has four incoming
+done: `fly-api` has fourteen outgoing edges, `grafana` has six, and `supabase-db` has three incoming
 from different directions. A naive layout renders that as spaghetti. If elkjs handles this one
 readably, it will handle most projects.
+
+**What the viewer has to render, beyond the DAG.** Nodes come in three kinds now and they are not
+interchangeable on screen: `service` is a vendor (brand icon, and the only kind a Layer 3 cost can
+ever attach to), `component` is infrastructure the owner runs themselves (no vendor, no invoice —
+so a cost rollup must exclude it rather than show a zero), and `stack` is what the code is written
+in, carrying a `version` that is the number a tile shows and the key an end-of-life date would hang
+off. `dagstree graph` already renders all three as text — `nginx (ingress-proxy, component)`,
+`dotnet (runtime-backend, stack, v10)` — which is the cheapest reference for what the web viewer
+has to say too.
+
+**Two things it does not exercise, and the viewer needs both.** It carries no `status`/`replaced_by`
+entries, so nothing on disk covers status colours or the migration view — use
+`examples/reference.dagstree.yaml`, which does. And it predates `kind`, so every node in it is a
+`service`: the component and stack rendering has no real input yet either. Check the counts above
+against the file before relying on them; the numbers in this document have already been stale once.
 
 Phase 4 (backend) stays deferred by owner decision. Phase 6 (MCP) and Phase 5 (auth/push) are
 untouched.
 
-### Follow-ups from 3.6, none of which block the viewer
+### Follow-ups from 3.6 — all five closed
 
-Each has its own section below with the evidence behind it. Roughly in order of how much they cost
-if left alone:
+Kept here with the evidence behind each, in the order they were originally ranked by how much they
+would cost if left alone. Each has its own section below.
 
-1. **Two pre-existing holes every writer shares** — a path argument that exists but holds no
-   manifest still edits the ancestor's, and a pre-existing cycle is reported as though the current
-   edit caused it. Both belong in `manifest-edit.ts`. The first one matters most on `remove`, which
-   is the only destructive writer.
-2. **`role` is an unconstrained slug.** Two cold runs produced a dozen granularities between them.
-   Phase 7 makes `role` a facet, so decide the convention before the viewer groups on it — this one
-   gets more expensive the longer the viewer exists.
-3. **`diff`'s "declared but no longer detected" reads as a delete list.** It named five real
-   services on a checkout missing its ignored config files.
-4. **The category enum has no monitoring, queue or email bucket**, so Sentry, Datadog, SQS,
-   RabbitMQ, Resend, SendGrid and Twilio all land in `other`. Schema change plus skill change in the
-   same commit, per the drift test.
-5. **`dagstree rename <old> <new>`** for service ids — the one writer still missing, and the only
-   one needing a find-every-reference traversal.
+1. ~~**Two pre-existing holes every writer shares.**~~ Closed — see that section for what was
+   fixed, how it was verified, and the six mutations that proved the new tests carry weight.
+2. ~~**`role` is an unconstrained slug.**~~ Settled — a documented convention in `SKILL.md`, no
+   schema change, and the viewer groups on the segment before the first `-`. See that section.
+3. ~~**`diff`'s "declared but no longer detected" reads as a delete list.**~~ Closed — the heading
+   now says "not visible to detection here", the list says outright that it is not a delete list,
+   and `diff` names a reason where it has one.
+4. ~~**The category enum has no monitoring, queue or email bucket.**~~ Closed — HANDOFF §4 amended
+   (with an amendment log) and both catalogs re-bucketed into `monitoring`, `queue` and `messaging`.
+   See that section.
+5. ~~**`dagstree rename <old> <new>`** for service ids.~~ Closed — built, and the CLI now has a
+   command behind every correctable field. See the `remove` section for what it does and what the
+   mutations found.
+
+## Phase 3.6.1 — Defects found by validating the skill's own output ✅
+
+The owner ran the current skill against a real repo and asked whether the manifest it produced was
+accurate. It was: all 26 services traced to evidence in the checkout, and the `added` dates matched
+`git log --diff-filter=A` on the file that proved each one, six for six. The defects were not in the
+data. Four of the six were in **shipped guidance** — the skill and the handoff telling an agent to
+do the wrong thing, which it then did correctly.
+
+The through-line, and the rule that came out of it: **where Dagstree does not know, it asks. It
+never guesses.** Every defect below is a variant of writing a plausible default instead of a
+question.
+
+- [x] **`kind: service | component | stack` on every entry, and an optional `version`.**
+      `SKILL.md` told the agent "if it cannot have an outage and cannot send an invoice, it is not a
+      service entry; languages and frameworks belong in the architecture description". Both halves
+      wrong. It excluded nginx (terminates the project's public traffic) and OpenTelemetry (carries
+      its logs) — nodes with real failure modes and no vendor behind them. And it parked the stack
+      in free text where nothing can render a tile or key an EOL date off it; `project.architecture`
+      is the *shape*, not the stack. The line is now runtime topology, not vendor relationship.
+      HANDOFF §4/§5 amended, 82 curated language/framework/runtime rows added to `mapping.ts` (each
+      cited to its `@specfy/stack-analyser` rule file, read out of the installed package), and a
+      `stack` category added.
+- [x] **`init` no longer guesses repo visibility.** It hardcoded `visibility: private` and wrote a
+      comment into the manifest admitting the guess. It was right on the repo it was written
+      against, which is the worst case — a wrong default that looks correct is never revisited.
+      Rejected `gh repo view` as the fix: it answers only for GitHub and fails quietly for GitLab,
+      Bitbucket, Azure DevOps or a plain origin, which is a provider-shaped guess replacing a
+      visibility-shaped one. `init` prompts, `--yes` takes `--visibility`, and with neither it omits
+      `project.vcs` entirely and prints the `set` command that fills it.
+- [x] **`agents-md` is gone and `.codex` is detected.** `AGENTS.md`/`.agents/` emitted a coding
+      agent literally named `agents-md` — a file convention in the field that names agents, and
+      self-confirming because it sat beside the real agents on every repo that had any. They are now
+      reported as *unidentified*: proof an agent works here, no claim about which. Separately there
+      was no `.codex` marker at all, so a correctly-declared `codex` entry was reported as drift by
+      `dagstree diff` **on every run** — a permanent false positive against a correct manifest.
+- [x] **`detect` no longer hides the two new kinds.** Its grouping filter was `kind === "service"`,
+      which dropped component- and stack-kind rows out of *both* the leading list and the collapsed
+      library count. Detected, and invisible.
+- [x] **`set services.<id>.kind` and `.version`**, so the new fields are correctable without a
+      remove-and-re-add, keeping the "every correctable field has a command behind it" property.
+
+### Two bugs that only execution found
+
+Both were invisible to the unit suite because both lived in the argv wiring, and both are now
+covered by argv-driven tests in `cli.test.ts`:
+
+- **`--version` was swallowed by commander.** `.version()` on the program registers `--version` on
+  every subcommand by inheritance, and the inherited option beats a subcommand's own. So
+  `dagstree add dotnet --kind stack --version 10 --role runtime-backend` printed `0.0.1`, added
+  nothing, and **exited 0** — silent data loss, not an error. Fixed with
+  `program.enablePositionalOptions()`, which scopes an option to the command it follows;
+  `dagstree --version` still reports the CLI version.
+- **`--kind` was silently discarded.** `add`'s commander action builds its options object field by
+  field and the two new fields were never added to it, so `--kind widget` was not rejected — it was
+  dropped, and the entry written without it. Validation in `runAdd` was correct and simply never ran.
+
+**The standing lesson for anyone adding a CLI flag here:** both bugs sat between commander and the
+command function, which is the one seam the unit tests do not cross — `add.test.ts` calls `runAdd`
+directly. A new flag is not done when `runAdd` handles it. Drive it through `runCli([...])` in
+`cli.test.ts`, and run the built binary once, because a flag that is silently dropped looks exactly
+like a flag that works.
+
+Verified by execution, not by reading: `pnpm build && pnpm test && pnpm typecheck` all green at
+**549 tests / 38 files**, and the built binary run against a scratch repo and against Clapline.
+`dagstree detect` on Clapline now reports `opentelemetry [component]`, `nginx [component]`, a
+`stack:` section (csharp, javascript, react, typescript), and `codex` — and no `agents-md`.
+
+**Not done, and left for the owner:** `C:/Workspace/repos/Clapline/dagstree.yaml` itself is
+unchanged. It still declares `agents-md`, carries no component or stack entries, and is missing five
+real edges found during validation (Fly's managed Prometheus scrapes `fly-api`; Supabase's custom
+SMTP sends through Resend; and `resend`, `cloudfront` and `supabase-auth` each need DNS records at
+`namecheap-dns`, which only `fly-web` currently has an edge for). Writing to another repo was not in
+scope for this pass.
+
 
 ## How to use this file
 
@@ -87,7 +194,7 @@ so a later session can tell whether something regressed.
 pnpm build && pnpm test && pnpm typecheck
 ```
 
-Current baseline: **500 tests, 36 files, zero skipped.** Build and typecheck both exit 0.
+Current baseline: **549 tests, 38 files, zero skipped.** Build and typecheck both exit 0.
 
 ---
 
@@ -167,6 +274,8 @@ No network, no auth, no backend. This is the phase that makes the tool useful da
       hand-edit gap; see "CLI gaps the skill exposed" below
 - [x] `dagstree remove <id> [path]` — added in Phase 3.6; the only subtractive writer, and the one
       that makes a wrong `add` recoverable. See its own section below
+- [x] `dagstree rename <old> <new> [path]` — the last writer, moving every edge and `replaced_by`
+      that names the id along with the entry. See the `remove` section below
 - [x] Manifest resolution: walks up from the working directory, `dagstree.yaml` preferred,
       `stack.yaml` accepted as a fallback on read, always writes `dagstree.yaml`
 - [x] Errors to stderr, data to stdout, so `--json` stays pipeable
@@ -303,7 +412,8 @@ material for teaching an agent to do the same.
 - [x] **Second cold run — done, and it is the best result the tool has produced.** Run by the owner
       against a real working tree with the current skill and CLI. **25 services, 31 edges, 7 notes,
       `validate` and `validate --strict` both exit 0**, against 23/28 on the first run and 21/24 on
-      the clone rehearsal. Owner's verdict: good enough for v1.
+      the clone rehearsal. Owner's verdict: good enough for v1. (A third run has since replaced that
+      file with 26 services and 30 edges, no notes and no lifecycle entries — see Phase 3.6.1.)
 
       Measured from the transcript, not self-reported: **33 tool calls in 10 minutes**, against 58 in
       roughly 18 for the rehearsal — with a richer result. The four things the skill was changed for
@@ -573,7 +683,7 @@ including a prefix-match entry lookup, which would delete the wrong service and 
 
 Two findings that are **not** defects in this change set, both pre-existing and shared with the
 other writers, recorded below as their own items: the ancestor-walk hole and the misattributed
-pre-existing cycle.
+pre-existing cycle. Both have since been closed in `manifest-edit.ts` — see that section.
 
 **The part most likely to break, and therefore the part to write a fixture for first:** comment
 attachment. Deleting an item from a `YAMLSeq` is not like appending to one. A comment written above
@@ -612,10 +722,43 @@ Then, for the same reason and once `remove` exists:
       (private) -- edit if this repo is public` into the manifest, instructing the reader to do the
       one thing the skill forbids. It now names the command: `dagstree set project.vcs.visibility
       public`.
-- [ ] **Correct an `id`.** Not a `set`: it is a rename, and every edge and `replaced_by` naming the
-      old id has to move with it or the manifest breaks. That is `dagstree rename <old> <new>`, and
-      it should be built after `remove`, since it shares the "find every reference to this id"
-      traversal.
+- [x] **Correct an `id`. Done: `dagstree rename <old> <new> [path]`.** Not a `set`: an id is
+      referenced from three places outside the entry carrying it — both endpoints of every
+      dependency edge, and any other entry's `replaced_by` — so writing only the field leaves a
+      manifest that fails referential integrity on the next `validate`. It shares `remove`'s
+      find-every-reference traversal, and was built after it as planned.
+
+      Simpler than `remove` in the one place that mattered: nothing is spliced out of a sequence, so
+      none of `remove`'s comment-attachment hazards apply — every reference is overwritten in place
+      and the node keeping the comment is still there. Both edge shapes are handled (a `[from, to]`
+      tuple and a `{from, to, notes}` object), the object edge's `notes` survives, and an inline
+      comment on the id itself rides along.
+
+      *A claim written into that module was measured and turned out false, so it was corrected
+      rather than shipped.* The first draft said the scalars are mutated through their nodes because
+      `doc.setIn` would replace the node and take an inline comment with it. A mutation test proved
+      otherwise — an inline comment on `id: fly-api # the public API` attaches to the **pair**, not
+      to the value scalar, so `setIn` keeps it. The real reason `renameScalar` exists is that it
+      reports whether it found what it expected, which `setIn` cannot: `setIn` writes the new id
+      whether or not the old one was there. The module comment now says that instead.
+
+      Refusals, all matching `link`/`deprecate`/`remove` character-for-character and verified by
+      executing the built binary: unknown id → 1 with the known ids listed; `<new>` already held by
+      another entry → 1 in its own words rather than as "duplicate id", which would read like a bug
+      in the tool; a malformed id on either side → 2 before the file is opened; no manifest → 2.
+      Renaming an entry to its own id is a no-op at exit 0, matching `link`'s treatment of an edge
+      that already exists. The manifest is byte-identical after all five, verified by checksum.
+
+      11 tests plus a `cli.test.ts` case for the argv wiring — two positional ids ahead of the
+      optional `[path]` is the shape most at risk of commander swallowing the directory, the bug
+      `--depends-on` hit in Phase 3.5. **Six mutations, and two of them initially survived**, which
+      is the reason to run them: a prefix-matching entry lookup (the defect the `remove` audits
+      caught, which would rename the wrong service and report success) passed green because the
+      fixture declared the shorter id first, where a prefix match happens to land correctly — the
+      fixture now declares `api-worker` before `api`; and the `setIn` mutation above, which was a
+      wrong claim rather than a weak test. The other four — edges not traversed, `replaced_by` not
+      traversed, object-form edges ignored, collision check removed — each turned exactly the
+      expected tests red.
 
 ### Rehearsal cold run on a Clapline clone — what it proved and what it cost ⬜ partial
 
@@ -659,42 +802,179 @@ along with an optional delegated research pass for harnesses that can run one.
       them. The skill's contradiction rule is now scoped to contradictions that change what gets
       written — two providers claimed for one job, a service in prose with no configuration, an
       environment disagreeing with the deploy config — and says so explicitly.
-- [ ] **`role` is an unconstrained slug.** The schema types it as `$defs/slug` with examples, not an
-      enum, and the run produced nine granularities: `ai-text`, `ai-text-image`, `ai-video`,
-      `monitoring-dashboard`, `monitoring-deadman`, `storage-media`, `storage-temp`, `logs-storage`,
-      `registrar-dns`. Nothing is wrong with any of them in isolation. But Phase 7 makes `role` a
-      facet, and free-form granularity means cross-project rollups do not group. Either a controlled
-      vocabulary with an escape hatch, or a documented convention, or accept the noise deliberately.
-- [ ] **`diff`'s "declared in the manifest but no longer detected" reads as a delete list.** On the
-      clone it named five services that were entirely real, just configured in files detection could
-      not see. The skill now warns against acting on it, but the wording itself invites the mistake.
-      Consider saying "not visible to detection here" and naming the reason where it is knowable.
-- [ ] **The category enum has no bucket for monitoring, queue or email.** Sentry, Datadog, SQS,
-      RabbitMQ, Resend, SendGrid and Twilio are unambiguously services and all land in `other`.
-      Widening it is a schema change plus a skill change in the same commit, per the drift test.
+- [x] **`role` is an unconstrained slug — settled as a documented convention.** The schema types it
+      as `$defs/slug` with examples, not an enum, and the runs produced nine granularities:
+      `ai-text`, `ai-text-image`, `ai-video`, `monitoring-dashboard`, `monitoring-deadman`,
+      `storage-media`, `storage-temp`, `logs-storage`, `registrar-dns`. Nothing was wrong with any
+      of them in isolation, but Phase 7 makes `role` a facet and free-form granularity does not roll
+      up.
 
-### Two pre-existing holes every writer shares ⬜ open
+      **Owner's decision: a documented convention, no schema change.** `skills/dagstree/SKILL.md`
+      gained a "Naming a role" section under step 6 with three rules:
+
+      - *Start from a base word* — a list of about twenty (`hosting`, `database`, `auth`, `storage`,
+        `cache`, `queue`, `search`, `ai`, `payments`, `email`, `sms`, `monitoring`, `logs`,
+        `analytics`, `dns`, `registrar`, `cdn`, `vcs`, `ci`, `pm`, `secrets`). Reusing one beats
+        inventing a synonym.
+      - *Qualify only to disambiguate* — write `hosting`, not `hosting-api`, until a second entry
+        would also be `hosting`; then both get a qualifier (`hosting-api`/`hosting-web`,
+        `storage-media`/`storage-temp`, `ai-text`/`ai-video`). A qualifier on a role nothing
+        collides with is noise.
+      - *The segment before the first `-` is what rollups group on.* That is the whole point of the
+        base-word rule: `monitoring-dashboard` and `monitoring-deadman` both count as `monitoring`,
+        `ai-text` and `ai-video` both count as `ai`. **The viewer groups on that segment.**
+
+      A compound naming two jobs (`registrar-dns`) is explicitly not a qualifier — it groups under
+      neither, so pick the primary job, or make it two entries the way Supabase is `supabase-db` and
+      `supabase-auth`.
+
+      *Roles and categories are deliberately not the same vocabulary*, and the skill says so. A
+      category describes a provider in the global catalog and has to be wide enough to hold Twilio
+      and Resend under `messaging`; a role describes what one instance does in one project, where
+      `email` and `sms` are different jobs. The first draft of the base-word list used `messaging`
+      for both and contradicted `examples/reference.dagstree.yaml`, which uses `role: email` and is
+      right to.
+
+      Reversible on purpose: nothing enforces it, so if the convention does not hold up in the next
+      cold run it can be tightened into an enum or dropped without a migration.
+- [x] **`diff`'s "declared in the manifest but no longer detected" read as a delete list. Fixed.**
+      On the clone it named five services that were entirely real, just configured in files
+      detection could not see. The skill warned against acting on it, but the wording itself invited
+      the mistake — "no longer detected" is a claim about the world, and what the command knows is a
+      claim about one checkout.
+
+      The heading is now **"Declared in the manifest but not visible to detection here:"**, and a
+      non-empty list is followed by three lines saying outright that it is not a delete list and
+      why. Two reasons are named where the command actually knows one: an entry the manifest itself
+      marks `deprecated`/`phasing_out`/`removed` is annotated `-- marked <status>, so this is
+      expected`, and `detection.warnings` — a settings file that exists but would not parse — is now
+      surfaced under "Detection could not read everything in this checkout" instead of being
+      dropped on the floor, since "found nothing" and "could not read" are different facts and the
+      second is the likeliest reason a line is on that list at all.
+
+      The `--json` key `staleServices` was renamed `notDetectedServices` and gained `status`, with
+      `detectionWarnings` alongside it. A key named "stale" makes the same wrong claim to a program
+      that the old heading made to a person, and a program acting on "stale" deletes. Nothing
+      consumes the old key — the CLI is unpublished and `SKILL.md` never named it — so this was the
+      cheap moment to fix it.
+
+      `skills/dagstree/SKILL.md` quotes the heading, so it changed in the same commit. Verified by
+      execution against a scratch project carrying an unparseable `.mcp.json`, a `phasing_out` entry
+      and an undetectable one: all four elements render, exit 1. 4 new tests, and the existing diff
+      tests were updated to the new strings rather than left asserting the old ones.
+- [x] **The category enum had no bucket for monitoring, queue or email — widened, with the spec
+      amended.** Sentry, Datadog, New Relic, SQS, RabbitMQ, Resend, SendGrid, Mailgun and Twilio are
+      unambiguously services and all landed in `other`.
+
+      *Correction to what this item used to say.* It described widening the enum as "a schema change
+      plus a skill change in the same commit, per the drift test". Checked: `category` is **not** a
+      field in `dagstree.yaml` and appears nowhere in `packages/schema` or in `SKILL.md`. It is
+      `ServiceCategory` in `packages/core/src/types.ts`, consumed by `mapping.ts` and by `detect`'s
+      grouped output, and it was pinned by **HANDOFF §4**. So the change was core + HANDOFF, and the
+      drift test was never involved.
+
+      **Owner's decision: add `monitoring`, `queue` and `messaging`.** `messaging` rather than
+      `email` because Twilio is SMS and voice, so an email-only bucket does not hold it while a
+      messaging bucket holds Resend, SendGrid, Mailgun, Twilio, Slack and Discord alike.
+
+      Done, in this order and for this reason — the spec first, since CLAUDE.md makes HANDOFF.md the
+      source of truth:
+
+      - **`docs/HANDOFF.md` §4 amended**, and the document gained an **amendment log** under its
+        header saying what changed, when, why, and that the owner approved it. A source-of-truth
+        document that changes silently stops being one.
+      - `ServiceCategory` is now derived from an exported `SERVICE_CATEGORIES` array rather than
+        being a bare type union. The union is erased at build time, so `mapping.test.ts` had
+        retyped the whole enum as a second copy — which passed green while the spec moved
+        underneath it. One list now, and the test reads from it.
+      - Rows moved in **both** catalogs. `mapping.ts`: Sentry/Datadog/New Relic → `monitoring`,
+        SQS/RabbitMQ/Supabase Realtime → `queue`, Resend/SendGrid/Mailgun/Twilio/Slack →
+        `messaging`. `detectors/config-keys.ts`: OpenTelemetry/Grafana/Loki/Sentry/Datadog/
+        Prometheus → `monitoring`, Resend/SendGrid/Postmark/Mailgun/Twilio/Slack/Discord →
+        `messaging`, RabbitMQ → `queue`. PostHog stays `analytics` — the split is what the thing is
+        *for*: observability that tells you the system is broken versus measurement of how it is
+        used.
+      - `SPECFY_TYPE_TO_CATEGORY` gained `monitoring`, `queue` and `notification` → `messaging`, so
+        an *unmapped* detection with one of those stack-analyser types lands in the right bucket
+        rather than in `other`.
+
+      **It closed a real inconsistency on the way.** Sentry and Datadog were `analytics` in the
+      config-key catalog and `other` in the mapping table — the same service arriving under a
+      different category depending on which detector found it. Slack had the same split. Both
+      catalogs now agree, and the code comments say to keep them that way.
+
+      Three tests changed, each because the change made its premise false rather than because it
+      broke: the two `config-keys` ordering assertions (results sort by category then slug, so the
+      shape moved), and `classifyDetectionKind`'s "no category still means service" case, which used
+      `monitoring` as its example of a type with no bucket — left alone it would have kept passing
+      while testing nothing, so it now uses `cdn`, and a new test covers the case the widening
+      created. Verified by execution: a scratch `appsettings.json` naming Sentry, Resend, Twilio,
+      RabbitMQ, OTLP, PostHog and Stripe renders under six real categories with nothing in `other`.
+
+### Two pre-existing holes every writer shares ✅ closed
 
 Both found by the `remove` audits and both reproduced against `link` and `deprecate` on the same
-files, so neither is something `remove` introduced. They belong in `packages/cli/src/manifest-edit.ts`,
-which is where the property each one breaks is stated once for all five writers.
+files, so neither is something `remove` introduced. Both are now fixed in
+`packages/cli/src/manifest-edit.ts`, which is where the property each one breaks is stated once for
+all five writers, and both are pinned by `packages/cli/src/manifest-edit.test.ts` — 19 tests that run
+**every writer** against the same two fixtures rather than testing `remove` alone, because covering
+only the command a shared hole was noticed on is how the next writer reintroduces it.
 
-- [ ] **A path argument that exists but holds no manifest still edits the ancestor's.**
+- [x] **A path argument that exists but holds no manifest no longer edits the ancestor's.**
       `openManifestForEdit`'s doc comment promises that a path the caller actually typed never falls
-      back to an ancestor directory's manifest through `findManifest`'s upward walk. It delivers half
-      of that: it rejects a path that does not exist, but an existing subdirectory with no manifest
-      of its own falls straight through to the walk. Observed: `dagstree remove fly-api <dir>/sub`
-      removed the entry from `<dir>/dagstree.yaml` and exited 0. The stakes are highest on `remove`,
-      the only destructive writer, but the fix belongs where the promise is made.
-- [ ] **A pre-existing cycle is reported as though the current edit caused it.** The two validators
-      are not the same check: `loadValidManifest` runs `parseManifest` — schema, referential
-      integrity, the private-value guard — while `commitManifestEdit` additionally runs
-      `checkAcyclic`. So a manifest carrying a cycle opens cleanly and fails on write, with a message
-      reading `Removing "svc-a" would make ... invalid: cyclic dependency -- svc-b -> svc-c -> svc-b`
-      even though `svc-a` has nothing to do with the cycle and the cycle predates the command.
-      Behaviour is safe — exit 1, nothing written — but the attribution is wrong, and it sends the
-      user to fix the wrong thing. Pinned by a test in `remove.test.ts` so the behaviour is at least
-      recorded rather than rediscovered.
+      back to an ancestor directory's manifest through `findManifest`'s upward walk. It delivered
+      half of that: it rejected a path that did not exist, but an existing subdirectory with no
+      manifest of its own fell straight through to the walk. Observed before the fix:
+      `dagstree remove fly-api <dir>/sub` removed the entry from `<dir>/dagstree.yaml` and exited 0.
+
+      Closed with `findManifestIn` in `manifest-io.ts` — the same "is there a manifest here" question
+      `findManifest` already asks at each level of its walk, minus the walk, so the
+      dagstree.yaml-beats-stack.yaml precedence cannot drift between the two callers. An explicit
+      path with no manifest of its own now exits 2 and **names the ancestor that was found**: the
+      likeliest cause is a path typed one level off, and a message that only says the directory is
+      empty leaves the user to guess what to type instead.
+
+      Verified by direct execution of the built binary: all five writers exit 2 against `<dir>/sub`,
+      the ancestor manifest is byte-identical afterwards by checksum, an explicit path to the
+      directory that *does* hold the manifest still exits 0, and a directory holding only the
+      `stack.yaml` fallback is still accepted.
+- [x] **A pre-existing cycle is no longer reported as though the current edit caused it.** The two
+      validators are not the same check: `loadValidManifest` runs `parseManifest` — schema,
+      referential integrity, the private-value guard — while `commitManifestEdit` additionally runs
+      `checkAcyclic`. So a manifest carrying a cycle opened cleanly and failed on write, with a
+      message reading `Removing "svc-a" would make ... invalid: cyclic dependency -- svc-b -> svc-c
+      -> svc-b` even though `svc-a` had nothing to do with the cycle and the cycle predated the
+      command. Behaviour was safe — exit 1, nothing written — but the attribution was wrong, and it
+      sent the user to fix the wrong thing.
+
+      Closed by having `openManifestForEdit` record the cycles the file already carried and
+      `commitManifestEdit` compare against them: when every cycle in the failing candidate was
+      already in the file, the failure is reported in the *file's* name rather than the command's,
+      and ends with what to do about it. `checkManifestObject`'s failure result now carries the
+      cycles it found, because a rendered message line is the wrong thing to diff.
+
+      **The manifest is still opened**, deliberately. `dagstree remove` on one of the cycle's own
+      services is the only thing in the CLI that breaks a cycle, so refusing to open a cyclic
+      manifest would have traded a misattributed message for an unfixable file — the same shape of
+      dead end the `remove` section above exists to prevent. A test pins that recovery path, and the
+      mutation that refuses on open turns it red.
+
+      Verified by direct execution: `remove` and `deprecate` aimed at the innocent entry both exit 1
+      naming the file, the manifest is byte-identical by checksum, `dagstree remove svc-c` — the
+      advice the message itself gives — then exits 0 with `validate` exiting 0 after it, while a
+      `link` that genuinely closes a cycle still exits 1 under `Linking "..." -> "..." would make`.
+
+**The assertions are load-bearing, proven by mutation.** Six mutations, applied one at a time, each
+turning exactly the expected tests red and no others: removing the `findManifestIn` guard (6 red),
+dropping `findManifestIn`'s `stack.yaml` fallback (2 red, one of them a pre-existing `manifest-io`
+test), forgetting the pre-existing cycles at open time (5 red), weakening `every` to `some` so an
+old cycle launders a new one (1 red), stopping `cycleKey` from rotating (1 red), and refusing to
+open a cyclic manifest at all (7 red, including the recovery path).
+
+One property is defensive rather than observed, and says so in the code: `cycleKey` normalises a
+cycle's rotation because `findCycles` returns a closed walk whose entry point depends on declaration
+order. No writer in the CLI reorders services today, so no command can currently produce that
+rotation — which is why it is tested directly as a unit rather than through a command.
 
 ### CLI gaps the skill exposed ✅ closed
 
@@ -815,13 +1095,16 @@ readable — none of which involve a database.
 - [ ] React + Vite app under `apps/web`
 - [ ] Manifest source: scan a workspace root for repos containing `dagstree.yaml`
 - [ ] Per-project DAG: elkjs layout, React Flow render, `simple-icons` brand icons with a
-      category-icon fallback from the start
+      category-icon fallback from the start. **Group on the segment of `role` before the first
+      `-`** — that is the convention settled in the 3.6 follow-ups, and the viewer is the first
+      consumer of it.
 - [ ] Status colours — active, `phasing_out`, deprecated — and `replaced_by` targets shown
 - [ ] Portfolio page: project list, service usage matrix across projects
 - [ ] Migration dashboard: everything `phasing_out` with its replacement
 - [ ] Layer 3 cost panel present, rendering an explicit "not connected" empty state
-- [x] **Unblocked.** A real manifest now exists — 25 services, 31 edges, lifecycle, off-repo
-      services and notes — alongside `examples/reference.dagstree.yaml`. That is enough to build and
+- [x] **Unblocked.** A real manifest now exists — 26 services, 30 edges, off-repo services, but no
+      lifecycle entries and no notes — alongside `examples/reference.dagstree.yaml`, which is the
+      one that covers status, `replaced_by`, `kind: component` and `kind: stack`. That is enough to build and
       judge the per-project DAG, the status colours and the `replaced_by` rendering, which are the
       genuinely hard parts. The portfolio page and the usage matrix want several projects, so they
       are the parts to build last, against whatever manifests exist by then.

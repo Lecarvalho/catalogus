@@ -14,9 +14,15 @@ import { findCycles } from "./toposort.js";
 // still carry warnings, and an invalid one can too) so `dagstree validate`
 // can print them regardless of which branch it lands in, and so it has what
 // it needs to implement --strict without re-running the scan itself.
+//
+// A failure additionally carries the cycles it found, when the thing that
+// failed was acyclicity. Callers that hold a *previous* version of the same
+// manifest -- every writing command does, via manifest-edit.ts -- need to
+// tell a cycle their edit created from one that was already in the file, and
+// a rendered message line is the wrong thing to compare for that.
 export type ManifestCheckResult =
   | { ok: true; manifest: DagstreeManifestV1; warnings: DagstreeManifestWarning[] }
-  | { ok: false; lines: string[]; warnings: DagstreeManifestWarning[] };
+  | { ok: false; lines: string[]; warnings: DagstreeManifestWarning[]; cycles?: string[][] };
 
 /** Formats soft private-value warnings the one way every command that surfaces them (validate, add, init) prints them, so a warning reads identically regardless of which command produced it. */
 export function warningLines(warnings: DagstreeManifestWarning[]): string[] {
@@ -41,6 +47,7 @@ function checkAcyclic(manifest: DagstreeManifestV1, warnings: DagstreeManifestWa
         ...result.cycles.map((cycle) => `  ${cycle.join(" -> ")}`),
       ],
       warnings,
+      cycles: result.cycles,
     };
   }
   return { ok: true, manifest, warnings };

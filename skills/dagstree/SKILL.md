@@ -35,12 +35,13 @@ The commands you will use:
 
 ```
 dagstree detect            # what the scanner can see, grouped by category
-dagstree init --yes        # create the manifest: project fields only, no service entries
-dagstree add <service> --role <r> [--depends-on <id>...] [--id <id>]
-dagstree set <field> <value> [<field> <value> ...]   # project fields, or a service's role
+dagstree init --yes [--visibility <v>]   # create the manifest: project fields only, no service entries
+dagstree add <service> --role <r> [--kind <k>] [--version <v>] [--depends-on <id>...] [--id <id>]
+dagstree set <field> <value> [<field> <value> ...]   # project fields, or a service's role/kind/version
 dagstree link <from> <to>  # one edge between services that already exist
 dagstree deprecate <id> [--status phasing_out] [--replaced-by <id>]
 dagstree remove <id>       # delete a wrong entry, and every edge naming it
+dagstree rename <old> <new> # change a local id, moving its edges and replaced_by with it
 dagstree validate          # schema, referential integrity, acyclicity, private-data guard
 dagstree diff              # detected vs declared, both directions
 dagstree graph [--mermaid] # render the DAG
@@ -61,6 +62,7 @@ dagstree set project.vcs.provider github project.vcs.visibility private
 dagstree set project.coding_agents claude-code,codex
 dagstree set project.name "Sluglin" project.slug sluglin
 dagstree set services.supabase-db.role database
+dagstree set services.dotnet.version 10
 dagstree link fly-api supabase-db
 dagstree deprecate vertex --status phasing_out --replaced-by anthropic-api
 ```
@@ -68,10 +70,19 @@ dagstree deprecate vertex --status phasing_out --replaced-by anthropic-api
 `project.name` and `project.slug` are settable even though `init` writes them first: its `--yes`
 value is a directory name, which is a guess, and this is how you correct it once you know better.
 A service's `role` is settable the same way — a wrong role is a `set`, not a remove-and-re-add.
+A wrong *id* is a `dagstree rename <old> <new>`, not a remove-and-re-add either: it moves both
+endpoints of every edge and any other entry's `replaced_by` along with the entry, which is the part
+a delete-and-recreate loses.
 
 `project.vcs` takes both halves in one call: the schema requires provider and visibility together,
 so neither can be written alone. `set` takes `--path` rather than a positional directory, because
 its pair list is variadic.
+
+**Visibility is asked, never guessed.** `init` prompts for it, and `init --yes` writes
+`project.vcs` only if you passed `--visibility`; otherwise it omits the block and tells you the
+`set` command that fills it. Nothing in a checkout says whether its remote is public, so if you do
+not know, ask the owner — one question is cheaper than a wrong value in a committed file, and a
+wrong default that happens to look right is one nobody ever goes back and checks.
 
 If a field you need has no command, say so rather than working around it with an editor — a hand
 edit is how a manifest ends up failing a client's CI. The shape those commands produce, as a
@@ -93,6 +104,9 @@ services:
   - id: vertex                # an entry dagstree add already created
     status: phasing_out       # active | deprecated | phasing_out | removed
     replaced_by: anthropic-api
+  - id: dotnet
+    kind: stack               # service (default) | component | stack
+    version: "10"             # free-form: what a tile shows, what an EOL date keys off
 ```
 
 Every one of those commands validates before it writes and preserves the comments and `$schema`
@@ -154,13 +168,43 @@ dagstree detect
 
 Read the output critically before using it.
 
-**It reports libraries as well as services.** TypeScript, React, Tailwind, ESLint, Vite and Serilog
-are not service dependencies. A useful test: if it cannot have an outage and cannot send an invoice,
-it is not a service entry. Languages and frameworks belong in the architecture description, if
-anywhere.
+**Read it as three kinds of node plus noise.** `detect` names the kind of anything that is not
+noise, and the kind is a flag you pass straight to `add`:
+
+- **`service`** — a vendor. It has an account, it can bill you, and someone else's outage is your
+  outage. Supabase, Stripe, Fly.io, a registrar. This is the default; `add` writes no `kind` line
+  for it.
+- **`component`** — infrastructure the project runs itself. No account and no invoice, but it is on
+  the request path and it can fail: nginx inside the web image, an OpenTelemetry transport carrying
+  logs to Loki. `--kind component`.
+- **`stack`** — the language, runtime or framework the code is written in. .NET, React, Python,
+  Angular. Attach it by an edge to whatever runs it (`--depends-on` from the API entry, or
+  `dagstree link fly-api dotnet`), and give it `--version` — that is the number a tile shows and
+  the one an end-of-life date keys off. `--kind stack`.
+- **noise** — ESLint, Prettier, Vitest, a build tool. Code a developer runs, not something the
+  project depends on at runtime. `detect` collapses these under a count; they are not entries in
+  any kind.
+
+The old rule here was "if it cannot have an outage and cannot send an invoice, it is not a service
+entry, and languages and frameworks belong in the architecture description". That was wrong in both
+halves. It threw away nginx and OpenTelemetry, which are real nodes with real failure modes and no
+vendor behind them. And it put the stack in free text, where nothing can render it or key an EOL
+date off it — `project.architecture` is the *shape* (modular monolith, vertical slices), which is
+not the stack.
+
+The line that replaces it is **runtime topology, not vendor relationship**: if it is on the path a
+request takes, or it is what the code is written in, it is a node. If it only runs on a developer's
+machine or at build time, it is not.
 
 **It cannot see anything outside the repo.** The registrar, the PM board, the error tracker someone
 set up in a web console — none of it leaves a trace in the files.
+
+**When it cannot tell, it says so instead of picking.** `AGENTS.md` and `.agents/` prove a coding
+agent works in this repo without naming which one, so `detect` reports them as unidentified rather
+than inventing an agent. That is a question for the owner: ask, then
+`dagstree set project.coding_agents <agent>[,<agent>]`. The same applies everywhere in this
+procedure — an unanswered field is a question, never a plausible default. A guess that happens to
+be right is worse than a gap, because nobody goes back to check it.
 
 ### 2. Create the manifest
 
@@ -169,7 +213,9 @@ dagstree init --yes
 ```
 
 This writes `dagstree.yaml` with the project name, VCS provider and coding agents inferred from
-detection, and **no service entries**. That is deliberate: a service entry needs a `role` — what
+detection, and **no service entries**. It does not write `project.vcs` at all unless you pass
+`--visibility`, because visibility cannot be detected — see "Visibility is asked, never guessed"
+above. That is deliberate: a service entry needs a `role` — what
 this instance does here, `database`, `hosting-api` — and detection only knows a *category*
 (`db`, `ai`, `other`). Services go in one at a time in step 6, each with a role you decided on.
 
@@ -221,9 +267,12 @@ gap**, which is why dependency registration, adapter classes and configuration-g
 the table above — they name a provider whether or not a settings file does.
 
 The corollary matters when you read `dagstree diff`: an entry listed under **"declared in the
-manifest but no longer detected" is not automatically stale.** It may be a service configured only
-in a file detection cannot see, or one no scan could ever find. `diff` reports what detection can
-see, never what is true. Do not remove an entry on that basis alone.
+manifest but not visible to detection here" is not automatically stale.** It may be a service
+configured only in a file detection cannot see, or one no scan could ever find. `diff` reports what
+detection can see, never what is true, and it says so under that list. Do not remove an entry on
+that basis alone. Where `diff` can name a reason it does — an entry the manifest already marks
+`deprecated`/`phasing_out` is annotated as expected, and anything detection could not read is
+listed under "Detection could not read everything in this checkout".
 
 An architecture diagram earns its row above the same way prose does — as a checklist of what to go
 and verify in code, never as the record itself. The gap runs both ways: the same run found a storage
@@ -337,11 +386,57 @@ one at a time, each with a real role, plus everything the user told you that det
 dagstree diff
 dagstree add supabase --role database --id supabase-db
 dagstree add supabase --role auth --id supabase-auth --depends-on supabase-db
+dagstree add nginx --kind component --role ingress-proxy --depends-on fly-api
+dagstree add dotnet --kind stack --version 10 --role runtime-backend
+dagstree link fly-api dotnet
 ```
+
+Components and stack entries are added by the same command as vendors, with `--kind`. A stack entry
+without an edge is a floating tile: attach it to whatever runs it, the way `fly-api` runs `dotnet`
+above. `diff` names the kind on any line that is not a plain service, so the flag to pass is the one
+already printed.
 
 One service used in two roles is **two entries with distinct ids**, not one entry with two roles.
 Four Fly apps are four entries. Edges point from the depender to the dependency:
 `--depends-on supabase-db` on the auth entry means auth needs the database.
+
+#### Naming a role
+
+`role` is free text, on purpose — no list can anticipate what a project does. But roles are what
+cross-project views group on, so a convention keeps them groupable without a schema constraining
+them. Two rules:
+
+**Start from a base word.** These cover almost everything, and reusing one is better than inventing
+a synonym for it:
+
+```
+hosting   database  auth      storage   cache     queue     search
+ai        payments  email     sms       monitoring logs     analytics
+dns       registrar cdn       vcs       ci        pm        secrets
+```
+
+For `--kind stack` and `--kind component` entries the same rules apply, with their own base words:
+`runtime` (`runtime-backend`, `runtime-web`), `language`, `ui-framework`, `ingress-proxy`,
+`telemetry-transport`.
+
+These are roles, not categories. The two vocabularies are deliberately not the same list: a
+*category* describes the provider in the global catalog and has to be wide enough to hold Twilio and
+Resend under one word (`messaging`), while a *role* describes what one instance does in one project,
+where `email` and `sms` are two different jobs and worth saying separately.
+
+**Qualify only to disambiguate.** Write `hosting`, not `hosting-api` — until the project has a
+second entry that would also be `hosting`, at which point both get a qualifier saying what
+distinguishes them: `hosting-api` and `hosting-web`, `storage-media` and `storage-temp`,
+`ai-text` and `ai-video`. A qualifier on a role nothing collides with is noise.
+
+**The part before the first `-` is what rollups group on.** `monitoring-dashboard` and
+`monitoring-deadman` both count as `monitoring`; `ai-text` and `ai-video` both count as `ai`. That
+is the whole reason for the base-word rule — pick the base word first and the grouping follows.
+
+A compound naming two different jobs is not a qualifier. `registrar-dns` reads as "registrar *and*
+DNS", which groups under neither: pick the one that is the reason the account exists, and if the
+service genuinely does two jobs, that is two entries (which is the same rule as Supabase being
+`supabase-db` and `supabase-auth`).
 
 Project-level answers through the CLI too — architecture, PM tooling, VCS, coding agents, and a
 corrected project name or slug via `dagstree set`; an edge you remember later via `dagstree link`;

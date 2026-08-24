@@ -25,19 +25,37 @@ describe("runStackAnalyser", () => {
   });
 
   it("passes an unrecognized slug through instead of discarding it", async () => {
+    // Prettier, not Vue. This test used the unmapped-vue fixture until the
+    // stack rows landed on 2026-08-23 and gave Vue a catalog entry -- at
+    // which point it was asserting the pass-through path while exercising
+    // the table. A formatter is a safe long-term stand-in: the catalog
+    // covers vendors, components and the stack, and a formatter is none of
+    // the three.
+    const technologies = await runStackAnalyser(fixturePath("stack-analyser", "unmapped-library"));
+
+    const prettier = find(technologies, "prettier");
+    expect(prettier).toBeDefined();
+    expect(prettier?.unmapped).toBe(true);
+    expect(prettier?.slug).toBe("prettier");
+    expect(prettier?.evidence.length).toBeGreaterThan(0);
+    // specfy type "linter" -- code a developer runs, not something the
+    // project depends on at runtime, so it comes back "library" and gets
+    // collapsed under a count rather than offered as a manifest candidate.
+    expect(prettier?.kind).toBe("library");
+  });
+
+  it("maps a UI framework to a stack-kind catalog entry rather than a library", async () => {
+    // The other half of the 2026-08-23 change: what the project is written
+    // in is a node now, not free text in `project.architecture`. Vue used
+    // to come back unmapped/library from this exact fixture.
     const technologies = await runStackAnalyser(fixturePath("stack-analyser", "unmapped-vue"));
 
     const vue = find(technologies, "vue");
     expect(vue).toBeDefined();
-    expect(vue?.unmapped).toBe(true);
+    expect(vue?.unmapped).toBe(false);
     expect(vue?.slug).toBe("vue");
-    expect(vue?.evidence.length).toBeGreaterThan(0);
-    // Vue is a UI framework in stack-analyser's own classification
-    // (specfy type "ui_framework") -- code the project imports, not a
-    // provider it depends on, so it comes back "library" rather than
-    // burying a real service's worth of visibility on something that
-    // can't have an outage or send an invoice.
-    expect(vue?.kind).toBe("library");
+    expect(vue?.category).toBe("stack");
+    expect(vue?.kind).toBe("stack");
   });
 
   it("returns an empty list for a repo with nothing detectable", async () => {

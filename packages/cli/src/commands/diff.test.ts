@@ -14,12 +14,12 @@ describe("runDiff", () => {
     await removeTempDir(dir);
   });
 
-  it("reports both directions: detected-but-missing and declared-but-stale", async () => {
+  it("reports both directions: detected-but-missing and declared-but-not-visible", async () => {
     // fly.toml on disk -> detect() will find fly-io. The manifest neither
     // declares fly-io (the "missing" direction) nor still matches
     // "postgresql" -- a real, mapped, detectable catalog slug (mapping.ts)
     // that nothing in this repo actually references, so it's genuinely
-    // stale rather than merely undetectable-by-design (the "stale"
+    // stale rather than merely undetectable-by-design (the not-visible
     // direction).
     await writeFixtureFile(dir, "fly.toml", 'app = "example"\n');
     await writeFixtureFile(
@@ -43,7 +43,7 @@ dependencies: []
     const text = result.stdout.join("\n");
     expect(text).toContain("Detected but missing from the manifest");
     expect(text).toContain("fly-io");
-    expect(text).toContain("Declared in the manifest but no longer detected");
+    expect(text).toContain("Declared in the manifest but not visible to detection here");
     expect(text).toContain("old-db");
   });
 
@@ -141,7 +141,7 @@ dependencies: []
     const result = await runDiff(dir);
     expect(result.exitCode).toBe(1);
     const text = result.stdout.join("\n");
-    expect(text).toContain("Declared in the manifest but no longer detected");
+    expect(text).toContain("Declared in the manifest but not visible to detection here");
     expect(text).toContain("cf (service: cloudflare, role: dns)");
   });
 
@@ -168,8 +168,10 @@ dependencies: []
 `
     );
     const result = await runDiff(dir, { json: true });
-    const payload = JSON.parse(result.stdout[0] as string) as { staleServices: Array<{ service: string }> };
-    expect(payload.staleServices.some((s) => s.service === "typescript")).toBe(false);
+    const payload = JSON.parse(result.stdout[0] as string) as {
+      notDetectedServices: Array<{ service: string }>;
+    };
+    expect(payload.notDetectedServices.some((s) => s.service === "typescript")).toBe(false);
   });
 
   it("exits 2 with a clear message when no manifest exists", async () => {
@@ -224,6 +226,80 @@ dependencies: []
     expect(result.exitCode).toBe(0);
     const payload = JSON.parse(result.stdout[0] as string);
     expect(payload).toHaveProperty("missingServices");
-    expect(payload).toHaveProperty("staleServices");
+    // Not `staleServices`: the key names a claim the command cannot make,
+    // and a program acting on "stale" deletes. See the module header.
+    expect(payload).toHaveProperty("notDetectedServices");
+    expect(payload).not.toHaveProperty("staleServices");
+    expect(payload).toHaveProperty("detectionWarnings");
+  });
+
+  // The wording of this direction is the fix, not the contents: on a clone
+  // of a real .NET repo the same list named five services that were all in
+  // use, invisible only because their config files are gitignored. A
+  // heading that reads as a delete list gets acted on as one.
+  describe("the not-visible direction says what it actually knows", () => {
+    async function diffWithService(entry: string): Promise<string> {
+      await writeFixtureFile(dir, "package.json", JSON.stringify({ name: "probe", dependencies: {} }));
+      await writeFixtureFile(
+        dir,
+        "dagstree.yaml",
+        `dagstree: 1
+project:
+  name: X
+  slug: x
+services:
+${entry}dependencies: []
+`
+      );
+      const result = await runDiff(dir);
+      return result.stdout.join("\n");
+    }
+
+    it("never calls the list stale, and says outright that it is not a delete list", async () => {
+      const text = await diffWithService(`  - id: old-db
+    service: postgresql
+    role: db
+    added: 2025-01-01
+`);
+      expect(text).toContain("Declared in the manifest but not visible to detection here:");
+      expect(text).toContain("Not a delete list.");
+      expect(text).toContain("gitignored file");
+      expect(text).not.toContain("no longer detected");
+    });
+
+    it("names the reason when the manifest itself already gave one", async () => {
+      const text = await diffWithService(`  - id: old-db
+    service: postgresql
+    role: db
+    added: 2025-01-01
+    status: phasing_out
+`);
+      expect(text).toContain("old-db (service: postgresql, role: db) -- marked phasing_out, so this is expected");
+    });
+
+    it("leaves an active entry unannotated, since nothing is known about why it is absent", async () => {
+      const text = await diffWithService(`  - id: old-db
+    service: postgresql
+    role: db
+    added: 2025-01-01
+    status: active
+`);
+      expect(text).toContain("old-db (service: postgresql, role: db)");
+      expect(text).not.toContain("so this is expected");
+    });
+
+    // "Detection found nothing" and "detection could not read something" are
+    // different facts, and the second one is the likeliest reason a line
+    // above is there at all. It used to be dropped on the floor.
+    it("surfaces detection's own warnings rather than discarding them", async () => {
+      await writeFixtureFile(dir, ".mcp.json", "{ this is not json");
+      const text = await diffWithService(`  - id: old-db
+    service: postgresql
+    role: db
+    added: 2025-01-01
+`);
+      expect(text).toContain("Detection could not read everything in this checkout:");
+      expect(text).toContain(".mcp.json");
+    });
   });
 });

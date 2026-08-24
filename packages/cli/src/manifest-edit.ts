@@ -1,5 +1,5 @@
 // The open-edit-validate-write cycle every writing command shares (`add`,
-// `set`, `link`, `deprecate`).
+// `set`, `link`, `deprecate`, `remove`).
 //
 // Two properties are worth keeping in exactly one place rather than four.
 // First, the manifest is a human-edited file, so edits go through the `yaml`
@@ -12,16 +12,17 @@
 // file nobody can validate.
 import { stat } from "node:fs/promises";
 
-import { MANIFEST_FILENAME_FALLBACK } from "@dagstree/schema";
+import { edgePairs, MANIFEST_FILENAME, MANIFEST_FILENAME_FALLBACK } from "@dagstree/schema";
 import type { DagstreeManifestV1 } from "@dagstree/schema";
 import { parseDocument } from "yaml";
 import type { Document, YAMLSeq } from "yaml";
 
 import { loadValidManifest } from "./load-manifest.js";
 import { checkManifestObject, warningLines } from "./manifest-checks.js";
-import { writeManifestText } from "./manifest-io.js";
+import { findManifest, findManifestIn, writeManifestText } from "./manifest-io.js";
 import type { ManifestLocation } from "./manifest-io.js";
 import { resolveTargetPath } from "./paths.js";
+import { findCycles } from "./toposort.js";
 import type { CommandResult } from "./types.js";
 
 export interface OpenedManifest {
@@ -30,6 +31,13 @@ export interface OpenedManifest {
   manifest: DagstreeManifestV1;
   /** The same file as an editable Document, comments and formatting intact. */
   doc: Document;
+  /**
+   * Cycles the manifest already carried when it was opened, so
+   * commitManifestEdit can tell a cycle this edit introduced from one that
+   * was in the file before the command ran. Empty for a healthy manifest,
+   * which is every manifest the CLI itself has written.
+   */
+  preexistingCycles: string[][];
 }
 
 export type OpenOutcome = { ok: true; value: OpenedManifest } | { ok: false; error: CommandResult };
@@ -57,6 +65,27 @@ export async function openManifestForEdit(pathArg: string | undefined): Promise<
     } catch {
       return { ok: false, error: { exitCode: 2, stdout: [], stderr: [`"${targetDir}" does not exist.`] } };
     }
+
+    // Existing-but-empty is the half of the promise above that the
+    // directory check alone does not deliver. A typo'd or wrong-level
+    // subdirectory exists perfectly often, and letting it through means
+    // loadValidManifest's upward walk silently retargets the edit at
+    // whichever ancestor happens to hold a manifest -- observed as
+    // `dagstree remove fly-api <dir>/sub` deleting the entry from
+    // <dir>/dagstree.yaml at exit 0. Refuse here instead, and name the
+    // ancestor that *was* found so the message says what to type next
+    // rather than only what went wrong.
+    if (!(await findManifestIn(targetDir))) {
+      const ancestor = await findManifest(targetDir);
+      const stderr = [`No ${MANIFEST_FILENAME} in "${targetDir}".`];
+      stderr.push(
+        ancestor
+          ? `${ancestor.filePath} exists, but "${targetDir}" was named explicitly, so the search did not walk up to it. ` +
+              `Point the command at "${ancestor.dir}" to edit that manifest.`
+          : `Run "dagstree init" to create one.`
+      );
+      return { ok: false, error: { exitCode: 2, stdout: [], stderr } };
+    }
   }
 
   const loaded = await loadValidManifest(targetDir);
@@ -70,6 +99,12 @@ export async function openManifestForEdit(pathArg: string | undefined): Promise<
       location: loaded.value.location,
       manifest: loaded.value.manifest,
       doc: parseDocument(loaded.value.text),
+      // Read before the edit rather than after, because "was this cycle
+      // already here?" is not a question the mutated document can answer.
+      preexistingCycles: findCycles(
+        loaded.value.manifest.services.map((service) => service.id),
+        edgePairs(loaded.value.manifest)
+      ).cycles,
     },
   };
 }
@@ -85,18 +120,72 @@ export interface CommitOptions {
 }
 
 /**
+ * Identifies a cycle by the loop itself rather than by where the traversal
+ * happened to enter it.
+ *
+ * findCycles returns a closed walk (`b -> c -> b`) whose starting node
+ * depends on the order services are declared in, so an edit that removes an
+ * unrelated entry earlier in the list can rotate the same loop's rendering.
+ * Dropping the repeated terminal node and rotating the smallest id to the
+ * front makes the key stable across exactly the edits this is used to see
+ * through. Direction is deliberately kept: `b -> c -> b` and `c -> b -> c`
+ * as *edge sets* are the same loop, but a reversed pair of edges is a
+ * different manifest and worth failing on.
+ */
+export function cycleKey(cycle: readonly string[]): string {
+  const nodes = cycle.slice(0, -1);
+  if (nodes.length === 0) {
+    return cycle.join(" -> ");
+  }
+  let start = 0;
+  for (let i = 1; i < nodes.length; i++) {
+    const candidate = nodes[i];
+    const smallest = nodes[start];
+    if (candidate !== undefined && smallest !== undefined && candidate < smallest) {
+      start = i;
+    }
+  }
+  return [...nodes.slice(start), ...nodes.slice(0, start)].join(" -> ");
+}
+
+/**
  * Validates the mutated document and, only if it passes, writes it.
  *
  * The check is the same one `dagstree validate` runs, so "the CLI wrote it"
  * and "it validates" cannot come apart.
  */
-export async function commitManifestEdit(
-  doc: Document,
-  location: ManifestLocation,
-  options: CommitOptions
-): Promise<CommandResult> {
+export async function commitManifestEdit(opened: OpenedManifest, options: CommitOptions): Promise<CommandResult> {
+  const { doc, location } = opened;
   const check = checkManifestObject(doc.toJS());
   if (!check.ok) {
+    // The two checks this module runs are not the same check.
+    // openManifestForEdit accepts anything parseManifest accepts -- schema,
+    // referential integrity, the private-value guard -- while the check
+    // above additionally runs checkAcyclic. So a manifest that already
+    // carried a cycle opens cleanly and fails here, and failurePrefix would
+    // name this command as the cause of a cycle that predates it, sending
+    // the user to fix an edit that was never the problem.
+    //
+    // Opening it at all is deliberate: `dagstree remove` on one of the
+    // cycle's services is the only thing in the CLI that breaks a cycle, so
+    // refusing to open a cyclic manifest would make it unfixable by the
+    // tool that reports it. The edit is still refused when it leaves the
+    // cycle standing -- exit 1, nothing written -- but it is refused in the
+    // file's name rather than in the command's.
+    const before = new Set(opened.preexistingCycles.map(cycleKey));
+    const cycles = check.cycles ?? [];
+    if (cycles.length > 0 && cycles.every((cycle) => before.has(cycleKey(cycle)))) {
+      return {
+        exitCode: 1,
+        stdout: [],
+        stderr: [
+          `${location.filePath} already contained a cyclic dependency before this command, and this edit does not break it:`,
+          ...check.lines,
+          `Nothing was written. Run "dagstree validate" for the full report; ` +
+            `"dagstree remove" on one of the services above drops its edges with it.`,
+        ],
+      };
+    }
     return {
       exitCode: 1,
       stdout: [],

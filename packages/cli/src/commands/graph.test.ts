@@ -177,4 +177,48 @@ dependencies:
       await removeTempDir(empty);
     }
   });
+
+  it("names kind and version on the nodes that have them, and stays quiet on the ones that do not", async () => {
+    // A manifest field the tool's own renderer cannot show is a field
+    // nobody sees. "service" is deliberately absent from the vendor row:
+    // printing the default on every line would drown the two that are not.
+    const dir = await createTempDir();
+    try {
+      await writeFixtureFile(
+        dir,
+        "dagstree.yaml",
+        [
+          "dagstree: 1",
+          "project:",
+          "  name: X",
+          "  slug: x",
+          "services:",
+          "  - id: fly-api",
+          "    service: fly-io",
+          "    role: hosting-api",
+          "    added: 2025-11-02",
+          "  - id: ingress",
+          "    service: nginx",
+          "    kind: component",
+          "    role: ingress-proxy",
+          "    added: 2025-11-02",
+          "  - id: dotnet",
+          "    service: dotnet",
+          "    kind: stack",
+          '    version: "10"',
+          "    role: runtime-backend",
+          "    added: 2025-11-02",
+          "dependencies: []",
+          "",
+        ].join("\n")
+      );
+
+      const text = (await runGraph(dir)).stdout.join("\n");
+      expect(text).toContain("fly-io (hosting-api)");
+      expect(text).toContain("nginx (ingress-proxy, component)");
+      expect(text).toContain("dotnet (runtime-backend, stack, v10)");
+    } finally {
+      await removeTempDir(dir);
+    }
+  });
 });

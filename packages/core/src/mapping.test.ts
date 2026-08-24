@@ -5,6 +5,7 @@ import { tech } from "@specfy/stack-analyser";
 import { describe, expect, it } from "vitest";
 
 import { mapSpecfySlug, SPECFY_TO_DAGSTREE } from "./mapping.js";
+import { DETECTION_KINDS, SERVICE_CATEGORIES } from "./types.js";
 
 // Mirrors @dagstree/schema's $defs.slug.pattern (packages/schema/src/schema.ts)
 // without a cross-package dependency — the CLI's `validate` command rejects
@@ -58,8 +59,15 @@ describe("mapSpecfySlug", () => {
   });
 
   it("converts a camelCase unmapped slug into kebab-case", () => {
-    const result = mapSpecfySlug("apacheCordova", "Apache Cordova");
-    expect(result.slug).toBe("apache-cordova");
+    // Synthetic on purpose. This used to use "apacheCordova", the one
+    // genuinely camelCase key @specfy/stack-analyser ships -- and then the
+    // stack rows added on 2026-08-23 mapped it, so the slug started coming
+    // from the table instead of from the converter and the test stopped
+    // exercising what it names. Real keys are covered by the whole-index
+    // test below, which is the one that must not be narrowed.
+    const result = mapSpecfySlug("someVendorTool", "Some Vendor Tool");
+    expect(result.unmapped).toBe(true);
+    expect(result.slug).toBe("some-vendor-tool");
   });
 
   it("every real stack-analyser key maps to a slug satisfying @dagstree/schema's slug pattern", () => {
@@ -79,22 +87,14 @@ describe("mapSpecfySlug", () => {
   });
 
   it("every mapping table entry has a non-empty slug, name, a valid category, and a valid kind", () => {
-    const categories = new Set([
-      "db",
-      "auth",
-      "ai",
-      "hosting",
-      "dns",
-      "payments",
-      "analytics",
-      "storage",
-      "ci",
-      "agent",
-      "pm",
-      "vcs",
-      "other",
-    ]);
-    const kinds = new Set(["service", "library"]);
+    // From SERVICE_CATEGORIES rather than retyped here: a second copy of the
+    // enum passes green while the spec moves underneath it, which is what
+    // this list did until HANDOFF §4 was widened on 2026-08-23.
+    const categories = new Set<string>(SERVICE_CATEGORIES);
+    // From DETECTION_KINDS for the same reason categories comes from
+    // SERVICE_CATEGORIES: this was a hand-typed ["service", "library"] and
+    // it stayed green while the union grew "component" and "stack".
+    const kinds = new Set<string>(DETECTION_KINDS);
     for (const [specfySlug, entry] of Object.entries(SPECFY_TO_DAGSTREE)) {
       expect(entry.slug.length, `slug for ${specfySlug}`).toBeGreaterThan(0);
       expect(entry.name.length, `name for ${specfySlug}`).toBeGreaterThan(0);
@@ -115,13 +115,28 @@ describe("classifyDetectionKind (via mapSpecfySlug's unmapped path)", () => {
   });
 
   it("classifies an unmapped technology whose specfy type names a provider or running infrastructure as a service", () => {
-    // "monitoring" has no Dagstree category (falls back to "other"), but it
-    // is still very much a service -- an error tracker or an uptime check
-    // can go down and send an invoice exactly like a database can.
-    const result = mapSpecfySlug("some-future-monitor", "Some Future Monitor", "monitoring");
+    // The two questions are independent, and this is the test that they
+    // are: "cdn" is not in LIBRARY_SPECFY_TYPES, so it is a service, and it
+    // is not in SPECFY_TYPE_TO_CATEGORY either, so it has no Dagstree
+    // bucket and lands in "other". Having no category must never imply
+    // being a library -- a CDN can go down and send an invoice exactly like
+    // a database can.
+    //
+    // This used to use "monitoring", which stopped being a case of "no
+    // category" when HANDOFF §4's enum was widened on 2026-08-23. Left as
+    // it was, the test would have kept passing while testing nothing.
+    const result = mapSpecfySlug("some-future-cdn", "Some Future CDN", "cdn");
     expect(result.unmapped).toBe(true);
     expect(result.category).toBe("other");
     expect(result.kind).toBe("service");
+  });
+
+  // The counterpart to the above, and the case the widening created: a type
+  // that now DOES have a bucket must land in it rather than in "other".
+  it("gives an unmapped technology the Dagstree category its specfy type maps to, when there is one", () => {
+    expect(mapSpecfySlug("some-future-monitor", "Some Future Monitor", "monitoring").category).toBe("monitoring");
+    expect(mapSpecfySlug("some-future-queue", "Some Future Queue", "queue").category).toBe("queue");
+    expect(mapSpecfySlug("some-future-mailer", "Some Future Mailer", "notification").category).toBe("messaging");
   });
 
   it("defaults to service kind when stack-analyser supplies no type at all", () => {

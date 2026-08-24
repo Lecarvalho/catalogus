@@ -82,6 +82,7 @@ describe("runInit", () => {
       architecture: "modular monolith",
       pm: "Trello kanban",
       vcsProvider: "github",
+      visibility: "public",
     });
     const result = await runInit(dir, { promptFn: promptFn as never });
     expect(result.exitCode).toBe(0);
@@ -91,7 +92,46 @@ describe("runInit", () => {
     expect(parsed.project.slug).toBe("custom-name");
     expect(parsed.project.architecture).toBe("modular monolith");
     expect(parsed.project.pm).toBe("Trello kanban");
-    expect(parsed.project.vcs).toEqual({ provider: "github", visibility: "private" });
+    // "public", not the old hardcoded "private": visibility is an answer
+    // now. A default here would have made this assertion pass whether the
+    // prompt was wired up or not, which is how the guess survived so long.
+    expect(parsed.project.vcs).toEqual({ provider: "github", visibility: "public" });
+  });
+
+  it("omits project.vcs entirely rather than guessing visibility under --yes", async () => {
+    // The defect this closes: --yes used to write `visibility: private`
+    // unconditionally, with a comment in the file admitting it was a guess.
+    // It was right on the repo it was written against, which is the worst
+    // case -- a wrong default that looks correct is never revisited.
+    // .gitlab-ci.yml is what makes detection name a VCS provider at all;
+    // without a provider there is no vcs block to omit and the test would
+    // pass vacuously. (A root file rather than .github/workflows because
+    // writeFixtureFile does not create parent directories.)
+    await writeFixtureFile(dir, ".gitlab-ci.yml", "stages: [build]");
+    const result = await runInit(dir, { yes: true });
+    expect(result.exitCode).toBe(0);
+
+    const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+    expect(parsed.project.vcs).toBeUndefined();
+
+    const stdout = result.stdout.join("!!");
+    expect(stdout).toContain("visibility was not given");
+    expect(stdout).toContain("dagstree set project.vcs.provider");
+  });
+
+  it("writes project.vcs when --yes is given an explicit visibility", async () => {
+    await writeFixtureFile(dir, ".gitlab-ci.yml", "stages: [build]");
+    const result = await runInit(dir, { yes: true, visibility: "internal" });
+    expect(result.exitCode).toBe(0);
+
+    const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+    expect(parsed.project.vcs).toEqual({ provider: "gitlab", visibility: "internal" });
+  });
+
+  it("refuses a visibility outside the schema enum", async () => {
+    const result = await runInit(dir, { yes: true, visibility: "secret" });
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.join("!!")).toContain("--visibility must be one of");
   });
 
   it("rejects an invalid slug from interactive input", async () => {

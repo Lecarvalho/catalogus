@@ -81,7 +81,7 @@ export async function runLink(
   tuple.flow = true;
   depsSeq.add(tuple);
 
-  return commitManifestEdit(doc, location, {
+  return commitManifestEdit(opened.value, {
     failurePrefix: `Linking "${from}" -> "${to}" would make`,
     successLines: (filePath) => [`Linked "${from}" -> "${to}" in ${filePath}`],
   });
