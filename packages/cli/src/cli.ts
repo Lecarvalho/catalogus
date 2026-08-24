@@ -22,6 +22,7 @@ import { runRemove } from "./commands/remove.js";
 import { runRename } from "./commands/rename.js";
 import { runSet, SETTABLE_FIELDS } from "./commands/set.js";
 import { runValidate } from "./commands/validate.js";
+import { DEFAULT_VIEW_PORT, runView } from "./commands/view.js";
 import { looksLikePrivateFlagName, privateFlagRefusalMessage } from "./private-guard.js";
 import type { CommandResult } from "./types.js";
 
@@ -205,7 +206,7 @@ function createProgram(): Command {
     .command("set")
     .description("set a manifest field: project-level, or an existing service's role")
     .argument("<field>", `one of: ${SETTABLE_FIELDS.join(", ")}`)
-    .argument("<value>", "the value; for coding_agents, a comma-separated list")
+    .argument("<value>", "the value")
     .argument("[pairs...]", "further <field> <value> pairs, applied as one edit")
     // Positional [path] is impossible here: the pair list is variadic, so a
     // trailing directory would be read as a field name. See commands/set.ts.
@@ -254,6 +255,16 @@ function createProgram(): Command {
     .argument("[path]", "target directory (defaults to the current directory)")
     .action(async (oldId: string, newId: string, path: string | undefined) => {
       emit(await runRename(path, oldId, newId));
+    });
+
+  program
+    .command("view")
+    .description("serve the web viewer for this repo's manifest and open it in a browser")
+    .argument("[path]", "repo path (defaults to the current directory)")
+    .option("--port <port>", `port to serve on (default: ${DEFAULT_VIEW_PORT})`)
+    .option("--no-open", "do not open a browser automatically")
+    .action(async (path: string | undefined, opts: { port?: string; open?: boolean }) => {
+      emit(await runView(path, opts));
     });
 
   return program;

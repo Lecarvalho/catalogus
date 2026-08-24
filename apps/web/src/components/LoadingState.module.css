@@ -1,0 +1,5 @@
+.state {
+  color: var(--color-text-muted);
+  padding: var(--space-6) 0;
+  text-align: center;
+}

@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@specfy/stack-analyser": "^1.0.0",
+    "simple-icons": "^16.28.0",
     "yaml": "^2.6.1"
   },
   "devDependencies": {

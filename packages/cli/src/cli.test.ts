@@ -253,8 +253,8 @@ describe("runCli", () => {
 
         const exitCode = await runCli([
           "set",
-          "project.vcs.provider",
-          "github",
+          "project.architecture",
+          "two-tier",
           "project.vcs.visibility",
           "private",
           "--path",
@@ -263,7 +263,7 @@ describe("runCli", () => {
 
         expect(exitCode).toBe(0);
         const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
-        expect(text).toContain("provider: github");
+        expect(text).toContain("architecture: two-tier");
         expect(text).toContain("visibility: private");
       } finally {
         await removeTempDir(dir);

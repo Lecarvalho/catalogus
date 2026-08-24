@@ -18,12 +18,8 @@ project:
   name: Example App
   slug: example-app
   architecture: "two-tier: an HTTP API behind a reverse proxy, with a single-page front end served from the same origin"
-  pm: "kanban board, one card per shipped change"
   vcs:
-    provider: github
     visibility: private
-  coding_agents:
-    - claude-code
 
 services:
   # One hosting provider, one entry per deployed app. Four apps would be four
@@ -111,6 +107,17 @@ services:
   - id: github-actions
     service: github-actions
     role: ci
+    added: 2025-11-02
+
+  # A coding agent has an identity and an icon like anything else above, so
+  # it is a service entry too -- not the free-text project.coding_agents
+  # list this manifest used to carry. No `kind`: it defaults to "service",
+  # which is correct here -- Claude Code is a vendor product with a
+  # subscription, so a Layer 3 cost can attach to it the same way one can
+  # attach to Fly.io or Supabase.
+  - id: claude-code
+    service: claude-code
+    role: coding-agent
     added: 2025-11-02
 
 dependencies:

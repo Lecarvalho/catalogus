@@ -93,17 +93,24 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
     (s) => !allDetectedSlugs.has(s.service) && !isUndetectableByDesign(s.service)
   );
 
-  const declaredAgents = new Set(manifest.project.coding_agents ?? []);
+  // Coding agents are service entries now (role: coding-agent), not
+  // project.coding_agents -- see HANDOFF.md's 2026-08-24 amendment. Matched
+  // by role rather than by a hardcoded list of known agent slugs so a
+  // project's own choice of which entries are coding agents is what this
+  // reads, the same way every other role-based fact in this file is read
+  // from the manifest rather than assumed.
+  const codingAgentEntries = manifest.services.filter((s) => s.role === "coding-agent");
+  const declaredAgentSlugs = new Set(codingAgentEntries.map((s) => s.service));
   const detectedAgentIds = new Set(detection.codingAgents.map((a) => a.agent));
-  const missingAgents = detection.codingAgents.filter((a) => !declaredAgents.has(a.agent));
-  const staleAgents = [...declaredAgents].filter((a) => !detectedAgentIds.has(a));
+  const missingAgents = detection.codingAgents.filter((a) => !declaredAgentSlugs.has(a.agent));
+  const staleAgents = codingAgentEntries.filter((s) => !detectedAgentIds.has(s.service));
 
   // AGENTS.md / .agents/ prove an agent works here without naming it. Worth
   // raising only when nothing else answered the question: alongside a
   // declared list it says nothing new, and alongside a detected one it is
   // already covered by the specific markers.
   const unidentifiedAgents =
-    declaredAgents.size === 0 && detectedAgentIds.size === 0 ? detection.unidentifiedCodingAgents : [];
+    codingAgentEntries.length === 0 && detectedAgentIds.size === 0 ? detection.unidentifiedCodingAgents : [];
 
   const hasDiff =
     missingServices.length > 0 || notDetectedServices.length > 0 || missingAgents.length > 0 || staleAgents.length > 0;
@@ -126,7 +133,11 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
       detectionWarnings: detection.warnings,
       unidentifiedCodingAgents: unidentifiedAgents,
       missingCodingAgents: missingAgents,
-      staleCodingAgents: staleAgents,
+      // Structured the same way notDetectedServices is above -- these are
+      // manifest service entries (role: coding-agent) now, not raw strings
+      // from a project.coding_agents list, so a program acting on this has
+      // the id to hand to `dagstree remove`, not just a bare slug.
+      staleCodingAgents: staleAgents.map((s) => ({ id: s.id, service: s.service, role: s.role })),
     };
     return { exitCode: hasDiff ? 1 : 0, stdout: [JSON.stringify(payload, null, 2)], stderr: [] };
   }
@@ -170,12 +181,12 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
   }
 
   if (missingAgents.length > 0 || staleAgents.length > 0) {
-    lines.push("Coding agents detected but not declared in project.coding_agents:");
+    lines.push("Coding agents detected but not declared as a service entry (role: coding-agent):");
     if (missingAgents.length === 0) {
       lines.push("  (none)");
     } else {
       for (const agent of missingAgents) {
-        lines.push(`  + ${agent.agent} (${agent.name})`);
+        lines.push(`  + ${agent.agent} (${agent.name}) -- dagstree add ${agent.agent} --role coding-agent`);
       }
     }
     lines.push("");
@@ -184,8 +195,8 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
     if (staleAgents.length === 0) {
       lines.push("  (none)");
     } else {
-      for (const agent of staleAgents) {
-        lines.push(`  - ${agent}`);
+      for (const s of staleAgents) {
+        lines.push(`  - ${s.id} (service: ${s.service}, role: coding-agent)`);
       }
     }
     lines.push("");
@@ -195,7 +206,7 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
     const files = [...new Set(unidentifiedAgents.map((e) => e.file))].join(", ");
     lines.push("Coding agent in use but not identified:");
     lines.push(`  ${files} says an agent works in this repo without naming which one.`);
-    lines.push("  Ask the owner, then: dagstree set project.coding_agents <agent>[,<agent>]");
+    lines.push("  Ask the owner, then: dagstree add <agent> --role coding-agent");
     lines.push("");
   }
 

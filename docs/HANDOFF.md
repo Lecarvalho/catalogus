@@ -53,6 +53,39 @@ here rather than made silently.
   owner. A `.codex` marker was added at the same time; without it a correctly-declared `codex`
   entry was reported as drift by `dagstree diff` on every single run. Approved by the owner.
 
+- *2026-08-24, §4, §5, §6 and Appendix A* — `project.pm`, `project.coding_agents` and
+  `project.vcs.provider` are removed. **Anything with an identity and an icon is a service entry; `role` gives its section.**
+  A Trello board was stated twice — free-text `project.pm` *and* a service entry
+  (`id: board, service: trello, role: pm`) — and so was GitHub — `project.vcs.provider` *and*
+  `id: github, service: github, role: vcs`. The governing constraint is that **a project-level
+  field can never be an edge target**: `[github-actions, github]` is a real edge in
+  `examples/reference.dagstree.yaml`, so the VCS provider has to be a service entry to be one of
+  its endpoints, and the same reasoning now extends to the PM tool and to coding agents, which were
+  never expressible as service entries before this change.
+
+  Concretely: `project.pm` (free-text methodology, e.g. "kanban board, one card per shipped
+  change") is dropped with no replacement field — the methodology itself was never more than a
+  comment, and the PM *tool* is the part worth recording, as a service entry (`role: pm`).
+  `project.coding_agents` (a raw string list) is dropped; each coding agent is now a service entry
+  (`role: coding-agent`, no `kind` — it defaults to `service`, correctly, since Claude Code, Cursor
+  and GitHub Copilot are vendor products with subscriptions, so a Layer 3 cost can attach the same
+  way one attaches to Fly.io or Supabase). `project.vcs.provider` is dropped; `project.vcs` keeps
+  only `visibility`, which has no identity and is never an edge target, so it stays a project field.
+
+  `dagstree: 1` is unchanged — this amends v1 in place rather than bumping to v2. The schema URL
+  the modeline points at (`https://dagstree.dev/schema/v1.json`) does not resolve yet, and no
+  manifest outside this repo is known to exist at the time of this amendment: the one this project
+  had been reasoning about, `C:/Workspace/repos/Clapline/dagstree.yaml`, was checked directly
+  while writing this entry and is not there — the directory is, the manifest is not. So there is
+  nothing to migrate, and bumping a version nobody can fetch buys nothing. Recorded rather than
+  left implicit because the earlier "exactly one real manifest exists" phrasing was inherited from
+  a stale note rather than verified, which is the defect class the 2026-08-23 amendment above
+  exists to stop. `dagstree validate` names what moved
+  (`MOVED_FIELD_HINTS` in `packages/schema/src/validate.ts`; `set` carries its own,
+  differently-shaped table in `packages/cli/src/commands/set.ts` for the same three names) rather
+  than reporting a bare "additional property" error on a manifest still in the old shape. Approved
+  by the owner.
+
 ---
 
 ## 1. What This Is
@@ -162,9 +195,13 @@ user_service_accounts -- PRIVATE overlay (RLS: owner only)
   plan_tier, cost_amount, cost_currency, billing_cycle,   -- monthly|yearly|usage
   renewal_date, started_at, notes_private
 
-project_meta        -- Layer 2 mirror in DB (synced from stack.yaml)
-  project_id, architecture_style, pm_method, vcs_provider,
-  coding_agents[],    -- ["Claude Code", "PAUTA", "PLACOTEUX", ...]
+project_meta        -- Layer 2 mirror in DB (synced from dagstree.yaml)
+  project_id, architecture_style, vcs_visibility,
+  -- pm_method, vcs_provider and coding_agents[] are gone (2026-08-24
+  -- amendment below): the PM tool, the VCS provider and each coding agent
+  -- are project_services rows now (role: pm/vcs/coding-agent), not columns
+  -- here. PM methodology itself has no column at all -- it was never more
+  -- than a comment and has no Layer 2 home.
   extra jsonb
 ```
 
@@ -177,7 +214,8 @@ The `services` table is **global and community-maintainable**, not per-user. Thi
 3. Total monthly cost across all projects; cost per project; cost per service. (Private layer, owner only.)
 4. All edges/nodes marked `phasing_out`, with their `replaced_by` targets → migration dashboard.
 5. Everything added in the last N days (from `added_at`).
-6. Which projects use coding agent Z / architecture style W / PM method V.
+6. Which projects use coding agent Z / architecture style W / PM tool V (each a `project_services`
+   row with the matching `role`, since the 2026-08-24 amendment below — not a `project_meta` column).
 
 ---
 
@@ -192,13 +230,29 @@ project:
   name: Clapline
   slug: clapline
   architecture: "modular monolith (.NET 10, vertical slices)"
-  pm: "Trello kanban (PAUTA agent sync)"
-  vcs: { provider: github, visibility: private }
-  coding_agents:
-    - claude-code
-    - pauta
+  vcs: { visibility: private }
 
 services:
+  # PM tool, VCS provider and coding agents are service entries -- anything
+  # with an identity and an icon is (2026-08-24 amendment above). PM
+  # methodology itself ("Trello kanban") has no Layer 2 field; only the tool
+  # does.
+  - id: board
+    service: trello
+    role: pm
+    added: 2025-11-02
+  - id: github
+    service: github
+    role: vcs
+    added: 2025-11-02
+  - id: claude-code
+    service: claude-code
+    role: coding-agent
+    added: 2025-11-02
+  - id: pauta
+    service: pauta
+    role: coding-agent
+    added: 2025-11-02
   - id: supabase-db          # local id, unique within file
     service: supabase        # slug into global catalog
     role: database
@@ -275,7 +329,7 @@ dagstree mcp                  # run as MCP server (stdio)
 ### MCP server mode (the agent workflow — this is the differentiator)
 `dagstree mcp` exposes tools so Claude Code (and other agents) can:
 - `detect_stack` → run detection, return structured diff vs manifest
-- `read_manifest` / `propose_manifest_edit` → agent infers Layer 2 facts mid-session ("this repo has CLAUDE.md and .mcp.json → coding_agents: claude-code; MCP servers: X, Y") and proposes edits
+- `read_manifest` / `propose_manifest_edit` → agent infers Layer 2 facts mid-session ("this repo has CLAUDE.md and .mcp.json → a service entry `claude-code` with `role: coding-agent`; MCP servers: X, Y") and proposes edits
 - `push_private` → routes through the CLI's credential; input validated so no secrets are accepted, only the allowed private-overlay fields
 
 Typical loop: during any coding session, the agent runs detect → diff → proposes "I see you added the Anthropic SDK — add it to stack.yaml?" → on approval, edits the manifest → `dagstree push`.
@@ -367,10 +421,16 @@ Recommended model split (per owner's established practice): Sonnet for ~80% of i
 - [x] Who depends on who (service-to-service) → `service_dependencies` edges (DAG)
 - [x] When the dependency was added → `project_services.added_at` / `added` in yaml
 - [x] Deprecated / phasing out / replaced by what → `status` + `replaced_by_*` at node, edge, and vendor level
-- [x] Coding agents used → `project_meta.coding_agents` (+ auto-detect via CLAUDE.md/.agents/)
-- [x] Source control + provider → `project_meta.vcs_provider` (+ auto-detect)
+- [x] Coding agents used → `project_services` row(s) with `role: coding-agent`, one per agent (+
+      auto-detect via CLAUDE.md/.agents/) — `project_meta.coding_agents` until the 2026-08-24
+      amendment above
+- [x] Source control + provider → `project_services` row with `role: vcs` (+ auto-detect);
+      `project_meta.vcs_visibility` for repo visibility — `project_meta.vcs_provider` until the
+      2026-08-24 amendment above
 - [x] Architecture style → `project_meta.architecture_style` (manual, Layer 2)
-- [x] PM methodology → `project_meta.pm_method` (manual, Layer 2)
+- [x] PM tool → `project_services` row with `role: pm` — `project_meta.pm_method` until the
+      2026-08-24 amendment above; the methodology itself ("Trello kanban, one card per shipped
+      change") has no Layer 2 field and never did more than sit in a comment
 - [x] Brand icons per service → `services.icon_ref` (simple-icons)
 - [x] Multi-project portfolio view → portfolio page + cross-project queries
 - [x] Easy out-of-the-box / CLI setup → `dagstree init` + agent-assisted population via MCP

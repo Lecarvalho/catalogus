@@ -57,9 +57,10 @@ Every Layer 2 field has a command behind it. Do not open `dagstree.yaml` in an e
 
 ```
 dagstree set project.architecture "modular monolith (.NET 10, vertical slices)"
-dagstree set project.pm "Trello kanban"
-dagstree set project.vcs.provider github project.vcs.visibility private
-dagstree set project.coding_agents claude-code,codex
+dagstree set project.vcs.visibility private
+dagstree add trello --role pm
+dagstree add claude-code --role coding-agent
+dagstree add github --role vcs
 dagstree set project.name "Sluglin" project.slug sluglin
 dagstree set services.supabase-db.role database
 dagstree set services.dotnet.version 10
@@ -74,9 +75,14 @@ A wrong *id* is a `dagstree rename <old> <new>`, not a remove-and-re-add either:
 endpoints of every edge and any other entry's `replaced_by` along with the entry, which is the part
 a delete-and-recreate loses.
 
-`project.vcs` takes both halves in one call: the schema requires provider and visibility together,
-so neither can be written alone. `set` takes `--path` rather than a positional directory, because
-its pair list is variadic.
+`project.vcs` carries only `visibility` now — the PM tool, the VCS provider and each coding agent
+are service entries (`role: pm`, `role: vcs`, `role: coding-agent`), added with `dagstree add`, not
+project fields written with `set`. This is the 2026-08-24 change: the manifest used to state some
+things twice (`github` as both `project.vcs.provider` and a `role: vcs` service entry; Trello as
+both free-text `project.pm` and a `role: pm` service entry), and a project-level field can never be
+an edge target — `[github-actions, github]` is a real edge, so the VCS provider has to be a service
+entry to be one of its endpoints. `set` takes `--path` rather than a positional directory regardless,
+because its pair list is variadic.
 
 **Visibility is asked, never guessed.** `init` prompts for it, and `init --yes` writes
 `project.vcs` only if you passed `--visibility`; otherwise it omits the block and tells you the
@@ -92,15 +98,19 @@ fragment, for reading rather than copying:
 ```yaml
 project:
   architecture: "modular monolith (.NET 10, vertical slices)"
-  pm: "Trello kanban"
   vcs:
-    provider: github          # github | gitlab | bitbucket | other
-    visibility: private       # private | public
-  coding_agents:
-    - claude-code
-    - codex
+    visibility: private       # public | private | internal
 
 services:
+  - id: board                 # PM tool -- role: pm, not project.pm
+    service: trello
+    role: pm
+  - id: claude-code            # coding agent -- role: coding-agent, no kind (defaults to service)
+    service: claude-code
+    role: coding-agent
+  - id: github                # VCS provider -- role: vcs, not project.vcs.provider
+    service: github
+    role: vcs
   - id: vertex                # an entry dagstree add already created
     status: phasing_out       # active | deprecated | phasing_out | removed
     replaced_by: anthropic-api
@@ -202,7 +212,7 @@ set up in a web console — none of it leaves a trace in the files.
 **When it cannot tell, it says so instead of picking.** `AGENTS.md` and `.agents/` prove a coding
 agent works in this repo without naming which one, so `detect` reports them as unidentified rather
 than inventing an agent. That is a question for the owner: ask, then
-`dagstree set project.coding_agents <agent>[,<agent>]`. The same applies everywhere in this
+`dagstree add <agent> --role coding-agent`. The same applies everywhere in this
 procedure — an unanswered field is a question, never a plausible default. A guess that happens to
 be right is worse than a gap, because nobody goes back to check it.
 
@@ -212,10 +222,14 @@ be right is worse than a gap, because nobody goes back to check it.
 dagstree init --yes
 ```
 
-This writes `dagstree.yaml` with the project name, VCS provider and coding agents inferred from
-detection, and **no service entries**. It does not write `project.vcs` at all unless you pass
-`--visibility`, because visibility cannot be detected — see "Visibility is asked, never guessed"
-above. That is deliberate: a service entry needs a `role` — what
+This writes `dagstree.yaml` with the project name inferred from the directory and, if you pass
+`--visibility`, `project.vcs.visibility` — and **no service entries at all**, not even ones
+detection can name with confidence. A VCS provider and a coding agent are both service entries now
+(`role: vcs`, `role: coding-agent`), so `init` does not write them either: it tells you what
+detection found and the `dagstree add ... --role ...` command that records each one, the same way
+it already does for every other detected service. It does not write `project.vcs` at all unless you
+pass `--visibility`, because visibility cannot be detected — see "Visibility is asked, never
+guessed" above. That is deliberate for services generally: a service entry needs a `role` — what
 this instance does here, `database`, `hosting-api` — and detection only knows a *category*
 (`db`, `ai`, `other`). Services go in one at a time in step 6, each with a role you decided on.
 
@@ -242,7 +256,7 @@ up, which is stronger evidence than a package that may only be a transitive depe
 | `docker-compose.yml` | Local dependencies: databases, caches, queues |
 | `fly.toml`, `vercel.json`, `netlify.toml`, `render.yaml`, `wrangler.toml` | Hosting, often one file per deployed app |
 | `.github/workflows`, `.gitlab-ci.yml` | CI provider and the deployment chain |
-| `docs/ARCHITECTURE.md`, `README.md` | Architecture style and PM method, in prose |
+| `docs/ARCHITECTURE.md`, `README.md` | Architecture style, and which PM tool is in use, in prose |
 | Dependency registration — `Program.cs`, `DependencyInjection.cs`, a `startup`/module file | Which providers are actually constructed and wired, including ones no settings file names |
 | Client and adapter classes, often under `Infrastructure/`, `clients/`, `providers/` | One class per external system, usually named after it |
 | A settings-validation or required-configuration guard class | The authoritative list of what the app refuses to start without |
@@ -298,7 +312,8 @@ These are what remains after step 3. They are why this skill asks questions:
   service that reads another's data by convention rather than by client. Bring those, not the ones
   you could have read.
 - **Domain registrar and DNS.**
-- **PM tooling and methodology.**
+- **PM tooling.** (Methodology itself — "kanban, one card per shipped change" — has no Layer 2
+  field; it is not modeled here.)
 - **Architecture style**, as the owner would describe it rather than as inferred from directory names.
 - **Lifecycle**: what is being phased out, what replaces it, what is deprecated.
 - **When each dependency was added.** Often recoverable — see below.
@@ -389,7 +404,14 @@ dagstree add supabase --role auth --id supabase-auth --depends-on supabase-db
 dagstree add nginx --kind component --role ingress-proxy --depends-on fly-api
 dagstree add dotnet --kind stack --version 10 --role runtime-backend
 dagstree link fly-api dotnet
+dagstree add trello --role pm
+dagstree add claude-code --role coding-agent
+dagstree add github --role vcs
 ```
+
+The last three are the PM tool, a coding agent and the VCS provider — service entries like any
+other, with no `kind` (it defaults to `service`, correctly: all three are vendor products a Layer 3
+cost can attach to).
 
 Components and stack entries are added by the same command as vendors, with `--kind`. A stack entry
 without an edge is a floating tile: attach it to whatever runs it, the way `fly-api` runs `dotnet`
@@ -413,7 +435,13 @@ a synonym for it:
 hosting   database  auth      storage   cache     queue     search
 ai        payments  email     sms       monitoring logs     analytics
 dns       registrar cdn       vcs       ci        pm        secrets
+coding-agent
 ```
+
+`coding-agent` is the one two-word base word in this list, and it is fixed rather than freely
+composed like the others: every coding agent entry (Claude Code, Cursor, GitHub Copilot, ...) takes
+this exact role, distinguished from each other by `service` and `id`, not by a role qualifier — they
+all do the same job in the project, the way two Fly apps under `hosting` do not.
 
 For `--kind stack` and `--kind component` entries the same rules apply, with their own base words:
 `runtime` (`runtime-backend`, `runtime-web`), `language`, `ui-framework`, `ingress-proxy`,
@@ -432,17 +460,25 @@ distinguishes them: `hosting-api` and `hosting-web`, `storage-media` and `storag
 **The part before the first `-` is what rollups group on.** `monitoring-dashboard` and
 `monitoring-deadman` both count as `monitoring`; `ai-text` and `ai-video` both count as `ai`. That
 is the whole reason for the base-word rule — pick the base word first and the grouping follows.
+Some base words are themselves two words, and for those the split lands mid-base-word rather than
+at a qualifier boundary: `coding-agent` rolls up to `coding`, `ingress-proxy` to `ingress`,
+`telemetry-transport` to `telemetry`, `ui-framework` to `ui`, `runtime-backend` to `runtime`. Same
+rule, no exception — the rollup is a mechanical grouping key, not a name, and the viewer keeps a
+display label for the ones whose key reads as a cut-off word. Do not add a qualifier you did not
+otherwise need just to make the grouping key come out prettier; pick the base word that describes
+the entry and let the key be whatever it is.
 
 A compound naming two different jobs is not a qualifier. `registrar-dns` reads as "registrar *and*
 DNS", which groups under neither: pick the one that is the reason the account exists, and if the
 service genuinely does two jobs, that is two entries (which is the same rule as Supabase being
 `supabase-db` and `supabase-auth`).
 
-Project-level answers through the CLI too — architecture, PM tooling, VCS, coding agents, and a
-corrected project name or slug via `dagstree set`; an edge you remember later via `dagstree link`;
-a phase-out via `dagstree deprecate`; a wrong `add` undone via `dagstree remove`; a wrong role
-corrected via `dagstree set services.<id>.role` rather than by removing and re-adding the entry.
-Nothing gets hand-edited.
+Project-level answers through the CLI too — architecture, VCS visibility, and a corrected project
+name or slug via `dagstree set`; PM tooling, the VCS provider and each coding agent via `dagstree
+add <slug> --role pm|vcs|coding-agent`; an edge you remember later via `dagstree link`; a phase-out
+via `dagstree deprecate`; a wrong `add` undone via `dagstree remove`; a wrong role corrected via
+`dagstree set services.<id>.role` rather than by removing and re-adding the entry. Nothing gets
+hand-edited.
 
 ### 7. Validate
 

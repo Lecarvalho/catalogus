@@ -28,8 +28,80 @@ design decisions; this file tracks *what has been built* against it and what rem
 
 ## Start here on a fresh session
 
-Phases 0 through 3.6 are complete, plus the 3.6.1 correction pass. Nothing is broken. Run the verify
-command first and confirm **549 tests / 38 files** before trusting anything below.
+Run `pnpm build && pnpm test` first and confirm **679 tests / 50 files**, plus `pnpm typecheck`
+clean across all four packages, before trusting anything below. (Phases 0–3.6 and the 3.6.1
+correction pass predate this at 549/38; the number moved a long way in one session.)
+
+### Handoff — 2026-08-24, end of the viewer-foundations session
+
+**What happened.** Phase 3.7's foundation was built and merged: the `apps/web` viewer, `dagstree
+view`, the service catalog, server-side icon resolution, the workspace scanner, and a breaking
+schema change. Four implementation slices, each attacked afterwards by a separate agent that did
+not write it. **Those validation passes found thirteen defects, four of them critical or high**,
+and every single one of the criticals was invisible to a green test suite. That loop is the reason
+this phase is trustworthy; do not drop it.
+
+**The owner's next action, and why this document may be behind.** The owner is running
+`dagstree view` from a real client repo and will come back with feedback. Nothing in this document
+reflects that run. Treat first-hand feedback as outranking anything written here.
+
+**To run it from a client repo:**
+
+```
+pnpm build && pnpm run link:cli     # in this repo, once
+cd <client repo>                    # the skill writes dagstree.yaml, then:
+dagstree view                       # serves 127.0.0.1:4180 and opens the browser
+```
+
+`--no-open` suppresses the browser, `--port <n>` moves it. It refuses to start on a missing or
+invalid manifest rather than serving a broken page.
+
+**Five decisions taken this session that supersede older text in this file.** Each was the owner's,
+each has reasoning, and none should be reversed without a new one:
+
+1. **`dagstree view` is single-repo, not workspace-root.** It takes `[path]` like every other
+   command and serves that repo's manifest. `scanWorkspace()` is built, tested and *dormant* — no
+   caller until the portfolio page. Sections of Phase 3.7 below were written under the old design.
+2. **`simple-icons` is not bundled into the client.** `index.mjs` is 5.2 MB and manifest-driven
+   lookups tree-shake to nothing, so icons resolve server-side and the payload carries path data.
+   Client bundle: 161 KB. The plan's own "bundled into the client" line predates this measurement.
+3. **`project.pm`, `project.coding_agents` and `project.vcs.provider` are removed** — HANDOFF §4's
+   2026-08-24 amendment. Anything with an identity and an icon is a service entry; `role` gives its
+   section. The constraint that settled it: a project-level field can never be an edge target.
+4. **Compact nodes plus a URL-addressed detail panel** (`#/service/<id>`), chosen over a popover
+   and a sub-page because detail content is expected to grow. This is also the shape a DAG node
+   needs, so the layout slice swaps the container, not the node.
+5. **Rollup display labels live in the viewer**, keeping the "segment before the first `-`" rule
+   mechanical and exception-free.
+
+**The one defect class this repo keeps producing, now three times over.** A keyed lookup built as a
+plain object literal, read with a key that can come from a manifest. `getCatalogEntry("constructor")`
+returned the `Object` function; then `GLYPHS["constructor"]` blanked the entire viewer with no error
+UI; `ROLLUP_LABELS` would have been the third. **`role: constructor` is schema-valid, `validate`
+accepts it and `graph` prints it.** Every existing test passed each time, because the tests named
+keys that were *absent* rather than *inherited* — those are different things and only one of them is
+a bug. **Any new keyed lookup gets `Object.create(null)` and a test naming `constructor`.** One
+remains reachable-but-gated: `StatusPill`'s `LABELS[status]`/`styles[status]`, safe only because
+`status` is a schema enum and `view` refuses invalid manifests. That is a guard one layer away from
+the bug, not an absence of it.
+
+**Open, ranked by consequence.** Details in the Phase 3.7 section below.
+
+1. **The DAG has nothing real to be judged against.** The 26-service Clapline manifest this document
+   described does not exist (checked directly). Either onboard a real project first, or build the
+   layout against a deliberately hard synthetic manifest and *say so* — do not declare it done on
+   the 14-node example and imply otherwise.
+2. **`skill-drift.test.ts` has less coverage than it appears to.** It walks only `SKILL.md`'s single
+   yaml fragment, so the shell command lines an agent copies are unchecked — proven by a validator
+   rewriting them to teach removed commands with the suite still green. It also ignores `pattern`,
+   so it would ship a fragment `parseManifest` rejects.
+3. **The traversal corpus is not committed.** ~50 raw-socket vectors have been re-proven three times
+   by scripts inside agent sessions that no longer exist.
+4. **`App.tsx` has no tests** — every browser-only behaviour (hash routing, focus restore, Escape
+   listener lifetime) lives there and is covered only by manual browser runs.
+5. Smaller, all recorded below: focus drops to `<body>` when closing a deep-linked panel; every
+   open and close pushes a history entry; the selected state's two visual cues are both colour; two
+   entries of the same vendor in one group are indistinguishable on the node.
 
 **Read Phase 3.6.1 before touching the skill, the schema or a CLI flag.** It is the most recent
 work and it changed three things a fresh session would otherwise get wrong: entries now carry
@@ -51,21 +123,29 @@ pass by an agent that did not write the code. Every substantial item below assum
 It is unblocked. Build the single-project DAG first, against a real manifest, because layout is the
 part that is genuinely hard and it de-risks everything after it.
 
-**Where the real manifest is, and why it is not in this repo.** The cold runs wrote
-`C:/Workspace/repos/Clapline/dagstree.yaml`. As of the third run it holds **26 services and 30
-edges**, all `kind: service`, with off-repo entries — and, unlike the second run's file, **no
-lifecycle entries and no notes**. It stays there. Copying it in would publish a private project's entire service
-inventory and topology in a public repo, which is the same reasoning that made
-`examples/reference.dagstree.yaml` synthetic (see Phase 3.6). So:
+**There is no real manifest, and this document said otherwise for a while.** Everything below used
+to read: the cold runs wrote `C:/Workspace/repos/Clapline/dagstree.yaml`, it holds 26 services and
+30 edges, `fly-api` has fourteen outgoing edges, and that file is the layout stress test the DAG
+should be judged against. **Checked directly on 2026-08-24: the directory exists, the manifest does
+not.** No `dagstree.yaml` and no `stack.yaml` anywhere under it. Nobody knows when it went, because
+nothing ever re-checked — this document warned that its own numbers had "already been stale once"
+and then went stale again in the same section, which is the argument for checking a claim before
+building on it rather than for writing the warning.
 
-- The viewer reads manifests by **scanning a workspace root**, which is Phase 3.7's design anyway.
-  Point it at `C:/Workspace/repos/` to develop against something real.
-- **Tests and fixtures use synthetic manifests only.** Anything committed here is public.
+Consequences, and they are real rather than bookkeeping:
 
-**What makes that manifest a good layout stress test**, and worth checking before declaring the DAG
-done: `fly-api` has fourteen outgoing edges, `grafana` has six, and `supabase-db` has three incoming
-from different directions. A naive layout renders that as spaghetti. If elkjs handles this one
-readably, it will handle most projects.
+- **The only manifest that exists is `examples/reference.dagstree.yaml`**, which is synthetic and
+  small — 14 entries, 14 edges. It covers every *shape* (`kind: component`, `kind: stack` with a
+  version, `status: phasing_out` with `replaced_by`, one vendor under two roles, and since the
+  2026-08-24 amendment a `role: coding-agent` entry) but it is not a layout stress test. Nothing on
+  disk currently proves elkjs handles a fourteen-edge fan-out readably.
+- **So the DAG slice cannot be judged against real topology yet.** Either onboard a real project
+  first, or build the layout against a synthetic manifest deliberately shaped to be hard and say
+  plainly that that is what happened. Do not declare the layout done on a 14-node example and
+  imply it was tested on something harder.
+- **Tests and fixtures stay synthetic regardless.** Anything committed here is public, which is the
+  reasoning that made the reference example synthetic in the first place (see Phase 3.6) and is
+  unaffected by any of the above.
 
 **What the viewer has to render, beyond the DAG.** Nodes come in three kinds now and they are not
 interchangeable on screen: `service` is a vendor (brand icon, and the only kind a Layer 3 cost can
@@ -985,11 +1065,18 @@ whole design wants. Verified by direct execution — `init --yes`, `set` ×2, `a
 `deprecate`, then `validate` exit 0 — on a scratch project, with the `$schema` modeline and comments
 intact afterwards.
 
-- [x] `dagstree set <field> <value> [<field> <value> ...]` — `project.architecture`, `project.pm`,
-      `project.vcs.provider`, `project.vcs.visibility`, `project.coding_agents`. Takes *pairs*, not
-      a single field, because the schema requires `project.vcs` to carry both `provider` and
-      `visibility`: a strictly one-field-per-call setter could never write vcs at all, in either
-      order. Every value is checked before the file is opened, so a bad second pair leaves the first
+- [x] `dagstree set <field> <value> [<field> <value> ...]` — `project.architecture`,
+      `project.vcs.visibility`, and the per-entry `services.<id>.role` / `.kind` / `.version`.
+      **Superseded in part by the 2026-08-24 schema amendment** (HANDOFF §4 amendment log):
+      `project.pm`, `project.vcs.provider` and `project.coding_agents` were settable when this was
+      written and no longer exist — the PM tool, the VCS provider and each coding agent are service
+      entries now, reached through `add`, and `set` rejects the three old names with a message
+      naming the replacement command. The pair-taking design below outlived its original reason.
+      It took *pairs* rather than a single field because the schema then required `project.vcs` to
+      carry both `provider` and `visibility`, so a one-field-per-call setter could never write vcs
+      at all, in either order; `vcs` now holds only `visibility`, so that constraint is gone, but
+      the variadic form stays because applying several edits as one write is worth having on its
+      own. Every value is checked before the file is opened, so a bad second pair leaves the first
       unwritten. Consequence of the variadic pair list: `set` takes `--path` where every other
       command takes a positional `[path]` — a trailing directory would be swallowed as a field name,
       the same shape of bug `--depends-on` hit in Phase 3.5.
@@ -1092,8 +1179,233 @@ This keeps the Phase 4 decision genuinely deferred rather than quietly pre-made,
 parts of the viewer that are actually hard — DAG layout, icon fallback, making a multi-parent graph
 readable — none of which involve a database.
 
-- [ ] React + Vite app under `apps/web`
-- [ ] Manifest source: scan a workspace root for repos containing `dagstree.yaml`
+#### Two decisions settled before implementation started
+
+The checkboxes below left one thing unstated that turns out to govern everything: a browser cannot
+read a filesystem, so *something* has to deliver scanned manifests to the app. Three answers were
+put to the owner — a Vite dev-server plugin, a `dagstree view` command serving them, or a
+`dagstree bundle` command writing one aggregate JSON file the app fetches.
+
+**Decided: `dagstree view` serves them.** The viewer is a shipped CLI feature rather than a
+repo-local dev tool, so it works in any checkout the owner points it at, behind one entry point
+they already know. `bundle` was rejected on the owner's own criterion: it is the only one of the
+three that duplicates data — a second copy of every manifest on disk, stale until regenerated, and
+a Layer 2 aggregate that would need a gitignore rule to stay out of the repo. The Vite plugin
+avoids that too but produces nothing runnable outside this checkout.
+
+Worth recording because it was asked and is easy to re-ask: **the transport does not affect icon
+rendering at all.** `simple-icons` is an npm package bundled into the client; the work is identical
+under all three.
+
+**Decided: a service catalog in `@dagstree/core`, keyed by dagstree slug.** What actually decides
+whether icons render is a slug → (display name, category, icon ref) table, and nothing in the repo
+was one. `SPECFY_TO_DAGSTREE` is not it: that table is keyed by **specfy** slug and answers "what
+did stack-analyser just find?", and it only covers what detection can emit. Manifest slugs come
+from people too — `dotnet`, `opentelemetry`, `namecheap` and `trello` all appear in
+`examples/reference.dagstree.yaml` and had no row anywhere. So the catalog is a separate module
+deriving its base rows from the mapping table (one source of truth for name and category) and
+layering verified icon refs plus the rows detection can never produce. It is the local seed for
+HANDOFF §4.1's eventual global catalog, and nothing more.
+
+The rule that governs it is the standing one: **an icon slug is written down only after being read
+out of the installed `simple-icons` package**, and a slug with no verified icon carries no icon
+field, falling back to a category icon in the viewer. `namecheap` is exactly the shape of guess
+this project keeps producing — plausible, unchecked, and mostly right.
+
+#### The icon fallback is the majority path, not an edge case
+
+Measured directly against `simple-icons` 16.28.0 (3,453 icons) before any code was written, because
+the checkbox below assumed brand icons with a fallback for the exceptions. It is the other way
+round.
+
+Of the 159 distinct dagstree slugs in `SPECFY_TO_DAGSTREE`, **77 match a simple-icons slug
+directly, a further 22 resolve by matching the catalog's display name against the icon's `title`,
+and 60 have no icon at all.** That last group is 38% of the catalog, and it is not a tail of
+obscure rows — **Slack, OpenAI, AWS (and S3, Lambda, EC2, Cognito, CloudFront, SQS), Heroku,
+Twilio, SendGrid, Segment, Amplitude and Java are all absent.**
+
+This is precisely the risk HANDOFF §7 flagged — "simple-icons has removed brand marks before under
+trademark pressure, so the generic category-icon fallback needs to exist from the start rather than
+being bolted on the first time a slug disappears" — except that it has already happened, at scale,
+before the viewer exists. Consequences for the design:
+
+- **The category fallback has to look deliberate.** Two nodes in five will use it. A fallback
+  styled as a missing-image placeholder makes a correct render look broken.
+- **A dagstree slug is not a simple-icons slug.** `fly-io` does not resolve; the icon is
+  `flydotio`. Any lookup that passes the dagstree slug straight through silently loses the owner's
+  primary host — a wrong render that looks like an absent one.
+- The catalog stores an explicit, verified `icon` ref precisely so these two facts live in one
+  table with a test behind them rather than in the viewer's guesswork.
+
+#### What the validation pass found — four defects, all fixed
+
+Both slices were written by implementer agents and then attacked by a separate agent that had not
+written them, per `CLAUDE.md`. It executed rather than read, and it earned its keep: two of the four
+defects were in mechanisms whose whole purpose was to prevent the thing they failed to prevent.
+
+1. **A Windows junction in the workspace root vanished from all three lists** — not `manifests`,
+   not `failures`, not `unmanaged`, despite its target being a real directory whose manifest read
+   and validated fine through the link. `dirent.isDirectory()` returns false for a junction. This
+   was the exact failure the three-way split exists to prevent, and it was caused by a brief that
+   told the implementer not to follow links for cycle safety — reasoning that does not apply at
+   depth 1, where there is no walk to loop. **Fixed by following links**: directory-ness is now
+   decided by resolving the target, not by trusting the dirent. A Windows quirk found on the way and
+   worth keeping: `stat()` on a junction whose target is a *file* throws `ENOENT`, identical to a
+   genuinely broken link, so the target text is read with `readlink()` first and that path stat-ed.
+2. **An `ICON_OVERLAY` key typo was silently swallowed.** Renaming the key `stripe` to `strpe` cost
+   Stripe its brand icon and **all 11 tests still passed** — the tripwire checked that every icon
+   which landed resolves, never that every overlay entry landed. One assertion closed it.
+3. **`getCatalogEntry("constructor")` returned the `Object` function.** The catalog was a plain
+   object literal, so a lookup fell through to `Object.prototype`; truthy, so a viewer would take
+   its known-service branch and render a service named **"Object"**. Not hypothetical: the schema's
+   slug pattern admits `constructor`, and a manifest with `service: constructor` validates clean
+   under the real CLI. Now built on `Object.create(null)`.
+4. **`deriveBaseCatalog` had no fallback and its comment claimed one.** With no specfy key equal to
+   the dagstree slug, the winning row was decided by nothing but declaration order in `mapping.ts` —
+   proven by swapping two lines and watching the catalog row change. The comment called the rule
+   "generic, not a supabase-specific special case". **Now a total three-rule order** (agree ->
+   bare-key wins -> **throw**, naming the slug and the competing names), and the pin list is gone:
+   its trap was that the natural way to fix its red was to append the new slug, silently accepting
+   an order-dependent row.
+
+Two claims came back *stronger* than reported. The malformed-YAML discriminator matches
+`@dagstree/schema`'s literal `"Could not parse YAML: "` prefix, which reads as fragile — but
+changing that wording and rebuilding showed the repo degrades to `reason: "invalid"` while staying
+in `failures`, and a `workspace-scan` test goes red, so the coupling cannot rot silently. And a
+20-directory adversarial workspace — malformed YAML, schema-invalid, empty manifest, a manifest
+that is a directory, an ACL-denied file, a `stack.yaml` fallback, non-ASCII names — came back with
+every entry in exactly one list, none duplicated, none dropped.
+
+**Verified state: 581 tests across 40 files, `pnpm build` and `pnpm typecheck` clean.** The junction
+fix and the prototype fix were each re-confirmed by the orchestrator running the built `dist`
+directly, and all 115 icon refs re-checked against a separately installed `simple-icons@16.28.0`.
+
+**Known behaviour, not a defect, recorded so it is not rediscovered as one:** junctioning a repo
+that already sits in the workspace root surfaces it twice, as two projects with the same slug.
+Deduplicating by resolved path is a design decision nobody has needed yet; in practice a junction
+points at another drive, where the case cannot arise.
+
+#### The catalog does not carry a category — `role` already answers that
+
+The catalog was first built as `{ slug, name, category, icon? }`, and the owner rejected the
+category field on sight: *"category is something that needs to be set by the client, no? your same
+question happens to AWS, azure, supabase, firebase. we can't hard category."*
+
+That is correct, and the repo already had the answer. **A category is not a property of a vendor.**
+Supabase is a database *and* auth *and* storage *and* a queue; AWS, Azure and Firebase are the
+same. Which one it is depends on what a given project uses it for — a per-project fact the client
+already states as **`role`**, required on every service entry. `packages/schema/src/schema.ts` says
+so in its own note on the field: *"The same catalog service can appear more than once under
+different roles/ids — e.g. supabase-db and supabase-auth both service: supabase."* And the viewer
+was already settled to group on the segment of `role` before the first `-`. So grouping never
+needed a catalog category; adding one introduced a second, weaker answer to a question `role`
+already answered.
+
+`ServiceCategory` stays exactly where it was — `mapping.ts` and the config-key detectors — because
+there it buckets **detection output** for `detect` and `diff`, which is the different question
+"what sort of thing did I just find?", and it never reaches the manifest. It appears nowhere in the
+manifest schema.
+
+So `CatalogEntry` is `{ slug, name, icon? }`: only what a global table can know that a project
+cannot. Two consequences worth recording, because both were live problems that this deleted rather
+than solved:
+
+- The `namecheap` category question disappeared. The row keeps its verified name and brand icon and
+  asserts no bucket. This is the *good* shape of "ask, never guess" — the question stopped being
+  asked because it was the wrong question, not because someone answered it plausibly.
+- The catalog previously coupled the two: `category` was required, so a verified icon could not be
+  recorded without also asserting a category. That coupling is gone.
+
+**The four fields that were being confused**, since the owner reasonably asked what separates
+`category` from `kind` — they answer different questions, and only two are the client's:
+
+| field | lives in | set by | answers |
+| --- | --- | --- | --- |
+| `role` | manifest entry (**required**) | the owner | what this project uses it for — `hosting-api`, `storage-media`. Rollup is the segment before the first `-`. **This is the grouping.** |
+| `kind` | manifest entry (optional, default `service`) | the owner | vendor (`service`) / infrastructure the project runs itself (`component`) / what the code is written in (`stack`). Decides rendering, and whether a Layer 3 cost can attach at all. |
+| `category` | core detection tables | Dagstree | bucket for *detection output* only. Never enters the manifest. |
+| `DetectionKind` | core mapping | Dagstree | whether a detected thing earns a node at all. |
+
+The viewer's category-icon fallback therefore keys off `role`, not off the catalog — which is the
+better source anyway, since a per-usage role is exactly what a generic icon should depict: the
+database node gets a database icon whoever the vendor is.
+
+#### Scope notes found while grounding the above
+
+- **The scan is depth 1.** `C:/Workspace/repos/` holds 19 directories as direct children (counted
+  by executing the scanner against it, after an earlier hand-count said 18). Recursing would walk
+  `node_modules` and every nested worktree, and a manifest inside a dependency is not a project in
+  the portfolio.
+- **One real manifest exists today** — `Clapline`. The portfolio page and the usage matrix have a
+  single row to render until more repos are onboarded, which is the reason they were already
+  ranked last.
+
+- [x] Service catalog in `@dagstree/core`: dagstree slug -> display name and a verified
+      `simple-icons` ref (**no category** — see the correction above). Names derived from
+      `SPECFY_TO_DAGSTREE` rather than copied from it. **164 rows, 115 with an icon, 49 without.**
+      A test fails when an icon ref does not resolve in the installed package, and a second one
+      fails when an overlay key matches no row — both tripped deliberately and observed red before
+      being trusted.
+- [x] Manifest source: `scanWorkspace(root)` scans a workspace root for repos holding
+      `dagstree.yaml` (or the `stack.yaml` fallback), depth 1, ordinal-sorted. Returns a three-way
+      split: `manifests`, `failures` (with a reason — `unreadable` / `malformed-yaml` / `invalid`)
+      and `unmanaged`. A repo with a broken manifest is a reported entry, not a dropped one — a
+      project that vanishes from the portfolio because of a typo is the worst available failure,
+      since nothing on screen says anything is wrong.
+- [x] React + Vite app under `apps/web`. CSS Modules plus a `tokens.css` custom-property layer;
+      every component below `App.tsx` is pure (props in, no fetch, no `window`, no node imports), so
+      a hosted viewer later reuses them as a file move rather than a rewrite. Client bundle is
+      **161 KB** with zero `simple-icons` bytes in it — icons resolve server-side, because
+      `simple-icons`' `index.mjs` is 5.2 MB and a manifest-driven lookup tree-shakes to nothing.
+- [x] **`dagstree view [path]`: serves one repo's manifest plus the built app, and opens the
+      browser.** Owner decision, superseding the workspace-root design this section was written
+      under: the skill runs it in the client repo after writing the manifest. `scanWorkspace` stays
+      built and tested but has no caller until the portfolio page. `GET /api/project` is the whole
+      API; the payload — not the CLI — is the boundary a hosted viewer reimplements from its own
+      store.
+
+      **Two validation passes, five defects between them, all fixed and re-verified.** The critical
+      one is worth recording because it is the same defect this project already fixed once: a
+      manifest with `role: constructor` — which `validate` accepts and `graph` prints — blanked the
+      *entire* page, because the viewer's glyph table was a plain object literal and the lookup
+      inherited `Object` through the prototype chain. The server-side catalog had been hardened
+      against exactly this one slice earlier; the client reintroduced it, and **all 619 tests passed
+      with it live**, because every existing test named a rollup that was merely absent rather than
+      inherited. Also fixed: a partial `dist/web` starting a server that 500s on every page; an
+      absolute-form request target bypassing `/api` routing; `stat().isFile()` passing an
+      unreadable `index.html`; and a `Host` check that made `--port 80` reject every request a real
+      browser sends. Bound to `127.0.0.1`, `Host` validated against DNS rebinding, traversal proven
+      over raw sockets with a planted canary, `nosniff` on every response.
+- [ ] **Compact nodes and a URL-addressed detail panel.** Owner decision after seeing the first
+      render: a node carries an icon and a name only — plus a status colour and an uncatalogued
+      marker, the two signals that must survive without a click — and everything else moves into a
+      side panel addressed by `#/service/<id>`. Hover is a tooltip, never the detail content.
+      Chosen over a popover and over a sub-page because the detail content is expected to grow
+      (edges, notes, then Layer 3 cost, EOL, blast radius): a panel scrolls, keeps the graph in
+      view, and the same route renders full-page later if it outgrows the panel. This is also the
+      shape a DAG node needs, so the layout slice swaps the container for a canvas rather than
+      rebuilding the node.
+- [ ] **Rollup display labels.** `role: coding-agent` rolls up to `coding`, so the section heading
+      reads "CODING" — the one rollup in the vocabulary that is a truncation rather than a word.
+      Settled as a viewer-side label table (`coding` → "Coding agents", and so on) falling back to
+      the raw rollup, keeping presentation in presentation: no schema change, no exception in the
+      one-line rollup rule. `SKILL.md` states outright that `coding-agent` rolls up to `coding`,
+      which resolves its own contradiction between "fixed two-word base word" and "group on the
+      part before the first `-`".
+- [ ] **The skill-drift test does not cover what it now needs to.** Found by validating the schema
+      migration: `skill-drift.test.ts` walks only `SKILL.md`'s single `<!-- dagstree:fragment -->`
+      yaml block, so a validator rewrote the skill's fenced *shell* blocks to teach
+      `dagstree set project.coding_agents ...` and `dagstree set project.vcs.provider ...` — both
+      removed commands, in the lines an agent copies — and **all 645 tests stayed green**. The hole
+      is pre-existing; this migration made it bite, because `project.pm` used to be a yaml field the
+      fragment covered and its replacement is a shell line nothing checks. `CLAUDE.md` names this
+      test as the mechanism that keeps the shipped skill honest, so it has to cover the commands.
+- [ ] **Commit the traversal corpus as a fixture.** The static server's containment is the
+      strongest security property here and it has been re-proven three times by throwaway scripts
+      inside agent sessions that no longer exist — ~50 raw-socket vectors (backslash separators,
+      double-encoding, overlong UTF-8, drive-absolute, UNC, NTFS ADS, absolute-form). None of it is
+      in the repo, so every future change re-earns it by hand or silently loses it. "Verified by an
+      agent that no longer exists" is not verification.
 - [ ] Per-project DAG: elkjs layout, React Flow render, `simple-icons` brand icons with a
       category-icon fallback from the start. **Group on the segment of `role` before the first
       `-`** — that is the convention settled in the 3.6 follow-ups, and the viewer is the first
@@ -1102,12 +1414,16 @@ readable — none of which involve a database.
 - [ ] Portfolio page: project list, service usage matrix across projects
 - [ ] Migration dashboard: everything `phasing_out` with its replacement
 - [ ] Layer 3 cost panel present, rendering an explicit "not connected" empty state
-- [x] **Unblocked.** A real manifest now exists — 26 services, 30 edges, off-repo services, but no
-      lifecycle entries and no notes — alongside `examples/reference.dagstree.yaml`, which is the
-      one that covers status, `replaced_by`, `kind: component` and `kind: stack`. That is enough to build and
-      judge the per-project DAG, the status colours and the `replaced_by` rendering, which are the
-      genuinely hard parts. The portfolio page and the usage matrix want several projects, so they
-      are the parts to build last, against whatever manifests exist by then.
+- [x] **Unblocked, on the synthetic example only.** This box used to claim a real 26-service
+      manifest existed alongside the reference example; it does not (see "There is no real
+      manifest" above — checked 2026-08-24). What is actually available is
+      `examples/reference.dagstree.yaml`: 14 entries and 14 edges covering status, `replaced_by`,
+      `kind: component`, `kind: stack` and `role: coding-agent`. That is enough to build the
+      per-project DAG, the status colours and the `replaced_by` rendering, because those are
+      questions about *shape*, and every shape is present. It is **not** enough to judge whether
+      the layout stays readable under a real fan-out, which is the genuinely hard part and now has
+      no evidence behind it either way. The portfolio page and the usage matrix want several
+      projects and have none, so they stay last.
 
 A local Postgres container (Docker 29.4.1 is installed) remains available and is worth doing
 separately, but for a different purpose: prototyping the §4 schema, RLS policies and the recursive

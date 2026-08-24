@@ -49,7 +49,7 @@ const ajv = new Ajv2020({ allErrors: true, strict: true });
 addFormats(ajv);
 const validateSchema = ajv.compile<DagstreeManifestV1>(dagstreeSchemaV1);
 
-export type DagstreeManifestErrorKind = "schema" | "private-key" | "private-value" | "reference";
+export type DagstreeManifestErrorKind = "schema" | "private-key" | "private-value" | "reference" | "moved-field";
 
 export interface DagstreeManifestError {
   /**
@@ -64,6 +64,14 @@ export interface DagstreeManifestError {
    * "reference" — passed schema validation but fails a check the schema
    * can't express: duplicate service id, or a dependency edge naming an
    * id no services[] entry has.
+   * "moved-field" — the property name is one of a handful the 2026-08-24
+   * amendment relocated from a project field to a service entry
+   * (project.pm, project.coding_agents, project.vcs.provider). Ajv reports
+   * this the same way it reports any other unknown property
+   * (`additionalProperties`), which for one of these three specifically
+   * would read as a bare "must NOT have additional properties" — true, but
+   * useless to whoever hits it on an old-shape manifest. See
+   * MOVED_FIELD_HINTS below.
    */
   kind: DagstreeManifestErrorKind;
   instancePath: string;
@@ -121,11 +129,49 @@ function additionalPropertyName(err: ErrorObject): string | undefined {
   return typeof params.additionalProperty === "string" ? params.additionalProperty : undefined;
 }
 
+// Fields the 2026-08-24 amendment moved from a project field to a service
+// entry (HANDOFF.md's amendment log). Keyed by the exact parent instancePath
+// and property name Ajv reports on an `additionalProperties` failure, so a
+// manifest still in the old shape gets told what to do instead of a bare
+// "must NOT have additional properties" -- see this file's skill-drift
+// sibling test and docs/PLAN.md for why a plausible-looking but wrong
+// message is worse than an admitted gap.
+const MOVED_FIELD_HINTS: ReadonlyArray<{ parentPath: string; property: string; message: string }> = [
+  {
+    parentPath: "/project",
+    property: "pm",
+    message:
+      'project.pm was removed -- PM tooling is a service entry now, not a project field: record it with, ' +
+      'e.g., "dagstree add trello --role pm" (the methodology text itself, e.g. "kanban board, one card per ' +
+      'shipped change", has no Layer 2 home; it was never more than a comment).',
+  },
+  {
+    parentPath: "/project",
+    property: "coding_agents",
+    message:
+      'project.coding_agents was removed -- coding agents are service entries now, one per agent, with ' +
+      '"role: coding-agent": record each with, e.g., "dagstree add claude-code --role coding-agent".',
+  },
+  {
+    parentPath: "/project/vcs",
+    property: "provider",
+    message:
+      'project.vcs.provider was removed -- the VCS provider is a service entry now, with "role: vcs": ' +
+      'record it with, e.g., "dagstree add github --role vcs". project.vcs keeps only "visibility".',
+  },
+];
+
+function movedFieldMessage(instancePath: string, property: string): string | undefined {
+  return MOVED_FIELD_HINTS.find((hint) => hint.parentPath === instancePath && hint.property === property)?.message;
+}
+
 function classifyAjvErrors(rawErrors: readonly ErrorObject[]): DagstreeManifestError[] {
   const privateByPath = new Map<string, DagstreeManifestError>();
-  // Parent object paths where a private-key hit already explains the
-  // failure, so the oneOf branch's "must match exactly one schema" noise
-  // (dependency edges try both the tuple and object shape) can be dropped.
+  const movedByPath = new Map<string, DagstreeManifestError>();
+  // Parent object paths where a private-key or moved-field hit already
+  // explains the failure, so the oneOf branch's "must match exactly one
+  // schema" noise (dependency edges try both the tuple and object shape)
+  // can be dropped.
   const explainedParents = new Set<string>();
 
   for (const err of rawErrors) {
@@ -156,6 +202,18 @@ function classifyAjvErrors(rawErrors: readonly ErrorObject[]): DagstreeManifestE
         });
       }
       explainedParents.add(err.instancePath);
+      continue;
+    }
+
+    if (property !== undefined) {
+      const moved = movedFieldMessage(err.instancePath, property);
+      if (moved) {
+        const path = `${err.instancePath}/${property}`;
+        if (!movedByPath.has(path)) {
+          movedByPath.set(path, { kind: "moved-field", instancePath: path, property, message: moved });
+        }
+        explainedParents.add(err.instancePath);
+      }
     }
   }
 
@@ -164,17 +222,17 @@ function classifyAjvErrors(rawErrors: readonly ErrorObject[]): DagstreeManifestE
     if (isPrivateKeyDenyError(err)) continue;
     const property = additionalPropertyName(err);
     if (property !== undefined && looksLikePrivateKey(property)) continue;
+    if (property !== undefined && movedFieldMessage(err.instancePath, property)) continue;
     if (err.keyword === "oneOf" && explainedParents.has(err.instancePath)) continue;
-    // A "type" mismatch at the same path as a private-key hit is
-    // guaranteed noise, not a second real problem: the private-key hit
-    // only ever fires from an object schema's patternProperties/
-    // additionalProperties, which proves the runtime value here really is
-    // an object, so oneOf's non-matching branch (e.g. dependencyEdgeTuple
-    // wanting an array) complaining about this same path can't be
-    // describing the actual data. Other keywords at that path -- a
-    // genuinely missing required property, say -- are kept: allErrors
-    // promises every real problem is reported, not just the private-key
-    // one.
+    // A "type" mismatch at the same path as a private-key or moved-field hit
+    // is guaranteed noise, not a second real problem: both hits only ever
+    // fire from an object schema's patternProperties/additionalProperties,
+    // which proves the runtime value here really is an object, so oneOf's
+    // non-matching branch (e.g. dependencyEdgeTuple wanting an array)
+    // complaining about this same path can't be describing the actual data.
+    // Other keywords at that path -- a genuinely missing required property,
+    // say -- are kept: allErrors promises every real problem is reported,
+    // not just this one.
     if (err.keyword === "type" && explainedParents.has(err.instancePath)) continue;
     others.push({
       kind: "schema",
@@ -183,7 +241,7 @@ function classifyAjvErrors(rawErrors: readonly ErrorObject[]): DagstreeManifestE
     });
   }
 
-  return [...privateByPath.values(), ...others];
+  return [...privateByPath.values(), ...movedByPath.values(), ...others];
 }
 
 /**

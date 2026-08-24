@@ -8,7 +8,7 @@
 //     manifest, to avoid inviting hand-authoring. It does embed one
 //     ```yaml FRAGMENT — the shape of the handful of Layer 2 fields that
 //     have no CLI command and still get hand-edited (project.architecture,
-//     project.pm, project.vcs, project.coding_agents, status/replaced_by).
+//     project.vcs, status/replaced_by).
 //     That fragment is marked with an `<!-- dagstree:fragment -->` HTML
 //     comment immediately above its fence.
 //   - examples/*.dagstree.yaml — reference manifests the skill's output is

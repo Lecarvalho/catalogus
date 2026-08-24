@@ -2,12 +2,13 @@
 // fields whose first value is a guess only a human can correct, wherever
 // that guess got written down.
 //
-// Why it exists: writing the agent skill surfaced five fields (architecture,
-// pm, vcs.provider, vcs.visibility, coding_agents) with no command behind
-// them, so an agent had to hand-edit the YAML and then validate.
-// Hand-editing is how a manifest ends up with a field the schema rejects, or
-// with a cost figure in an architecture note. With this, the CLI is the only
-// writer -- which is the property the whole design wants.
+// Why it exists: writing the agent skill surfaced fields (architecture,
+// pm, vcs.provider, vcs.visibility, coding_agents -- the first three of
+// which have since moved to service entries, see FIELDS below) with no
+// command behind them, so an agent had to hand-edit the YAML and then
+// validate. Hand-editing is how a manifest ends up with a field the schema
+// rejects, or with a cost figure in an architecture note. With this, the
+// CLI is the only writer -- which is the property the whole design wants.
 //
 // project.name and project.slug used to be excluded here on the theory that
 // `init` owns them: it writes both, once, when the manifest is scaffolded.
@@ -29,12 +30,16 @@
 // wrong: a service entry beyond its role stays `add`'s, an edge stays
 // `link`'s, lifecycle stays `deprecate`'s.
 //
-// Why it takes more than one pair: the schema requires `project.vcs` to
-// carry *both* provider and visibility. Setting either one alone on a
-// manifest that has neither produces a half-built object the validator
-// rejects, in both orders, so a strictly one-field-per-call setter could
-// never write vcs at all. Trailing pairs are applied as a single edit, and
-// the manifest is validated once at the end.
+// Why it takes more than one pair: originally because the schema required
+// `project.vcs` to carry *both* provider and visibility, so a strictly
+// one-field-per-call setter could never write it at all in either order.
+// `project.vcs` carries only `visibility` now (2026-08-24 -- the provider is
+// a service entry, see FIELDS's comment above), so that specific coupling is
+// gone, but the capability stays: unrelated fields still benefit from one
+// validation pass instead of several (project.name and project.slug
+// together, or several services.<id>.* edits in one call). Trailing pairs
+// are applied as a single edit, and the manifest is validated once at the
+// end.
 //
 // Why the target directory is `--path` here rather than a positional
 // `[path]` like every other command: the pair list is variadic, so a
@@ -47,12 +52,19 @@ import type { CommandResult } from "../types.js";
 
 /**
  * How a settable field is written. `text` is free prose; `slug` must satisfy
- * the schema's slug pattern; `slug-list` is a comma-separated list of them.
+ * the schema's slug pattern.
+ *
+ * There used to be a third kind here, `slug-list` (a comma-separated list of
+ * slugs), for project.coding_agents -- the only field that ever needed it.
+ * Removed along with that field on 2026-08-24 (coding agents are service
+ * entries now, one `add` call each, not a list written in one `set`); no
+ * other field has needed a list shape since, so it stays gone rather than
+ * kept as an untested, unreachable branch of prepareValue below.
  */
-type FieldKind = "text" | "slug" | "slug-list";
+type FieldKind = "text" | "slug";
 
 interface SettableField {
-  /** Path into the document, e.g. ["project", "vcs", "provider"]. */
+  /** Path into the document, e.g. ["project", "vcs", "visibility"]. */
   path: string[];
   kind: FieldKind;
   /** What the schema will accept. Shown when a value is rejected. */
@@ -72,21 +84,17 @@ const FIELDS: Record<string, SettableField> = {
   // the schema's rule, which is that project.slug is a slug.
   "project.slug": { path: ["project", "slug"], kind: "slug" },
   "project.architecture": { path: ["project", "architecture"], kind: "text" },
-  "project.pm": { path: ["project", "pm"], kind: "text" },
-  "project.vcs.provider": {
-    path: ["project", "vcs", "provider"],
-    kind: "slug",
-    hint: "e.g. github, gitlab, bitbucket",
-  },
+  // project.pm, project.vcs.provider and project.coding_agents were removed
+  // from the schema on 2026-08-24 (see HANDOFF.md's amendment log): a
+  // project-level field can never be an edge target, and each of these three
+  // names something with an identity and an icon -- a PM tool, a VCS host, a
+  // coding agent product -- exactly the shape a service entry already
+  // covers. They are `dagstree add <slug> --role pm|vcs|coding-agent` now,
+  // not `set` targets. `project.vcs` keeps only `visibility` below.
   "project.vcs.visibility": {
     path: ["project", "vcs", "visibility"],
     kind: "slug",
     hint: "public | private | internal",
-  },
-  "project.coding_agents": {
-    path: ["project", "coding_agents"],
-    kind: "slug-list",
-    hint: "comma-separated, e.g. claude-code,codex",
   },
 };
 
@@ -116,6 +124,19 @@ const SERVICE_FIELD_SPECS: Record<string, SettableField> = {
 
 /** Shown in place of a literal field name in usage/error text -- see SETTABLE_FIELDS. */
 const SERVICE_FIELD_PLACEHOLDERS = Object.keys(SERVICE_FIELD_SPECS).map((name) => `services.<id>.${name}`);
+
+// The three fields the 2026-08-24 amendment moved to service entries (see
+// FIELDS's own comment above). A caller still typing the old field name gets
+// a message naming exactly what replaced it, the same way @dagstree/schema's
+// validate.ts does for a manifest still holding the old shape -- not the
+// generic "Unknown field" list below, which would leave them to guess.
+const MOVED_FIELD_HINTS: Record<string, string> = {
+  "project.pm": 'PM tooling is a service entry now -- use, e.g., "dagstree add trello --role pm".',
+  "project.vcs.provider":
+    'the VCS provider is a service entry now -- use, e.g., "dagstree add github --role vcs".',
+  "project.coding_agents":
+    'coding agents are service entries now, one per agent -- use, e.g., "dagstree add claude-code --role coding-agent".',
+};
 
 // The static field names, sorted, with the patterns appended rather than
 // interleaved. Sorting them in alphabetically would bury them among the
@@ -152,40 +173,16 @@ function prepareValue(field: string, spec: SettableField, value: string): Prepar
     return { ok: true, node: value, shown: value };
   }
 
-  if (spec.kind === "slug") {
-    if (!isValidSlug(value)) {
-      return {
-        ok: false,
-        error: usageError([
-          `"${value}" is not a valid slug for ${field} (lowercase letters, digits, single - or _ separators).` +
-            (spec.hint ? ` ${spec.hint}` : ""),
-        ]),
-      };
-    }
-    return { ok: true, node: value, shown: value };
-  }
-
-  const items = value
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-  if (items.length === 0) {
-    return {
-      ok: false,
-      error: usageError([`"${field}" needs at least one value${spec.hint ? ` (${spec.hint})` : ""}.`]),
-    };
-  }
-  const invalid = items.filter((item) => !isValidSlug(item));
-  if (invalid.length > 0) {
+  if (!isValidSlug(value)) {
     return {
       ok: false,
       error: usageError([
-        `${field} takes slugs; these are not: ${invalid.map((item) => `"${item}"`).join(", ")}.` +
+        `"${value}" is not a valid slug for ${field} (lowercase letters, digits, single - or _ separators).` +
           (spec.hint ? ` ${spec.hint}` : ""),
       ]),
     };
   }
-  return { ok: true, node: items, shown: items.join(", ") };
+  return { ok: true, node: value, shown: value };
 }
 
 interface PreparedEdit {
@@ -217,7 +214,7 @@ export async function runSet(pathArg: string | undefined, tokens: string[]): Pro
   if (tokens.length === 0 || tokens.length % 2 !== 0) {
     return usageError([
       "set takes <field> <value> pairs, e.g. " +
-        'dagstree set project.vcs.provider github project.vcs.visibility private',
+        'dagstree set project.architecture "modular monolith" project.vcs.visibility private',
       `  settable fields: ${SETTABLE_FIELDS.join(", ")}`,
     ]);
   }
@@ -244,6 +241,11 @@ export async function runSet(pathArg: string | undefined, tokens: string[]): Pro
       }
       edits.push({ field, node: prepared.node, shown: prepared.shown, path: staticSpec.path });
       continue;
+    }
+
+    const movedHint = MOVED_FIELD_HINTS[field];
+    if (movedHint) {
+      return usageError([`"${field}" is no longer a settable field -- ${movedHint}`]);
     }
 
     const serviceFieldMatch = SERVICE_FIELD.exec(field);

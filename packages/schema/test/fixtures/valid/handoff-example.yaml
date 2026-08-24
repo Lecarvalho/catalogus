@@ -4,11 +4,7 @@ project:
   name: Clapline
   slug: clapline
   architecture: "modular monolith (.NET 10, vertical slices)"
-  pm: "Trello kanban (PAUTA agent sync)"
-  vcs: { provider: github, visibility: private }
-  coding_agents:
-    - claude-code
-    - pauta
+  vcs: { visibility: private }
 
 services:
   - id: supabase-db          # local id, unique within file

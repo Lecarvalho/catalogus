@@ -28,10 +28,11 @@ const MARKERS: Marker[] = [
  * Files that prove *some* agent reads this repo without saying which one.
  *
  * `AGENTS.md` and `.agents/` used to emit an agent called `agents-md`, and
- * that was a category error: the field is `project.coding_agents`, which
- * answers "which agents are used here", and AGENTS.md is a vendor-neutral
- * instruction file by design -- naming it as an agent is like answering
- * "which car do you drive" with "a driver's manual". Worse, it was
+ * that was a category error: this detector answers "which agents are used
+ * here" (a coding-agent service entry, `role: coding-agent`, as of the
+ * 2026-08-24 amendment -- `project.coding_agents` before it), and AGENTS.md
+ * is a vendor-neutral instruction file by design -- naming it as an agent is
+ * like answering "which car do you drive" with "a driver's manual". Worse, it was
  * self-confirming: it appeared next to the real agents on every repo that
  * had any, so it always looked corroborated.
  *

@@ -1,0 +1,27 @@
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.icon:not(.fallback) {
+  color: var(--color-text);
+}
+
+/* The fallback tile is visually distinct on purpose -- a tinted background
+   plus a muted, never-accent glyph colour, so it reads as "a deliberate
+   generic stand-in" rather than a missing-image placeholder. Two nodes in
+   five use this (docs/PLAN.md's Phase 3.7 icon measurement). */
+.fallback {
+  background: var(--icon-fallback-bg);
+  color: var(--icon-fallback-fill);
+}

@@ -50,3 +50,18 @@ export type { GraphCommandOptions } from "./commands/graph.js";
 
 export { runAdd } from "./commands/add.js";
 export type { AddCommandOptions } from "./commands/add.js";
+
+export { buildViewPayload } from "./view-payload.js";
+export type { ViewPayload, ViewService } from "./view-payload.js";
+
+export { createViewServer, DEFAULT_VIEW_PORT, runView } from "./commands/view.js";
+export type { CreateViewServerOutcome, ViewCommandOptions, ViewServerHandle } from "./commands/view.js";
+
+export { InvalidWorkspaceRootError, scanWorkspace } from "./workspace-scan.js";
+export type {
+  WorkspaceManifestEntry,
+  WorkspaceManifestFailure,
+  WorkspaceManifestFailureReason,
+  WorkspaceRepoRef,
+  WorkspaceScanResult,
+} from "./workspace-scan.js";
