@@ -1,11 +1,16 @@
 # Private-key family: billing. Nested two levels down (project.vcs), with
 # a shouting-case variant (BILLING) to exercise case-insensitive matching.
+#
+# Deliberately carries nothing else wrong. It used to also set
+# `vcs.provider`, which the 2026-08-24 amendment removed -- leaving it in
+# would make this fixture fail for two independent reasons, and a fixture
+# that fails for a reason other than the one it is named after stops
+# proving anything about that reason.
 dagstree: 1
 project:
   name: Clapline
   slug: clapline
   vcs:
-    provider: github
     visibility: private
     BILLING: monthly
 services: []

@@ -12,7 +12,7 @@ dagstree: 1
 project:
   name: Example App
   slug: example-app
-  vcs: { provider: github, visibility: private }
+  vcs: { visibility: private }
 services:
   - id: supabase-db # primary datastore
     service: supabase
@@ -45,7 +45,7 @@ describe("runAdd", () => {
     // [from, to] edge tuples) also tightens this pre-existing inline map's
     // interior spacing -- still the same flow-style choice the human made,
     // just reformatted, which is the expected trade-off.
-    expect(text).toContain("vcs: {provider: github, visibility: private}");
+    expect(text).toContain("vcs: {visibility: private}");
     // new entry present with a derived id
     expect(text).toContain("id: fly-io");
     expect(text).toContain("service: fly-io");

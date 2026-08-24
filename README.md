@@ -41,10 +41,12 @@ dagstree init --yes        # write dagstree.yaml: project fields, no service ent
 dagstree diff              # the work list: detected services not yet declared
 ```
 
-`init` fills in the project name, VCS provider and coding agents, and deliberately writes no
-service entries — a service entry needs a `role` (what this instance *does*: `database`,
-`hosting-api`), and detection only knows a category (`db`, `other`). `diff` lists what it found so
-you add each one with a role you chose.
+`init` fills in the project name, and deliberately writes no service entries — a service entry
+needs a `role` (what this instance *does*: `database`, `hosting-api`), and detection only knows a
+category (`db`, `other`). That includes the VCS provider and any coding agent detection finds:
+both are service entries now (`role: vcs`, `role: coding-agent`), not project fields, so `init`
+never writes them either. `diff` lists everything it found — services, the VCS provider, coding
+agents — so you add each one with a role you chose.
 
 Then record what a scan cannot see. The lines below are **examples** — substitute whatever your
 project actually uses. Nothing here installs anything; you are recording services that are already
@@ -54,7 +56,10 @@ there:
 dagstree add supabase --role database --id supabase-db
 dagstree add supabase --role auth --id supabase-auth --depends-on supabase-db
 dagstree link fly-api supabase-db                    # an edge you remember later
-dagstree set project.vcs.provider github project.vcs.visibility private
+dagstree set project.vcs.visibility private
+dagstree add github --role vcs
+dagstree add trello --role pm
+dagstree add claude-code --role coding-agent
 dagstree deprecate heroku-api --status phasing_out --replaced-by fly-api
 dagstree remove old-entry                            # undo a wrong add, edges included
 dagstree rename fly-api fly-backend                  # change an id, edges and replaced_by follow
@@ -63,13 +68,14 @@ dagstree graph --mermaid   # render the dependency graph
 ```
 
 One service in two roles is two entries, not one entry with two roles — that is what makes
-`supabase-auth --depends-on supabase-db` expressible.
+`supabase-auth --depends-on supabase-db` expressible. The VCS provider, the PM tool and each coding
+agent are exactly the same shape: anything with an identity and an icon is a service entry, `role`
+gives its section, and `add` is how it gets in — never a project field.
 
 Every command validates the whole manifest before writing and refuses to write one that would fail
 `validate`, so the file never needs a hand edit — comments and the `$schema` modeline survive
-untouched. `set` writes the project-level fields (`architecture`, `pm`, `vcs.provider`,
-`vcs.visibility`, `coding_agents`) and takes several `<field> <value>` pairs at once, which is how
-`vcs` gets written: the schema requires both halves together.
+untouched. `set` writes the remaining project-level fields (`architecture`, `vcs.visibility`, `name`,
+`slug`) and takes several `<field> <value>` pairs at once.
 
 `validate` is the CI entrypoint: exit 0 valid, 1 invalid, 2 usage error. Run it without `--strict`
 there — soft private-data warnings are printed for a person to read, not to gate on, because whether

@@ -30,7 +30,11 @@ describe("runInit", () => {
     expect(parsed.dagstree).toBe(1);
     expect(parsed.project.name).toBeTruthy();
     expect(parsed.project.slug).toMatch(/^[a-z0-9]+(?:[_-][a-z0-9]+)*$/);
-    expect(parsed.project.coding_agents).toContain("claude-code");
+    // Coding agents are service entries now (role: coding-agent), not
+    // project.coding_agents -- init never writes them, it follows up with
+    // the `dagstree add` command that records the one detection found.
+    expect(parsed.project.coding_agents).toBeUndefined();
+    expect(result.stdout.join("\n")).toContain("dagstree add claude-code --role coding-agent");
   });
 
   // init used to write one entry per detected service, with the detection
@@ -80,8 +84,6 @@ describe("runInit", () => {
       name: "Custom Name",
       slug: "custom-name",
       architecture: "modular monolith",
-      pm: "Trello kanban",
-      vcsProvider: "github",
       visibility: "public",
     });
     const result = await runInit(dir, { promptFn: promptFn as never });
@@ -91,11 +93,31 @@ describe("runInit", () => {
     expect(parsed.project.name).toBe("Custom Name");
     expect(parsed.project.slug).toBe("custom-name");
     expect(parsed.project.architecture).toBe("modular monolith");
-    expect(parsed.project.pm).toBe("Trello kanban");
     // "public", not the old hardcoded "private": visibility is an answer
     // now. A default here would have made this assertion pass whether the
     // prompt was wired up or not, which is how the guess survived so long.
-    expect(parsed.project.vcs).toEqual({ provider: "github", visibility: "public" });
+    // No provider alongside it -- project.vcs carries only visibility since
+    // 2026-08-24; the VCS provider is a service entry, not asked by init.
+    expect(parsed.project.vcs).toEqual({ visibility: "public" });
+  });
+
+  it("no longer asks for a VCS provider or a PM methodology -- both are service entries now", async () => {
+    // Even if a promptFn answers these keys (e.g. a caller still on the old
+    // shape), init must not write them: there is no schema field left for
+    // either, and writing one would make the generated manifest fail its
+    // own validateManifest check.
+    const promptFn = async () => ({
+      name: "X",
+      slug: "x",
+      pm: "Trello kanban",
+      vcsProvider: "github",
+      visibility: "public",
+    });
+    const result = await runInit(dir, { promptFn: promptFn as never });
+    expect(result.exitCode).toBe(0);
+    const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
+    expect(parsed.project.pm).toBeUndefined();
+    expect(parsed.project.vcs).toEqual({ visibility: "public" });
   });
 
   it("omits project.vcs entirely rather than guessing visibility under --yes", async () => {
@@ -116,16 +138,22 @@ describe("runInit", () => {
 
     const stdout = result.stdout.join("!!");
     expect(stdout).toContain("visibility was not given");
-    expect(stdout).toContain("dagstree set project.vcs.provider");
+    expect(stdout).toContain("dagstree set project.vcs.visibility");
+    // The detected VCS provider is a service entry now, not a project
+    // field -- init never writes it, it follows up with the `add` command.
+    expect(stdout).toContain("dagstree add gitlab --role vcs");
   });
 
-  it("writes project.vcs when --yes is given an explicit visibility", async () => {
+  it("writes project.vcs.visibility when --yes is given an explicit visibility, and separately follows up on the detected provider", async () => {
     await writeFixtureFile(dir, ".gitlab-ci.yml", "stages: [build]");
     const result = await runInit(dir, { yes: true, visibility: "internal" });
     expect(result.exitCode).toBe(0);
 
     const parsed = parse(await readFile(join(dir, "dagstree.yaml"), "utf8"));
-    expect(parsed.project.vcs).toEqual({ provider: "gitlab", visibility: "internal" });
+    // No provider alongside it: the VCS provider is a service entry
+    // (role: vcs), not written into project.vcs.
+    expect(parsed.project.vcs).toEqual({ visibility: "internal" });
+    expect(result.stdout.join("\n")).toContain("dagstree add gitlab --role vcs");
   });
 
   it("refuses a visibility outside the schema enum", async () => {
@@ -153,8 +181,12 @@ describe("runInit", () => {
     await expect(readFile(join(dir, "dagstree.yaml"), "utf8")).rejects.toThrow();
   });
 
-  it("refuses an interactive pm answer that looks like Layer 3 data (a hard hit), and writes nothing", async () => {
-    const promptFn = async () => ({ name: "X", slug: "x", pm: "contact dsnk@example.com about renewal" });
+  it("refuses an interactive architecture answer that looks like Layer 3 data (a hard hit), and writes nothing", async () => {
+    const promptFn = async () => ({
+      name: "X",
+      slug: "x",
+      architecture: "contact dsnk@example.com about renewal",
+    });
     const result = await runInit(dir, { promptFn: promptFn as never });
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("push --private");
@@ -162,10 +194,10 @@ describe("runInit", () => {
   });
 
   it("refuses an interactive name answer that looks like Layer 3 data, and writes nothing", async () => {
-    // FIX: `name` (and `vcsProvider`) used to reach only the final
-    // validateManifest call, whose failure branch reports a "this is a
-    // bug -- please report it" message for a user's own input. Now it's
-    // caught by the same early guard as architecture/pm.
+    // FIX: `name` used to reach only the final validateManifest call, whose
+    // failure branch reports a "this is a bug -- please report it" message
+    // for a user's own input. Now it's caught by the same early guard as
+    // architecture.
     const promptFn = async () => ({ name: "Acme (dsnk@acme.com)", slug: "acme" });
     const result = await runInit(dir, { promptFn: promptFn as never });
     expect(result.exitCode).toBe(2);
@@ -174,25 +206,17 @@ describe("runInit", () => {
     await expect(readFile(join(dir, "dagstree.yaml"), "utf8")).rejects.toThrow();
   });
 
-  it("refuses an interactive vcsProvider answer that looks like Layer 3 data, and writes nothing", async () => {
-    const promptFn = async () => ({ name: "X", slug: "x", vcsProvider: "github (billing dsnk@acme.com)" });
-    const result = await runInit(dir, { promptFn: promptFn as never });
-    expect(result.exitCode).toBe(2);
-    expect(result.stderr.join("\n")).toContain("push --private");
-    await expect(readFile(join(dir, "dagstree.yaml"), "utf8")).rejects.toThrow();
-  });
-
-  it("accepts a pm answer with a bare soft keyword and writes it, with a warning rather than a refusal", async () => {
+  it("accepts an architecture answer with a bare soft keyword and writes it, with a warning rather than a refusal", async () => {
     // FIX (write-time gate over-blocking): a soft-only hit ("renewal" with
     // no email/currency/card/API-key nearby) used to be refused outright,
     // with no override -- the exact string `dagstree validate` accepts at
     // exit 0. Now it's written, with the warning surfaced instead of
     // dropped.
-    const promptFn = async () => ({ name: "X", slug: "x", pm: "renewal is automated via GitHub Actions" });
+    const promptFn = async () => ({ name: "X", slug: "x", architecture: "renewal is automated via GitHub Actions" });
     const result = await runInit(dir, { promptFn: promptFn as never });
     expect(result.exitCode).toBe(0);
     const text = await readFile(join(dir, "dagstree.yaml"), "utf8");
-    expect(text).toContain("pm: renewal is automated via GitHub Actions");
+    expect(text).toContain("architecture: renewal is automated via GitHub Actions");
     expect(result.stderr.join("\n")).toContain("warning:");
   });
 

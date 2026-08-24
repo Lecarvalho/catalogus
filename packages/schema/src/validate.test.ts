@@ -303,22 +303,40 @@ describe("free-text private-value guard, wired into validateManifest", () => {
     );
   });
 
-  it("catches a hard hit nested inside a coding_agents array entry", () => {
+  // project.coding_agents (a raw string array) was removed in the
+  // 2026-08-24 amendment -- it was the only free-text array field the
+  // schema had, so there is no longer a schema-shaped array of raw strings
+  // to nest a private-value hit inside end to end through validateManifest.
+  // The sibling test above already covers array-of-*objects* nesting via
+  // dependencies[], and free-text-guard.test.ts's own "scanManifestForPrivate
+  // Values -- generic recursive walk" tests the walker's array recursion
+  // directly, unconstrained by any particular schema shape. What replaces
+  // this case is the amendment's own new behavior: an old-shape manifest
+  // still naming pm/coding_agents/vcs.provider should be told what moved,
+  // not given a bare "additional property" error -- see the test below.
+  it("names what moved, not a bare additional-property error, for a manifest still in the old (pre-2026-08-24) shape", () => {
     const result = validateManifest({
       dagstree: 1,
       project: {
         name: "x",
         slug: "x",
-        coding_agents: ["claude-code", "reach dsnk@example.com for the license"],
+        pm: "Trello kanban",
+        coding_agents: ["claude-code"],
+        vcs: { provider: "github", visibility: "private" },
       },
       services: [],
       dependencies: [],
     });
     expect(result.valid).toBe(false);
     if (result.valid) return;
-    expect(
-      result.errors.some((e) => e.kind === "private-value" && e.instancePath === "/project/coding_agents/1"),
-    ).toBe(true);
+    const moved = result.errors.filter((e) => e.kind === "moved-field");
+    expect(moved.map((e) => e.property).sort()).toEqual(["coding_agents", "pm", "provider"]);
+    for (const error of moved) {
+      expect(error.message).not.toMatch(/additional propert/i);
+    }
+    expect(moved.find((e) => e.property === "pm")?.message).toContain("--role pm");
+    expect(moved.find((e) => e.property === "coding_agents")?.message).toContain("--role coding-agent");
+    expect(moved.find((e) => e.property === "provider")?.message).toContain("--role vcs");
   });
 
   it.each([

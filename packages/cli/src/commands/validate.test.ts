@@ -149,7 +149,7 @@ dependencies: []
 project:
   name: X
   slug: x
-  pm: "renewal is automated via GitHub Actions"
+  architecture: "renewal is automated via GitHub Actions"
 services: []
 dependencies: []
 `;
@@ -183,7 +183,7 @@ dependencies: []
     it.each([
       ["architecture", "modular monolith (.NET 10, vertical slices)"],
       ["architecture", "vertical slices + MediatR"],
-      ["pm", "Trello kanban (PAUTA agent sync)"],
+      ["architecture", "Trello kanban (PAUTA agent sync)"],
     ])("%s: %j produces no error and no warning (false-positive guard)", async (field, value) => {
       await writeFixtureFile(
         dir,

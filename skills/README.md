@@ -36,10 +36,13 @@ fails, rather than hand-writing a manifest as a fallback — the CLI owns id der
 integrity, acyclicity and the private-data guard, and a hand-rolled file bypasses all of it. When
 adding to the skill, route new work through a command rather than through hand-editing.
 
-That exception is now closed. The five Layer 2 fields that once had no command behind them —
-`project.architecture`, `project.pm`, `project.vcs`, `project.coding_agents`, and
-`status`/`replaced_by` on an existing entry — are covered by `dagstree set` and `dagstree deprecate`,
-edges by `dagstree link`, and undoing a wrong entry by `dagstree remove`. The CLI is the only writer,
-and the skill contains no hand-edit path.
+That exception is now closed. The Layer 2 fields that once had no command behind them —
+`project.architecture`, `project.vcs.visibility`, and `status`/`replaced_by` on an existing entry —
+are covered by `dagstree set` and `dagstree deprecate`, edges by `dagstree link`, and undoing a
+wrong entry by `dagstree remove`. `project.pm`, `project.vcs.provider` and `project.coding_agents`
+were removed from the schema entirely on 2026-08-24: a PM tool, a VCS provider and a coding agent
+each have an identity and an icon, so each is a service entry (`role: pm`/`vcs`/`coding-agent`) added
+with `dagstree add`, the same as any other service. The CLI is the only writer, and the skill
+contains no hand-edit path.
 
 No backend account is needed. Everything the skill does is local.

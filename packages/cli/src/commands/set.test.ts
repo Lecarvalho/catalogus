@@ -64,39 +64,32 @@ describe("runSet", () => {
     expect(text).toContain("two-tier: .NET API + React SPA");
   });
 
-  // The schema requires project.vcs to carry both provider and visibility,
-  // so neither half can be written on its own. A setter that only ever took
-  // one pair could never write vcs at all, in either order.
-  it("writes both halves of project.vcs in one edit", async () => {
-    const result = await runSet(dir, [
-      "project.vcs.provider",
-      "github",
-      "project.vcs.visibility",
-      "private",
-    ]);
+  // project.vcs carries only visibility as of the 2026-08-24 amendment (the
+  // provider is a service entry now, added with `dagstree add <provider>
+  // --role vcs`) -- so setting visibility alone is enough; there is no
+  // second half to write together, and no half-built state to refuse.
+  it("writes project.vcs.visibility on its own", async () => {
+    const result = await runSet(dir, ["project.vcs.visibility", "private"]);
     expect(result.exitCode).toBe(0);
 
     const text = await manifestText();
-    expect(text).toContain("provider: github");
     expect(text).toContain("visibility: private");
+    expect(text).not.toContain("provider:");
   });
 
-  it("refuses a half-built vcs block and writes nothing", async () => {
-    const before = await manifestText();
-    const result = await runSet(dir, ["project.vcs.provider", "github"]);
-
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr.join("\n")).toContain("visibility");
-    expect(await manifestText()).toBe(before);
-  });
-
-  it("takes coding_agents as a comma-separated list", async () => {
-    const result = await runSet(dir, ["project.coding_agents", "claude-code, codex"]);
-    expect(result.exitCode).toBe(0);
-
-    const text = await manifestText();
-    expect(text).toContain("claude-code");
-    expect(text).toContain("codex");
+  it("rejects project.pm, project.vcs.provider and project.coding_agents, naming the `dagstree add` command that replaced each", async () => {
+    const expectations: Array<[string, string]> = [
+      ["project.pm", "dagstree add trello --role pm"],
+      ["project.vcs.provider", "dagstree add github --role vcs"],
+      ["project.coding_agents", "dagstree add claude-code --role coding-agent"],
+    ];
+    for (const [field, hint] of expectations) {
+      const result = await runSet(dir, [field, "github"]);
+      expect(result.exitCode).toBe(2);
+      const stderr = result.stderr.join("\n");
+      expect(stderr).toContain("no longer a settable field");
+      expect(stderr).toContain(hint);
+    }
   });
 
   it("rejects an unknown field and names the ones that exist", async () => {
@@ -109,31 +102,26 @@ describe("runSet", () => {
   });
 
   it("rejects an odd number of positional tokens", async () => {
-    const result = await runSet(dir, ["project.vcs.provider", "github", "project.vcs.visibility"]);
+    const result = await runSet(dir, ["project.architecture", "two-tier", "project.vcs.visibility"]);
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("<field> <value> pairs");
   });
 
   it("rejects the same field given twice in one call", async () => {
-    const result = await runSet(dir, ["project.pm", "trello", "project.pm", "linear"]);
+    const result = await runSet(dir, ["project.architecture", "two-tier", "project.architecture", "monolith"]);
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("twice");
   });
 
   it("rejects a non-slug value for a slug field", async () => {
-    const result = await runSet(dir, ["project.vcs.provider", "GitHub"]);
+    const result = await runSet(dir, ["project.vcs.visibility", "Not A Slug"]);
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("not a valid slug");
   });
 
   it("rejects a value the schema's own enum does not allow, and writes nothing", async () => {
     const before = await manifestText();
-    const result = await runSet(dir, [
-      "project.vcs.provider",
-      "github",
-      "project.vcs.visibility",
-      "secret",
-    ]);
+    const result = await runSet(dir, ["project.vcs.visibility", "secret"]);
     expect(result.exitCode).toBe(1);
     expect(await manifestText()).toBe(before);
   });
@@ -143,7 +131,7 @@ describe("runSet", () => {
   // names the value the user typed.
   it("refuses a value carrying private data and writes nothing", async () => {
     const before = await manifestText();
-    const result = await runSet(dir, ["project.pm", "Trello, billed to finance@example.com"]);
+    const result = await runSet(dir, ["project.architecture", "Trello, billed to finance@example.com"]);
 
     expect(result.exitCode).toBe(2);
     expect(await manifestText()).toBe(before);
@@ -151,7 +139,7 @@ describe("runSet", () => {
 
   it("validates every pair before touching the file, so a bad second pair leaves the first unwritten", async () => {
     const before = await manifestText();
-    const result = await runSet(dir, ["project.pm", "trello-board", "project.architecture", ""]);
+    const result = await runSet(dir, ["project.name", "Real Name", "project.architecture", ""]);
 
     expect(result.exitCode).toBe(2);
     expect(await manifestText()).toBe(before);
@@ -160,7 +148,7 @@ describe("runSet", () => {
   it("fails with exit 2 when there is no manifest to edit", async () => {
     const empty = await createTempDir();
     try {
-      const result = await runSet(empty, ["project.pm", "trello"]);
+      const result = await runSet(empty, ["project.architecture", "two-tier"]);
       expect(result.exitCode).toBe(2);
     } finally {
       await removeTempDir(empty);
@@ -292,11 +280,11 @@ describe("runSet", () => {
     });
 
     it("can be combined with a project-level field in one call", async () => {
-      const result = await runSet(dir, ["project.pm", "trello-board", "services.fly-api.role", "database"]);
+      const result = await runSet(dir, ["project.architecture", "two-tier", "services.fly-api.role", "database"]);
       expect(result.exitCode).toBe(0);
 
       const text = await manifestText();
-      expect(text).toContain("pm: trello-board");
+      expect(text).toContain("architecture: two-tier");
       expect(text).toMatch(/id: fly-api[\s\S]*?role: database/);
     });
   });

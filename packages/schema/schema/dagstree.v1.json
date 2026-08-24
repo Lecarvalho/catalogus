@@ -11,16 +11,11 @@
     },
     "vcs": {
       "type": "object",
-      "description": "Source control provider and repo visibility.",
+      "description": "Repo visibility. The VCS provider itself is a service entry (role: vcs), not a project field.",
       "patternProperties": {
         "(?:[cC][oO][sS][tT]|[pP][rR][iI][cC][eE]|[pP][rR][iI][cC][iI][nN][gG]|[aA][mM][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT][_-]?[iI][dD]|[uU][sS][eE][rR][nN][aA][mM][eE]|[uU][sS][eE][rR]|[eE][mM][aA][iI][lL]|[tT][oO][kK][eE][nN]|[aA][pP][iI][_-]?[kK][eE][yY]|[kK][eE][yY]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][sS]|[bB][iI][lL][lL][iI][nN][gG]|[iI][nN][vV][oO][iI][cC][eE]|[rR][eE][nN][eE][wW][aA][lL]|[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][_-]?[iI][dD]|[pP][aA][yY][mM][eE][nN][tT]|[cC][aA][rR][dD]|[pP][lL][aA][nN][_-]?[tT][iI][eE][rR]|[sS][eE][aA][tT]|[sS][pP][eE][nN][dD])": false
       },
       "properties": {
-        "provider": {
-          "type": "string",
-          "minLength": 1,
-          "description": "VCS host, e.g. \"github\", \"gitlab\", \"bitbucket\"."
-        },
         "visibility": {
           "enum": [
             "public",
@@ -31,14 +26,13 @@
         }
       },
       "required": [
-        "provider",
         "visibility"
       ],
       "additionalProperties": false
     },
     "project": {
       "type": "object",
-      "description": "Layer 2 project-level metadata: identity, architecture style, PM method, VCS, and coding agents in use. Everything except name/slug is optional so a freshly-scaffolded manifest is already valid.",
+      "description": "Layer 2 project-level metadata: identity, architecture style, and VCS visibility. Everything except name/slug is optional so a freshly-scaffolded manifest is already valid. PM tooling, coding agents and the VCS provider are service entries now, not project fields -- see services[].",
       "patternProperties": {
         "(?:[cC][oO][sS][tT]|[pP][rR][iI][cC][eE]|[pP][rR][iI][cC][iI][nN][gG]|[aA][mM][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT]|[aA][cC][cC][oO][uU][nN][tT][_-]?[iI][dD]|[uU][sS][eE][rR][nN][aA][mM][eE]|[uU][sS][eE][rR]|[eE][mM][aA][iI][lL]|[tT][oO][kK][eE][nN]|[aA][pP][iI][_-]?[kK][eE][yY]|[kK][eE][yY]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][sS]|[bB][iI][lL][lL][iI][nN][gG]|[iI][nN][vV][oO][iI][cC][eE]|[rR][eE][nN][eE][wW][aA][lL]|[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][_-]?[iI][dD]|[pP][aA][yY][mM][eE][nN][tT]|[cC][aA][rR][dD]|[pP][lL][aA][nN][_-]?[tT][iI][eE][rR]|[sS][eE][aA][tT]|[sS][pP][eE][nN][dD])": false
       },
@@ -57,22 +51,9 @@
           "minLength": 1,
           "description": "Architecture style in free text, e.g. \"modular monolith (.NET 10, vertical slices)\"."
         },
-        "pm": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Project management methodology in free text, e.g. \"Trello kanban (PAUTA agent sync)\"."
-        },
         "vcs": {
           "$ref": "#/$defs/vcs",
-          "description": "Source control provider and repo visibility."
-        },
-        "coding_agents": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": "Coding agents used on this project, e.g. \"claude-code\", \"pauta\"."
+          "description": "Repo visibility. The VCS provider itself is a service entry (role: vcs), not a project field."
         }
       },
       "required": [
@@ -201,7 +182,7 @@
     },
     "project": {
       "$ref": "#/$defs/project",
-      "description": "This project's identity, architecture, PM method, VCS, and coding agents."
+      "description": "This project's identity, architecture style, and VCS visibility."
     },
     "services": {
       "type": "array",

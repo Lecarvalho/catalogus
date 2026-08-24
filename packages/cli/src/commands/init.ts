@@ -1,9 +1,8 @@
 // `dagstree init [--yes]` -- scaffolds a dagstree.yaml. Interactive by
-// default (prompts for project name, slug, architecture style, PM method,
-// and VCS provider); with --yes, infers the project-level fields it can
-// (VCS provider and coding agents from detection, the directory name as the
-// project name) and writes without prompting. Never overwrites an existing
-// manifest without --force.
+// default (prompts for project name, slug, architecture style, and repo
+// visibility); with --yes, infers the project-level fields it can (the
+// directory name as the project name) and writes without prompting. Never
+// overwrites an existing manifest without --force.
 //
 // It deliberately writes NO service entries, even though detection knows
 // several. It used to prefill one per detected service, and that turned out
@@ -16,6 +15,16 @@
 // database --id supabase-db`) ended up with `supabase` *and* `supabase-db`
 // in the file and no way back except deleting it and starting over. That
 // was observed happening.
+//
+// The VCS provider and every coding agent are exactly this same case now
+// (2026-08-24): both used to be project-level fields `--yes` filled in
+// straight from detection (project.vcs.provider, project.coding_agents), and
+// both are service entries today (role: vcs, role: coding-agent) for the
+// reason recorded in HANDOFF.md's amendment log -- a project-level field can
+// never be an edge target, and `[github-actions, github]` is a real edge.
+// So `--yes` no longer writes either: it follows up with the `dagstree add`
+// command that records what detection found, the same way it already does
+// for every other detected service.
 //
 // `dagstree diff` already reports every detected service missing from the
 // manifest, which is the same information as a work list rather than as
@@ -83,8 +92,6 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
   let name = defaultName;
   let slug = defaultSlug;
   let architecture: string | undefined;
-  let pm: string | undefined;
-  let vcsProvider: string | undefined;
   let visibility: string | undefined = options.visibility?.trim() || undefined;
   // Things the owner still has to answer, printed after the summary. A
   // follow-up is what this command emits instead of a guess: it names the
@@ -124,13 +131,16 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
         { type: "text", name: "name", message: "Project name", initial: defaultName },
         { type: "text", name: "slug", message: "Project slug", initial: defaultSlug },
         { type: "text", name: "architecture", message: "Architecture style (optional)" },
-        { type: "text", name: "pm", message: "PM methodology (optional)" },
-        { type: "text", name: "vcsProvider", message: "VCS provider (optional, e.g. github)" },
         {
           // Asked, never inferred -- see the visibility note further down.
-          // Skipped outright when no provider was named: visibility without
-          // a provider is not a shape the schema accepts.
-          type: (prev) => (typeof prev === "string" && prev.trim() ? "select" : null),
+          // Unconditional now: the schema's project.vcs used to require
+          // provider and visibility together, so this question was gated on
+          // a provider having been given first. project.vcs carries only
+          // visibility as of 2026-08-24 (the provider is a service entry,
+          // added with `dagstree add <provider> --role vcs`, not asked here
+          // -- init does not ask about services at all, see this module's
+          // header), so there is no longer a shape to gate on.
+          type: "select",
           name: "visibility",
           message: "Repo visibility",
           choices: [
@@ -156,8 +166,6 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
     name = (typeof answers.name === "string" && answers.name.trim()) || defaultName;
     slug = (typeof answers.slug === "string" && answers.slug.trim()) || defaultSlug;
     architecture = typeof answers.architecture === "string" ? answers.architecture.trim() || undefined : undefined;
-    pm = typeof answers.pm === "string" ? answers.pm.trim() || undefined : undefined;
-    vcsProvider = typeof answers.vcsProvider === "string" ? answers.vcsProvider.trim() || undefined : undefined;
     if (typeof answers.visibility === "string" && answers.visibility.trim()) {
       visibility = answers.visibility.trim();
     }
@@ -172,17 +180,15 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
   }
 
   // Every free-text answer the interactive prompt collects, not just
-  // architecture/pm -- `name` and `vcsProvider` are just as unconstrained,
-  // and a hard hit in either used to reach validateManifest's failure
-  // branch further down, which reports it as "this is a bug -- please
-  // report it" (correct for an actual internal fault, wrong for a user
-  // typing their own email into a text prompt). Catching it here gives it
-  // the same exit-2 redirect message as architecture/pm.
+  // architecture -- `name` is just as unconstrained, and a hard hit in
+  // either used to reach validateManifest's failure branch further down,
+  // which reports it as "this is a bug -- please report it" (correct for an
+  // actual internal fault, wrong for a user typing their own email into a
+  // text prompt). Catching it here gives it the same exit-2 redirect
+  // message.
   for (const [field, value] of [
     ["name", name],
     ["architecture", architecture],
-    ["pm", pm],
-    ["vcsProvider", vcsProvider],
   ] as const) {
     if (value && hasBlockingPrivateFreeText(value)) {
       return { exitCode: 2, stdout: [], stderr: [privateFlagRefusalMessage(field)] };
@@ -190,9 +196,12 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
   }
 
   // Always empty. See this module's header: services go in through `add`,
-  // with a real role, once someone has decided what each one is.
+  // with a real role, once someone has decided what each one is. That now
+  // includes the VCS provider and every coding agent too -- both are service
+  // entries (role: vcs, role: coding-agent), not project fields, so
+  // detecting them here only ever produces a followUp naming the `add`
+  // command that records them, never a value written straight into the file.
   const services: Array<Record<string, unknown>> = [];
-  let codingAgents: string[] = [];
   const fileComments: string[] = [];
   let detectedServiceCount = 0;
 
@@ -211,23 +220,31 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
     // list, so nobody has to wonder whether detection found anything.
     detectedServiceCount = collectDetectedServices(detection).length;
 
-    codingAgents = detection.codingAgents.map((a) => a.agent);
-
     // An AGENTS.md with no vendor-specific marker beside it proves an agent
     // reads this repo without saying which. That is a question for the
     // owner, not a value to invent -- the previous behaviour was to write a
     // pseudo-agent called `agents-md`, which named a file convention in a
     // field that names agents.
-    if (codingAgents.length === 0 && detection.unidentifiedCodingAgents.length > 0) {
+    if (detection.codingAgents.length === 0 && detection.unidentifiedCodingAgents.length > 0) {
       const files = detection.unidentifiedCodingAgents.map((e) => e.file).join(", ");
       followUps.push(
-        `${files} says a coding agent works in this repo but not which one -- ` +
-          "set it with: dagstree set project.coding_agents <agent>[,<agent>]"
+        `${files} says a coding agent works in this repo but not which one -- ask the owner, then: ` +
+          "dagstree add <agent> --role coding-agent"
       );
+    } else if (detection.codingAgents.length > 0) {
+      for (const agent of detection.codingAgents) {
+        followUps.push(
+          `coding agent detected (${agent.agent}) and not yet declared -- record it with: ` +
+            `dagstree add ${agent.agent} --role coding-agent`
+        );
+      }
     }
 
     if (detection.vcs) {
-      vcsProvider = detection.vcs.provider;
+      followUps.push(
+        `vcs provider detected (${detection.vcs.provider}) and not yet declared -- record it with: ` +
+          `dagstree add ${detection.vcs.provider} --role vcs`
+      );
     }
   }
 
@@ -257,19 +274,16 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
     };
   }
 
-  if (vcsProvider && visibility === undefined) {
+  if (options.yes && visibility === undefined) {
     followUps.push(
-      `repo visibility was not given, so project.vcs is omitted -- set both with: ` +
-        `dagstree set project.vcs.provider ${vcsProvider} project.vcs.visibility <public|private|internal>`
+      "repo visibility was not given, so project.vcs is omitted -- set it with: " +
+        "dagstree set project.vcs.visibility <public|private|internal>"
     );
-    vcsProvider = undefined;
   }
 
   const project: Record<string, unknown> = { name, slug };
   if (architecture) project.architecture = architecture;
-  if (pm) project.pm = pm;
-  if (vcsProvider && visibility) project.vcs = { provider: vcsProvider, visibility };
-  if (codingAgents.length > 0) project.coding_agents = codingAgents;
+  if (visibility) project.vcs = { visibility };
 
   const manifestObject = {
     dagstree: 1,
@@ -293,9 +307,6 @@ export async function runInit(pathArg: string | undefined, options: InitCommandO
   const filePath = await writeManifestText(targetDir, `${header}${yamlBody}`);
 
   const summary = [`Wrote ${filePath}`];
-  if (codingAgents.length > 0) {
-    summary.push(`  coding agents: ${codingAgents.join(", ")}`);
-  }
   if (detectedServiceCount > 0) {
     summary.push(
       `  ${detectedServiceCount} service(s) detected and not yet declared -- run "dagstree diff" to list them,`

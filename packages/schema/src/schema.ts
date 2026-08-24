@@ -44,30 +44,44 @@ export const dagstreeSchemaV1 = {
         "Lowercase identifier: letters, digits, and single internal - or _ separators. No leading/trailing separators, no doubled separators.",
     },
 
+    // Repo visibility only, as of the 2026-08-24 amendment (see HANDOFF.md's
+    // amendment log): the provider used to live here too, but a project-level
+    // field can never be an edge target, and `[github-actions, github]` is a
+    // real edge (examples/reference.dagstree.yaml) -- so the VCS provider has
+    // to be a service entry (`role: vcs`) like anything else with an identity
+    // and an icon. Visibility has no identity and is never an edge target, so
+    // it stays here rather than becoming a service entry of its own.
     vcs: {
       type: "object",
-      description: "Source control provider and repo visibility.",
+      description: "Repo visibility. The VCS provider itself is a service entry (role: vcs), not a project field.",
       patternProperties: { [PRIVATE_KEY_PATTERN]: false },
       properties: {
-        provider: {
-          type: "string",
-          minLength: 1,
-          description: "VCS host, e.g. \"github\", \"gitlab\", \"bitbucket\".",
-        },
         visibility: {
           enum: ["public", "private", "internal"],
           description:
             "Repo visibility as configured on the VCS host. \"internal\" covers org-visible-only repos (GitHub/GitLab Enterprise).",
         },
       },
-      required: ["provider", "visibility"],
+      required: ["visibility"],
       additionalProperties: false,
     },
 
+    // `pm` (free-text PM methodology) and `coding_agents` (a raw string list)
+    // were removed in the same amendment as vcs.provider above, for the same
+    // reason: the manifest used to state some things twice -- a Trello board
+    // was both free-text `project.pm` and a service entry (`id: board,
+    // service: trello, role: pm`), and a coding agent had no service-entry
+    // form at all despite being exactly as identity-bearing and icon-able as
+    // any vendor. Both are service entries now: the PM *tool* with
+    // `role: pm` (methodology itself -- "kanban, one card per change" -- is
+    // not modeled in Layer 2 and was never more than a comment), and each
+    // coding agent with `role: coding-agent` and no `kind` (kind defaults to
+    // "service", correctly: Claude Code, Cursor and GitHub Copilot are
+    // vendor products with subscriptions, so a Layer 3 cost can attach).
     project: {
       type: "object",
       description:
-        "Layer 2 project-level metadata: identity, architecture style, PM method, VCS, and coding agents in use. Everything except name/slug is optional so a freshly-scaffolded manifest is already valid.",
+        "Layer 2 project-level metadata: identity, architecture style, and VCS visibility. Everything except name/slug is optional so a freshly-scaffolded manifest is already valid. PM tooling, coding agents and the VCS provider are service entries now, not project fields -- see services[].",
       patternProperties: { [PRIVATE_KEY_PATTERN]: false },
       properties: {
         name: {
@@ -85,21 +99,9 @@ export const dagstreeSchemaV1 = {
           description:
             "Architecture style in free text, e.g. \"modular monolith (.NET 10, vertical slices)\".",
         },
-        pm: {
-          type: "string",
-          minLength: 1,
-          description:
-            "Project management methodology in free text, e.g. \"Trello kanban (PAUTA agent sync)\".",
-        },
         vcs: {
           $ref: "#/$defs/vcs",
-          description: "Source control provider and repo visibility.",
-        },
-        coding_agents: {
-          type: "array",
-          items: { type: "string", minLength: 1 },
-          description:
-            "Coding agents used on this project, e.g. \"claude-code\", \"pauta\".",
+          description: "Repo visibility. The VCS provider itself is a service entry (role: vcs), not a project field.",
         },
       },
       required: ["name", "slug"],
@@ -217,7 +219,7 @@ export const dagstreeSchemaV1 = {
     },
     project: {
       $ref: "#/$defs/project",
-      description: "This project's identity, architecture, PM method, VCS, and coding agents.",
+      description: "This project's identity, architecture style, and VCS visibility.",
     },
     services: {
       type: "array",
