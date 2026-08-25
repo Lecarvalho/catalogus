@@ -247,10 +247,14 @@ The short version:
    and must not be invented.
 3. **Graph and Migrations views still wear the old world.** They work; they do not
    match.
-4. **`docs/HANDOFF.md` §6's command list is stale** — missing `set`, `link`,
+4. **`ServiceDetailPanel` is dead code.** Nothing renders it since the service
+   page landed. Its test still passes on its own, so it was left rather than
+   deleted under a running agent. Delete both, or move what the test really
+   covers onto `ServicePage`.
+5. **`docs/HANDOFF.md` §6's command list is stale** — missing `set`, `link`,
    `deprecate`, `remove`, `rename`. Found while adding `unlink`; deliberately not
    half-fixed.
-5. **Two writers on one page**, and **what a page is made of** — both recorded as
+6. **Two writers on one page**, and **what a page is made of** — both recorded as
    open in `PRODUCT.md`, neither blocking the redesign.
 
 #### What the three parallel agents delivered, with their verification
@@ -274,8 +278,28 @@ its own tests by mutation. Worth reading their patterns, not just their output.
   dist. Its hex test pins Stripe's known `#635BFF` rather than a format regex,
   and it proved that choice by mutating in a `#000000` fallback a regex would
   have passed. **112 tests in `packages/core` over five runs.**
-- **The viewer test rewrite** -- see the verification note below for the numbers
-  I confirmed myself rather than taking on trust.
+- **The viewer test rewrite** -- `App.test.tsx` rewritten and ten new test files.
+  Around 25 mutations run and reverted across `bands.ts`, `service-tags.ts`,
+  `ServiceTile`, `App.tsx` and the module components. **It found two real source
+  defects and refused to fix them**, encoding each as `it.fails` so the suite
+  stayed honest rather than green-by-omission — both were mine, both are fixed
+  now, and the fix was verified by re-mutating (removing the slug lookup turns
+  both tests red on exactly the behaviour they name).
+
+  **The most valuable thing it reported was a test of its own that asserted
+  nothing.** Its `Tag.test.tsx` prototype-pollution guard was inert: vitest's
+  CSS-modules handling fabricates a string for *any* key including `toString`,
+  so the assertion passed against source with the guard deleted. It probed this
+  rather than assuming it, and traced the same flaw to the **pre-existing
+  `StatusPill.test.tsx`**, which it did not own. Both are fixed by mocking the
+  stylesheet to a real `{}`, and both were then mutated to prove they now catch
+  the defect. That matters beyond the two files: this repo's header comments
+  claim the prototype defect class is closed, and one of the guards backing that
+  claim could not have caught it.
+
+**Verified by the main session, not taken on trust:** `pnpm test` at **1131
+tests / 69 files, green on five consecutive full runs**, `pnpm typecheck` clean
+across all four packages, and the tree confirmed test-files-only from the agent.
 
 **One number in this file is now stale** and the catalog agent flagged it rather
 than editing a file it did not own: the "60 of 159 slugs have no icon" figure in

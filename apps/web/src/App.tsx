@@ -100,8 +100,7 @@ export function App() {
   // plain DOM refs, not React state, because moving focus is an imperative
   // side effect, never something a render should read back.
   const panelRef = useRef<HTMLElement | null>(null);
-  const lastFocusedRef = useRef<HTMLElement | null>(null);
-  const previousSelectedIdRef = useRef<string | null>(null);
+  const previousSelectedRef = useRef<{ id: string; service: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,9 +178,6 @@ export function App() {
 
   const handleSelect = useCallback(
     (id: string) => {
-      if (document.activeElement instanceof HTMLElement) {
-        lastFocusedRef.current = document.activeElement;
-      }
       replaceHash(hashForServiceId(id));
     },
     [replaceHash]
@@ -292,45 +288,48 @@ export function App() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [selectedService, handleClose]);
 
-  // Moves focus into the panel the moment it opens (click or deep link),
-  // and hands it somewhere sensible once it closes. Keyed on the resolved
-  // service's id, not on the raw (possibly stale/unknown) hash id, so an
-  // unmatched hash never tries to focus a panel that isn't rendered.
+  // Moves focus into the page the moment it opens (click or deep link), and
+  // hands it back to the thing that opened it once it closes. Keyed on the
+  // resolved service, not on the raw (possibly stale/unknown) hash id, so an
+  // unmatched hash never tries to focus a page that isn't rendered.
   //
-  // Closing has two cases and only one of them used to work. A panel opened
-  // by a click restores the element that opened it. A panel opened by a
-  // *deep link* had no opener -- nothing was clicked, so `lastFocusedRef`
-  // was still null and focus fell to `<body>`, which is the state where the
-  // next Tab starts from the top of the document and a screen reader loses
-  // its place entirely. There is still an obvious target in that case: the
-  // node for the service that was open, which is where a click would have
-  // left focus anyway. Hence the DOM-id lookup.
+  // **Restoring by DOM id, never by a captured element reference.** An earlier
+  // version stashed `document.activeElement` on select and refocused it on
+  // close, falling back to a lookup only for the deep-link case where nothing
+  // had been clicked. That worked while the panel rendered *beside* the board.
+  // It stopped working the moment the service page began replacing the board:
+  // opening a page unmounts every tile, so the captured node is detached by
+  // the time anyone closes, `document.contains` is false on every path, and
+  // focus fell to `<body>` for clicks as well as deep links. A stashed element
+  // is a reference to a render that no longer exists.
   //
-  // The opener is cleared once used, so a click, a close, and then a deep
-  // link to some *other* service cannot restore focus to the first
-  // service's node -- a stale ref is worse than none, because it moves
-  // focus somewhere confidently wrong.
+  // Two ids are tried because two surfaces render a service and they key
+  // differently. The board's tiles are keyed by **catalog slug**, because one
+  // tile can stand for several entries and no single entry id names it. The
+  // graph and the migration board key by entry id. Trying slug first and id
+  // second covers all three without this file knowing which view is mounted.
+  //
+  // A focus restore that silently finds nothing is invisible in a passing test
+  // suite -- this repo has shipped that exact defect twice now, once on the
+  // migration board and once here -- so both branches are covered by tests
+  // that go red when the id scheme changes underneath them.
   useEffect(() => {
-    const matchedId = selectedService?.id ?? null;
-    const closedId = previousSelectedIdRef.current;
-    if (matchedId === closedId) {
+    const matched = selectedService ?? null;
+    const closed = previousSelectedRef.current;
+    if (matched?.id === closed?.id) {
       return;
     }
-    previousSelectedIdRef.current = matchedId;
+    previousSelectedRef.current = matched ? { id: matched.id, service: matched.service } : null;
 
-    if (matchedId) {
+    if (matched) {
       panelRef.current?.focus();
       return;
     }
 
-    const opener = lastFocusedRef.current;
-    lastFocusedRef.current = null;
-    if (opener && document.contains(opener)) {
-      opener.focus();
-      return;
-    }
-    if (closedId) {
-      document.getElementById(serviceNodeDomId(closedId))?.focus();
+    if (closed) {
+      const target =
+        document.getElementById(serviceTileDomId(closed.service)) ?? document.getElementById(serviceNodeDomId(closed.id));
+      target?.focus();
     }
   }, [selectedService]);
 
