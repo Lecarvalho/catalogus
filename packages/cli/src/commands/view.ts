@@ -105,6 +105,15 @@ const MIME_TYPES: Record<string, string> = {
   ".txt": "text/plain; charset=utf-8",
 };
 
+// MIME_TYPES stays a plain object literal, unlike the null-prototype tables
+// elsewhere in this repo (commands/set.ts's FIELDS, @catalogus/core's
+// catalog, the viewer's GLYPHS and ROLLUP_LABELS). The key here is
+// path.extname()'s return value, which is either "" or a string starting
+// with ".", and no Object.prototype member has either shape -- so a request
+// for "/x.constructor" looks up ".constructor" and misses, as it should.
+// Recorded rather than left to be re-derived by the next person auditing
+// this class of bug, and stated as the reason it is safe rather than as an
+// assurance that it is.
 function mimeTypeFor(filePath: string): string {
   return MIME_TYPES[extname(filePath).toLowerCase()] ?? "application/octet-stream";
 }
