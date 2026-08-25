@@ -25,8 +25,9 @@ import { ErrorState } from "./components/ErrorState.js";
 import { LoadingState } from "./components/LoadingState.js";
 import { MigrationList } from "./components/MigrationList.js";
 import { ProjectHeader } from "./components/ProjectHeader.js";
-import { ServiceDetailPanel } from "./components/ServiceDetailPanel.js";
+import { ServicePage } from "./components/ServicePage.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
+import { serviceTileDomId } from "./components/ServiceTile.js";
 import { ProjectBoard } from "./components/ProjectBoard.js";
 import { ServicePopover } from "./components/ServicePopover.js";
 import { ViewToggle, type ViewMode } from "./components/ViewToggle.js";
@@ -334,86 +335,93 @@ export function App() {
   }, [selectedService]);
 
   return (
-    <main className={`${styles.page} ${mode === "graph" ? styles.wide : ""}`}>
+    <main className={`${styles.page} ${mode === "graph" && !selectedService ? styles.wide : ""}`}>
       {state.kind === "loading" && <LoadingState />}
       {state.kind === "error" && <ErrorState message={state.message} />}
       {state.kind === "loaded" && edgeMaps && (
         <>
-          <ProjectHeader
-            project={state.payload.project}
-            manifestPath={state.payload.manifestPath}
-            serviceCount={state.payload.services.length}
-            edgeCount={state.payload.edges.length}
-            readAt={state.payload.readAt}
-          />
-          <ViewToggle mode={mode} onChange={setMode} />
-          <div className={styles.body}>
-            {mode === "list" ? (
-              <ProjectBoard
-                services={state.payload.services}
-                readAt={state.payload.readAt}
-                selectedId={selectedId}
-                onActivate={handleActivate}
-                onPeek={handlePeek}
-                onPeekEnd={handlePeekEnd}
-              />
-            ) : mode === "graph" ? (
-              <Suspense fallback={<p>Loading the graph…</p>}>
-                <GraphCanvas
-                  services={state.payload.services}
-                  edges={state.payload.edges}
-                  selectedId={selectedId}
-                  onSelect={handleSelect}
-                  layout={layoutWithElk}
-                />
-              </Suspense>
-            ) : (
-              <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
-            )}
-            {selectedService && (
-              <ServiceDetailPanel
-                service={selectedService}
-                dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
-                dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
-                labelForId={edgeMaps.labelForId}
-                onClose={handleClose}
-                panelRef={panelRef}
-              />
-            )}
-          </div>
-          {peek && mode === "list" && (
-            <ServicePopover
-              group={peek.group}
+          {/*
+            The masthead is the board's, not the app's. On a service page the
+            breadcrumb already names the project, and rendering both put two
+            `<h1>`s on one document -- the project's and the service's -- which
+            is wrong for a page whose subject is the service. A reader on a
+            service page needs the way back, which the breadcrumb is, not the
+            project's entry counts.
+          */}
+          {!selectedService && (
+            <ProjectHeader
+              project={state.payload.project}
+              manifestPath={state.payload.manifestPath}
+              serviceCount={state.payload.services.length}
+              edgeCount={state.payload.edges.length}
               readAt={state.payload.readAt}
-              position={peek.position}
-              dependsOn={(id) => edgeMaps.dependsOn.get(id) ?? []}
-              dependedOnBy={(id) => edgeMaps.dependedOnBy.get(id) ?? []}
-              labelForId={edgeMaps.labelForId}
-              onOpen={handleSelect}
-              onPointerEnter={cancelClose}
-              onPointerLeave={handlePeekEnd}
             />
           )}
-          {/* The text edge list used to render under the list view, on the
-              reasoning that it was "the list view's way of showing edges at
-              all". That reasoning expired on 2026-08-25: the board shows a
-              dependent count on every row and ranks the most depended-on
-              entries in their own module, so the edges are represented
-              where they mean something rather than as a flat transcript.
 
-              And the transcript was actively harmful once the board got
-              dense. Against Clapline it rendered 41 lines of
-              `fly-api (Fly.io) -> dotnet (.NET)` below the fold -- taller
-              than the entire project summary above it, and the largest
-              thing on a page whose whole argument is that a project fits
-              one screen. The owner chose "nothing -- it should fit" over
-              every search and index affordance; a 41-line appendix is that
-              affordance wearing a different hat.
+          {/*
+            The page replaces the board rather than docking beside it. That is
+            the difference between a panel and a page, and leaving the old
+            panel on the click path produced a visible defect once the same
+            content became the hover popover: hovering a tile and then
+            clicking it rendered the identical facts twice, once floating and
+            once docked on the right.
 
-              EdgesList itself is kept, not deleted: it is the honest
-              rendering for a viewer that cannot draw a graph, and the
-              no-JavaScript and print paths may want it. It simply has no
-              caller on this page. The Graph view draws the same edges. */}
+            The toggle goes with the board. It selects between three views of
+            the *project*, and a service page is not one of them -- leaving it
+            on screen would offer to switch a view that is no longer showing.
+          */}
+          {selectedService ? (
+            <ServicePage
+              service={selectedService}
+              projectName={state.payload.project.name}
+              dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
+              dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
+              labelForId={edgeMaps.labelForId}
+              onBack={handleClose}
+              pageRef={panelRef}
+            />
+          ) : (
+            <>
+              <ViewToggle mode={mode} onChange={setMode} />
+              <div className={styles.body}>
+                {mode === "list" ? (
+                  <ProjectBoard
+                    services={state.payload.services}
+                    readAt={state.payload.readAt}
+                    selectedId={selectedId}
+                    onActivate={handleActivate}
+                    onPeek={handlePeek}
+                    onPeekEnd={handlePeekEnd}
+                  />
+                ) : mode === "graph" ? (
+                  <Suspense fallback={<p>Loading the graph…</p>}>
+                    <GraphCanvas
+                      services={state.payload.services}
+                      edges={state.payload.edges}
+                      selectedId={selectedId}
+                      onSelect={handleSelect}
+                      layout={layoutWithElk}
+                    />
+                  </Suspense>
+                ) : (
+                  <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+                )}
+              </div>
+              {peek && mode === "list" && (
+                <ServicePopover
+                  group={peek.group}
+                  readAt={state.payload.readAt}
+                  position={peek.position}
+                  dependsOn={(id) => edgeMaps.dependsOn.get(id) ?? []}
+                  dependedOnBy={(id) => edgeMaps.dependedOnBy.get(id) ?? []}
+                  labelForId={edgeMaps.labelForId}
+                  onOpen={handleSelect}
+                  onPointerEnter={cancelClose}
+                  onPointerLeave={handlePeekEnd}
+                />
+              )}
+            </>
+          )}
         </>
       )}
     </main>
