@@ -80,6 +80,220 @@ three of six consecutive runs while every single run *of that file alone* passed
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
 
+### Handoff — 2026-08-25, the viewer redesign
+
+**Read this one first.** It supersedes the two handoffs below it wherever they
+disagree, and it changes what the product is understood to be, not just how it
+looks.
+
+**Start here:** `PRODUCT.md` at the repo root is new and is the record of what
+the owner said this product is. It is subordinate to `docs/HANDOFF.md` and says
+so. Read it before touching the viewer, because the redesign below is
+downstream of it.
+
+#### What happened
+
+The owner ran `catalogus view` against the real Clapline manifest — **the first
+time anyone has run this viewer against real data**, after three handoffs said
+it had not happened — and judged it "too poor and generic", naming Confluence
+and Notion as the bar. Everything else in this session followed from that.
+
+#### What the interview changed about the product
+
+Four things, all the owner's, all recorded in `PRODUCT.md` and amended into
+`docs/HANDOFF.md`'s own log:
+
+1. **The manifest is a skeleton; the page is the product.** What the owner wants
+   to keep is the operational knowledge attached to an entry — the example given
+   was a Stripe tax-registration table specific to their business — and that is a
+   *page*, not a field. This is why a detail panel sized for fields always felt
+   thin.
+2. **Pages are Layer 3, edited in the browser.** Committed direction. It
+   **un-defers Phase 4**, the viewer stops working offline, and a page acquires
+   two writers. All three costs were named and accepted.
+3. **The capture loop is the product.** Mid-session, an agent explains something
+   and the owner says *"catalogus that please"*. Filing must cost nothing, which
+   it can, because Catalogus already knows the project, the service and the
+   topology. **The agent captures, the browser curates.**
+4. **The manifest is authoritative for coding agents too.** "Change something in
+   Supabase" becomes one file read instead of a repo-wide grep — and agents are
+   obliged to keep it current, which nothing currently insists on. Both halves
+   are unbuilt.
+
+#### The viewer, rebuilt
+
+The direction was chosen through the `impeccable` skill's roll: the assigned
+grounded direction was a shipping-manifest world, and the **owner picked a
+challenger — a Japanese high-density module mosaic** — which beats the roll.
+Seed key `ac1ba604`. The full contract is in the scratchpad's
+`direction-contract.md`; its substance is reproduced in the component headers,
+which is where it will actually be read.
+
+What is on screen now, against the real 36-service manifest:
+
+- **Architecture bands, not an alphabet.** `apps/web/src/bands.ts`. At most eight
+  bands in a fixed reading order. **Bands key on `rollup`, never on the full
+  `role`**, so the grouping stays mechanical; that file records what this
+  deliberately gets wrong and why the alternative is worse.
+- **One tile per vendor, collapsed per band.** Four Fly.io entries were saying
+  "Fly.io" four times. Collapsing is never global — Supabase is `auth` in one
+  band and `database` in another.
+- **Tiles are an icon and a name**, floating, after StackShare.
+- **Hover shows the detail panel; click opens the page.** The panel's body is
+  `ServiceSummary`, shared so the facts have one implementation.
+- **One signal colour.** `active` earns no tag at all.
+- **Light is the committed design**, dark derived from it, with a `data-theme`
+  seam so the light palette can actually be viewed on a dark-set machine.
+
+#### What the redesign found that no test could
+
+- **A defect in the owner's own manifest.** `fly-prometheus` was `service: fly-io`
+  — the Fly app was standing in for Prometheus itself, so Fly.io appeared under
+  "Watched by" claiming to be a metrics service. The alphabetical list hid it;
+  architecture grouping made it obvious. Fixed in the Clapline repo with the
+  owner's approval, matching how Grafana and Loki were already modelled.
+- **No `unlink` command existed.** `link` adds an edge, `remove` deletes a service
+  and all its edges, and nothing removed a single edge — a manifest state the CLI
+  could not reach, which is a hole in the "CLI is the only writer" guarantee.
+  Built this session.
+- **The catalog cannot name four services in a real project.** `grafana`, `loki`,
+  `prometheus` and `healthchecks-io` render as raw slugs with generic glyphs.
+  Being fixed this session.
+
+#### Decisions taken, so they are not re-litigated
+
+- **The portfolio page stays deferred**; the viewer stays single-repo. Its three
+  open questions are recorded as *open*, not rejected, in its checkbox.
+- **`catalogus view` is not being removed** and the webapp is not being moved into
+  this repo. The owner proposed both; the reasons against are that `view` is the
+  product's entry point and works offline in any checkout, and that copying the
+  real Clapline manifest into this public repo would publish a private project's
+  whole topology — which `CLAUDE.md` explicitly forbids. The dev loop already
+  exists: `vite dev` proxies `/api` to a running `catalogus view` on 4180.
+- **The "most depended on" ranking was removed**, by the owner: "we should first
+  work on the catalog before start judging." `RankModule` and `mostDependedOn`
+  are kept, tested and callerless. The hierarchy problem they solve is real and
+  returns once the catalog is worth judging on.
+- **Icons: monochrome on the board, colour in the popover and page.** Agreed. The
+  reasoning against colouring the board is measured, not aesthetic: 60 of 159
+  catalog slugs have no brand icon, so a coloured board splits into real logos
+  and grey holes and makes 40% of a correct render look broken.
+
+#### The redesign is NOT done, and this is the owner's verdict on it
+
+**"That app still needs more life, it's boring. We need a shell, a header, a
+mark for Catalogus."** Owner, 2026-08-25, on seeing the finished board, popover
+and page. Do not read the commits below as a completed redesign.
+
+What that means concretely, because "boring" is not a brief:
+
+- **There is no app chrome at all.** No product identity, no shell, no global
+  header, nothing that says this is Catalogus rather than a bare document on a
+  white page. Notion and Confluence -- the owner's stated bar -- both have one,
+  and this has none. The viewer currently renders straight into `<main>`.
+- **There is no mark.** `docs/HANDOFF.md` §2 records this as genuinely open:
+  the previous logo was a pun on a dropped name and does not carry over, and
+  **nothing has been chosen to replace it.** So a shell needs a brand decision
+  first, or a deliberately typographic placeholder that is labelled as one. Do
+  not invent a logo and let it harden into the real one by default.
+- **The board has a lot of dead space.** The whole project fits the top third
+  of a 1440x800 screen, which is what "it should fit" asked for, and the
+  remaining two-thirds is empty. That is the space a shell and whatever else
+  earns a place would occupy.
+
+This is the **first thing to pick up in a fresh session**, ahead of everything
+in the list below.
+
+#### The next session must re-enter `/impeccable`, and this is its state
+
+**Yes, run it again.** The design work is not finished (the box above) *and* the
+flow itself was left mid-run. `apps/web/docs/DIRECTION.md` is the contract --
+rescued out of a session-scoped scratchpad and committed precisely so the seed
+key and the world's grammar survive this session. **Read it before designing
+anything**, and read the run-status note at its foot before assuming what is
+left.
+
+The short version:
+
+- **`init` will not re-run**, and should not. `PRODUCT.md` exists and
+  `context.mjs` resolves it.
+- **The direction is settled**: the owner chose the challenger
+  `japanese-high-density-web` over the assigned grounded direction, and a
+  user-pinned choice beats the roll permanently. Seed key `ac1ba604`. Do not
+  re-roll it because the result is "boring" -- the owner's complaint is about
+  the app having no shell and no identity, not about the world.
+- **Three required steps never ran**: the contract is not embedded in the built
+  markup, the finish review has not happened, and `DESIGN.md` does not exist.
+  **No mobile screenshot has ever been taken of this redesign** -- every capture
+  this session was desktop at 1440-1500px, which means the responsive behaviour
+  of a multi-column mosaic is entirely unverified.
+- **Order matters**: do the shell work first, then close the run over the
+  result. Running the finish review now would review a design the owner has
+  already rejected.
+
+#### Open, and what to do about each
+
+0. **The shell, the header and the mark** -- see the box directly above. The
+   mark is a brand decision the owner has not made, so it is a question before
+   it is a task.
+1. **Is "Serves requests" the right band label?** It now holds three Fly apps that
+   run the monitoring stack, because all of them are `hosting-*`. That is the
+   banding rule working as designed. Either rename the band to something truer of
+   everything `hosting-*`, or accept it. **Owner's call — do not invent a
+   per-service exception.**
+2. **The service page does not exist.** Click currently opens the old
+   `ServiceDetailPanel`. The page is the next piece of work and it is the whole
+   point of the product; its *content model* is an open question in `PRODUCT.md`
+   and must not be invented.
+3. **Graph and Migrations views still wear the old world.** They work; they do not
+   match.
+4. **`docs/HANDOFF.md` §6's command list is stale** — missing `set`, `link`,
+   `deprecate`, `remove`, `rename`. Found while adding `unlink`; deliberately not
+   half-fixed.
+5. **Two writers on one page**, and **what a page is made of** — both recorded as
+   open in `PRODUCT.md`, neither blocking the redesign.
+
+#### What the three parallel agents delivered, with their verification
+
+All three reported numbers they observed rather than assumed, and each verified
+its own tests by mutation. Worth reading their patterns, not just their output.
+
+- **`catalogus unlink <from> <to> [path]`** -- the mirror of `link`, removing one
+  edge without touching either entry. 11 tests; six mutations each caught by a
+  named test and reverted; the real binary driven against scratch manifests with
+  observed exit codes per scenario, including the object-form edge carrying
+  `notes` (reported as discarded rather than dropped silently) and a stranded
+  header comment (left in place, reported). Judgement calls it had to make are
+  listed in its report: a no-op removal exits 0, mirroring `link`'s duplicate-add.
+- **The catalog gap** -- 47 distinct slugs audited across both examples and the
+  real manifest; exactly four missing. `grafana` and `prometheus` gained verified
+  icons; `loki` and `healthchecks-io` genuinely have no simple-icons entry and
+  correctly carry **no icon field** rather than a guess. `resolveIcon` now returns
+  the brand hex: all 3,453 installed simple-icons records carry one, and 120 of
+  the catalog's 120 iconned rows resolve it -- both measured against the built
+  dist. Its hex test pins Stripe's known `#635BFF` rather than a format regex,
+  and it proved that choice by mutating in a `#000000` fallback a regex would
+  have passed. **112 tests in `packages/core` over five runs.**
+- **The viewer test rewrite** -- see the verification note below for the numbers
+  I confirmed myself rather than taking on trust.
+
+**One number in this file is now stale** and the catalog agent flagged it rather
+than editing a file it did not own: the "60 of 159 slugs have no icon" figure in
+"The icon fallback is the majority path" is off by the two icons just added.
+The *argument* it supports is unchanged and was re-measured against the real
+manifest during the colour decision: 25 of 36 services resolve a mark and 11 do
+not.
+
+#### How this session was run, and what to copy
+
+Three subagents in parallel, each with an explicit list of the files the others
+were touching, per `CLAUDE.md`. That worked — no collisions — and the two
+mid-flight source changes I made were messaged to the affected agent rather than
+discovered by it. **Copy that.** What also worked: verifying interaction in a
+real browser rather than through synthetic events. An early reading of "the
+popover never closes" was an artifact of React deriving `onPointerEnter` from
+delegated `pointerover`, which a non-bubbling synthetic event never reaches.
+
 ### Handoff — 2026-08-25, closing Phase 3.7
 
 **What happened.** No code. Phase 3.7's last open box was put to the owner and deferred, and this
