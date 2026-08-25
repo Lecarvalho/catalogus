@@ -90,11 +90,29 @@ a file mid-flight that a running agent depends on, it *tells* that agent rather 
 discover the change — a brief is a snapshot, and a stale one produces confident work against a
 version that no longer exists just as surely as a shared file does.
 
-**A subagent may delegate to its own subagents, and should when the work is genuinely wide.** A brief
-that turns out to hold eight independent pieces is better fanned out than ground through serially,
-and the agent holding it is better placed to see that than the session that wrote the brief. Two
-things bind a delegating agent, and both exist because delegation is where verification quietly goes
-missing:
+**Sizing the brief is the orchestrator's job, and a brief that holds many independent pieces should
+have been many briefs.** This is the primary discipline; everything in the paragraph after it is a
+fallback for when it fails. On 2026-08-25 the main session handed one agent "rewrite the viewer's
+tests" — seven-plus files, several independent modules — and that single agent spent **422k tokens**
+grinding through serially what three or four agents would have done in parallel. The brief was the
+defect, not the agent.
+
+Cutting the work finer is not only cheaper. Three things get better:
+
+- **Quality.** An agent whose context fills with eight files' worth of detail is a worse agent by the
+  eighth file than it was on the first. Long briefs degrade exactly where care matters most.
+- **Verification.** A narrow brief produces a claim that can be checked. "All the tests pass" from an
+  agent that wrote thirty of them is a claim nobody can usefully audit; "these four tests cover this
+  module, and here are the mutations that proved them" is.
+- **Recovery.** When one narrow brief comes back wrong, one narrow brief is re-run. When a wide one
+  does, everything in it is suspect.
+
+The test: if a brief names more than a handful of files, or contains the word "every", it is probably
+two or more briefs. Split it before spending the tokens, not after.
+
+**A subagent may still delegate to its own subagents** — for width that only becomes visible from
+inside the work, which is the case the rule above cannot catch. Two things bind a delegating agent,
+and both exist because delegation is where verification quietly goes missing:
 
 - **It owns the file partition for its children, and can only hand out files from its own
   allocation.** The main session's list of who-touches-what stops at its direct children, so a
