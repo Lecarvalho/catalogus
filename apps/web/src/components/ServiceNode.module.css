@@ -152,3 +152,34 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Kind, as a shape. One rule per exact schema `kind` value, named identically
+   to it -- the same convention `.status-*` above follows, and for the same
+   reason: two vocabularies for one field is how they drift apart.
+
+   These are deliberately *shape* differences rather than colour ones, because
+   colour on this node is already spoken for twice over (the status ring and
+   the selected state), and a third hue competing with those two would make
+   all three harder to read rather than adding a signal. Shape is the axis
+   that is still free.
+
+   `service` keeps the default rounded tile and needs no rule: it is the
+   overwhelming majority (29 of 35 entries in
+   examples/layout-stress.catalogus.yaml), and a rule that restates the
+   default is a rule that can silently disagree with it. */
+
+/* Infrastructure the project runs itself -- no vendor, no account, no
+   invoice. A dashed edge says "not something you are billed for" without
+   needing a word for it, and it is the one border treatment nothing else on
+   this node uses. */
+.kind-component {
+  border-style: dashed;
+}
+
+/* What the code is written in. Squared off, because a stack entry is not on
+   the request path at all -- it is a different sort of thing from the two
+   kinds that can take traffic, and the corner radius is the cheapest way to
+   say so at tile size. */
+.kind-stack {
+  border-radius: var(--radius-sm);
+}

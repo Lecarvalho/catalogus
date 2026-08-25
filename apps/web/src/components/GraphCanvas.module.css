@@ -1,0 +1,90 @@
+.canvas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+/* `height`, and specifically not `min-height`. React Flow's own root element
+   is `height: 100%`, and a percentage height resolves against the parent's
+   *definite* height -- which `min-height` alone does not provide. With
+   min-height the box here measured 921px, the element inside it measured 0,
+   and React Flow reported "[react-flow 004] The parent container needs a
+   width and a height to render the graph" while still drawing all 35 nodes:
+   the nodes are absolutely positioned and do not need the measurement, and
+   every edge does, so the graph rendered as a field of unconnected tiles.
+   Found by running it and reading the console, not by reading the CSS.
+
+   Viewport units rather than a pixel height so a tall window still gives the
+   graph more room, which was the point of the min-height. */
+.flow {
+  position: relative;
+  height: 70vh;
+  min-height: 420px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+/* Says out loud which way the arrows are read. Decision 2 in docs/PLAN.md's
+   Phase 3.7 picked the manifest's own direction, which means blast radius is
+   read backwards -- the reverse of what most people assume on first look, so
+   it is written on screen rather than left to be inferred. */
+.legend {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.message {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+}
+
+/* The React Flow node wrapper. The node itself is ServiceNode, unchanged from
+   the list; this only gives it the fixed box elk laid out against, so an edge
+   arrives where the layout expected it to. */
+/* Fills the box React Flow was given (NODE_SIZE, the same constant elk laid
+   out against), rather than restating those numbers here where they could
+   drift from it. */
+.node {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.node > button {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+}
+
+/* The connection points edges attach to. Invisible on purpose: this canvas
+   never lets anyone draw an edge -- an edge is a fact in catalogus.yaml and
+   the CLI is the only writer -- so a visible handle would advertise an
+   interaction that does not exist. */
+.handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Muted text rather than the border colour: a border is a 1px line against a
+   surface it sits on, and an edge is a line crossing open canvas -- at
+   --color-border it is nearly invisible at zoom-out, which is the zoom the
+   whole graph is looked at from. */
+.edge {
+  stroke: var(--color-text-muted);
+}
+
+/* An edge touching the selected node. Two changes, only one of them colour,
+   for the same reason the selected node itself carries a weight cue: an
+   accent stroke alone is invisible to a viewer who cannot separate the hues. */
+.edgeIncident {
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}

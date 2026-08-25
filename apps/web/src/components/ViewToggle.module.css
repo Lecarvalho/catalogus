@@ -1,0 +1,38 @@
+.toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.option {
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 3px);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.option:hover {
+  color: var(--color-text);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* The chosen view. `aria-checked` carries this for assistive tech; for
+   sighted users it is a raised surface plus full-strength text, so the cue is
+   not a hue difference alone -- the same rule ServiceNode.module.css's
+   `.selected` follows, and for the same reason. */
+.current {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}

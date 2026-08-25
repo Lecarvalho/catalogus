@@ -24,6 +24,16 @@
 //    see ServiceNode.module.css's `.uncataloguedDot` comment for why a dot
 //    rather than a badge.
 //
+// A third that is always present but only ever *differs* for two entries in
+// three: `kind`. A vendor with an invoice, infrastructure the owner runs, and
+// the language the code is written in are not interchangeable on screen --
+// a cost rollup has to exclude the middle one rather than show it as zero --
+// so the node carries the kind as a shape (see the `.kind-*` rules in
+// ServiceNode.module.css), as a `data-kind` attribute, and, for the two
+// non-default kinds, as visually-hidden text. Three carriers because the
+// shape alone is unreadable to a screen reader and untestable without
+// computed styles.
+//
 // And one that appears only when it has to: the local id, rendered under
 // the name when `showId` says another node beside this one shows the same
 // display name. Two entries of one vendor (`supabase-db` and
@@ -81,8 +91,19 @@ export function ServiceNode({ service, isSelected, showId, onSelect }: ServiceNo
       <button
         type="button"
         id={serviceNodeDomId(service.id)}
-        className={`${styles.node} ${isSelected ? styles.selected : ""}`}
+        // `?? ""`, because `kind: service` has no rule by design (see the
+        // `.kind-*` comment in the stylesheet) and CSS Modules return
+        // undefined for a class that does not exist -- which template-literals
+        // into the literal string "undefined" as a class name. Harmless to
+        // look at and wrong in a way that survives every test that checks
+        // behaviour rather than markup; found by reading the live DOM.
+        className={`${styles.node} ${styles[`kind-${service.kind}`] ?? ""} ${isSelected ? styles.selected : ""}`}
         aria-pressed={isSelected}
+        // The shape cue below is CSS, which no test can read and no screen
+        // reader announces. This is the machine-readable half of the same
+        // fact: one attribute, asserted by the tests, and the only way the
+        // three kinds are distinguishable without computing styles.
+        data-kind={service.kind}
         // Hover is a tooltip only -- name and role, nothing more. Never the
         // detail content: hover-to-open fights a pannable canvas (the next
         // slice) and is dead weight on a touch device, which is why this is
@@ -100,6 +121,12 @@ export function ServiceNode({ service, isSelected, showId, onSelect }: ServiceNo
             {!service.known && <span className={styles.srOnly}> (uncatalogued -- no catalog entry for this slug)</span>}
           </span>
           {showId && <span className={styles.id}>{service.id}</span>}
+          {service.kind !== "service" && (
+            <span className={styles.srOnly}>
+              {" "}
+              ({service.kind === "component" ? "component -- infrastructure this project runs itself" : "stack -- what the code is written in"})
+            </span>
+          )}
         </span>
       </button>
     </li>

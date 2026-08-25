@@ -14,8 +14,8 @@
 // plain `hashchange` plus the one hook below (hash-route.ts carries the
 // pure parsing, kept out of this file and out of `window` the same way
 // group-services.ts is kept out of the render tree).
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ViewPayload } from "@catalogus/cli";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ViewPayload, ViewService } from "@catalogus/cli";
 
 import styles from "./App.module.css";
 import { EdgesList } from "./components/EdgesList.js";
@@ -25,7 +25,20 @@ import { ProjectHeader } from "./components/ProjectHeader.js";
 import { ServiceDetailPanel } from "./components/ServiceDetailPanel.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
 import { ServiceList } from "./components/ServiceList.js";
+import { ViewToggle, type ViewMode } from "./components/ViewToggle.js";
 import { hashForServiceId, serviceIdFromHash } from "./hash-route.js";
+
+// Both halves of the graph view load on demand, and for two different
+// reasons. React Flow is several hundred KB that a viewer who never leaves
+// the list should not download, so the canvas is a lazy chunk. elkjs is
+// worse than large: it reaches its worker through a Vite `?worker` import
+// that cannot be evaluated outside a browser at all, so a static import here
+// would make every test in this file fail at module load. Neither is loaded
+// until someone actually asks for the graph.
+const GraphCanvas = lazy(() => import("./components/GraphCanvas.js").then((module) => ({ default: module.GraphCanvas })));
+
+const layoutWithElk = (services: readonly ViewService[], edges: readonly { from: string; to: string }[]) =>
+  import("./elk-layout.js").then((module) => module.layoutGraph(services, edges));
 
 type LoadState = { kind: "loading" } | { kind: "error"; message: string } | { kind: "loaded"; payload: ViewPayload };
 
@@ -68,6 +81,11 @@ function currentHash(): string {
 export function App() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [hash, setHash] = useState<string>(currentHash);
+  // Plain state, deliberately not a second route: docs/PLAN.md's Phase 3.7
+  // DAG decision 1 chose a toggle over `#/graph` precisely so the viewer
+  // stays one addressable page, and `#/service/<id>` keeps addressing the
+  // panel from either view.
+  const [mode, setMode] = useState<ViewMode>("list");
 
   // Panel focus management: a click captures whatever had focus (the node
   // button just activated) so Escape can hand focus back to it, and the
@@ -226,14 +244,27 @@ export function App() {
   }, [selectedService]);
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${mode === "graph" ? styles.wide : ""}`}>
       {state.kind === "loading" && <LoadingState />}
       {state.kind === "error" && <ErrorState message={state.message} />}
       {state.kind === "loaded" && edgeMaps && (
         <>
           <ProjectHeader project={state.payload.project} manifestPath={state.payload.manifestPath} />
+          <ViewToggle mode={mode} onChange={setMode} />
           <div className={styles.body}>
-            <ServiceList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+            {mode === "list" ? (
+              <ServiceList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+            ) : (
+              <Suspense fallback={<p>Loading the graph…</p>}>
+                <GraphCanvas
+                  services={state.payload.services}
+                  edges={state.payload.edges}
+                  selectedId={selectedId}
+                  onSelect={handleSelect}
+                  layout={layoutWithElk}
+                />
+              </Suspense>
+            )}
             {selectedService && (
               <ServiceDetailPanel
                 service={selectedService}
@@ -245,7 +276,10 @@ export function App() {
               />
             )}
           </div>
-          <EdgesList edges={state.payload.edges} labelForId={edgeMaps.labelForId} />
+          {/* The text edge list is the list view's way of showing edges at
+              all. On the canvas the same edges are drawn, so repeating them
+              underneath is the same information twice. */}
+          {mode === "list" && <EdgesList edges={state.payload.edges} labelForId={edgeMaps.labelForId} />}
         </>
       )}
     </main>
