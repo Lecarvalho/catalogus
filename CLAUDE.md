@@ -41,6 +41,8 @@ Also run `pnpm typecheck` when touching type signatures across package boundarie
 
 ## How implementation work runs here: orchestrate, delegate, validate
 
+**Subagents here are user-requested.**
+
 Work in this repo runs as three roles rather than as one agent doing everything. The main session
 orchestrates; substantial implementation goes to a subagent; verification goes to a *different*
 subagent that did not write the code. The reason is in this project's own history: the
