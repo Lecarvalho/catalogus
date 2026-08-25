@@ -1,9 +1,10 @@
 // The only place data enters this app -- fetches GET /api/project once on
 // mount and derives the per-service dependency maps the detail panel needs
 // -- and, since the Phase 3.7 restructure, the only place `window` is
-// touched at all: reading and writing `location.hash` for the
-// `#/service/<id>` detail-panel route, and listening for `hashchange` and
-// `Escape`. Every component this renders is pure -- props in, no fetch, no
+// touched at all: reading `location.hash` and replacing it through
+// `history.replaceState` for the `#/service/<id>` detail-panel route,
+// listening for `hashchange` and `Escape`, and the two `document` focus
+// calls the panel's open/close needs. Every component this renders is pure -- props in, no fetch, no
 // window/location, no node import, no module-level singleton -- which is
 // what lets them move to a shared package later as a file move rather than
 // a rewrite (docs/PLAN.md's Phase 3.7 styling decisions), and what the next
@@ -22,6 +23,7 @@ import { ErrorState } from "./components/ErrorState.js";
 import { LoadingState } from "./components/LoadingState.js";
 import { ProjectHeader } from "./components/ProjectHeader.js";
 import { ServiceDetailPanel } from "./components/ServiceDetailPanel.js";
+import { serviceNodeDomId } from "./components/ServiceNode.js";
 import { ServiceList } from "./components/ServiceList.js";
 import { hashForServiceId, serviceIdFromHash } from "./hash-route.js";
 
@@ -131,16 +133,39 @@ export function App() {
     [state, selectedId]
   );
 
-  const handleSelect = useCallback((id: string) => {
-    if (document.activeElement instanceof HTMLElement) {
-      lastFocusedRef.current = document.activeElement;
-    }
-    window.location.hash = hashForServiceId(id);
+  // Opening and closing the panel *replaces* the current history entry
+  // instead of pushing one. The panel is a view of this page, not a page of
+  // its own: assigning `window.location.hash` pushed an entry per open and
+  // per close, so Back walked the user's clicks one at a time instead of
+  // leaving the viewer -- and a close pushed an entry whose only content is
+  // "no panel", which Back then undoes by reopening it. The hash stays in
+  // the URL, so a deep link, a reload and a copied address still address a
+  // panel; it just stops accumulating.
+  //
+  // `replaceState` fires no `hashchange`, which is why this sets the state
+  // itself. The listener above is still the only path for back/forward and
+  // for a hash edited by hand -- this is the one navigation that bypasses
+  // it, deliberately, and it is the reason this component keeps `hash` in
+  // state at all rather than reading `window.location.hash` at render.
+  const replaceHash = useCallback((next: string) => {
+    const base = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, "", next ? `${base}${next}` : base);
+    setHash(next);
   }, []);
 
+  const handleSelect = useCallback(
+    (id: string) => {
+      if (document.activeElement instanceof HTMLElement) {
+        lastFocusedRef.current = document.activeElement;
+      }
+      replaceHash(hashForServiceId(id));
+    },
+    [replaceHash]
+  );
+
   const handleClose = useCallback(() => {
-    window.location.hash = "";
-  }, []);
+    replaceHash("");
+  }, [replaceHash]);
 
   // Escape closes the panel, only while one is open -- the listener is
   // added and removed with the panel's own lifetime rather than sitting on
@@ -159,20 +184,44 @@ export function App() {
   }, [selectedService, handleClose]);
 
   // Moves focus into the panel the moment it opens (click or deep link),
-  // and hands focus back to whatever opened it once it closes. Keyed on
-  // the resolved service's id, not on the raw (possibly stale/unknown)
-  // hash id, so an unmatched hash never tries to focus a panel that isn't
-  // rendered.
+  // and hands it somewhere sensible once it closes. Keyed on the resolved
+  // service's id, not on the raw (possibly stale/unknown) hash id, so an
+  // unmatched hash never tries to focus a panel that isn't rendered.
+  //
+  // Closing has two cases and only one of them used to work. A panel opened
+  // by a click restores the element that opened it. A panel opened by a
+  // *deep link* had no opener -- nothing was clicked, so `lastFocusedRef`
+  // was still null and focus fell to `<body>`, which is the state where the
+  // next Tab starts from the top of the document and a screen reader loses
+  // its place entirely. There is still an obvious target in that case: the
+  // node for the service that was open, which is where a click would have
+  // left focus anyway. Hence the DOM-id lookup.
+  //
+  // The opener is cleared once used, so a click, a close, and then a deep
+  // link to some *other* service cannot restore focus to the first
+  // service's node -- a stale ref is worse than none, because it moves
+  // focus somewhere confidently wrong.
   useEffect(() => {
     const matchedId = selectedService?.id ?? null;
-    if (matchedId === previousSelectedIdRef.current) {
+    const closedId = previousSelectedIdRef.current;
+    if (matchedId === closedId) {
       return;
     }
     previousSelectedIdRef.current = matchedId;
+
     if (matchedId) {
       panelRef.current?.focus();
-    } else if (lastFocusedRef.current && document.contains(lastFocusedRef.current)) {
-      lastFocusedRef.current.focus();
+      return;
+    }
+
+    const opener = lastFocusedRef.current;
+    lastFocusedRef.current = null;
+    if (opener && document.contains(opener)) {
+      opener.focus();
+      return;
+    }
+    if (closedId) {
+      document.getElementById(serviceNodeDomId(closedId))?.focus();
     }
   }, [selectedService]);
 

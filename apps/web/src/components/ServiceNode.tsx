@@ -24,6 +24,13 @@
 //    see ServiceNode.module.css's `.uncataloguedDot` comment for why a dot
 //    rather than a badge.
 //
+// And one that appears only when it has to: the local id, rendered under
+// the name when `showId` says another node beside this one shows the same
+// display name. Two entries of one vendor (`supabase-db` and
+// `supabase-auth`, both "Supabase") are otherwise the same node twice, on
+// screen and in the accessible name. Conditional rather than always-on
+// because the id is the thing the compact node was shrunk to drop.
+//
 // A control, not a card: rendered as a real `<button>` so keyboard
 // operability (Tab to focus, Enter/Space to activate) and the accessible
 // name come from native semantics rather than a hand-rolled click handler
@@ -38,15 +45,42 @@ import styles from "./ServiceNode.module.css";
 export interface ServiceNodeProps {
   service: ViewService;
   isSelected: boolean;
+  /**
+   * True when another entry rendered beside this one carries the same
+   * display name, in which case the local id renders under it -- two
+   * entries of the same vendor are otherwise the same node twice. The
+   * container decides, because only it knows what is on screen together
+   * (see group-services.ts's `duplicateNames`); required rather than
+   * optional so the canvas slice has to answer it rather than inherit a
+   * default that silently drops the disambiguation.
+   */
+  showId: boolean;
   /** Called with the service id when this node is activated (click or keyboard). App.tsx turns this into a hash change -- this component never touches `window` itself. */
   onSelect: (id: string) => void;
 }
 
-export function ServiceNode({ service, isSelected, onSelect }: ServiceNodeProps) {
+/**
+ * The DOM id this node's button carries, so App.tsx can hand focus back to
+ * it when a detail panel closes that nothing on the page opened -- a deep
+ * link, where there is no previously-focused element to restore. Exported
+ * rather than duplicated as a template string at the call site: the format
+ * is one fact, and a focus restore that silently finds nothing is invisible
+ * in a passing test suite.
+ *
+ * Read back with `document.getElementById`, never a CSS selector: a service
+ * id is manifest text and would need selector escaping, which is the kind
+ * of detail that works until the first id with a dot in it.
+ */
+export function serviceNodeDomId(id: string): string {
+  return `service-node-${id}`;
+}
+
+export function ServiceNode({ service, isSelected, showId, onSelect }: ServiceNodeProps) {
   return (
     <li className={styles.item}>
       <button
         type="button"
+        id={serviceNodeDomId(service.id)}
         className={`${styles.node} ${isSelected ? styles.selected : ""}`}
         aria-pressed={isSelected}
         // Hover is a tooltip only -- name and role, nothing more. Never the
@@ -60,9 +94,12 @@ export function ServiceNode({ service, isSelected, onSelect }: ServiceNodeProps)
           <Icon iconPath={service.icon} rollup={service.rollup} label={service.name} />
           {!service.known && <span className={styles.uncataloguedDot} aria-hidden="true" />}
         </span>
-        <span className={`${styles.name} ${service.known ? "" : styles.uncataloguedName}`}>
-          {service.name}
-          {!service.known && <span className={styles.srOnly}> (uncatalogued -- no catalog entry for this slug)</span>}
+        <span className={styles.label}>
+          <span className={`${styles.name} ${service.known ? "" : styles.uncataloguedName}`}>
+            {service.name}
+            {!service.known && <span className={styles.srOnly}> (uncatalogued -- no catalog entry for this slug)</span>}
+          </span>
+          {showId && <span className={styles.id}>{service.id}</span>}
         </span>
       </button>
     </li>

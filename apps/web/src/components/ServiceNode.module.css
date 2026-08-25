@@ -28,14 +28,23 @@
   outline-offset: 2px;
 }
 
-/* Selected is conveyed by `aria-pressed` on the button (assistive tech) and
-   by both a border colour *and* a background tint here (never colour
-   alone for sighted users either) -- two independent visual cues so the
-   selected node reads clearly even for a viewer who can't distinguish the
-   border-colour change on its own. */
+/* Selected is conveyed by `aria-pressed` on the button (assistive tech) and,
+   for sighted users, by three cues of which only two are colour: the border
+   colour, the background tint, and -- the one that survives a viewer who
+   cannot separate the accent hue from the border hue at all -- the *weight*
+   of the edge. The inset ring stacks on the 1px border, so a selected node's
+   outline reads as 3px against every other node's 1px in pure greyscale.
+
+   Deliberately an inset box-shadow rather than a wider `border-width`: a
+   border change reflows the node's content by 2px, and a row of tiles that
+   twitches as the selection moves is its own defect. This was a real gap,
+   not a precaution -- both previous cues were colour, and the comment that
+   used to sit here called them "two independent visual cues" while naming
+   two colours (docs/PLAN.md, Phase 3.7's five smaller viewer defects). */
 .selected {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--color-accent);
 }
 
 /* The status ring: a coloured ring around the icon, colour only, no text --
@@ -84,6 +93,16 @@
   border: 2px solid var(--color-surface-raised);
 }
 
+/* The name and, when it is needed, the id stack vertically inside the node's
+   horizontal icon-then-text layout. min-width:0 on the column as well as on
+   .name, or the flex item refuses to shrink below its content and the
+   ellipsis in .name never fires. */
+.label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .name {
   font-weight: 600;
   min-width: 0;
@@ -117,4 +136,19 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* The disambiguating id line, rendered only when another node beside this one
+   shows the same display name (see ServiceNode.tsx's `showId`). Monospace and
+   muted, the same treatment .uncataloguedName gives a raw slug -- an id is a
+   slug too, and reusing that vocabulary says so without a second one. Smaller
+   than the name because it is the tiebreaker, not the label. */
+.id {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--color-text-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
