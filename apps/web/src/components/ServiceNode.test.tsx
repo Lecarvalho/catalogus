@@ -85,6 +85,23 @@ describe("ServiceNode", () => {
     expect(document.getElementById(serviceNodeDomId("fly-api"))).toBe(screen.getByRole("button"));
   });
 
+  it.each([
+    ["service", null],
+    ["component", /component -- infrastructure this project runs itself/],
+    ["stack", /stack -- what the code is written in/],
+  ] as const)("carries kind '%s' as a data attribute, and as text for the two non-default kinds", (kind, textPattern) => {
+    render(<ServiceNode service={makeViewService({ id: "svc", role: "hosting", kind })} isSelected={false} showId={false} onSelect={vi.fn()} />);
+    // The shape cue is CSS, which jsdom does not compute -- this attribute is
+    // the machine-readable half of the same fact, and the sr-only text is the
+    // half a screen reader gets. A shape alone would be neither.
+    expect(screen.getByRole("button").getAttribute("data-kind")).toBe(kind);
+    if (textPattern) {
+      expect(screen.getByRole("button").textContent).toMatch(textPattern);
+    } else {
+      expect(screen.getByRole("button").textContent).not.toMatch(/component|stack/);
+    }
+  });
+
   it("builds a DOM id that survives a service id a CSS selector would choke on", () => {
     render(<ServiceNode service={makeViewService({ id: "fly.io api", role: "hosting" })} isSelected={false} showId={false} onSelect={vi.fn()} />);
     expect(document.getElementById(serviceNodeDomId("fly.io api"))).toBe(screen.getByRole("button"));
@@ -116,5 +133,19 @@ describe("ServiceNode.module.css's selected state", () => {
   it("still declares the two colour cues alongside it", () => {
     expect(selectedRule).toContain("border-color");
     expect(selectedRule).toContain("background");
+  });
+
+  // Same kind of tripwire, same limits, one rule further: kind is carried by
+  // shape precisely because colour on this node is already spoken for twice
+  // (status ring, selected state). A `.kind-*` rule that starts setting a
+  // colour is the drift this catches.
+  it.each([".kind-component", ".kind-stack"])("declares %s as a shape rule, not a colour one", (selector) => {
+    const rule = css.slice(css.indexOf(`${selector} {`), css.indexOf("}", css.indexOf(`${selector} {`)));
+    expect(rule.length).toBeGreaterThan(selector.length + 2);
+    expect(rule).not.toMatch(/color|background/);
+  });
+
+  it("declares no rule for kind-service, so the default tile has exactly one definition", () => {
+    expect(css).not.toContain(".kind-service");
   });
 });

@@ -12,11 +12,33 @@
 // component does with a payload once it has one.
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ViewPayload, ViewService } from "@catalogus/cli";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
 import { makeViewService } from "./test-support/fixtures.js";
+
+// elk-layout.ts reaches its worker through a Vite `?worker` import that
+// cannot be evaluated outside a browser -- importing it under jsdom throws at
+// module load. App.tsx only ever reaches it through a dynamic import, so
+// mocking the module here means the real one is never loaded at all, and the
+// graph-mode tests below can exercise App's own wiring rather than elk's.
+vi.mock("./elk-layout.js", () => ({
+  layoutGraph: async (services: { id: string }[]) => new Map(services.map((service, index) => [service.id, { x: index * 300, y: 0 }])),
+}));
+
+beforeAll(() => {
+  // React Flow measures its container and jsdom has no ResizeObserver. Same
+  // stub, same reasoning as GraphCanvas.test.tsx -- nothing here asserts on
+  // geometry.
+  if (!("ResizeObserver" in globalThis)) {
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+  }
+});
 
 function payload(overrides: { services?: ViewService[]; edges?: { from: string; to: string }[] } = {}): ViewPayload {
   return {
@@ -201,5 +223,53 @@ describe("App -- focus when the panel closes", () => {
     await renderLoaded();
     fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("region")));
+  });
+});
+
+// The toggle, per docs/PLAN.md's Phase 3.7 DAG decision 1: a view switch, the
+// list as default, and one addressable page rather than a second route.
+describe("App -- the list/graph toggle", () => {
+  it("starts on the list", async () => {
+    await renderLoaded();
+    expect(screen.getByRole("radio", { name: "List" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("heading", { level: 2, name: "Hosting" })).not.toBeNull();
+  });
+
+  it("swaps the list for the canvas, and back", async () => {
+    await renderLoaded();
+    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
+
+    // The rollup headings are the list's; the legend is the canvas's.
+    await waitFor(() => expect(screen.queryByText(/Arrows point from a service to what it depends on/)).not.toBeNull());
+    expect(screen.queryByRole("heading", { level: 2, name: "Hosting" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "List" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "Hosting" })).not.toBeNull());
+    expect(screen.queryByText(/Arrows point from a service to what it depends on/)).toBeNull();
+  });
+
+  it("keeps the same nodes and the same selection contract across the swap", async () => {
+    window.history.replaceState(null, "", "/#/service/fly-api");
+    await renderLoaded();
+    expect(screen.getByRole("button", { name: /Fly\.io/ }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
+    // Still selected, still the same panel, addressed by the same hash --
+    // the toggle is a view switch, not a navigation.
+    await waitFor(() => expect(screen.getByRole("button", { name: /Fly\.io/ }).getAttribute("aria-pressed")).toBe("true"));
+    expect(screen.getByRole("region")).not.toBeNull();
+    expect(window.location.hash).toBe("#/service/fly-api");
+  });
+
+  it("drops the text edge list on the canvas, where the same edges are drawn", async () => {
+    await renderLoaded();
+    const edgeText = (id: string) => screen.queryAllByText(new RegExp(id)).length;
+    expect(edgeText("supabase-db")).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
+    await waitFor(() => expect(screen.queryByText(/Arrows point from a service/)).not.toBeNull());
+    // The node itself still names it; what is gone is the second, textual
+    // copy of the edge list underneath.
+    expect(screen.queryByText("fly-api (Fly.io)")).toBeNull();
   });
 });
