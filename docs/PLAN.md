@@ -27,6 +27,13 @@ design decisions; this file tracks *what has been built* against it and what rem
   React Flow), and the portfolio/migration/cost pages that want more than one project.** Phase 4
   stays deferred by owner decision.
 
+  **The five smaller viewer defects are closed** (2026-08-25) — deep-link focus, a stale focus
+  ref found while fixing it, history entries on every panel open and close, a selection state
+  cued only by colour, and two entries of one vendor rendering as the same node twice. Verified
+  by seven mutations each watched go red, and by a live `catalogus view` run in real Chrome —
+  the first-hand browser run this document had been missing for two sessions. `App.tsx` went
+  from no tests to 15.
+
   **The session after the viewer foundations spent itself on verification rather than features**,
   and that was the right trade because it found things. The two committed corpora now exist (the
   skill's shell commands checked against the live CLI surface; 65 path-traversal vectors executed
@@ -34,20 +41,62 @@ design decisions; this file tracks *what has been built* against it and what rem
   would have caught**: a suite flake that made `pnpm test` fail half the time while every
   single-file run passed, and a live `catalogus set` bug that reported a schema error against a
   perfectly valid manifest. Both are written up below.
-- **Last updated:** 2026-08-24
+- **Last updated:** 2026-08-25
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **879 tests / 52 files**, plus `pnpm typecheck`
+Run `pnpm build && pnpm test` first and confirm **909 tests / 53 files**, plus `pnpm typecheck`
 clean across all four packages, before trusting anything below. (Phases 0–3.6 and the 3.6.1
-correction pass predate this at 549/38, and the viewer-foundations session ended at 679/50; the
-number moved a long way again in the drift-and-corpus session that followed — 200 of those tests
-are two committed corpora plus two components' first test files, not 200 new behaviours.)
+correction pass predate this at 549/38, the viewer-foundations session ended at 679/50, and the
+drift-and-corpus session that followed ended at 879/52 — 200 of those tests are two committed
+corpora plus two components' first test files, not 200 new behaviours. The 30 added on 2026-08-25
+are the five smaller viewer defects and `App.tsx`'s first test file, which is the one new file.)
 
 **Run it more than once before believing it.** That session's own corpus made the suite fail on
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
+
+### Handoff — 2026-08-25, end of the small-defects session
+
+**What happened.** No new features. The one Phase 3.7 item that needed no decision from the owner
+was closed: the five smaller viewer defects the previous validation pass found and nobody had
+fixed. Baseline **879/52 confirmed over four runs before touching anything**, and the session ends
+at **909/53** over six.
+
+**What is actually different on screen.** A deep-linked panel now hands focus back to a node
+instead of to `<body>`; opening and closing panels no longer grows history, so Back leaves the
+viewer rather than walking the last dozen clicks; a selected node's edge is 3px against every other
+node's 1px, which is the first selection cue that survives greyscale; and two entries of one vendor
+in one group show their local ids. Full detail, including the fifth defect that was hiding inside
+the first, is in the ticked box in Phase 3.7.
+
+**The verification is the part worth copying, not the fixes.** Seven mutations, each applied to the
+fixed code and each watched go red on exactly the tests that name it — the counts are in the box.
+That harness is `$CLAUDE_JOB_DIR/tmp/mutate.py`-shaped and took ten minutes to write; it is the
+cheapest way to find out that a new test asserts nothing, which is the failure this file keeps
+recording.
+
+**And the browser run finally happened.** Two consecutive handoffs said the owner would run
+`catalogus view` from a real repo and that nothing here reflected such a run. This session ran it
+against a scratch copy of `examples/reference.catalogus.yaml` in real Chrome and read computed
+styles and `history.length` out of the live page. That is **not** the owner's run on a real client
+repo — it is a synthetic example on a scratch directory, and it says nothing about how the viewer
+reads against a real inventory. The owner's run still outranks it and still has not happened.
+
+**What was deliberately not done, and why.** The DAG. It is the next real piece of work and it is
+blocked on six decisions the plan has been carrying for two sessions — list-versus-graph, arrow
+direction, grouping on the canvas, how `component` and `stack` nodes render, which React Flow, and
+whether elkjs fits the bundle budget. Those are the owner's to make, not an implementer's, and
+answering them by typing first is the failure mode this repo has a rule against. They are listed
+verbatim in the DAG box below and asked of the owner as this session's last act.
+
+**One thing to know before writing more `apps/web` tests.** Under jsdom the global `URL` resolves a
+relative reference against the *document* base, so `new URL("./x", import.meta.url)` returns
+`http://localhost:3000/...` and `node:fs` rejects it with "The URL must be of scheme file". Derive
+paths from `fileURLToPath(import.meta.url)` by string replacement instead — and not from
+`process.cwd()`, which is the repo root under `pnpm test` and `apps/web` under a per-package vitest
+run. `ServiceNode.test.tsx` carries the comment.
 
 ### Handoff — 2026-08-24, end of the drift-and-corpus session
 
@@ -68,13 +117,15 @@ previous handoff ranked second and third, and both closures found defects on the
    `dist/web` in parallel workers), and **`catalogus set constructor`** taking the known-field
    branch through `Object.prototype` and blaming the user's manifest for it.
 
-**What was deliberately not done, and why.** The five smaller viewer defects (focus, history
-entries, colour-only selection cue, duplicate-vendor nodes) are still open and now have their own
-checkbox rather than being hidden inside a ticked one. `App.tsx` still has no tests and is now the
-largest untested surface in the repo. **The DAG is still the next real piece of work**, and the
-previous handoff's warning about it stands unchanged: there is no real manifest to judge layout
-against, so either onboard a project first or build against a deliberately hard synthetic one and
-say plainly that that is what happened.
+**What was deliberately not done, and why.** *(Both halves of this paragraph were closed on
+2026-08-25 — see the handoff above. Left as written, because a dated handoff that gets edited to
+stay true stops being a record of what was known when.)* The five smaller viewer defects (focus,
+history entries, colour-only selection cue, duplicate-vendor nodes) are still open and now have
+their own checkbox rather than being hidden inside a ticked one. `App.tsx` still has no tests and
+is now the largest untested surface in the repo. **The DAG is still the next real piece of work**,
+and the previous handoff's warning about it stands unchanged: there is no real manifest to judge
+layout against, so either onboard a project first or build against a deliberately hard synthetic
+one and say plainly that that is what happened.
 
 **One habit worth keeping from this session.** Every claim below that says "watched go red" means
 the code was mutated, the test was observed failing, and the mutation was reverted — and the suite
@@ -1484,17 +1535,74 @@ database node gets a database icon whoever the vendor is.
       fix more than the one case this box named: `coding` was not the only rollup that reads as a
       truncation — `ingress`, `telemetry`, `ui`, `runtime` and `language` are in the same shape,
       and the viewer was rendering INGRESS and TELEMETRY as headings.
-- [ ] **Five smaller viewer defects, all found by the validation pass, none fixed.** Split out of
-      the two boxes above so ticking those does not quietly carry them: focus drops to `<body>`
-      when a deep-linked panel is closed (`lastFocusedRef` was never set, because nothing was
-      clicked to open it); every open and close pushes a history entry, because `App.tsx` assigns
-      `window.location.hash` rather than calling `replaceState`, so Back walks the panel instead
-      of leaving the page; the selected state's two *visual* cues are both colour (`aria-pressed`
-      carries it for assistive tech, so this is a low-vision gap rather than an AT one); and two
-      entries of the same vendor in one group are indistinguishable on the node, since the node
-      shows the catalog display name and not the local id. **Both routing claims re-checked
-      against `App.tsx` directly on 2026-08-24 rather than trusted from this file** — this
-      document has gone stale on its own numbers twice.
+- [x] **Five smaller viewer defects, all fixed.** The box's title said five and its prose listed
+      four; the fifth is item 2 below, found while fixing item 1 rather than by the validation
+      pass. Split out of the two boxes above so ticking those did not quietly carry them, and
+      closed on 2026-08-25:
+
+      1. **Focus dropped to `<body>` when a deep-linked panel was closed** — `lastFocusedRef` is
+         captured on click, and a deep link involves no click, so the restore branch had nothing to
+         restore to and silently did nothing. From `<body>` the next Tab restarts at the top of the
+         document and a screen reader has lost its place entirely. Fixed by giving every node a
+         stable DOM id (`serviceNodeDomId`, exported from `ServiceNode.tsx` rather than duplicated
+         as a template string at the call site) and falling back to the node the closed panel was
+         addressing — where a click would have left focus anyway. Read back with
+         `document.getElementById`, never a selector, because a service id is manifest text and a
+         selector would need escaping.
+      2. **The opener ref could go stale.** Not in the original list, found while fixing (1): a
+         click, a close, and then a deep link to a *different* service restored focus to the first
+         service's node. `lastFocusedRef` is now cleared once used — a stale ref is worse than
+         none, because it moves focus somewhere confidently wrong rather than nowhere.
+      3. **Every open and close pushed a history entry.** `App.tsx` assigned
+         `window.location.hash`; it now calls `history.replaceState` and sets its own state, since
+         `replaceState` fires no `hashchange`. The `hashchange` listener is still the only path for
+         back/forward and for a hand-edited hash. Closing also leaves no bare `#` behind. The panel
+         is a view of the page, not a page of its own — and the close entry was the worse half of
+         this: its only content was "no panel", which Back then undid by reopening it.
+      4. **The selected state's two visual cues were both colour.** Now three, of which one is not:
+         an inset 2px ring stacks on the 1px border, so a selected node's edge reads as 3px against
+         every other node's 1px in pure greyscale. An inset `box-shadow` deliberately, not a wider
+         `border-width`, which would reflow the tile by 2px and make the row twitch as the
+         selection moves.
+      5. **Two entries of one vendor in a group were the same node twice.** `host-api` and
+         `host-web` in `examples/reference.catalogus.yaml` are both `service: fly-io`, both roll up
+         to `hosting`, and both rendered as "Fly.io" with the same icon and nothing else. The local
+         id now renders under the name for exactly the names that collide — `duplicateNames()` in
+         `group-services.ts`, computed per rendered group by `ServiceGroup`, never manifest-wide:
+         the two Supabase entries sit under `AUTH` and `DATABASE`, are already told apart by the
+         headings, and correctly show no id. `showId` is a **required** prop rather than an
+         optional one defaulting to false, so the canvas slice has to answer it instead of silently
+         inheriting a default that drops the disambiguation.
+
+      **What the tick rests on.** `pnpm build && pnpm test` at **909 tests / 53 files**, run six
+      consecutive times (up from 879/52; +30 tests, and the one new file is `App.test.tsx`), plus
+      `pnpm typecheck` clean across all four packages. **Seven mutations applied and each watched
+      go red on exactly the tests that name it** — push-instead-of-replace (2 red), the deep-link
+      focus fallback deleted (2), the opener not cleared (1), the node's DOM id removed (4), the
+      group never disambiguating (1), the id rendered unconditionally (5), and the non-colour
+      selection cue deleted from the CSS (1).
+
+      **And a live browser run, which this document had been missing for two sessions.**
+      `catalogus view` against a scratch copy of `examples/reference.catalogus.yaml`, driven in
+      real Chrome, not jsdom: both Fly.io nodes render their ids and both Supabase nodes render
+      none; computed styles confirm `1px border + 2px inset ring` on the selected node against
+      `1px, none` on its neighbour; `history.length` is **2 before and 2 after three
+      open-then-close cycles**, with the address back to a clean `/`; and closing a panel opened by
+      a deep link (hash set directly, `document.body` focused first) lands focus on
+      `service-node-supabase-auth` rather than on `<body>`.
+
+      **`App.tsx` is no longer the largest untested surface in the repo.** It had no tests at all;
+      it now has 15, covering the load/error paths, the hash route, both history fixes and all four
+      focus cases. One thing worth knowing before writing more of them: under jsdom the global
+      `URL` resolves a relative reference against the *document* base, so
+      `new URL("./x.css", import.meta.url)` returns `http://localhost:3000/...` and `node:fs`
+      rejects it — `ServiceNode.test.tsx` derives its stylesheet path from
+      `fileURLToPath(import.meta.url)` by string replacement instead, and says why.
+
+      **One limit, stated rather than left to be assumed:** the greyscale claim in (4) is reasoned
+      from the declared CSS and confirmed against computed styles, not measured with a contrast
+      tool or checked by a low-vision reader. The test behind it is a source-level tripwire that
+      fails when the non-colour cue is deleted; it cannot tell whether the result looks right.
 - [x] **The skill-drift test now covers what it needs to.** Two separate holes, both closed, both
       watched go red against the real `SKILL.md` before being trusted.
 
