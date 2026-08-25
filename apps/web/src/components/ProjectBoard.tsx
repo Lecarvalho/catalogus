@@ -10,32 +10,39 @@
 // paperwork -- so a reader who scans top to bottom has been told the shape
 // of the project rather than an index of it. See bands.ts for why bands key
 // on `rollup` rather than on the full `role`.
+//
+// **The "most depended on" ranking was removed on 2026-08-25**, by the owner:
+// "the most depend panel is noise for now, we should first work on the
+// catalog before start judging."
+//
+// That is a sequencing argument rather than a verdict on the module, and it is
+// the right one. A ranking is a judgement, and this one would have been made
+// over a catalog that cannot yet name four of the services it ranks --
+// `grafana`, `loki`, `prometheus` and `healthchecks-io` have no catalog row,
+// so they render as raw slugs with generic glyphs. Ranking data that
+// incomplete puts a confident ordering in front of a reader on top of
+// reference data nobody has finished, which is this project's recurring defect
+// wearing a new hat.
+//
+// `RankModule.tsx` and bands.ts's `mostDependedOn` are kept, not deleted: they
+// are correct, tested, and the hierarchy problem they solve is real -- the
+// board still gives `fly-api` and `namecheap-registrar` identical weight. They
+// simply have no caller until the catalog is worth judging on. `dependentCounts`
+// remains in use; the popover states per-entry dependents.
 import type { ViewService } from "@catalogus/cli";
 
 import type { VendorGroup } from "../bands.js";
-import { groupIntoBands, mostDependedOn } from "../bands.js";
+import { groupIntoBands } from "../bands.js";
 import { BandModule } from "./BandModule.js";
-import { RankModule } from "./RankModule.js";
 import styles from "./ProjectBoard.module.css";
-
-/**
- * How many rows the rank module shows. Eight is enough to cover the spine of
- * a project this size without the tail -- past that the counts flatten to
- * one and two, where the ordering stops meaning anything and the module
- * would be asserting a ranking the data no longer supports.
- */
-const RANK_LIMIT = 8;
 
 export interface ProjectBoardProps {
   services: ViewService[];
-  edges: { from: string; to: string }[];
   /** Server-stamped moment the manifest was read; every recency mark measures from it. */
   readAt: string;
   selectedId: string | null;
   /** Catalog slug of the tile whose popover is pinned open, if any. */
   expandedService: string | null;
-  /** Opening one entry by id -- used by the rank module, whose rows are entries. */
-  onOpen: (id: string) => void;
   onActivate: (group: VendorGroup, anchor: HTMLElement) => void;
   onPeek: (group: VendorGroup, anchor: HTMLElement) => void;
   onPeekEnd: () => void;
@@ -43,17 +50,14 @@ export interface ProjectBoardProps {
 
 export function ProjectBoard({
   services,
-  edges,
   readAt,
   selectedId,
   expandedService,
-  onOpen,
   onActivate,
   onPeek,
   onPeekEnd,
 }: ProjectBoardProps) {
   const bands = groupIntoBands(services);
-  const rank = mostDependedOn(services, edges, RANK_LIMIT);
 
   if (bands.length === 0) {
     return <p className={styles.empty}>No services declared.</p>;
@@ -74,8 +78,6 @@ export function ProjectBoard({
           onPeekEnd={onPeekEnd}
         />
       ))}
-
-      <RankModule rows={rank} selectedId={selectedId} onOpen={onOpen} />
     </div>
   );
 }

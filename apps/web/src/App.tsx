@@ -323,17 +323,21 @@ export function App() {
       {state.kind === "error" && <ErrorState message={state.message} />}
       {state.kind === "loaded" && edgeMaps && (
         <>
-          <ProjectHeader project={state.payload.project} manifestPath={state.payload.manifestPath} />
+          <ProjectHeader
+            project={state.payload.project}
+            manifestPath={state.payload.manifestPath}
+            serviceCount={state.payload.services.length}
+            edgeCount={state.payload.edges.length}
+            readAt={state.payload.readAt}
+          />
           <ViewToggle mode={mode} onChange={setMode} />
           <div className={styles.body}>
             {mode === "list" ? (
               <ProjectBoard
                 services={state.payload.services}
-                edges={state.payload.edges}
                 readAt={state.payload.readAt}
                 selectedId={selectedId}
                 expandedService={expandedService}
-                onOpen={handleSelect}
                 onActivate={handleActivate}
                 onPeek={handlePeek}
                 onPeekEnd={handlePeekEnd}
