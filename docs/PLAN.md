@@ -200,6 +200,20 @@ What that means concretely, because "boring" is not a brief:
   of a 1440x800 screen, which is what "it should fit" asked for, and the
   remaining two-thirds is empty. That is the space a shell and whatever else
   earns a place would occupy.
+- **Mobile is bad, and the owner has seen it.** Stated directly on 2026-08-25.
+  Treat that as the finding, not as something to re-derive: **nobody on the
+  building side ever looked**. Every screenshot this session was desktop at
+  1440-1500px, and the board's single-column breakpoint at 640px was written
+  and never rendered. First-hand feedback outranks anything in this file, and
+  this is the second time that rule has earned its place in one session.
+
+  What is most likely wrong, as leads rather than as claims: the mosaic is a
+  `column-width` multi-column field that collapses to one column, so on a phone
+  it becomes a very long single stack of band modules -- which is the scrolling
+  index the whole redesign exists to replace. The service page's two columns
+  stack at 860px. And the hover popover has no mobile story at all beyond "touch
+  devices skip it and go straight to the page", which is a degradation nobody
+  has watched happen on a real device.
 
 This is the **first thing to pick up in a fresh session**, ahead of everything
 in the list below.
@@ -225,8 +239,9 @@ The short version:
 - **Three required steps never ran**: the contract is not embedded in the built
   markup, the finish review has not happened, and `DESIGN.md` does not exist.
   **No mobile screenshot has ever been taken of this redesign** -- every capture
-  this session was desktop at 1440-1500px, which means the responsive behaviour
-  of a multi-column mosaic is entirely unverified.
+  this session was desktop at 1440-1500px. The owner has since looked and
+  reported that mobile is bad, so this is a known defect rather than an unknown;
+  see the box above.
 - **Order matters**: do the shell work first, then close the run over the
   result. Running the finish review now would review a design the owner has
   already rejected.
