@@ -3,7 +3,8 @@
 Working plan and status board. `docs/HANDOFF.md` is the specification and the source of truth for
 design decisions; this file tracks *what has been built* against it and what remains.
 
-- **Status:** Phases 0–3.6 complete, plus a **3.6.1 correction pass** (see its own section below):
+- **Status:** Phases 0–3.7 complete — 3.7 less its portfolio page, which the owner deferred on
+  2026-08-25 — plus a **3.6.1 correction pass** (see its own section below):
   validating a manifest the skill had just written found six defects, four of them in shipped
   guidance rather than in code. The third cold run produced **26 services and 30 edges** on a real
   project, validating clean under `--strict`. The CLI has no unrecoverable state left (`remove`) and no
@@ -21,11 +22,12 @@ design decisions; this file tracks *what has been built* against it and what rem
   widened with `monitoring`, `queue` and `messaging` — **HANDOFF §4 was amended for that, and the
   document now carries an amendment log**.
 
-  **Phase 3.7 is most of the way through.** The viewer renders — `catalogus view` serves one repo's
-  manifest, grouped by rollup, with compact nodes, a URL-addressed detail panel, status colours and
-  `replaced_by`. **What is left in it is one large item and one small one: the DAG layout (elkjs +
-  React Flow), and the portfolio/migration/cost pages that want more than one project.** Phase 4
-  stays deferred by owner decision.
+  **Phase 3.7 is closed, less the portfolio page** (2026-08-25). The viewer renders — `catalogus
+  view` serves one repo's manifest, grouped by rollup, with compact nodes, a URL-addressed detail
+  panel, status colours, `replaced_by`, a DAG, a migration board and the Layer 3 empty state.
+  **The portfolio page and the usage matrix are deferred by owner decision: the viewer stays
+  single-repo.** That is the only unticked box in the phase and it has its own box explaining what
+  was asked, what came back and what stays open. Phase 4 stays deferred by owner decision too.
 
   **Phase 3.7's last big item is done: the per-project DAG is built** (2026-08-25). elkjs in a
   worker, `@xyflow/react`, a List/Graph toggle with the list as default, and the
@@ -40,8 +42,15 @@ design decisions; this file tracks *what has been built* against it and what rem
   state cued only by colour, and two entries of one vendor rendering as the same node twice.
   `App.tsx` went from no tests to 15.
 
-  **What is left in Phase 3.7 is the three multi-project pages** — portfolio, migration dashboard,
-  Layer 3 cost panel — and two of the three want more than one manifest, which does not exist.
+  **Two of those three pages shipped and the third was deferred.** The migration dashboard and the
+  Layer 3 cost empty state are both in; the portfolio page is the deferral above. *(This paragraph
+  read "what is left is the three multi-project pages" until 2026-08-25 — it was written before any
+  of them existed and went stale twice without being noticed, which is the same drift the fixture
+  paragraphs below record.)*
+
+  **`HANDOFF §4.2` is two of six**, and each query's status is written out rather than left as an
+  unticked acceptance line: one answered, one half-answered, one unbuilt-but-unblocked, three
+  deferred with the portfolio, and one not expressible in Layer 2 at all.
 
   **The session after the viewer foundations spent itself on verification rather than features**,
   and that was the right trade because it found things. The two committed corpora now exist (the
@@ -70,6 +79,46 @@ validation pass, which is the more interesting number of the two.)
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
+
+### Handoff — 2026-08-25, closing Phase 3.7
+
+**What happened.** No code. Phase 3.7's last open box was put to the owner and deferred, and this
+document was corrected where it had gone stale. Baseline confirmed first: **1001 tests / 58 files
+on three consecutive runs**, `pnpm typecheck` clean across four packages, on `main` at the
+`viewer-small-defects` merge.
+
+**The decision.** Three questions were open on the portfolio page and all three were the owner's —
+the transport for a multi-repo viewer, whether to onboard real repos first, and whether the
+portfolio is a fourth toggle mode or its own route. The answer was to defer: **the viewer stays
+single-repo for now.** The portfolio checkbox carries the full text of what was asked, because the
+three options are *unanswered*, not rejected, and the next person should not read the deferral as a
+decision against any of them.
+
+**The document was wrong about the one fact the whole phase was planned around.** `docs/PLAN.md`
+said, with a direct-check date on it, that `C:/Workspace/repos/Clapline/catalogus.yaml` did not
+exist. **It exists — 35 services, 41 edges, `catalogus validate` clean.** Nothing recorded it
+coming back, exactly as nothing recorded it going. The 2026-08-24 paragraph is left unedited with a
+dated correction above it, because it is the reason `examples/layout-stress.catalogus.yaml` was
+written and deleting it would delete the reasoning.
+
+**What that changes is smaller than it sounds, and one thing it does not change.** It is one
+project out of nineteen directories, so the portfolio blocker is untouched. What it does do is make
+the owner's run possible for the first time: three consecutive handoffs have said the owner would
+run `catalogus view` against a real repo and that nothing in this file reflected such a run. The
+manifest for that run now exists. **It still has not happened**, and it remains the highest-value
+next action in the phase — every browser-based claim in this file is against synthetic fixtures.
+
+**§4.2 is two of six and now says so per query.** The acceptance line had been a single unticked
+checkbox, which reads the same whether one query is missing or five. Written out, it is: query 1
+answered; query 4 answered for nodes and *not expressible* for edges, because Layer 2 gives an edge
+no status field; query 5 unbuilt but blocked on nothing; queries 2, 3 and 6 deferred with the
+portfolio. **Query 5 is the cheapest thing left in the phase** — `added` already reaches the payload
+and renders per service, and what is missing is a filter across services.
+
+**One correction made while verifying, worth copying as a habit.** A first grep for `added` in
+`apps/web/src/*.tsx` found nothing and nearly went into this file as "the viewer never renders
+`added`". The glob missed `components/`, where `ServiceDetailPanel.tsx` renders it. A negative
+result from a search is a claim about the search, not about the repo.
 
 ### Handoff — 2026-08-25, end of the small-defects-and-DAG session
 
@@ -243,24 +292,34 @@ value is `""` or starts with `"."` and so can never name a prototype member; and
 
 **Open, ranked by consequence.** Details in the Phase 3.7 section below.
 
-1. **The DAG has nothing real to be judged against.** The 26-service Clapline manifest this document
-   described does not exist (checked directly). Either onboard a real project first, or build the
-   layout against a deliberately hard synthetic manifest and *say so* — do not declare it done on
-   the 14-node example and imply otherwise.
+1. ~~**The DAG has nothing real to be judged against.**~~ Closed the second way, and then the
+   premise flipped underneath it. The DAG was built and judged against
+   `examples/layout-stress.catalogus.yaml`, said plainly to be synthetic; and as of 2026-08-25 the
+   Clapline manifest exists again at **35 services and 41 edges**. The layout has still never been
+   seen against it — that is the owner's run, and it is now the top open item in the phase.
 2. ~~**`skill-drift.test.ts` has less coverage than it appears to.**~~ Closed — both halves. See the
    two ticked boxes in Phase 3.7 below for what was built and which mutations were watched go red.
 3. ~~**The traversal corpus is not committed.**~~ Closed — 65 vectors now live in
    `packages/cli/src/test-support/traversal-vectors.ts`, executed against a live server by
    `view-traversal.test.ts`. See Phase 3.7 below.
-4. **`App.tsx` has no tests** — every browser-only behaviour (hash routing, focus restore, Escape
-   listener lifetime) lives there and is covered only by manual browser runs. **Now the largest
-   untested surface in the repo**, since the two items above stopped being.
-5. Smaller, all recorded below: focus drops to `<body>` when closing a deep-linked panel; every
+4. ~~**`App.tsx` has no tests**~~ — closed. `App.test.tsx` carries **23 tests**, and four of them
+   exist because a mutation pass found the migration board swappable for a bare paragraph with the
+   whole suite still green. See the two ticked boxes below.
+5. ~~Smaller, all recorded below: focus drops to `<body>` when closing a deep-linked panel; every
    open and close pushes a history entry; the selected state's two visual cues are both colour; two
-   entries of the same vendor in one group are indistinguishable on the node.
+   entries of the same vendor in one group are indistinguishable on the node.~~ All closed, plus a
+   fifth found inside the first. The focus one **regressed** on the migration board later the same
+   day and was caught by that slice's validation pass — a fix is not a guarantee that the next
+   surface gets it.
 6. ~~**`SKILL.md` never teaches `catalogus view`.**~~ Settled and done — see decision 11. The skill
    now hands the command to the user in prose and is told never to run it, and a test keeps it out
    of the fenced blocks.
+
+**Every item on that list is now struck through, so here is what replaced it, 2026-08-25.**
+1. **Nobody has run the viewer against a real inventory.** The manifest for it exists now; the run
+   does not. Every browser claim in this file is against synthetic fixtures.
+2. **§4.2 query 5** — "everything added in the last N days" — is unbuilt and blocked on nothing.
+3. **The portfolio page's three open questions**, deferred rather than answered. See its checkbox.
 
 **Read Phase 3.6.1 before touching the skill, the schema or a CLI flag.** It is the most recent
 work and it changed three things a fresh session would otherwise get wrong: entries now carry
@@ -277,10 +336,32 @@ repo is ever moved, re-run `pnpm run link:cli`.
 boilerplate: it records how this project's defects have actually been caught, which is a validation
 pass by an agent that did not write the code. Every substantial item below assumes that loop.
 
-### The next thing is Phase 3.7, the viewer
+### Phase 3.7, the viewer — closed 2026-08-25, less its portfolio page
 
-It is unblocked. Build the single-project DAG first, against a real manifest, because layout is the
+*(This section was headed "The next thing is Phase 3.7" and opened "it is unblocked, build the
+single-project DAG first". Both were true when written and the DAG is now built; the heading is
+updated and the sentence kept below, because the rest of the section is written as advice to
+someone about to start it and reads wrongly without it.)*
+
+It was unblocked. Build the single-project DAG first, against a real manifest, because layout is the
 part that is genuinely hard and it de-risks everything after it.
+
+**Superseded 2026-08-25 — `C:/Workspace/repos/Clapline/catalogus.yaml` exists again.** Counted
+directly: **35 services, 41 edges**, `catalogus validate` clean. It was absent when the paragraph
+below was written and it is present now, and nothing recorded it arriving. That is the second time
+this one file's existence has flipped without the document noticing, which is an argument for
+re-running the check rather than for reading either claim.
+
+**The paragraph below stands unedited as the record of what was known on 2026-08-24.** The DAG was
+built against a synthetic stress fixture because that was the honest option at the time, and that
+decision is why `examples/layout-stress.catalogus.yaml` exists at all. Rewriting the history to
+match today's disk would delete the reasoning.
+
+**What its return unblocks is narrower than it looks.** It is *one* project. The workspace holds 19
+directories and exactly one of them has a manifest, so the portfolio page and the usage matrix are
+as blocked as they were — see the deferral in the portfolio checkbox below. What it does give is the
+first opportunity to judge the *existing* single-project viewer against a real inventory instead of
+a fixture, which is the owner's run that three consecutive handoffs have said had not happened.
 
 **There is no real manifest, and this document said otherwise for a while.** Everything below used
 to read: the cold runs wrote `C:/Workspace/repos/Clapline/catalogus.yaml`, it holds 26 services and
@@ -1349,7 +1430,7 @@ The agent workflow, and the differentiator. `catalogus mcp` over stdio.
 - [ ] `push_private` — routes through the CLI's credential; the agent never sees it
 - [ ] Wire into Claude Code and run the detect → diff → propose loop against a real repo
 
-## Phase 3.7 — Viewer on manifests, no backend ⬜
+## Phase 3.7 — Viewer on manifests, no backend ✅ complete, less the portfolio page
 
 Decided: the viewer comes **before** Phase 4 and reads manifests directly. Layers 1 and 2 are the
 entire graph — nodes, edges, roles, status, `replaced_by`, architecture, coding agents all live in
@@ -1958,7 +2039,39 @@ database node gets a database icon whoever the vendor is.
       against it. Details in "the one defect class this repo keeps producing" near the top of this
       file. The audit cleared everything else and recorded *why* at each site, so the next person
       checking this class reads a reason rather than re-deriving one.
-- [ ] Portfolio page: project list, service usage matrix across projects
+- [ ] **Portfolio page: project list, service usage matrix across projects — deferred by the owner,
+      2026-08-25. The viewer stays single-repo.** This is the one box Phase 3.7 closes without, and
+      the deferral is a decision rather than an omission, so it is recorded here rather than left as
+      an unexplained empty checkbox.
+
+      **What was put to the owner and what came back.** Three questions were open and all three were
+      the owner's: how a viewer that is single-repo by design gets pointed at several projects
+      (a `--workspace <root>` flag on `view`, a separate `catalogus portfolio` command, or `view`
+      auto-detecting a root that holds no manifest); whether to onboard more repos first or build
+      against the one real manifest plus two synthetics; and whether the portfolio is a fourth
+      `ViewToggle` mode or its own route. The answer made all three moot: **skip the workspace mode
+      for now, single repo is fine.** None of the three is settled, and none should be treated as
+      settled by whoever picks this up — they are open questions with a deferred answer, not
+      rejected options.
+
+      **The blocker behind it is data, and it has not moved.** The owner's 2026-08-25 decision
+      recorded two boxes above — *the portfolio page and the usage matrix are judged against real
+      topology or not at all* — still governs. The workspace holds **19 directories and exactly one
+      manifest** (`Clapline`, counted directly). A usage matrix over one project is a column, and a
+      cross-project view built against two synthetic examples would be judged on topology nobody
+      chose for that purpose. Onboarding more repos is what unblocks this, and that is the owner's
+      call to make when they want it.
+
+      **`scanWorkspace()` stays dormant, and that is now a deliberate state rather than a waiting
+      one.** It is built, tested (`packages/cli/src/workspace-scan.test.ts`) and exported from
+      `packages/cli/src/index.ts`, with no caller. The previous note said "no caller until the
+      portfolio page"; the portfolio page is deferred, so the honest reading is that it is finished
+      code with no consumer. Do not delete it on that basis — it is the thing the deferred work
+      resumes from — but do not read its existence as evidence that the transport question was
+      answered either.
+
+      **Three of HANDOFF §4.2's six acceptance queries need this page**, so §4.2 is not met and the
+      Phase 7 acceptance line stays unticked. Full status in the box below.
 - [x] **Migration dashboard: everything `phasing_out` with its replacement.** Shipped as a third
       `ViewToggle` mode beside List and Graph — same one-addressable-page reasoning as DAG decision
       1, and the roving-tabindex radiogroup absorbed a third option without a line of its key
@@ -2107,6 +2220,40 @@ database node gets a database icon whoever the vendor is.
       no evidence behind it either way. The portfolio page and the usage matrix want several
       projects and have none, so they stay last.
 
+#### HANDOFF §4.2 at the close of Phase 3.7 — two of six fully answerable
+
+Phase 7's list carries "Acceptance: all six HANDOFF §4.2 queries answerable from the UI". It is not
+met, and this is what each query actually stands at, so that the unticked acceptance line means
+something specific rather than "not finished". Verified against the built viewer, not inferred from
+the checkbox list.
+
+1. **All services for project X, grouped by category, with icons — yes.** The List view, with the
+   rollup grouping and the server-resolved icons plus the category fallback.
+2. **All projects depending on service Y — no.** Cross-project by definition; deferred with the
+   portfolio page. Single-project blast radius is *partly* visible in the Graph view's edges, but
+   the query asks across projects and the viewer sees one.
+3. **Cost across all projects — no, and doubly so.** Layer 3 has no store, so the detail panel
+   renders the explicit "not connected" empty state; and "across all projects" needs the portfolio.
+   The empty state is the shipped answer to *neither field is missing from your manifest*, not to
+   the query.
+4. **`phasing_out` nodes with `replaced_by` — the nodes half, yes; the edges half, not expressible.**
+   The migration board ships both `phasing_out` and `deprecated`. An edge carries no status field in
+   Layer 2, so the edges half is blocked on the schema rather than on the viewer. `migrations.ts`
+   says so in its header.
+5. **Everything added in the last N days — partly.** `added` reaches the payload
+   (`view-payload.ts`) and renders per service in the detail panel
+   (`ServiceDetailPanel.tsx`). There is no filter, sort or "last N days" view across services, so
+   the date is visible one service at a time and the query as written is not answerable. **This one
+   is single-project and is not blocked on anything** — it is simply unbuilt, and it is the cheapest
+   remaining §4.2 item by a distance.
+6. **Which projects use coding agent Z / architecture W / PM tool V — no.** Cross-project; deferred
+   with the portfolio page. The `role`-based grouping that would answer it *within* one project is
+   already there, which is why this is a transport gap rather than a modelling one.
+
+So: **two answered (1, 4-nodes-half), one unbuilt but unblocked (5), three deferred with the
+portfolio (2, 3, 6), and one not expressible in Layer 2 (4-edges-half).** Whoever resumes this
+should note that 5 is the only one they can close without either a decision or a schema change.
+
 A local Postgres container (Docker 29.4.1 is installed) remains available and is worth doing
 separately, but for a different purpose: prototyping the §4 schema, RLS policies and the recursive
 CTE against a real Postgres before choosing a host. It powers nothing in the viewer.
@@ -2128,7 +2275,9 @@ same correction rather than a quiet edit.)
 - [ ] Project list and portfolio page with cost totals (private layer, owner only)
 - [ ] Migration dashboard: everything `phasing_out` with its replacement
 - [ ] Cross-project blast radius view
-- [ ] Acceptance: all six HANDOFF §4.2 queries answerable from the UI
+- [ ] Acceptance: all six HANDOFF §4.2 queries answerable from the UI — **two of six today**, and
+      the per-query status is in Phase 3.7's "HANDOFF §4.2 at the close of Phase 3.7" box rather
+      than left for a reader to re-derive.
 
 `simple-icons` has removed brand marks before under trademark pressure, so the generic
 category-icon fallback needs to exist from the start rather than being bolted on the first time a
