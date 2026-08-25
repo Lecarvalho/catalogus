@@ -18,15 +18,18 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewPayload, ViewService } from "@catalogus/cli";
 
+import type { VendorGroup } from "./bands.js";
+import { dependentCounts } from "./bands.js";
+
 import styles from "./App.module.css";
-import { EdgesList } from "./components/EdgesList.js";
 import { ErrorState } from "./components/ErrorState.js";
 import { LoadingState } from "./components/LoadingState.js";
 import { MigrationList } from "./components/MigrationList.js";
 import { ProjectHeader } from "./components/ProjectHeader.js";
 import { ServiceDetailPanel } from "./components/ServiceDetailPanel.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
-import { ServiceList } from "./components/ServiceList.js";
+import { ProjectBoard } from "./components/ProjectBoard.js";
+import { ServicePopover } from "./components/ServicePopover.js";
 import { ViewToggle, type ViewMode } from "./components/ViewToggle.js";
 import { hashForServiceId, serviceIdFromHash } from "./hash-route.js";
 
@@ -188,6 +191,74 @@ export function App() {
     replaceHash("");
   }, [replaceHash]);
 
+  // Hover peek and click-to-open, settled by the owner 2026-08-25: hovering
+  // a tile shows a popover near it, clicking opens the page. Where a tile
+  // stands for several entries of one vendor -- Clapline's four Fly.io apps
+  // -- clicking cannot open "the" page because there isn't one, so it pins
+  // the popover and the reader picks an entry from it.
+  //
+  // Position is measured here rather than in the popover, and measured from
+  // the anchor at the moment of the event, because the tiles live inside a
+  // CSS multi-column container: a column fragment is not a containing block
+  // an absolutely-positioned child can be trusted against, so the popover is
+  // `position: fixed` and wants viewport coordinates. getBoundingClientRect()
+  // already returns those.
+  const [peek, setPeek] = useState<{ group: VendorGroup; position: { top: number; left: number } } | null>(null);
+  const [expandedService, setExpandedService] = useState<string | null>(null);
+
+  const positionFor = useCallback((anchor: HTMLElement) => {
+    const rect = anchor.getBoundingClientRect();
+    const width = 268;
+    const gap = 6;
+    // Prefer the right of the tile; flip to the left when that would run off
+    // the viewport, and clamp rather than allow a negative left, so a tile in
+    // the first column of a narrow window still produces a reachable popover.
+    const rightRoom = window.innerWidth - rect.right - gap;
+    const left = rightRoom >= width ? rect.right + gap : Math.max(gap, rect.left - width - gap);
+    // Top-aligned to the tile, then pulled up only as far as needed to stay
+    // on screen. Popover height is unknown before paint, so this uses the
+    // max-height the stylesheet caps it at.
+    const maxHeight = window.innerHeight * 0.6;
+    const top = Math.max(gap, Math.min(rect.top, window.innerHeight - maxHeight - gap));
+    return { top, left };
+  }, []);
+
+  const handlePeek = useCallback(
+    (group: VendorGroup, anchor: HTMLElement) => {
+      // A pinned popover outranks hover: moving the pointer across the board
+      // must not silently replace the thing the reader deliberately opened.
+      if (expandedService !== null) return;
+      setPeek({ group, position: positionFor(anchor) });
+    },
+    [expandedService, positionFor]
+  );
+
+  const handlePeekEnd = useCallback(() => {
+    if (expandedService !== null) return;
+    setPeek(null);
+  }, [expandedService]);
+
+  const handleActivate = useCallback(
+    (group: VendorGroup, anchor: HTMLElement) => {
+      if (group.entries.length === 1) {
+        setExpandedService(null);
+        setPeek(null);
+        handleSelect(group.entries[0].id);
+        return;
+      }
+      // Several entries: pin the popover so it survives the pointer leaving
+      // the tile, and toggle it closed if this tile is already pinned.
+      setExpandedService((current) => (current === group.service ? null : group.service));
+      setPeek({ group, position: positionFor(anchor) });
+    },
+    [handleSelect, positionFor]
+  );
+
+  useEffect(() => {
+    setPeek(null);
+    setExpandedService(null);
+  }, [selectedId, mode]);
+
   // Escape closes the panel, only while one is open -- the listener is
   // added and removed with the panel's own lifetime rather than sitting on
   // `document` permanently doing nothing.
@@ -256,7 +327,17 @@ export function App() {
           <ViewToggle mode={mode} onChange={setMode} />
           <div className={styles.body}>
             {mode === "list" ? (
-              <ServiceList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+              <ProjectBoard
+                services={state.payload.services}
+                edges={state.payload.edges}
+                readAt={state.payload.readAt}
+                selectedId={selectedId}
+                expandedService={expandedService}
+                onOpen={handleSelect}
+                onActivate={handleActivate}
+                onPeek={handlePeek}
+                onPeekEnd={handlePeekEnd}
+              />
             ) : mode === "graph" ? (
               <Suspense fallback={<p>Loading the graph…</p>}>
                 <GraphCanvas
@@ -281,15 +362,36 @@ export function App() {
               />
             )}
           </div>
-          {/* The text edge list is the list view's way of showing edges at
-              all. On the canvas the same edges are drawn, so repeating them
-              underneath is the same information twice. On the migration
-              board it is noise a different way: that board is about which
-              *nodes* still need a decision, not the whole dependency graph,
-              and the replacement each row already names is the one edge a
-              migration reader cares about -- the full edge list answers a
-              question this mode isn't asking. */}
-          {mode === "list" && <EdgesList edges={state.payload.edges} labelForId={edgeMaps.labelForId} />}
+          {peek && mode === "list" && (
+            <ServicePopover
+              group={peek.group}
+              readAt={state.payload.readAt}
+              position={peek.position}
+              dependentsById={dependentCounts(state.payload.edges)}
+              labelForId={edgeMaps.labelForId}
+              onOpen={handleSelect}
+            />
+          )}
+          {/* The text edge list used to render under the list view, on the
+              reasoning that it was "the list view's way of showing edges at
+              all". That reasoning expired on 2026-08-25: the board shows a
+              dependent count on every row and ranks the most depended-on
+              entries in their own module, so the edges are represented
+              where they mean something rather than as a flat transcript.
+
+              And the transcript was actively harmful once the board got
+              dense. Against Clapline it rendered 41 lines of
+              `fly-api (Fly.io) -> dotnet (.NET)` below the fold -- taller
+              than the entire project summary above it, and the largest
+              thing on a page whose whole argument is that a project fits
+              one screen. The owner chose "nothing -- it should fit" over
+              every search and index affordance; a 41-line appendix is that
+              affordance wearing a different hat.
+
+              EdgesList itself is kept, not deleted: it is the honest
+              rendering for a viewer that cannot draw a graph, and the
+              no-JavaScript and print paths may want it. It simply has no
+              caller on this page. The Graph view draws the same edges. */}
         </>
       )}
     </main>

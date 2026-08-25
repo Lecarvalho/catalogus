@@ -1,0 +1,133 @@
+/*
+ * Fixed positioning, viewport coordinates. `fixed` rather than `absolute`
+ * because the tile that anchors this sits inside a multi-column container,
+ * and a CSS multi-column fragment is not a containing block an absolutely
+ * positioned child can be trusted against -- the popover would land in the
+ * wrong column. App.tsx measures the anchor with getBoundingClientRect(),
+ * which is already viewport-relative, so `fixed` is also the coordinate
+ * space the numbers arrive in.
+ *
+ * This is the one element in the app that floats above the page, so it is
+ * the one place a shadow is allowed -- and it is a hard-edged offset block
+ * rather than a soft blur, which is what the committed world does when it
+ * needs to lift something.
+ */
+.popover {
+  position: fixed;
+  z-index: 20;
+  width: 268px;
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface);
+  box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.12);
+  /* The pointer is travelling toward a tile, not toward this: it must never
+     intercept a hover meant for the board underneath. Rows re-enable it. */
+  pointer-events: none;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-header-fill);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.name {
+  font-size: var(--text-module);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+}
+
+.count {
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  color: var(--color-signal);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+}
+
+.entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  border: 0;
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  /* Re-enabled against the container's `none`: the rows are the one part of
+     this that is meant to be clickable. */
+  pointer-events: auto;
+}
+
+.entries li:first-child .entry {
+  border-top: 0;
+}
+
+.entry:hover {
+  background: var(--color-surface-sunken);
+}
+
+.entryHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.role {
+  font-size: var(--text-row);
+  font-weight: var(--weight-bold);
+}
+
+.id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.fact {
+  font-size: var(--text-label);
+  line-height: var(--leading-body);
+  color: var(--color-text-muted);
+}
+
+.hint {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface-sunken);
+  font-size: 10px;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}

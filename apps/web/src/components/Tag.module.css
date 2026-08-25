@@ -1,0 +1,65 @@
+/*
+ * Sharp rectangles, caps, 10px, positive tracking. No radius and no icon --
+ * a tag in this world is a printed mark, not a chip.
+ *
+ * Every tone reads in greyscale: the two signal tones differ from each other
+ * by fill vs outline, not by hue, and the ink and grey solids differ by
+ * lightness. That is the property the old status colours did not have, and
+ * it is the reason the selected-node cue in this app is a 3px border rather
+ * than a colour (docs/PLAN.md, the five smaller viewer defects).
+ */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: 15px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  /* Numerals inside a tag (`stack 10`) align with numerals elsewhere. */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+}
+
+.signal-solid {
+  background: var(--color-signal);
+  border-color: var(--color-signal);
+  color: var(--color-signal-ink);
+}
+
+.signal-outline {
+  background: transparent;
+  border-color: var(--tag-phasing-line);
+  color: var(--tag-phasing-ink);
+}
+
+.ink-solid {
+  background: var(--tag-deprecated-bg);
+  border-color: var(--tag-deprecated-bg);
+  color: var(--tag-deprecated-ink);
+}
+
+.grey-solid {
+  background: var(--tag-removed-bg);
+  border-color: var(--tag-removed-bg);
+  color: var(--tag-removed-ink);
+}
+
+/*
+ * The `kind` marks. Deliberately the quietest thing in the vocabulary: they
+ * are context a reader consults, not a state that should catch the eye. Any
+ * louder and every component and stack row in a project would out-shout the
+ * four rows that are actually phasing out.
+ */
+.quiet-outline {
+  background: transparent;
+  border-color: var(--color-line);
+  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
+}
