@@ -38,11 +38,11 @@ design decisions; this file tracks *what has been built* against it and what rem
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **878 tests / 52 files**, plus `pnpm typecheck`
+Run `pnpm build && pnpm test` first and confirm **879 tests / 52 files**, plus `pnpm typecheck`
 clean across all four packages, before trusting anything below. (Phases 0–3.6 and the 3.6.1
 correction pass predate this at 549/38, and the viewer-foundations session ended at 679/50; the
-number moved a long way again in the drift-and-corpus session that followed — 199 of those tests
-are two committed corpora plus two components' first test files, not 199 new behaviours.)
+number moved a long way again in the drift-and-corpus session that followed — 200 of those tests
+are two committed corpora plus two components' first test files, not 200 new behaviours.)
 
 **Run it more than once before believing it.** That session's own corpus made the suite fail on
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
@@ -85,11 +85,11 @@ going to run `catalogus view` from a real client repo and come back with feedbac
 document reflects such a run. **First-hand feedback outranks anything written here**, so if it has
 since happened, start from that rather than from the ranked list below.
 
-**Where this session's work lives:** branch **`phase-3.7-drift-and-corpus`**, three commits on top
-of `d3b5fda`, **not merged and not pushed**. `git log --oneline main..` shows them. Ordered
-fixes -> tests -> chore+docs deliberately, so every commit is independently green; tests-first
-would have been a red commit, since the new `set` and `StatusPill` cases fail without their
-fixes. **If `git branch --show-current` says `main`, none of what follows is in your tree.**
+**The drift-and-corpus session's work is merged** — PR #6, three commits, on `main` as of
+2026-08-24. Nothing below is waiting on a branch. The commits were ordered fixes -> tests ->
+chore+docs so each is independently green; tests-first would have been a red commit, since the new
+`set` and `StatusPill` cases fail without their fixes. Worth copying if you split work the same
+way.
 
 ### Handoff — 2026-08-24, end of the viewer-foundations session
 
@@ -181,21 +181,9 @@ value is `""` or starts with `"."` and so can never name a prototype member; and
 5. Smaller, all recorded below: focus drops to `<body>` when closing a deep-linked panel; every
    open and close pushes a history entry; the selected state's two visual cues are both colour; two
    entries of the same vendor in one group are indistinguishable on the node.
-6. **`SKILL.md` never teaches `catalogus view` — and the obvious fix is wrong.** Surfaced while
-   building the shell-command drift check, which deliberately does not fail on it: the reverse
-   direction (a command the skill never teaches) is a scope decision, not a drift bug.
-
-   **Not scheduled, and it is not a one-line addition.** `runView` returns exit 0 as soon as the
-   server is listening, but the listening socket holds the event loop open — the process runs until
-   Ctrl+C, which is what its own `press Ctrl+C to stop` line says. **An agent that runs
-   `catalogus view` in a client repo blocks its own tool call until it times out or is killed.**
-   Adding it to the skill's fenced command list, where every other line is something the agent runs
-   itself, would teach exactly that.
-
-   The shape that works is the skill telling the agent to *hand the command to the user* — the
-   viewer is for the human, the way `catalogus graph` (ASCII, exits immediately) is the agent's own
-   sanity check and is already taught. That is a wording decision about the skill's closing section,
-   not a new command. **Owner's call; do not just add the line.**
+6. ~~**`SKILL.md` never teaches `catalogus view`.**~~ Settled and done — see decision 11. The skill
+   now hands the command to the user in prose and is told never to run it, and a test keeps it out
+   of the fenced blocks.
 
 **Read Phase 3.6.1 before touching the skill, the schema or a CLI flag.** It is the most recent
 work and it changed three things a fresh session would otherwise get wrong: entries now carry
@@ -1759,6 +1747,28 @@ From HANDOFF §9, plus decisions taken during implementation. Settled — reopen
     the one file nobody could review, and nothing would ever have reported it. NUL is still the right
     separator (the schema's slug pattern cannot produce one); it is spelled `\u0000` now. Behaviour
     unchanged — `toposort.test.ts`'s 7 tests and the full suite pass — and the file is plain ASCII again.
+
+11. **The skill hands `catalogus view` to the user and never runs it** — owner-confirmed
+    2026-08-24. The gap was found while building the shell-command drift check, and the obvious fix
+    was the wrong one.
+
+    `runView` returns exit 0 as soon as the socket is listening, but the listening socket holds the
+    event loop open, so the process runs until Ctrl+C — which is what its own `press Ctrl+C to stop`
+    line says. Every other fenced command in `SKILL.md` is one the agent runs itself, so a fenced
+    `catalogus view` would teach an agent to **block its own tool call**, with everything after it in
+    the agent's plan silently not happening.
+
+    So the viewer is documented in prose only, in a new `### 8. Hand the viewer to the user`
+    section, plus a Common-mistakes bullet. That turned an accidental convention into a stated one:
+    **fenced means the agent runs it, prose means it is for the user.** `catalogus graph` stays the
+    agent's own check — it prints and exits.
+
+    **A test enforces it**, because nothing else would. The four existing per-line checks all *pass*
+    on `catalogus view --no-open`: it is a registered command, those are real options, and it needs
+    no positional. It is a correct command line and still the wrong thing to teach — exactly the
+    decision that gets undone by the next person who notices the viewer is missing from the skill
+    and helpfully adds it. Mutation-checked: adding a fenced `catalogus view` to `SKILL.md` fails
+    with a message naming the fix.
 
 ## Non-goals
 
