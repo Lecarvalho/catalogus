@@ -59,7 +59,7 @@ describe("toElkGraph", () => {
     expect(graph.edges.map((edge) => edge.sources[0] + "->" + edge.targets[0])).toEqual(["a->b"]);
   });
 
-  it("gives two declarations of the same pair distinct ids, since elk rejects a duplicate", () => {
+  it("gives two declarations of the same pair distinct ids, which React Flow's edge registry needs", () => {
     const graph = toElkGraph(
       [service({ id: "a", role: "x" }), service({ id: "b", role: "y" })],
       [

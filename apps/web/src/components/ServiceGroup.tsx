@@ -27,13 +27,18 @@ export function ServiceGroup({ rollup, services, selectedId, onSelect }: Service
       <h2 className={styles.heading}>{rollupLabel(rollup)}</h2>
       <ul className={styles.list}>
         {services.map((service) => (
-          <ServiceNode
-            key={service.id}
-            service={service}
-            isSelected={service.id === selectedId}
-            showId={duplicated.has(service.name)}
-            onSelect={onSelect}
-          />
+          // The `<li>` lives here, not inside ServiceNode: this is the one
+          // caller with a `<ul>` around it. GraphCanvas.tsx renders the same
+          // ServiceNode inside a plain `<div>` instead -- see ServiceNode.tsx's
+          // top comment for why the wrapper moved out.
+          <li key={service.id} className={styles.item}>
+            <ServiceNode
+              service={service}
+              isSelected={service.id === selectedId}
+              showId={duplicated.has(service.name)}
+              onSelect={onSelect}
+            />
+          </li>
         ))}
       </ul>
     </section>

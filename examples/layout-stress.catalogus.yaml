@@ -22,11 +22,15 @@
 #   - A fan-out hub. `host-api` has 18 outgoing edges. This is the property
 #     the old Clapline manifest had (fourteen out of one node) and the only
 #     one that reliably turns a layered layout into a fan of crossings.
-#   - A fan-in hub. `db-primary` is depended on by six entries from five
-#     different rollups.
+#   - A fan-in hub. `db-primary` is depended on by six entries from four
+#     different rollups (`hosting`, `auth`, `analytics`, `ai`). The count was
+#     five here until an independent pass recomputed it off the file; the
+#     header's whole claim is that these numbers are measured, so it is worth
+#     recording that one of them was not.
 #   - Depth. ingress-edge -> host-web -> host-api -> auth-users -> db-primary
-#     -> obs-trace is six nodes deep, and is the longest path in the graph,
-#     so a layout that only ever draws two ranks is visibly wrong here.
+#     -> obs-trace is six nodes deep, and is *a* longest path in the graph --
+#     `ci -> host-web -> ...` ties it -- so a layout that only ever draws two
+#     ranks is visibly wrong here.
 #   - Diamonds. host-web reaches db-cache by two disjoint paths (via host-api
 #     and via host-edge), which is the shape that makes a naive tree layout
 #     duplicate a node or drop an edge.
@@ -37,9 +41,11 @@
 #   - Three entries of one vendor in one rollup (`host-api`, `host-web`,
 #     `host-worker`, all Fly.io) and two more elsewhere -- the duplicate-name
 #     case the node's id line exists for.
-#   - Every kind and every status, including `removed`, plus two independent
-#     `replaced_by` pairs and one three-entry lifecycle (mongodb ->
-#     postgresql) where the replacement is itself a hub.
+#   - Every kind and every status, including `removed`, plus four
+#     `replaced_by` pairs (`db-legacy` -> `db-primary`, `auth-legacy` ->
+#     `auth-users`, `pay-legacy` -> `pay-cards`, `mail-legacy` -> `mail-tx`),
+#     one of which points at the fan-in hub. This line used to claim two
+#     pairs and a three-entry lifecycle; the file has never held either.
 #   - Three entries with no edges at all (`board`, `agent-claude`,
 #     `agent-cursor`), which a layout that walks the edge list rather than the
 #     service list will silently drop. Three rather than one deliberately: a
@@ -289,7 +295,8 @@ dependencies:
   - [auth-users, db-primary]
   - [db-primary, obs-trace]
 
-  # The rest of the fan-in on db-primary, from five different rollups.
+  # The rest of the fan-in on db-primary. Four distinct rollups across the
+  # six edges, not five -- see the header.
   - [host-worker, db-primary]
   - [host-edge, db-primary]
   - [analytics-product, db-primary]

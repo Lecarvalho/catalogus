@@ -10,6 +10,36 @@ afterEach(() => {
 });
 
 describe("ServiceList", () => {
+  // The counterpart to GraphCanvas.test.tsx's "no list item on the canvas".
+  // `ServiceNode` returns a bare `<button>` and each caller supplies its own
+  // wrapper, so the `<ul>` -> `<li>` -> `<button>` chain the list depends on
+  // is now a property of ServiceGroup rather than of the node, and nothing
+  // asserted it. Reverting the hoist -- putting the `<li>` back inside
+  // ServiceNode, or dropping it from ServiceGroup -- left the whole suite
+  // green, which is what this closes.
+  it("wraps each node in a list item inside the group's list", () => {
+    render(
+      <ServiceList
+        services={[
+          makeViewService({ id: "host-api", role: "hosting-api", rollup: "hosting", name: "Fly.io" }),
+          makeViewService({ id: "host-web", role: "hosting-web", rollup: "hosting", name: "Fly.io" }),
+        ]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />
+    );
+
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    for (const item of items) {
+      expect(item.parentElement?.tagName).toBe("UL");
+      // One button per item, and it is the item's own child -- not a
+      // grandchild, which is the shape that made the canvas stylesheet's
+      // `.node > button` rule dead.
+      expect(Array.from(item.children).map((child) => child.tagName)).toEqual(["BUTTON"]);
+    }
+  });
+
   it("renders one heading per rollup group, grouping services that share a rollup, under the rollup's display label", () => {
     render(
       <ServiceList

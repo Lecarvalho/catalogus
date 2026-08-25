@@ -41,12 +41,20 @@
 // screen and in the accessible name. Conditional rather than always-on
 // because the id is the thing the compact node was shrunk to drop.
 //
-// A control, not a card: rendered as a real `<button>` so keyboard
-// operability (Tab to focus, Enter/Space to activate) and the accessible
-// name come from native semantics rather than a hand-rolled click handler
-// on a `<div>` or `<li>`. `aria-pressed` conveys the selected state to
-// assistive tech -- the visual `.selected` styling is never the only signal
-// for it.
+// A control, not a card: rendered as a real `<button>` -- the root element
+// this component returns, not wrapped in a `<div>` or `<li>` of its own here
+// -- so keyboard operability (Tab to focus, Enter/Space to activate) and the
+// accessible name come from native semantics rather than a hand-rolled click
+// handler. `aria-pressed` conveys the selected state to assistive tech --
+// the visual `.selected` styling is never the only signal for it.
+//
+// The `<li>` a list needs around each node is the container's to add, not
+// this component's: ServiceGroup.tsx wraps this button in one for its `<ul>`,
+// while GraphCanvas.tsx wraps the same button in a plain `<div>` for the
+// canvas. It used to be the other way around -- this component returned its
+// own `<li>`, correct inside ServiceGroup's list and invalid on the canvas,
+// where it was an `<li>` with no `<ul>` around it at all. Hoisting the `<li>`
+// out to the one caller that actually has a list is what fixed that.
 import type { ViewService } from "@catalogus/cli";
 
 import { Icon } from "./Icon.js";
@@ -87,48 +95,46 @@ export function serviceNodeDomId(id: string): string {
 
 export function ServiceNode({ service, isSelected, showId, onSelect }: ServiceNodeProps) {
   return (
-    <li className={styles.item}>
-      <button
-        type="button"
-        id={serviceNodeDomId(service.id)}
-        // `?? ""`, because `kind: service` has no rule by design (see the
-        // `.kind-*` comment in the stylesheet) and CSS Modules return
-        // undefined for a class that does not exist -- which template-literals
-        // into the literal string "undefined" as a class name. Harmless to
-        // look at and wrong in a way that survives every test that checks
-        // behaviour rather than markup; found by reading the live DOM.
-        className={`${styles.node} ${styles[`kind-${service.kind}`] ?? ""} ${isSelected ? styles.selected : ""}`}
-        aria-pressed={isSelected}
-        // The shape cue below is CSS, which no test can read and no screen
-        // reader announces. This is the machine-readable half of the same
-        // fact: one attribute, asserted by the tests, and the only way the
-        // three kinds are distinguishable without computing styles.
-        data-kind={service.kind}
-        // Hover is a tooltip only -- name and role, nothing more. Never the
-        // detail content: hover-to-open fights a pannable canvas (the next
-        // slice) and is dead weight on a touch device, which is why this is
-        // a plain `title` attribute rather than a custom hover panel.
-        title={`${service.name} — ${service.role}`}
-        onClick={() => onSelect(service.id)}
-      >
-        <span className={`${styles.ring} ${styles[`status-${service.status}`]}`}>
-          <Icon iconPath={service.icon} rollup={service.rollup} label={service.name} />
-          {!service.known && <span className={styles.uncataloguedDot} aria-hidden="true" />}
+    <button
+      type="button"
+      id={serviceNodeDomId(service.id)}
+      // `?? ""`, because `kind: service` has no rule by design (see the
+      // `.kind-*` comment in the stylesheet) and CSS Modules return
+      // undefined for a class that does not exist -- which template-literals
+      // into the literal string "undefined" as a class name. Harmless to
+      // look at and wrong in a way that survives every test that checks
+      // behaviour rather than markup; found by reading the live DOM.
+      className={`${styles.node} ${styles[`kind-${service.kind}`] ?? ""} ${isSelected ? styles.selected : ""}`}
+      aria-pressed={isSelected}
+      // The shape cue below is CSS, which no test can read and no screen
+      // reader announces. This is the machine-readable half of the same
+      // fact: one attribute, asserted by the tests, and the only way the
+      // three kinds are distinguishable without computing styles.
+      data-kind={service.kind}
+      // Hover is a tooltip only -- name and role, nothing more. Never the
+      // detail content: hover-to-open fights a pannable canvas (the next
+      // slice) and is dead weight on a touch device, which is why this is
+      // a plain `title` attribute rather than a custom hover panel.
+      title={`${service.name} — ${service.role}`}
+      onClick={() => onSelect(service.id)}
+    >
+      <span className={`${styles.ring} ${styles[`status-${service.status}`]}`}>
+        <Icon iconPath={service.icon} rollup={service.rollup} label={service.name} />
+        {!service.known && <span className={styles.uncataloguedDot} aria-hidden="true" />}
+      </span>
+      <span className={styles.label}>
+        <span className={`${styles.name} ${service.known ? "" : styles.uncataloguedName}`}>
+          {service.name}
+          {!service.known && <span className={styles.srOnly}> (uncatalogued -- no catalog entry for this slug)</span>}
         </span>
-        <span className={styles.label}>
-          <span className={`${styles.name} ${service.known ? "" : styles.uncataloguedName}`}>
-            {service.name}
-            {!service.known && <span className={styles.srOnly}> (uncatalogued -- no catalog entry for this slug)</span>}
+        {showId && <span className={styles.id}>{service.id}</span>}
+        {service.kind !== "service" && (
+          <span className={styles.srOnly}>
+            {" "}
+            ({service.kind === "component" ? "component -- infrastructure this project runs itself" : "stack -- what the code is written in"})
           </span>
-          {showId && <span className={styles.id}>{service.id}</span>}
-          {service.kind !== "service" && (
-            <span className={styles.srOnly}>
-              {" "}
-              ({service.kind === "component" ? "component -- infrastructure this project runs itself" : "stack -- what the code is written in"})
-            </span>
-          )}
-        </span>
-      </button>
-    </li>
+        )}
+      </span>
+    </button>
   );
 }

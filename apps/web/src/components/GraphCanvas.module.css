@@ -58,6 +58,17 @@
   align-items: center;
 }
 
+/* A direct-child selector, and correctly one now: ServiceNode's root is the
+   button itself (see ServiceNode.tsx), so the chain here is exactly
+   div._node > button._node with nothing between them. It used to run through
+   an `<li>` ServiceNode wrapped itself in for the list -- correct there, dead
+   weight here, since that made the button a *grandchild* and this rule never
+   matched anything in the built stylesheet. The visible tile kept its list
+   `max-width: 220px` and content-driven height inside the box elk laid out
+   for, while the handles edges anchor to stayed positioned against the full
+   box. Moving the `<li>` out to ServiceGroup.tsx, the one caller with a `<ul>`
+   around it, is what makes this selector real; verified against the built
+   CSS, not just read here. */
 .node > button {
   width: 100%;
   max-width: none;

@@ -104,9 +104,23 @@ export interface NodePosition {
  *
  * The index is the edge's position in the manifest's own `dependencies` list.
  * An id of just `from--to` would collide on a manifest that declares the same
- * pair twice -- elk rejects a duplicate edge id outright -- and keying off
- * the position *after* filtering would mean one dangling edge silently
- * renumbering every edge after it.
+ * pair twice, which `catalogus validate --strict` accepts, so it is reachable
+ * rather than theoretical. Keying off the position *after* filtering would
+ * mean one dangling edge silently renumbering every edge after it.
+ *
+ * **Who actually needs the uniqueness is React Flow, not elk.** This comment
+ * used to say elk rejects a duplicate edge id outright; an independent pass
+ * ran elkjs 0.12.0 against duplicate edge ids and duplicate *node* ids and it
+ * laid both out without complaint. What elk does reject is a dangling
+ * endpoint (`JsonImportException: Referenced shape does not exist`), which is
+ * the filter below, not this id scheme.
+ *
+ * React Flow is what actually needs the uniqueness, and that half was run
+ * too rather than read off `edgeLookup.set(edge.id, edge)`: dropping the
+ * index and rendering a duplicated pair draws both lines but hands React two
+ * children with the same key, which React warns may be "duplicated and/or
+ * omitted". Not a crash -- a graph that is quietly one line short of the
+ * manifest, which is the failure mode this whole module is arranged against.
  */
 function edgeId(edge: { from: string; to: string }, index: number): string {
   return `${edge.from}--${edge.to}--${index}`;

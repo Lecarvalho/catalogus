@@ -123,16 +123,27 @@ export function GraphCanvas({ services, edges, selectedId, onSelect, layout }: G
       width: NODE_SIZE.width,
       height: NODE_SIZE.height,
       // `measured` as well, which is not redundant with the two lines above.
-      // React Flow keeps each node's handle bounds -- the anchors every edge
-      // resolves against -- in internal state keyed by id, and `parseHandles`
-      // in @xyflow/system drops them whenever a node object arrives *without*
-      // `measured` set. This array is rebuilt on every selection change, so
-      // that path is taken constantly here. Recovering from it depends on a
-      // ResizeObserver callback that has no reason to fire when the element's
-      // size has not changed, and an edge that cannot resolve its endpoints
-      // renders nothing and reports nothing. Read out of the installed
-      // library rather than reproduced end to end: the cost of setting it is
-      // one line and the failure it forecloses is a silently edgeless graph.
+      // `adoptUserNodes` copies handle bounds -- the anchors every edge
+      // resolves against -- from `userNode.measured` and from nowhere else,
+      // so a node object arriving without it loses them; `width`/`height` do
+      // not stand in. This array is rebuilt on every selection change, so
+      // that path is taken constantly here.
+      //
+      // **What this line does not do is prevent an edgeless graph.** It said
+      // so until an independent pass ran it: React Flow self-heals, because
+      // `useNodeObserver` sees `handleBounds` go missing and re-`observe()`s
+      // the element, which by spec fires a fresh callback whether or not the
+      // size changed. Measured under jsdom with a spec-accurate
+      // ResizeObserver, dropping this line loses the bounds for one frame and
+      // has them back ~50ms later, edges and all. The library's own comment
+      // beside `parseHandles` says that is the intent.
+      //
+      // So it stays for what it actually buys -- no one-frame dropout, and no
+      // re-measure of every node on every selection -- and not for the
+      // catastrophe the old comment claimed. Recorded at length because the
+      // wrong half was reached by reading the library instead of running it,
+      // three lines from a comment saying the opposite, which is this repo's
+      // signature defect rather than an unlucky one.
       measured: NODE_SIZE,
       draggable: false,
       selectable: false,

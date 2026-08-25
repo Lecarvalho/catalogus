@@ -54,7 +54,7 @@ design decisions; this file tracks *what has been built* against it and what rem
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **951 tests / 56 files**, plus `pnpm typecheck`
+Run `pnpm build && pnpm test` first and confirm **963 tests / 56 files**, plus `pnpm typecheck`
 clean across all four packages, before trusting anything below. (Phases 0–3.6 and the 3.6.1
 correction pass predate this at 549/38, the viewer-foundations session ended at 679/50, and the
 drift-and-corpus session that followed ended at 879/52 — 200 of those tests are two committed
@@ -1725,7 +1725,7 @@ database node gets a database icon whoever the vendor is.
       `examples/layout-stress.catalogus.yaml` — synthetic, valid under `--strict`, and shaped to
       break a layout rather than to demonstrate a manifest. Its header states each property and why;
       the numbers there were **measured off the file, not asserted**: 35 services, 48 edges, 21
-      rollups, a fan-out hub with 18 outgoing edges, a fan-in hub with 6 incoming from 5 rollups, a
+      rollups, a fan-out hub with 18 outgoing edges, a fan-in hub with 6 incoming from 4 rollups, a
       longest path of 6 nodes, three entries with no edges at all, three Fly.io entries in one
       rollup, every kind, every status, and one uncatalogued slug. **46 of the 48 edges cross a
       rollup boundary — 96%** — which is the measured evidence behind decision 3's flat layout:
@@ -1770,21 +1770,78 @@ database node gets a database icon whoever the vendor is.
       clean across four packages, and **16 mutations each watched go red on exactly the tests that
       name them** — including one deliberately left in the list that produced *zero* failures
       (removing the `measured` line above), which is the honest way to say that fix has no
-      automated coverage rather than implying the suite covers everything.
+      automated coverage rather than implying the suite covers everything. **The honesty was
+      real and the count was not:** the pass below found two more shipped lines in the same
+      state, which is what a mutation list assembled by the author of the code looks like — it
+      covers what its author thought to doubt.
 
-      **NOT VALIDATED BY A SEPARATE AGENT, and that is the one gap in this box.** CLAUDE.md's
-      process is orchestrate / implement / validate, with the validation done by a subagent that
-      did not write the code, because the failure mode here has always been plausible code checked
-      by whoever wrote it. This slice was written and checked by the same session. The mutations
-      and the live run are real evidence and they are all first-party evidence. **Treat every
-      claim in this box as unverified until an independent pass reproduces it**, and run that pass
-      before building anything on top of the canvas.
+      **The independent validation pass ran (2026-08-25) and the split in its verdict is the
+      point.** Every claim about *behaviour* reproduced: the suite at 951/56 on five consecutive
+      runs with no sign of the shared-directory flake, typecheck clean, the layout rules, the
+      id agreement between elk and React Flow, the dangling-endpoint filter, the effect stability,
+      all five smaller fixes covered by tests that go red when reverted, the bundle split, every
+      asset served without a 404, and the whole live-run geometry reproduced *headlessly* by
+      running elkjs over the fixture directly — 9 ranks sized [1,1,1,2,3,7,17,2,1], zero
+      overlapping node pairs, 2646x1619px (the claimed 2634x1607 plus elk's 12px inset), and
+      `host-api` with exactly 21 incident edges.
+
+      **What did not survive was a set of explanations.** Three comments and two numbers, and
+      they failed in the same direction every time — read out of a library or carried forward
+      from an older line rather than executed:
+
+      - The `measured` comment claimed the line prevents a silently edgeless graph. Half right:
+        `adoptUserNodes` really does drop handle bounds without it, and `width`/`height` do not
+        substitute. But React Flow **self-heals** — `useNodeObserver` re-`observe()`s the element
+        when the bounds go missing, and a spec-accurate ResizeObserver delivers a fresh callback
+        whether or not the size changed. Measured: bounds gone for one frame, back ~50ms later,
+        edges and all. The library's own comment three lines from the one that was read says
+        exactly that. The line stays for what it does buy; the comment is rewritten.
+      - "elk rejects a duplicate edge id outright" is false — real elkjs 0.12.0 lays out duplicate
+        edge *and* duplicate node ids without complaint. What it does reject is a dangling
+        endpoint. The uniqueness is needed by React Flow's edge registry, and the false reason
+        was embedded in a test name. Both corrected.
+      - `ViewToggle`'s comment claimed `role="radiogroup"` gives arrow-key navigation "for free
+        from native semantics". ARIA describes, it does not implement: arrow keys moved nothing
+        and both buttons sat in the tab order.
+      - The fan-in hub is **4 rollups, not 5** — wrong in the fixture header, in an inline comment
+        beside the edges, and in this box, in a set of numbers whose selling point was that they
+        were measured. Recomputed twice, independently, off `role` rather than `id` (which is what
+        `rollupOf` actually keys on).
+      - The bundle baseline was stale: see the paragraph below.
+
+      **And it found the disclosure understated.** This box said 16 mutations produced *one*
+      zero-failure result. There are at least three shipped lines with no automated coverage:
+      `measured`, the `onError` wiring the box calls permanent, and the incident-edge highlight —
+      deleting the ternary so selecting a node highlights nothing fails no test. Two new defects
+      came with them: `.node > button` in the canvas stylesheet was **dead**, because the button
+      was a grandchild rather than a child, so the visible tile never filled the 216x64 box its
+      handles are anchored against; and every canvas node was an **orphan `<li>`**, since
+      `ServiceNode` returned a list item and the canvas wrapped it in a plain `<div>`. **All of
+      that is fixed in the box below** — past tense deliberately, because the first draft of this
+      paragraph shipped in the present tense alongside the commit that fixed it.
+
+      **The lesson is narrower than "check the work" and worth stating exactly.** Nothing built
+      here was wrong. What was wrong was every place a *reason* had been reached by reading rather
+      than running — and each of those reasons read as more authoritative than the code it sat
+      above, because it cited a library internal by name.
 
       **The bundle budget survived, and by a better route than the decision expected.** Decision 6
       accepted growth; the default view took none. `@xyflow/react` and elkjs are both behind
-      dynamic imports, so the initial chunk is **161.65 KB** against the 161 KB it was before this
-      slice, and the graph pulls **186 KB (React Flow) plus a 1.4 MB elk worker** only when someone
-      switches to it. The worker is also the reason elk cannot be imported by a test: it arrives
+      dynamic imports, so the initial chunk is **162.23 KB** (measured after the fix pass below;
+      it was 161.65 KB when the DAG landed), and the graph pulls **186.35 KB
+      (React Flow) plus a 1.43 MB elk worker** only when someone switches to it. The entry chunk
+      contains zero occurrences of `xyflow`, `react-flow`, `ReactFlow`, `nodeLookup` or
+      `handleBounds`; all of them appear only in the lazy chunk. (`elkjs` appears in *no* built
+      asset — it is a module specifier that does not survive bundling, so it was never evidence
+      of anything.)
+
+      **The comparison this originally drew was wrong, and it is the stale-number failure this
+      file keeps producing.** It said "against the 161 KB it was before this slice", which was a
+      figure carried forward from line 1524 rather than re-measured. The validation pass built the
+      pre-slice tree in a throwaway worktree at `738d5c8` on the same vite 6.4.3 and got
+      **158.64 KB**. So the DAG slice cost **+3.01 KB (+1.9%)**, not +0.65 KB, and the fix pass
+      below took it to **+3.59 KB (+2.3%)** total. The conclusion holds —
+      no library bytes reached the default view — but the arithmetic behind it did not. The worker is also the reason elk cannot be imported by a test: it arrives
       through a Vite `?worker` import that does not evaluate outside a browser, which is why
       `GraphCanvas` takes its layout function as a prop.
 
@@ -1794,6 +1851,71 @@ database node gets a database icon whoever the vendor is.
       goes. Dragging, connecting and React Flow's own selection model: an edge is a fact in
       `catalogus.yaml` and the CLI is the only writer, so the canvas is strictly read-only and the
       one selection model is the `#/service/<id>` route the list already used.
+
+- [x] **The DAG's validation pass, and the fixes it forced.** Two independent passes ran against
+      the slice above (2026-08-25), neither by the session that wrote it. **963 tests / 56 files**
+      on three consecutive full runs, `pnpm typecheck` clean across four packages.
+
+      **What the first pass found is in the box above.** What matters about it is the shape: every
+      claim about *behaviour* reproduced, and five *explanations* did not. Nothing built was
+      wrong. Every wrong thing was a reason reached by reading a library or carrying a number
+      forward, sitting in a comment that read as more authoritative than the code under it
+      because it cited an internal by name.
+
+      **Six fixes, each with the mutation that proves its test.** All six went red on exactly the
+      test naming them, and every mutation was restored:
+
+      1. **The orphan `<li>` and the dead selector, which were one bug.** `ServiceNode` now
+         returns a bare `<button>` and each caller supplies its own wrapper — `<li>` in
+         `ServiceGroup`'s list, React Flow's div on the canvas. That removes a list item that had
+         no list around it *and* makes `.node > button` a selector that matches, since the button
+         was a grandchild before and the rule had never once applied. Proved both ways by loading
+         both production stylesheets into a CSSOM: the old chain computes `max-width: 220px`, the
+         new one `max-width: none`.
+      2. **`onError` is now asserted**, and the assertion's own footing is written down: it passes
+         only because React Flow's 004 fires in an unmeasured jsdom pane, so it would go red for
+         an unrelated reason if this file ever measures. Better to say that than to discover it.
+      3. **The incident-edge highlight is now tested end to end** — real edges in jsdom, via a
+         spec-accurate `ResizeObserver`, element-size stubs and a `DOMMatrixReadOnly` polyfill,
+         each of which the second pass confirmed load-bearing by removing it.
+      4. **`ViewToggle` implements the radiogroup it announces**: roving tabindex, arrow keys with
+         wraparound, Home/End, and `preventDefault` so ArrowUp/ArrowDown stop scrolling the page
+         out from under the user.
+      5. **And a bug the second pass found in that fix.** It focused the *requested* option rather
+         than the committed one, so a parent that declined `onChange` left focus on the
+         `tabIndex={-1}` button while the other kept the group's only tab stop — roving tabindex's
+         single invariant, inverted. `App.tsx` always honours `onChange`, so it was never live. It
+         was still wrong, and a controlled component has to get that state right.
+      6. **The false comments and the wrong numbers**, listed in the box above, all corrected in
+         place rather than deleted — a comment that records what it got wrong is worth more here
+         than one that quietly reads correctly.
+
+      **Two limits, stated because the alternative is implying coverage that does not exist.**
+      Removing `measured` still fails no test, and no browser-free test can reach it. And no test
+      in this suite can see whether `.node > button` is still *in* the stylesheet — vitest's CSS
+      Module proxy synthesises a class name for any key, so only the DOM shape is guarded, not the
+      rule.
+
+      **The third limit was closed by running it.** Whether the button visually fills its 216x64
+      box is a layout question and jsdom does no layout, so it was cascade-derived until a live
+      run measured it: `catalogus view` against the stress fixture, all **35 nodes**, every one
+      with `button.getBoundingClientRect()` matching its `.react-flow__node` box to within half a
+      pixel — **ratio 1.000 on both axes**, computed `max-width: none`, and **zero `<li>` elements
+      anywhere on the canvas**. 48 edges drawn, clean console. The roving tabindex was driven with
+      a real keyboard too: ArrowLeft from Graph moved both the selection and the visible focus
+      ring to List, with `tabindex` reading `0`/`-1` on the checked and unchecked options.
+
+      **One live-run note that is not a defect, and cost time anyway.** A click that lands on the
+      already-selected option leaves `document.activeElement` on `<body>`, so the arrow key that
+      follows goes nowhere and reads exactly like a broken key handler. The keyboard path is fine;
+      the *click* did not focus. This is the same class as the previous session's unpainted-tab
+      artifact — **in an automated browser, confirm what has focus before concluding a key did
+      nothing.**
+
+      **The pattern worth carrying forward.** The second pass found a defect in the first pass's
+      own fixes, and this box's first draft described four defects in the present tense in the
+      same commit that fixed them. Validation is not a gate you pass once — each pass is written
+      by someone who now believes something, which is the condition the next one exists to check.
 
 - [x] **Status colours and `replaced_by` targets.** Shipped in `f256d72`, unticked until now for
       the same reason the two boxes above were — nobody went back. `ServiceNode.module.css` carries
@@ -1823,6 +1945,17 @@ database node gets a database icon whoever the vendor is.
 - [ ] Portfolio page: project list, service usage matrix across projects
 - [ ] Migration dashboard: everything `phasing_out` with its replacement
 - [ ] Layer 3 cost panel present, rendering an explicit "not connected" empty state
+
+      **Order settled by the owner, 2026-08-25: the cost panel first.** It is the only one of the
+      three blocked on nothing — single project, no new manifest, and no Layer 3 data touched,
+      because the whole of it is the empty state that says the private layer is not connected.
+      The migration dashboard is second and is renderable against the reference manifest today.
+
+      **And the manifest gap closes by onboarding real repos, not by writing more synthetics.**
+      Owner decision, same date, superseding this file's habit of proposing another synthetic:
+      the portfolio page and the usage matrix are judged against real topology or not at all.
+      What that does *not* change is `examples/` — those stay synthetic on purpose (CLAUDE.md),
+      so an onboarded project's manifest lives in its own repo and never lands here.
 - [x] **Unblocked, on the synthetic example only.** This box used to claim a real 26-service
       manifest existed alongside the reference example; it does not (see "There is no real
       manifest" above — checked 2026-08-24). What is actually available is
