@@ -1,16 +1,25 @@
+/* The measure used to be 960px, on the reasoning that "the list is a column
+   of tiles that reads badly past a comfortable measure" while "the graph
+   wants the window". The first half of that stopped being true when the list
+   became a mosaic: a multi-column field of band modules spends width the way
+   the DAG does -- every extra column is another band visible without
+   scrolling -- and 960px on a 1440px screen was two-fifths of the display
+   holding a project that was supposed to fit on one screen.
+
+   1680px rather than none, because the columns are 300px and an unbounded
+   width on a very wide display eventually produces a row of modules so long
+   that the eye loses which band it is in. */
 .page {
-  max-width: 960px;
+  max-width: 1680px;
   margin: 0 auto;
-  padding: var(--space-6) var(--space-4);
+  padding: var(--space-6) var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-5);
 }
 
-/* The graph wants the window. The list is a column of tiles that reads badly
-   past a comfortable measure, which is what the 960px above is for; a
-   left-to-right layered DAG is the opposite -- every extra pixel of width is
-   another rank visible without panning. */
+/* The graph still wants every pixel: a left-to-right layered DAG has no
+   comfortable measure at all, and panning is the cost of any bound. */
 .wide {
   max-width: none;
 }

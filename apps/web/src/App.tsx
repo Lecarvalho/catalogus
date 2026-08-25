@@ -18,15 +18,18 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewPayload, ViewService } from "@catalogus/cli";
 
+import type { VendorGroup } from "./bands.js";
+
 import styles from "./App.module.css";
-import { EdgesList } from "./components/EdgesList.js";
 import { ErrorState } from "./components/ErrorState.js";
 import { LoadingState } from "./components/LoadingState.js";
 import { MigrationList } from "./components/MigrationList.js";
 import { ProjectHeader } from "./components/ProjectHeader.js";
-import { ServiceDetailPanel } from "./components/ServiceDetailPanel.js";
+import { ServicePage } from "./components/ServicePage.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
-import { ServiceList } from "./components/ServiceList.js";
+import { serviceTileDomId } from "./components/ServiceTile.js";
+import { ProjectBoard } from "./components/ProjectBoard.js";
+import { ServicePopover } from "./components/ServicePopover.js";
 import { ViewToggle, type ViewMode } from "./components/ViewToggle.js";
 import { hashForServiceId, serviceIdFromHash } from "./hash-route.js";
 
@@ -97,8 +100,7 @@ export function App() {
   // plain DOM refs, not React state, because moving focus is an imperative
   // side effect, never something a render should read back.
   const panelRef = useRef<HTMLElement | null>(null);
-  const lastFocusedRef = useRef<HTMLElement | null>(null);
-  const previousSelectedIdRef = useRef<string | null>(null);
+  const previousSelectedRef = useRef<{ id: string; service: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,9 +178,6 @@ export function App() {
 
   const handleSelect = useCallback(
     (id: string) => {
-      if (document.activeElement instanceof HTMLElement) {
-        lastFocusedRef.current = document.activeElement;
-      }
       replaceHash(hashForServiceId(id));
     },
     [replaceHash]
@@ -187,6 +186,91 @@ export function App() {
   const handleClose = useCallback(() => {
     replaceHash("");
   }, [replaceHash]);
+
+  // Hover peek and click-to-open, settled by the owner 2026-08-25:
+  // **hovering a tile shows the popover; clicking opens the page.** An
+  // earlier build pinned the popover on click, and that was wrong -- it made
+  // the click do the cheap thing and left the reader without the expensive
+  // one.
+  //
+  // The hover model has one hazard that is easy to ship broken: the popover
+  // has to survive the pointer travelling *into* it. Clearing the peek
+  // straight from the tile's pointerleave closes it in the gap between tile
+  // and popover, so its rows -- which are the destinations for a vendor with
+  // several entries -- can never be clicked. Hence the close is scheduled
+  // rather than immediate, and the popover cancels it on enter.
+  //
+  // Position is measured here rather than in the popover because the tiles
+  // live inside a CSS multi-column container: a column fragment is not a
+  // containing block an absolutely-positioned child can be trusted against,
+  // so the popover is `position: fixed` and wants viewport coordinates,
+  // which is what getBoundingClientRect() already returns.
+  const [peek, setPeek] = useState<{ group: VendorGroup; position: { top: number; left: number } } | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
+
+  const positionFor = useCallback((anchor: HTMLElement) => {
+    const rect = anchor.getBoundingClientRect();
+    const width = 268;
+    const gap = 6;
+    // Prefer the right of the tile; flip to the left when that would run off
+    // the viewport, and clamp rather than allow a negative left, so a tile in
+    // the first column of a narrow window still produces a reachable popover.
+    const rightRoom = window.innerWidth - rect.right - gap;
+    const left = rightRoom >= width ? rect.right + gap : Math.max(gap, rect.left - width - gap);
+    // Top-aligned to the tile, then pulled up only as far as needed to stay
+    // on screen. Popover height is unknown before paint, so this uses the
+    // max-height the stylesheet caps it at.
+    const maxHeight = window.innerHeight * 0.6;
+    const top = Math.max(gap, Math.min(rect.top, window.innerHeight - maxHeight - gap));
+    return { top, left };
+  }, []);
+
+  const handlePeek = useCallback(
+    (group: VendorGroup, anchor: HTMLElement) => {
+      cancelClose();
+      setPeek({ group, position: positionFor(anchor) });
+    },
+    [cancelClose, positionFor]
+  );
+
+  // Scheduled, not immediate -- see the hover-bridge note above. The delay is
+  // the time a pointer needs to cross a 6px gap, not a deliberate dwell.
+  const handlePeekEnd = useCallback(() => {
+    cancelClose();
+    closeTimerRef.current = window.setTimeout(() => {
+      setPeek(null);
+      closeTimerRef.current = null;
+    }, 120);
+  }, [cancelClose]);
+
+  useEffect(() => cancelClose, [cancelClose]);
+
+  const handleActivate = useCallback(
+    (group: VendorGroup) => {
+      // One entry: the tile *is* the page, so open it.
+      //
+      // Several entries: there is no page to open -- "Fly.io" is not a
+      // document, five Fly.io deployments are -- so the tile does not
+      // navigate and the popover's rows stay the destinations. The popover is
+      // already open, because hover opened it.
+      if (group.entries.length === 1) {
+        setPeek(null);
+        handleSelect(group.entries[0].id);
+      }
+    },
+    [handleSelect]
+  );
+
+  useEffect(() => {
+    setPeek(null);
+  }, [selectedId, mode]);
 
   // Escape closes the panel, only while one is open -- the listener is
   // added and removed with the panel's own lifetime rather than sitting on
@@ -204,92 +288,139 @@ export function App() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [selectedService, handleClose]);
 
-  // Moves focus into the panel the moment it opens (click or deep link),
-  // and hands it somewhere sensible once it closes. Keyed on the resolved
-  // service's id, not on the raw (possibly stale/unknown) hash id, so an
-  // unmatched hash never tries to focus a panel that isn't rendered.
+  // Moves focus into the page the moment it opens (click or deep link), and
+  // hands it back to the thing that opened it once it closes. Keyed on the
+  // resolved service, not on the raw (possibly stale/unknown) hash id, so an
+  // unmatched hash never tries to focus a page that isn't rendered.
   //
-  // Closing has two cases and only one of them used to work. A panel opened
-  // by a click restores the element that opened it. A panel opened by a
-  // *deep link* had no opener -- nothing was clicked, so `lastFocusedRef`
-  // was still null and focus fell to `<body>`, which is the state where the
-  // next Tab starts from the top of the document and a screen reader loses
-  // its place entirely. There is still an obvious target in that case: the
-  // node for the service that was open, which is where a click would have
-  // left focus anyway. Hence the DOM-id lookup.
+  // **Restoring by DOM id, never by a captured element reference.** An earlier
+  // version stashed `document.activeElement` on select and refocused it on
+  // close, falling back to a lookup only for the deep-link case where nothing
+  // had been clicked. That worked while the panel rendered *beside* the board.
+  // It stopped working the moment the service page began replacing the board:
+  // opening a page unmounts every tile, so the captured node is detached by
+  // the time anyone closes, `document.contains` is false on every path, and
+  // focus fell to `<body>` for clicks as well as deep links. A stashed element
+  // is a reference to a render that no longer exists.
   //
-  // The opener is cleared once used, so a click, a close, and then a deep
-  // link to some *other* service cannot restore focus to the first
-  // service's node -- a stale ref is worse than none, because it moves
-  // focus somewhere confidently wrong.
+  // Two ids are tried because two surfaces render a service and they key
+  // differently. The board's tiles are keyed by **catalog slug**, because one
+  // tile can stand for several entries and no single entry id names it. The
+  // graph and the migration board key by entry id. Trying slug first and id
+  // second covers all three without this file knowing which view is mounted.
+  //
+  // A focus restore that silently finds nothing is invisible in a passing test
+  // suite -- this repo has shipped that exact defect twice now, once on the
+  // migration board and once here -- so both branches are covered by tests
+  // that go red when the id scheme changes underneath them.
   useEffect(() => {
-    const matchedId = selectedService?.id ?? null;
-    const closedId = previousSelectedIdRef.current;
-    if (matchedId === closedId) {
+    const matched = selectedService ?? null;
+    const closed = previousSelectedRef.current;
+    if (matched?.id === closed?.id) {
       return;
     }
-    previousSelectedIdRef.current = matchedId;
+    previousSelectedRef.current = matched ? { id: matched.id, service: matched.service } : null;
 
-    if (matchedId) {
+    if (matched) {
       panelRef.current?.focus();
       return;
     }
 
-    const opener = lastFocusedRef.current;
-    lastFocusedRef.current = null;
-    if (opener && document.contains(opener)) {
-      opener.focus();
-      return;
-    }
-    if (closedId) {
-      document.getElementById(serviceNodeDomId(closedId))?.focus();
+    if (closed) {
+      const target =
+        document.getElementById(serviceTileDomId(closed.service)) ?? document.getElementById(serviceNodeDomId(closed.id));
+      target?.focus();
     }
   }, [selectedService]);
 
   return (
-    <main className={`${styles.page} ${mode === "graph" ? styles.wide : ""}`}>
+    <main className={`${styles.page} ${mode === "graph" && !selectedService ? styles.wide : ""}`}>
       {state.kind === "loading" && <LoadingState />}
       {state.kind === "error" && <ErrorState message={state.message} />}
       {state.kind === "loaded" && edgeMaps && (
         <>
-          <ProjectHeader project={state.payload.project} manifestPath={state.payload.manifestPath} />
-          <ViewToggle mode={mode} onChange={setMode} />
-          <div className={styles.body}>
-            {mode === "list" ? (
-              <ServiceList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
-            ) : mode === "graph" ? (
-              <Suspense fallback={<p>Loading the graph…</p>}>
-                <GraphCanvas
-                  services={state.payload.services}
-                  edges={state.payload.edges}
-                  selectedId={selectedId}
-                  onSelect={handleSelect}
-                  layout={layoutWithElk}
+          {/*
+            The masthead is the board's, not the app's. On a service page the
+            breadcrumb already names the project, and rendering both put two
+            `<h1>`s on one document -- the project's and the service's -- which
+            is wrong for a page whose subject is the service. A reader on a
+            service page needs the way back, which the breadcrumb is, not the
+            project's entry counts.
+          */}
+          {!selectedService && (
+            <ProjectHeader
+              project={state.payload.project}
+              manifestPath={state.payload.manifestPath}
+              serviceCount={state.payload.services.length}
+              edgeCount={state.payload.edges.length}
+              readAt={state.payload.readAt}
+            />
+          )}
+
+          {/*
+            The page replaces the board rather than docking beside it. That is
+            the difference between a panel and a page, and leaving the old
+            panel on the click path produced a visible defect once the same
+            content became the hover popover: hovering a tile and then
+            clicking it rendered the identical facts twice, once floating and
+            once docked on the right.
+
+            The toggle goes with the board. It selects between three views of
+            the *project*, and a service page is not one of them -- leaving it
+            on screen would offer to switch a view that is no longer showing.
+          */}
+          {selectedService ? (
+            <ServicePage
+              service={selectedService}
+              projectName={state.payload.project.name}
+              dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
+              dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
+              labelForId={edgeMaps.labelForId}
+              onBack={handleClose}
+              pageRef={panelRef}
+            />
+          ) : (
+            <>
+              <ViewToggle mode={mode} onChange={setMode} />
+              <div className={styles.body}>
+                {mode === "list" ? (
+                  <ProjectBoard
+                    services={state.payload.services}
+                    readAt={state.payload.readAt}
+                    selectedId={selectedId}
+                    onActivate={handleActivate}
+                    onPeek={handlePeek}
+                    onPeekEnd={handlePeekEnd}
+                  />
+                ) : mode === "graph" ? (
+                  <Suspense fallback={<p>Loading the graph…</p>}>
+                    <GraphCanvas
+                      services={state.payload.services}
+                      edges={state.payload.edges}
+                      selectedId={selectedId}
+                      onSelect={handleSelect}
+                      layout={layoutWithElk}
+                    />
+                  </Suspense>
+                ) : (
+                  <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+                )}
+              </div>
+              {peek && mode === "list" && (
+                <ServicePopover
+                  group={peek.group}
+                  readAt={state.payload.readAt}
+                  position={peek.position}
+                  dependsOn={(id) => edgeMaps.dependsOn.get(id) ?? []}
+                  dependedOnBy={(id) => edgeMaps.dependedOnBy.get(id) ?? []}
+                  labelForId={edgeMaps.labelForId}
+                  onOpen={handleSelect}
+                  onPointerEnter={cancelClose}
+                  onPointerLeave={handlePeekEnd}
                 />
-              </Suspense>
-            ) : (
-              <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
-            )}
-            {selectedService && (
-              <ServiceDetailPanel
-                service={selectedService}
-                dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
-                dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
-                labelForId={edgeMaps.labelForId}
-                onClose={handleClose}
-                panelRef={panelRef}
-              />
-            )}
-          </div>
-          {/* The text edge list is the list view's way of showing edges at
-              all. On the canvas the same edges are drawn, so repeating them
-              underneath is the same information twice. On the migration
-              board it is noise a different way: that board is about which
-              *nodes* still need a decision, not the whole dependency graph,
-              and the replacement each row already names is the one edge a
-              migration reader cares about -- the full edge list answers a
-              question this mode isn't asking. */}
-          {mode === "list" && <EdgesList edges={state.payload.edges} labelForId={edgeMaps.labelForId} />}
+              )}
+            </>
+          )}
         </>
       )}
     </main>

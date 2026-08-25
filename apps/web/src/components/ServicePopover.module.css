@@ -1,0 +1,176 @@
+/*
+ * Fixed positioning, viewport coordinates. `fixed` rather than `absolute`
+ * because the tile that anchors this sits inside a multi-column container,
+ * and a CSS multi-column fragment is not a containing block an absolutely
+ * positioned child can be trusted against -- the popover would land in the
+ * wrong column. App.tsx measures the anchor with getBoundingClientRect(),
+ * which is already viewport-relative, so `fixed` is also the coordinate
+ * space the numbers arrive in.
+ *
+ * This is the one element in the app that floats above the page, so it is
+ * the one place a shadow is allowed -- and it is a hard-edged offset block
+ * rather than a soft blur, which is what the committed world does when it
+ * needs to lift something.
+ */
+.popover {
+  position: fixed;
+  z-index: 20;
+  width: 300px;
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface);
+  box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.12);
+  /*
+   * The popover accepts the pointer. An earlier version set
+   * `pointer-events: none` here to keep it from intercepting hovers meant
+   * for the board, and that made its rows unreachable: the pointer left the
+   * tile, the peek cleared, and the popover was gone before it could be
+   * entered. It now hosts the hover bridge instead -- entering cancels the
+   * scheduled close (see App.tsx) -- which is both reachable and correct,
+   * because a popover under the pointer is a popover the reader is using.
+   */
+  pointer-events: auto;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-header-fill);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.glyph {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.glyph svg {
+  width: 20px;
+  height: 20px;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.name {
+  font-size: var(--text-module);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * The local id, or the entry count for a collapsed vendor. Mono for the id
+ * because it is a literal from the manifest that the reader may need to type
+ * into a `catalogus set services.<id>...` command.
+ */
+.slug {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Stated in the signal colour, because unlike everything else in this header
+ * it is a defect the reader can act on: the catalog has no row for this slug,
+ * so the name is the raw slug and there is no verified brand mark.
+ */
+.uncatalogued {
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--color-signal);
+}
+
+.entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.entries li:first-child .entry {
+  border-top: 0;
+}
+
+.entry:hover {
+  background: var(--color-surface-sunken);
+}
+
+.entryHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.role {
+  font-size: var(--text-row);
+  font-weight: var(--weight-bold);
+}
+
+.id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.fact {
+  font-size: var(--text-label);
+  line-height: var(--leading-body);
+  color: var(--color-text-muted);
+}
+
+/*
+ * The one instruction, said once. A single-entry tile opens on click, which
+ * the reader discovers for free the first time; a multi-entry tile
+ * deliberately does not navigate, because there is no vendor page to
+ * navigate to, so the rows being the destinations has to be stated.
+ */
+.hint {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface-sunken);
+  font-size: 10px;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}

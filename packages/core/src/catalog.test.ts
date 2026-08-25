@@ -142,6 +142,30 @@ describe("CATALOGUS_CATALOG invariants", () => {
   });
 });
 
+describe("closing the Phase 3.7 catalog-gap slice: real slugs a live manifest rendered as raw text", () => {
+  // grafana, loki, prometheus and healthchecks-io were the four slugs a real
+  // 36-service manifest rendered as lowercase raw slugs beside properly
+  // named neighbours -- the defect this slice exists to close. grafana and
+  // prometheus flow through SPECFY_TO_CATALOGUS (mapping.ts); loki has no
+  // @specfy/stack-analyser rule at all and is an EXTRA_ROWS entry instead
+  // (see that constant's own comment).
+
+  it("gives grafana and prometheus a name and a verified icon", () => {
+    expect(getCatalogEntry("grafana")).toEqual({ slug: "grafana", name: "Grafana", icon: "grafana" });
+    expect(getCatalogEntry("prometheus")).toEqual({ slug: "prometheus", name: "Prometheus", icon: "prometheus" });
+  });
+
+  it("gives loki and healthchecks-io a name with no icon field at all -- simple-icons has neither mark", () => {
+    const loki = getCatalogEntry("loki");
+    expect(loki).toEqual({ slug: "loki", name: "Loki" });
+    expect(loki && "icon" in loki).toBe(false);
+
+    const healthchecks = getCatalogEntry("healthchecks-io");
+    expect(healthchecks).toEqual({ slug: "healthchecks-io", name: "Healthchecks.io" });
+    expect(healthchecks && "icon" in healthchecks).toBe(false);
+  });
+});
+
 describe("getCatalogEntry", () => {
   it("returns undefined for a slug with no catalog row -- not a synthesised placeholder", () => {
     expect(getCatalogEntry("some-slug-nobody-has-catalogued")).toBeUndefined();

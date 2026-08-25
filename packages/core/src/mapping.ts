@@ -164,6 +164,19 @@ export const SPECFY_TO_CATALOGUS: Record<string, MappingEntry> = {
   sentry: { slug: "sentry", category: "monitoring", name: "Sentry", kind: "service" }, // verified: rules/monitoring/sentry.js
   datadog: { slug: "datadog", category: "monitoring", name: "Datadog", kind: "service" }, // verified: rules/monitoring/datadog.js
   newrelic: { slug: "new-relic", category: "monitoring", name: "New Relic", kind: "service" }, // verified: rules/monitoring/newrelic.js
+  // Three added closing the Phase 3.7 catalog-gap slice: real slugs found
+  // rendering as raw lowercase text in a real 36-service manifest, each
+  // confirmed as an actual @specfy/stack-analyser tech key before being
+  // added (not typed from memory). "app" (grafana's own specfy `type`) has
+  // no Catalogus bucket, but a dashboard tool that visualises whether the
+  // system is broken is exactly this category's own test -- kind "service"
+  // for all three matches what classifyDetectionKind would already default
+  // an unmapped detection of their (non-library) specfy types to.
+  grafana: { slug: "grafana", category: "monitoring", name: "Grafana", kind: "service" }, // verified: rules/app/grafana.js
+  prometheus: { slug: "prometheus", category: "monitoring", name: "Prometheus", kind: "service" }, // verified: rules/monitoring/prometheus.js
+  // specfy's tech key has no separator; the catalogus slug adds one, same
+  // convention as flyio -> "fly-io" above.
+  healthchecksio: { slug: "healthchecks-io", category: "monitoring", name: "Healthchecks.io", kind: "service" }, // verified: rules/monitoring/healthchecksio.js
 
   // --- queue ---------------------------------------------------------------
   "aws.sqs": { slug: "aws-sqs", category: "queue", name: "AWS SQS", kind: "service" }, // verified: rules/queue/aws.sqs.js

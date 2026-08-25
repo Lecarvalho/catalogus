@@ -1,0 +1,70 @@
+/*
+ * The mosaic. A masonry-ish multi-column grid rather than a row grid,
+ * because bands are wildly uneven -- Clapline's "Serves requests" holds
+ * seven services and "Registered at" holds two -- and a row grid would
+ * stretch every module in a row to the tallest one, reintroducing exactly
+ * the equal-weight problem this layout exists to fix.
+ *
+ * CSS multi-column does the packing with no JavaScript, no measurement pass,
+ * and no layout thrash on resize. The cost is that reading order runs down
+ * each column before moving right; that is acceptable here because the bands
+ * are independent of one another -- there is no sentence running across
+ * them -- and because the DOM order, which is what a screen reader and the
+ * keyboard follow, stays the deliberate one bands.ts fixes.
+ */
+.board {
+  /* The board is a flex item beside the detail panel (App.module.css's
+     `.body`). Without `min-width: 0` a flex item refuses to shrink below its
+     content's intrinsic width, which for a multi-column container is one
+     full column -- so the board sized itself to ~230px and tiled nothing.
+     `flex: 1` claims the rest of the row; `min-width: 0` lets it. */
+  flex: 1 1 auto;
+  min-width: 0;
+  column-width: 300px;
+  column-gap: var(--space-5);
+  /*
+   * The hairline between columns is the source world's own device: it turns
+   * a set of floating boxes into a ruled field, which is what stops a dense
+   * layout reading as clutter.
+   */
+  column-rule: 1px solid var(--color-line);
+}
+
+/*
+ * `break-inside: avoid` is what keeps a module from being sliced across a
+ * column boundary. Without it a band's header can land at the bottom of one
+ * column and its rows at the top of the next, which reads as two broken
+ * modules rather than one whole one.
+ */
+.board > * {
+  break-inside: avoid;
+  /*
+   * Multi-column ignores margin-collapsing rules in a way that leaves the
+   * first module in each column with a phantom top gap unless it is stated
+   * explicitly. Bottom-only margin, so every column starts flush.
+   */
+  margin: 0 0 var(--space-5);
+  /* Belt on braces for engines that honour the older keyword only. */
+  page-break-inside: avoid;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-6);
+  border: 1px solid var(--color-line);
+  color: var(--color-text-muted);
+  font-size: var(--text-body);
+}
+
+/*
+ * One column below 640px. The mosaic is a desktop argument -- it exists so a
+ * project fits one screen -- and on a phone the honest answer is a single
+ * ordered column in the reading order bands.ts fixes, not a squeezed grid.
+ */
+@media (max-width: 640px) {
+  .board {
+    column-width: auto;
+    column-count: 1;
+    column-rule: none;
+  }
+}

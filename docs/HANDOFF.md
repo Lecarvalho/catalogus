@@ -103,6 +103,45 @@ here rather than made silently.
   than silently honoured. This is recorded because it is a deliberate decision with a confirmed
   basis, not an oversight — if the assumption ever turns out to be wrong, the fallback goes there.
 
+- *2026-08-25, §3, §7 and §8* — **a service entry gains a page, and the page is Layer 3 content
+  edited in the browser.** Approved by the owner as a committed direction, not a candidate.
+
+  The manifest is a **skeleton**. `catalogus.yaml` records topology — identity, role, status, edges —
+  and the operational knowledge attached to an entry is a *page*, not a field: the tax registration
+  table behind a Stripe integration, why an ingress is wired a particular way, the thing that took a
+  day to learn and must never be re-derived. The owner's own example was a GST/QST rate table that is
+  true for their business and for nobody else's.
+
+  **It does not go in the repo.** Long prose churns diffs nobody reviews, bloats the checkout, and
+  dies when a repo is archived or renamed; and a tax registration table in a committed file is
+  precisely the business detail that leaks by accident. `catalogus.yaml` is the wrong home for a
+  second reason — YAML block scalars make tables unreadable, and §5's private-key guard would find
+  itself policing prose. **Layer 3 already is this layer**: private, per-user, behind auth, never
+  touching the repo. Its `Contents` line above gains page content alongside cost and account
+  references. The no-secrets rule is unchanged and still absolute.
+
+  **Scope consequences, named and accepted when the decision was taken.** This un-defers **Phase 4**:
+  browser editing needs a store, auth, and an MCP write path, which is §8's v1 item 6 plus the auth
+  design in §6. The viewer stops working offline and account-free, which it does today on any
+  checkout — a real loss for a CLI-shipped tool. And a page acquires **two writers**, the owner in
+  the browser and the MCP server, which needs a version or draft-approval story that does not exist;
+  it is recorded as open rather than solved.
+
+  **Page scope is per project + service.** Vendor-general knowledge ("Stripe Tax only collects where
+  you have a registration") repeats across projects rather than being inherited from §4.1's eventual
+  global catalog. That is a deliberate simplification and §4.1 may revisit it.
+
+  **Sequencing, decided at the same time:** the page-centric viewer redesign ships *first*,
+  read-only against manifest data, and editing arrives with Phase 4 as an addition to a page that
+  already exists. The information architecture is the same either way, so no design work is spent
+  twice and the viewer does not wait on a backend.
+
+  **What prompted it.** The owner ran `catalogus view` against a real 35-service manifest on
+  2026-08-25 — the first such run — and judged the result "too poor and generic", naming Confluence
+  and Notion as the bar. The diagnosis is that the viewer renders a service as a *row with a detail
+  panel* when the product's real unit is a page. Recorded in `PRODUCT.md`, which is subordinate to
+  this document.
+
 ---
 
 ## 1. What This Is
@@ -165,7 +204,7 @@ This is the core architectural decision. Every piece of data belongs to exactly 
 
 ### Layer 3 — Private overlay (platform DB only, per-user, behind auth)
 - **Source:** user or agent via authenticated CLI push. **Never touches the repo.**
-- **Contents:** cost, currency, billing cycle, renewal dates, plan/tier, account reference ("auth via GitHub SSO", "billing account: dsnk@…"), private notes.
+- **Contents:** cost, currency, billing cycle, renewal dates, plan/tier, account reference ("auth via GitHub SSO", "billing account: dsnk@…"), private notes, and — since the 2026-08-25 amendment above — **service page content**: long-form operational documentation per project+service, written by the owner in the browser or by the MCP server.
 - **Rules:** Supabase with RLS, row ownership per user. Joined to projects/services by ID at render time.
 - **Hard rule — no secrets:** store *references* to identity, never credentials, API keys, or passwords. Those stay in a password manager. Rationale: a file/DB listing every service + cost + how to log in is a high-value target; the registry must never become that.
 
@@ -368,6 +407,9 @@ Typical loop: during any coding session, the agent runs detect → diff → prop
 - Useful SQL views: `v_project_costs` (sum private costs per project), `v_service_blast_radius` (recursive CTE over edges), `v_phaseouts`.
 
 ### Viewer (web app)
+- **A service is a page, not a row** (2026-08-25 amendment). The viewer's core object is a destination
+  you navigate into and read: the entry's manifest facts plus its Layer 3 page content. Everything
+  below is a view *onto* that, not a replacement for it.
 - Per-project page: DAG of service nodes with **brand icons**, edges, status colors (active / phasing_out red-amber / deprecated).
 - Portfolio page: all projects, cost totals (private layer), service usage matrix ("which projects touch Vertex").
 - Migration dashboard: everything `phasing_out` + `replaced_by` targets.
@@ -388,6 +430,9 @@ Typical loop: during any coding session, the agent runs detect → diff → prop
 6. MCP server mode with `detect_stack`, `read_manifest`, `propose_manifest_edit`.
 
 ### v1.5
+- **Service pages** — Layer 3 content per project+service, editable in the browser and writable by the
+  MCP server (2026-08-25 amendment). Listed here rather than in v1 because it needs the backend; the
+  page-shaped *viewer* ships before it, read-only.
 - `push --private`, cost rollups, renewal-date reminders.
 - Migration dashboard (phase-out view).
 - Cross-project blast radius view.

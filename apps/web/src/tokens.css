@@ -5,74 +5,235 @@
  * fork. Plain CSS on purpose -- no CSS-in-JS, no Tailwind config to keep in
  * sync with it (see docs/PLAN.md's Phase 3.7 styling decisions).
  *
- * Status colours are keyed by the exact ServiceStatus values the schema
- * defines (@catalogus/schema's ServiceEntry.status) so a component can build
- * a variable name directly from the field (`var(--status-${status})`)
- * instead of a switch statement mapping one vocabulary onto another.
+ * ---------------------------------------------------------------------
+ * Rewritten 2026-08-25 for the dense-module world (see the direction
+ * contract in App.tsx's opening comment). The previous palette was a dark
+ * near-black ground with a blue accent and four status colours -- the
+ * category default for a developer dashboard, and the owner's verdict on
+ * seeing it against a real manifest was "too poor and generic". What
+ * replaces it is one ground, one ink, one signal colour, and a grey ramp
+ * that exists almost entirely to draw hairlines.
+ *
+ * The discipline that matters: **red is the only chromatic colour in the
+ * system.** Not one of several accents -- the only one. It marks what
+ * departs from normal (a deprecated service, a phase-out, a count worth
+ * reading) and nothing else, which is what makes it legible at a glance in
+ * a screen holding thirty-five entries. Adding a second hue to this palette
+ * costs the first one its meaning.
+ *
+ * Light is the committed design, not a preference. The scene is a desk
+ * mid-workday, a CLI having just opened a tab beside an editor, and a
+ * document to read. Dark is kept and derived from it below, because
+ * dropping a working preference would be a regression nobody asked for --
+ * but it is a translation of this design, never a separate one.
+ *
+ * No webfont. `catalogus view` serves from 127.0.0.1 and has to work with
+ * no network at all, so a remote face would fail exactly where the tool is
+ * most useful. Density is bought with size, tracking and leading instead of
+ * with a compact gothic, and the type scale below is deliberately small:
+ * 12px body at 1.5 is the reference register, not an accessibility
+ * oversight -- nothing here is below 11px, and the 11px sizes carry labels
+ * in caps with positive tracking, which is where they stay legible.
  */
 :root {
+  /* Ground and ink. */
   --color-bg: #ffffff;
-  --color-surface: #f4f5f7;
-  --color-surface-raised: #ffffff;
-  --color-border: #dfe2e8;
-  --color-text: #14161a;
-  --color-text-muted: #5c6270;
-  --color-accent: #2f5fd6;
-  --color-accent-soft: #eaf0fe;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f7f7f8;
+  --color-header-fill: #f2f2f2;
+  --color-text: #111111;
+  --color-text-muted: #6b6b70;
+  --color-text-faint: #96969c;
 
-  --status-active: #1f8a4c;
-  --status-phasing_out: #b8860b;
-  --status-deprecated: #c0342c;
-  --status-removed: #8a8f98;
+  /* Rules. The mosaic is built almost entirely out of these two. */
+  --color-line: #e0e0e0;
+  --color-line-strong: #111111;
 
-  /* Fill for both the brand-icon fallback glyphs and their surrounding
-     tile -- deliberately neutral (see App.tsx's rollup fallback table):
-     the fallback conveys a shape, never a brand, so it must never borrow
-     an accent colour that could read as "this is the real logo". */
-  --icon-fallback-fill: #8a8f98;
-  --icon-fallback-bg: #e8e9ec;
+  /* The one signal colour. */
+  --color-signal: #d40010;
+  --color-signal-ink: #ffffff;
+  --color-signal-wash: #fdeced;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 14px;
+  /*
+   * Status is expressed as a tag, not as a hue per state -- see Tag.tsx.
+   * `active` deliberately has no colour and no tag: it is the norm, and
+   * tagging the norm is what produced thirty-five identical green pills.
+   * These three exist because the tag vocabulary needs fills, and they are
+   * ink/grey/red rather than a traffic-light ramp so that meaning survives
+   * greyscale, which colour-coded status never did.
+   */
+  --tag-deprecated-bg: #111111;
+  --tag-deprecated-ink: #ffffff;
+  --tag-removed-bg: #d6d6d6;
+  --tag-removed-ink: #3a3a3e;
+  --tag-phasing-line: var(--color-signal);
+  --tag-phasing-ink: var(--color-signal);
+  --tag-new-line: var(--color-signal);
+  --tag-new-ink: var(--color-signal);
 
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
+  /*
+   * Fill for both the brand-icon fallback glyphs and their surrounding
+   * tile -- deliberately neutral: the fallback conveys a shape, never a
+   * brand, so it must never borrow the signal colour and read as "this is
+   * the real logo". It is the majority path, not an edge case: 60 of 159
+   * catalog slugs have no verified icon, so this must look deliberate
+   * rather than like a failed image.
+   */
+  --icon-fallback-fill: #8a8a90;
+  --icon-fallback-bg: #f2f2f2;
+  --icon-tile-line: #e0e0e0;
+
+  /* Sharp. The world has no rounding above a hairline's worth. */
+  --radius-sm: 0px;
+  --radius-md: 2px;
+
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 32px;
+
+  /*
+   * Type scale. Small on purpose; the whole argument of this layout is that
+   * a project fits on one screen without a search field (PRODUCT.md: the
+   * owner chose "nothing -- it should fit" over every search affordance).
+   */
+  --text-label: 11px;
+  --text-body: 12px;
+  --text-row: 13px;
+  --text-module: 13px;
+  --text-lead: 15px;
+  --text-title: 26px;
+
+  --leading-tight: 1.25;
+  --leading-body: 1.5;
+
+  --track-caps: 0.06em;
+  --track-title: -0.02em;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-bold: 700;
 
   --font-sans:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /*
+   * Numerals carry weight in this world -- counts, dependent totals, dates.
+   * `tabular-nums` so a column of them aligns, which is the whole reason a
+   * rank module reads as a rank rather than as a list.
+   */
+  --numeric-features: "tnum" 1, "lnum" 1;
 
   color-scheme: light;
 }
 
-/* System preference only -- no in-app toggle (PLAN.md's Phase 3.7 scope
-   explicitly declines one for this slice). */
+/*
+ * System preference only -- no in-app toggle (PLAN.md's Phase 3.7 scope
+ * explicitly declines one). This is the light design translated, not a
+ * second design: the same one-signal-colour rule, the same hairline mosaic,
+ * ink and ground swapped. The signal lightens because #d40010 on near-black
+ * fails contrast; everything else is a direct inversion.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #101215;
-    --color-surface: #16181c;
-    --color-surface-raised: #1c1f24;
-    --color-border: #2b2f37;
-    --color-text: #e7e9ec;
-    --color-text-muted: #9aa0ac;
-    --color-accent: #7ea2ff;
-    --color-accent-soft: #1c2740;
+  :root:not([data-theme="light"]) {
+    --color-bg: #0e0e10;
+    --color-surface: #141416;
+    --color-surface-sunken: #101012;
+    --color-header-fill: #1c1c1f;
+    --color-text: #f2f2f3;
+    --color-text-muted: #9a9aa1;
+    --color-text-faint: #6e6e75;
 
-    --status-active: #3ecb7a;
-    --status-phasing_out: #e0ac3a;
-    --status-deprecated: #ef6259;
-    --status-removed: #767b85;
+    --color-line: #2a2a2e;
+    --color-line-strong: #f2f2f3;
 
-    --icon-fallback-fill: #9aa0ac;
-    --icon-fallback-bg: #22252b;
+    --color-signal: #ff5a5f;
+    --color-signal-ink: #14090a;
+    --color-signal-wash: #2a1416;
+
+    --tag-deprecated-bg: #f2f2f3;
+    --tag-deprecated-ink: #0e0e10;
+    --tag-removed-bg: #3a3a40;
+    --tag-removed-ink: #c8c8ce;
+
+    --icon-fallback-fill: #8b8b93;
+    --icon-fallback-bg: #1c1c1f;
+    --icon-tile-line: #2a2a2e;
 
     color-scheme: dark;
   }
+}
+
+/*
+ * The same dark values under an explicit `data-theme="dark"`, and the
+ * `:not([data-theme="light"])` guard above, so the theme can be pinned rather
+ * than only inherited from the OS.
+ *
+ * This is **not** the in-app toggle Phase 3.7's scope declined: nothing in
+ * the UI sets this attribute and no control exists to. It is a seam, and it
+ * exists because without it the light palette -- which is the committed
+ * design, the one the world was chosen for -- cannot be looked at on a
+ * machine whose OS is set to dark, which is the machine this was built on.
+ * A design nobody can view is a design nobody has checked.
+ */
+:root[data-theme="dark"] {
+  --color-bg: #0e0e10;
+  --color-surface: #141416;
+  --color-surface-sunken: #101012;
+  --color-header-fill: #1c1c1f;
+  --color-text: #f2f2f3;
+  --color-text-muted: #9a9aa1;
+  --color-text-faint: #6e6e75;
+
+  --color-line: #2a2a2e;
+  --color-line-strong: #f2f2f3;
+
+  --color-signal: #ff5a5f;
+  --color-signal-ink: #14090a;
+  --color-signal-wash: #2a1416;
+
+  --tag-deprecated-bg: #f2f2f3;
+  --tag-deprecated-ink: #0e0e10;
+  --tag-removed-bg: #3a3a40;
+  --tag-removed-ink: #c8c8ce;
+
+  --icon-fallback-fill: #8b8b93;
+  --icon-fallback-bg: #1c1c1f;
+  --icon-tile-line: #2a2a2e;
+
+  color-scheme: dark;
+}
+
+/*
+ * Migration bridge, 2026-08-25. The rewrite renamed the palette, and eight
+ * CSS modules still reference the old names across 37 declarations. Rather
+ * than leave those components rendering a blue accent and a traffic-light
+ * status ramp until each is rewritten, the old names survive here **aliased
+ * onto the new palette** -- so a component nobody has touched yet is already
+ * in the new world, just not yet in the new layout.
+ *
+ * Note what the status aliases do: `active` loses its green and becomes
+ * muted text, because the norm should not be coloured; `phasing_out` takes
+ * the signal; `deprecated` becomes plain ink. That is the tag semantics
+ * arriving ahead of the tag components.
+ *
+ * Every one of these is deletable, and deleting the last of them is how this
+ * migration is known to be finished. Do not add to this block.
+ */
+:root {
+  --color-border: var(--color-line);
+  --color-accent: var(--color-signal);
+  --color-accent-soft: var(--color-signal-wash);
+  --color-surface-raised: var(--color-surface);
+  --radius-lg: var(--radius-md);
+
+  --status-active: var(--color-text-muted);
+  --status-phasing_out: var(--color-signal);
+  --status-deprecated: var(--color-text);
+  --status-removed: var(--color-text-faint);
 }
 
 * {
@@ -84,4 +245,38 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  /*
+   * Grayscale-antialiased text is a hair heavier and holds up better at the
+   * 11-13px this layout lives at; the default subpixel rendering thins caps
+   * labels enough to read as disabled.
+   */
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * One focus treatment for the whole app, defined once here rather than per
+ * component. Two rules it must keep: it is never removed without a
+ * replacement, and it never relies on colour alone -- the offset ring reads
+ * as a ring in greyscale, which the previous accent-coloured outline did
+ * not.
+ */
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-line-strong);
+  outline-offset: 1px;
+}
+
+/*
+ * Motion is functional in this world and nothing here animates layout, but
+ * hover/press transitions still need to answer the preference.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

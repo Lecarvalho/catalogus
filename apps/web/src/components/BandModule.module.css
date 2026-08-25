@@ -1,0 +1,98 @@
+/*
+ * The module: a 1px hairline box, no radius, no shadow, no gradient. Every
+ * boundary in this layout is a hairline, and depth is expressed by fill
+ * alone. That is what lets modules tile edge to edge without the whitespace
+ * inflation a card grid needs to separate its cards.
+ */
+.module {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  /* Modules never grow taller than their contents; the grid places them. */
+  align-self: start;
+}
+
+/*
+ * The header bar. Filled, with a heavier bottom rule than the row hairlines
+ * so the band's name reads as a lid rather than as the first row.
+ */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 24px;
+  padding: 0 var(--space-3);
+  background: var(--color-header-fill);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * The count, in the signal colour. This is one of the two places red is
+ * spent on the project page (the other is a departure from normal), and it
+ * earns it: the counts are how a reader takes in the shape of the project
+ * before reading a single service name.
+ *
+ * aria-hidden on the element itself -- the heading it sits beside already
+ * names the band, and a screen reader announcing "Serves requests 7" as a
+ * heading would be reading a decoration as content. The rows carry the
+ * real information.
+ */
+.count {
+  flex: 0 0 auto;
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  color: var(--color-signal);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+}
+
+.note {
+  margin: 0;
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+  font-size: var(--text-label);
+  line-height: var(--leading-body);
+  color: var(--color-text-muted);
+}
+
+/*
+ * The tile grid: separated cards, not table cells.
+ *
+ * Two earlier attempts ruled this grid with hairlines -- first by filling the
+ * container with the line colour and letting 1px gaps show through, then by
+ * moving the rule onto each tile as an outward box-shadow. The first left
+ * dark holes wherever a band's count was not a multiple of the column count,
+ * because an empty track had no tile covering the container's fill. The
+ * second fixed that and was still the wrong shape: the owner's reference is
+ * StackShare's integration grid, where each entry is a separate bordered card
+ * and the set reads as a collection of marks rather than as a ruled table.
+ *
+ * The cost is real and was taken deliberately: gaps between every tile spend
+ * space, and this layout's whole argument is that a project fits one screen
+ * without a search field. It is paid for by keeping the gaps small (8px), the
+ * borders hairline, and the tiles at 74px -- and by refusing the drop shadow
+ * the reference has, which is the single detail that would tip a disciplined
+ * collection into a generic card wall.
+ */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-surface);
+}

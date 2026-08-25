@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveIconPath } from "./icons.js";
+import { resolveIcon, resolveIconPath } from "./icons.js";
 
 describe("resolveIconPath", () => {
   it("resolves a known ref to real SVG path data", async () => {
@@ -37,5 +37,47 @@ describe("resolveIconPath", () => {
       const d = await resolveIconPath(ref);
       expect(d, `expected ${ref} to resolve`).not.toBeNull();
     }
+  });
+});
+
+describe("resolveIcon", () => {
+  it("resolves a known ref to both path data and a real 6-digit hex colour", async () => {
+    // Stripe's brand hex is public and stable (635BFF) -- asserted as a
+    // format check plus this one known value, not a hand-typed table of
+    // every brand's colour, which is exactly the guess-not-verify shape
+    // this function exists to avoid everywhere else.
+    const resolved = await resolveIcon("stripe");
+    expect(resolved).not.toBeNull();
+    expect(resolved!.path).toMatch(/^M/);
+    expect(resolved!.hex).toBe("#635BFF");
+    expect(resolved!.hex).toMatch(/^#[0-9A-Fa-f]{6}$/);
+  });
+
+  it("resolves the same hex on a second call, from the cached data rather than a second read", async () => {
+    const first = await resolveIcon("nginx");
+    const second = await resolveIcon("nginx");
+    expect(first).not.toBeNull();
+    expect(second).toEqual(first);
+  });
+
+  it("returns null for undefined -- the 'no verified icon' case", async () => {
+    expect(await resolveIcon(undefined)).toBeNull();
+  });
+
+  it("returns null rather than throwing for a slug with no installed icon at all", async () => {
+    await expect(resolveIcon("this-slug-does-not-exist-in-simple-icons")).resolves.toBeNull();
+  });
+
+  it("returns null rather than throwing for a ref shaped like a path-traversal attempt", async () => {
+    await expect(resolveIcon("../../../etc/passwd")).resolves.toBeNull();
+  });
+
+  it("leaves resolveIconPath's own behaviour unchanged -- resolveIcon is additive, not a replacement", async () => {
+    // The two functions must agree on the path half for the same ref: this
+    // is the regression resolveIcon's own doc comment promises against --
+    // reusing resolveIconPath rather than a second, divergent SVG lookup.
+    const path = await resolveIconPath("stripe");
+    const combined = await resolveIcon("stripe");
+    expect(combined!.path).toBe(path);
   });
 });
