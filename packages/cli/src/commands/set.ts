@@ -71,32 +71,51 @@ interface SettableField {
   hint?: string;
 }
 
-const FIELDS: Record<string, SettableField> = {
-  "project.name": { path: ["project", "name"], kind: "text" },
-  // Changing project.slug is safe today and will not stay safe. Nothing
-  // inside a manifest references it -- service ids are local to the file,
-  // so a slug rename cannot dangle an edge or a replaced_by the way a
-  // service id rename would. But Phase 4/5 (docs/PLAN.md) makes the slug
-  // the key the backend's project row is keyed on, and `catalogus push`
-  // does not exist yet to have an opinion about what a rename after that
-  // should do -- migrate the row, refuse the rename, something else.
-  // Whoever adds `push` has to decide that then; this command only knows
-  // the schema's rule, which is that project.slug is a slug.
-  "project.slug": { path: ["project", "slug"], kind: "slug" },
-  "project.architecture": { path: ["project", "architecture"], kind: "text" },
-  // project.pm, project.vcs.provider and project.coding_agents were removed
-  // from the schema on 2026-08-24 (see HANDOFF.md's amendment log): a
-  // project-level field can never be an edge target, and each of these three
-  // names something with an identity and an icon -- a PM tool, a VCS host, a
-  // coding agent product -- exactly the shape a service entry already
-  // covers. They are `catalogus add <slug> --role pm|vcs|coding-agent` now,
-  // not `set` targets. `project.vcs` keeps only `visibility` below.
-  "project.vcs.visibility": {
-    path: ["project", "vcs", "visibility"],
-    kind: "slug",
-    hint: "public | private | internal",
+// Null-prototype, not a plain object literal, and this one is not
+// precautionary: `FIELDS[field]` below reads a key that comes straight off
+// the command line. On a literal, `catalogus set constructor boom` resolved
+// through Object.prototype to the `Object` function -- truthy, so the
+// known-field branch ran, `staticSpec.path` was undefined, and the caller
+// got `[schema] / must be object` at exit 1 instead of the
+// `Unknown field "constructor"` list at exit 2. Same for toString, valueOf
+// and __proto__. Nothing was ever written (manifest-edit.ts validates before
+// it writes, and that guard held), so this was a wrong-diagnostic bug rather
+// than a corruption one -- but the message it produced pointed at the
+// manifest, which is the one place the problem was not.
+//
+// Fourth instance of this defect class in this repo (getCatalogEntry,
+// GLYPHS, ROLLUP_LABELS, StatusPill), and the first found on the CLI side
+// rather than the viewer. See CLAUDE.md's standing rule: any keyed lookup
+// gets Object.create(null) and a test naming "constructor".
+const FIELDS: Record<string, SettableField> = Object.assign(
+  Object.create(null) as Record<string, SettableField>,
+  {
+    "project.name": { path: ["project", "name"], kind: "text" },
+    // Changing project.slug is safe today and will not stay safe. Nothing
+    // inside a manifest references it -- service ids are local to the file,
+    // so a slug rename cannot dangle an edge or a replaced_by the way a
+    // service id rename would. But Phase 4/5 (docs/PLAN.md) makes the slug
+    // the key the backend's project row is keyed on, and `catalogus push`
+    // does not exist yet to have an opinion about what a rename after that
+    // should do -- migrate the row, refuse the rename, something else.
+    // Whoever adds `push` has to decide that then; this command only knows
+    // the schema's rule, which is that project.slug is a slug.
+    "project.slug": { path: ["project", "slug"], kind: "slug" },
+    "project.architecture": { path: ["project", "architecture"], kind: "text" },
+    // project.pm, project.vcs.provider and project.coding_agents were removed
+    // from the schema on 2026-08-24 (see HANDOFF.md's amendment log): a
+    // project-level field can never be an edge target, and each of these three
+    // names something with an identity and an icon -- a PM tool, a VCS host, a
+    // coding agent product -- exactly the shape a service entry already
+    // covers. They are `catalogus add <slug> --role pm|vcs|coding-agent` now,
+    // not `set` targets. `project.vcs` keeps only `visibility` below.
+    "project.vcs.visibility": {
+      path: ["project", "vcs", "visibility"],
+      kind: "slug",
+      hint: "public | private | internal",
+    },
   },
-};
+);
 
 /**
  * The per-entry settable fields are the ones whose name is not static:
@@ -110,17 +129,25 @@ const FIELDS: Record<string, SettableField> = {
  */
 const SERVICE_FIELD = /^services\.([^.]+)\.(role|kind|version)$/;
 
-const SERVICE_FIELD_SPECS: Record<string, SettableField> = {
-  // `path` is never read on any of these: a per-entry field has no fixed
-  // path until <id> resolves to a real index, which only happens once the
-  // manifest is open. Kept so prepareValue can be reused unchanged for both
-  // the static and the dynamic fields.
-  role: { path: [], kind: "slug", hint: "e.g. database, hosting-api, auth" },
-  kind: { path: [], kind: "slug", hint: "service | component | stack" },
-  // Free text, not a slug: "13.1.3" and "19.2" both have dots in them, and
-  // a version is a label to display rather than an identifier to resolve.
-  version: { path: [], kind: "text", hint: 'e.g. 10, 19.2, 13.1.3' },
-};
+// Null-prototype for the same reason as FIELDS, though the exposure here is
+// narrower: this is read with SERVICE_FIELD's second capture group, which
+// the pattern already constrains to role|kind|version. Built the same way
+// anyway rather than left as the one table that has to be argued safe --
+// the argument is what has failed three times.
+const SERVICE_FIELD_SPECS: Record<string, SettableField> = Object.assign(
+  Object.create(null) as Record<string, SettableField>,
+  {
+    // `path` is never read on any of these: a per-entry field has no fixed
+    // path until <id> resolves to a real index, which only happens once the
+    // manifest is open. Kept so prepareValue can be reused unchanged for both
+    // the static and the dynamic fields.
+    role: { path: [], kind: "slug", hint: "e.g. database, hosting-api, auth" },
+    kind: { path: [], kind: "slug", hint: "service | component | stack" },
+    // Free text, not a slug: "13.1.3" and "19.2" both have dots in them, and
+    // a version is a label to display rather than an identifier to resolve.
+    version: { path: [], kind: "text", hint: 'e.g. 10, 19.2, 13.1.3' },
+  },
+);
 
 /** Shown in place of a literal field name in usage/error text -- see SETTABLE_FIELDS. */
 const SERVICE_FIELD_PLACEHOLDERS = Object.keys(SERVICE_FIELD_SPECS).map((name) => `services.<id>.${name}`);
@@ -130,13 +157,18 @@ const SERVICE_FIELD_PLACEHOLDERS = Object.keys(SERVICE_FIELD_SPECS).map((name) =
 // a message naming exactly what replaced it, the same way @catalogus/schema's
 // validate.ts does for a manifest still holding the old shape -- not the
 // generic "Unknown field" list below, which would leave them to guess.
-const MOVED_FIELD_HINTS: Record<string, string> = {
-  "project.pm": 'PM tooling is a service entry now -- use, e.g., "catalogus add trello --role pm".',
-  "project.vcs.provider":
-    'the VCS provider is a service entry now -- use, e.g., "catalogus add github --role vcs".',
-  "project.coding_agents":
-    'coding agents are service entries now, one per agent -- use, e.g., "catalogus add claude-code --role coding-agent".',
-};
+// Null-prototype: also read with a raw command-line key, one branch below
+// FIELDS, so it carried the same bug for the same reason.
+const MOVED_FIELD_HINTS: Record<string, string> = Object.assign(
+  Object.create(null) as Record<string, string>,
+  {
+    "project.pm": 'PM tooling is a service entry now -- use, e.g., "catalogus add trello --role pm".',
+    "project.vcs.provider":
+      'the VCS provider is a service entry now -- use, e.g., "catalogus add github --role vcs".',
+    "project.coding_agents":
+      'coding agents are service entries now, one per agent -- use, e.g., "catalogus add claude-code --role coding-agent".',
+  },
+);
 
 // The static field names, sorted, with the patterns appended rather than
 // interleaved. Sorting them in alphabetically would bury them among the

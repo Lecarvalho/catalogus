@@ -38,13 +38,29 @@
 //     `parseManifest` as a whole document. Running it through the full
 //     validator would only ever report "missing required property", which
 //     tells nobody anything about real drift. Instead it's checked the way
-//     the coordinator asked: walk the actual field names and enum values
-//     the fragment uses against `catalogusSchemaV1`'s own definitions
+//     the coordinator asked: walk the actual field names and values the
+//     fragment uses against `catalogusSchemaV1`'s own definitions
 //     (`checkFragmentAgainstSchemaFields` below) — every property the
 //     fragment names must still exist in the schema at that path, and every
-//     value at an `enum` field must still be a legal member of that enum.
-//     A renamed field or a dropped enum value fails this exactly as it
-//     would fail full validation on a complete manifest.
+//     value must still be one the schema accepts there: a legal member of
+//     an `enum`, and a string that satisfies whatever `pattern`, `format`
+//     or length bound the schema declares. A renamed field, a dropped enum
+//     value, or a value parseManifest would reject fails this exactly as
+//     it would fail full validation on a complete manifest.
+//
+//     The value half was added after `pattern` and `format` were found to
+//     be walked straight past: the check confirmed a field still existed
+//     and stopped, so `id: Board` or `added: 24/08/2026` in the fragment
+//     would ship green. Both are now proven red against the real file (see
+//     "the fragment walk itself catches drift" below for the synthetic
+//     cases that keep it that way).
+//
+// What this file does NOT cover, deliberately, so nobody reads it as
+// wider than it is: SKILL.md's fenced *shell* blocks — the `catalogus ...`
+// lines an agent copies verbatim. Those name commands, flags and settable
+// fields, which are @catalogus/cli's surface, not this package's, and this
+// package cannot import the CLI (the dependency runs the other way).
+// packages/cli/src/skill-commands-drift.test.ts is where they are checked.
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -109,6 +125,18 @@ interface SchemaNode {
   type?: string;
   properties?: Record<string, SchemaNode>;
   items?: SchemaNode;
+  // Value-level constraints. These used to be absent from this view, and
+  // their absence was the hole: the walk confirmed a field still *exists*
+  // and stopped there, so a fragment could name every field correctly and
+  // still be rejected by parseManifest on the value -- `id: Board` against
+  // the slug pattern, `added: 24/08/2026` against format: date -- with this
+  // test green. Checking existence but not legality is the weaker half of
+  // what "agrees with the schema" has to mean for a document an agent
+  // reads as a template.
+  pattern?: string;
+  format?: string;
+  minLength?: number;
+  maxLength?: number;
 }
 
 function resolveRef(schema: SchemaNode, node: SchemaNode): SchemaNode {
@@ -186,9 +214,59 @@ function checkFragmentNode(
     return;
   }
 
-  // A plain scalar leaf (string, etc.): the caller already confirmed this
-  // field still exists in the schema by finding it in the parent's
-  // `properties`, which is the whole contract for a non-enum field.
+  // A plain scalar leaf. The caller already confirmed the field still
+  // exists by finding it in the parent's `properties`; what is left is
+  // whether the fragment's *value* is one the schema would accept there.
+  checkScalarConstraints(node, value, path, problems);
+}
+
+/**
+ * The value-level constraints `parseManifest` enforces and a
+ * field-existence walk would otherwise skip straight past. Only the
+ * vocabulary `catalogusSchemaV1` actually uses is handled -- adding a
+ * constraint keyword to the schema that is not handled here silently
+ * widens what this test accepts, which is why `schema-sync.test.ts` and
+ * `schema.test.ts` cover the schema's own shape and this covers the
+ * fragment against it.
+ */
+function checkScalarConstraints(node: SchemaNode, value: unknown, path: string, problems: string[]): void {
+  if (typeof value !== "string") return;
+
+  if (node.pattern !== undefined && !new RegExp(node.pattern, "u").test(value)) {
+    problems.push(
+      `${path}: ${JSON.stringify(value)} does not match the schema's pattern for this field ` +
+        `(${node.pattern}) -- the fragment names the right field but shows a value parseManifest ` +
+        "would reject",
+    );
+  }
+
+  if (node.minLength !== undefined && value.length < node.minLength) {
+    problems.push(`${path}: ${JSON.stringify(value)} is shorter than the schema's minLength of ${node.minLength}`);
+  }
+
+  if (node.maxLength !== undefined && value.length > node.maxLength) {
+    problems.push(`${path}: ${JSON.stringify(value)} is longer than the schema's maxLength of ${node.maxLength}`);
+  }
+
+  // `format: "date"` is the only format the schema uses (serviceEntry.added).
+  // ajv is the authority at validation time; this mirrors its full-date rule
+  // -- YYYY-MM-DD, and a real calendar day, so 2026-02-30 fails here exactly
+  // as it does there.
+  if (node.format === "date" && !isIsoCalendarDate(value)) {
+    problems.push(
+      `${path}: ${JSON.stringify(value)} is not an ISO 8601 date (YYYY-MM-DD) -- the schema declares ` +
+        'format: "date" on this field',
+    );
+  }
+}
+
+function isIsoCalendarDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (month < 1 || month > 12 || day < 1) return false;
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day <= daysInMonth;
 }
 
 /** Every field name and enum value a (possibly partial) fragment document uses, checked against the live schema. */
@@ -285,6 +363,79 @@ describe("skills/catalogus/SKILL.md's ```yaml examples vs. packages/schema", () 
       ).toEqual([]);
     },
   );
+});
+
+// The walk above is the only thing standing between a fragment and a
+// client-repo agent copying a shape parseManifest rejects, and until this
+// block existed nothing proved it could fail. That is the failure mode
+// docs/PLAN.md's Phase 3.7 recorded twice over (an ICON_OVERLAY key typo
+// that no assertion noticed; a rewritten SKILL.md that kept 645 tests
+// green): a tripwire that has never been observed red is a tripwire nobody
+// has tested. Each case here is a real drift shape -- a renamed field, a
+// dropped enum member, a value the schema's own constraints reject -- fed
+// through the same function the SKILL.md check calls.
+describe("the fragment walk itself catches drift", () => {
+  it("passes a fragment that agrees with the schema", () => {
+    expect(
+      checkFragmentAgainstSchemaFields(schemaRoot, {
+        project: { architecture: "modular monolith", vcs: { visibility: "private" } },
+        services: [{ id: "supabase-db", service: "supabase", role: "database", added: "2026-08-24" }],
+      }),
+    ).toEqual([]);
+  });
+
+  it("catches a field the schema no longer has", () => {
+    // project.pm, removed by HANDOFF.md's 2026-08-24 amendment. This is
+    // the check that already worked; pinned here so a refactor of the walk
+    // cannot quietly lose it while the new value checks distract.
+    const problems = checkFragmentAgainstSchemaFields(schemaRoot, { project: { pm: "trello" } });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("/project/pm");
+  });
+
+  it("catches an enum value the schema no longer accepts", () => {
+    const problems = checkFragmentAgainstSchemaFields(schemaRoot, { services: [{ status: "retired" }] });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("phasing_out");
+  });
+
+  // The three below are what the walk used to miss entirely: every field
+  // name is correct, so the old existence-only walk returned no problems
+  // while parseManifest would reject the same document outright.
+  it("catches a value the slug pattern rejects", () => {
+    const problems = checkFragmentAgainstSchemaFields(schemaRoot, { services: [{ id: "Board" }] });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("pattern");
+  });
+
+  it("catches a date that is not ISO 8601", () => {
+    const problems = checkFragmentAgainstSchemaFields(schemaRoot, { services: [{ added: "24/08/2026" }] });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("YYYY-MM-DD");
+  });
+
+  it("catches a well-formed date that is not a real calendar day", () => {
+    // Shape-only date checking would pass this; ajv's format: "date" does
+    // not, so neither does this walk.
+    const problems = checkFragmentAgainstSchemaFields(schemaRoot, { services: [{ added: "2026-02-30" }] });
+    expect(problems).toHaveLength(1);
+  });
+
+  // The walk's own claims about the schema are checked against the real
+  // validator rather than asserted: if the slug pattern is relaxed or
+  // `added` stops being a date, these stop describing drift and the pair
+  // disagrees loudly instead of silently.
+  it("agrees with parseManifest about what the schema rejects", () => {
+    const badSlug = parseManifest(
+      ["catalogus: 1", "project:", "  name: X", "  slug: x", "services:", "  - id: Board", "    service: supabase", "    role: database", "    added: 2026-08-24", "dependencies: []"].join("\n"),
+    );
+    expect(badSlug.valid, "the slug pattern this walk enforces must be one parseManifest enforces too").toBe(false);
+
+    const badDate = parseManifest(
+      ["catalogus: 1", "project:", "  name: X", "  slug: x", "services:", "  - id: board", "    service: supabase", "    role: database", "    added: 24/08/2026", "dependencies: []"].join("\n"),
+    );
+    expect(badDate.valid, 'format: "date" on `added` must be enforced by parseManifest too').toBe(false);
+  });
 });
 
 describe("examples/*.catalogus.yaml vs. packages/schema", () => {

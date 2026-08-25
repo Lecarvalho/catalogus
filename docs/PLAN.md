@@ -21,16 +21,75 @@ design decisions; this file tracks *what has been built* against it and what rem
   widened with `monitoring`, `queue` and `messaging` — **HANDOFF §4 was amended for that, and the
   document now carries an amendment log**.
 
-  **Next is Phase 3.7, the viewer on manifests**, with nothing left in front of it: a real manifest
-  exists, the role convention it groups on is settled, and every category it renders has a real
-  bucket. Phase 4 stays deferred by owner decision.
+  **Phase 3.7 is most of the way through.** The viewer renders — `catalogus view` serves one repo's
+  manifest, grouped by rollup, with compact nodes, a URL-addressed detail panel, status colours and
+  `replaced_by`. **What is left in it is one large item and one small one: the DAG layout (elkjs +
+  React Flow), and the portfolio/migration/cost pages that want more than one project.** Phase 4
+  stays deferred by owner decision.
+
+  **The session after the viewer foundations spent itself on verification rather than features**,
+  and that was the right trade because it found things. The two committed corpora now exist (the
+  skill's shell commands checked against the live CLI surface; 65 path-traversal vectors executed
+  against a live server), and the process of building them turned up **two defects nothing else
+  would have caught**: a suite flake that made `pnpm test` fail half the time while every
+  single-file run passed, and a live `catalogus set` bug that reported a schema error against a
+  perfectly valid manifest. Both are written up below.
 - **Last updated:** 2026-08-24
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **679 tests / 50 files**, plus `pnpm typecheck`
+Run `pnpm build && pnpm test` first and confirm **878 tests / 52 files**, plus `pnpm typecheck`
 clean across all four packages, before trusting anything below. (Phases 0–3.6 and the 3.6.1
-correction pass predate this at 549/38; the number moved a long way in one session.)
+correction pass predate this at 549/38, and the viewer-foundations session ended at 679/50; the
+number moved a long way again in the drift-and-corpus session that followed — 199 of those tests
+are two committed corpora plus two components' first test files, not 199 new behaviours.)
+
+**Run it more than once before believing it.** That session's own corpus made the suite fail on
+three of six consecutive runs while every single run *of that file alone* passed, because vitest
+parallelises across files and two of them were mutating the same real directory. A single green
+`pnpm test` is weaker evidence than this document has historically treated it as.
+
+### Handoff — 2026-08-24, end of the drift-and-corpus session
+
+**What happened.** No new viewer features. This session closed the two verification gaps the
+previous handoff ranked second and third, and both closures found defects on the way:
+
+1. **The skill's shell commands are checked now** (`packages/cli/src/skill-commands-drift.test.ts`)
+   and the yaml fragment's *values* are too, not just its field names. Five mutation classes
+   watched red, including the two removed `set` fields that started it.
+2. **The traversal corpus is committed** (`packages/cli/src/test-support/traversal-vectors.ts`,
+   65 vectors, run from `view.test.ts`). Watched red twice by mutating the guard: 32 of 65 on a
+   deleted containment check, 9 on the classic naive one — **and not one of those 9 is a literal
+   `../` vector**, which is the case for the corpus having families rather than a pile of dots.
+3. **Four stale checkboxes ticked.** Compact nodes, the detail panel, rollup labels and status
+   colours were all shipped in `f256d72` and left unticked. Each tick now says what it rests on.
+4. **Two defects found and fixed**, neither of them in the work being done: a **suite flake**
+   (three of six full runs red, every single-file run green — two test files mutating the real
+   `dist/web` in parallel workers), and **`catalogus set constructor`** taking the known-field
+   branch through `Object.prototype` and blaming the user's manifest for it.
+
+**What was deliberately not done, and why.** The five smaller viewer defects (focus, history
+entries, colour-only selection cue, duplicate-vendor nodes) are still open and now have their own
+checkbox rather than being hidden inside a ticked one. `App.tsx` still has no tests and is now the
+largest untested surface in the repo. **The DAG is still the next real piece of work**, and the
+previous handoff's warning about it stands unchanged: there is no real manifest to judge layout
+against, so either onboard a project first or build against a deliberately hard synthetic one and
+say plainly that that is what happened.
+
+**One habit worth keeping from this session.** Every claim below that says "watched go red" means
+the code was mutated, the test was observed failing, and the mutation was reverted — and the suite
+was run repeatedly rather than once. Both defects in item 4 were invisible to a single green run.
+
+**Still outstanding from the previous handoff, and it did not happen in this one:** the owner was
+going to run `catalogus view` from a real client repo and come back with feedback. Nothing in this
+document reflects such a run. **First-hand feedback outranks anything written here**, so if it has
+since happened, start from that rather than from the ranked list below.
+
+**Where this session's work lives:** branch **`phase-3.7-drift-and-corpus`**, three commits on top
+of `d3b5fda`, **not merged and not pushed**. `git log --oneline main..` shows them. Ordered
+fixes -> tests -> chore+docs deliberately, so every commit is independently green; tests-first
+would have been a red commit, since the new `set` and `StatusPill` cases fail without their
+fixes. **If `git branch --show-current` says `main`, none of what follows is in your tree.**
 
 ### Handoff — 2026-08-24, end of the viewer-foundations session
 
@@ -74,16 +133,36 @@ each has reasoning, and none should be reversed without a new one:
 5. **Rollup display labels live in the viewer**, keeping the "segment before the first `-`" rule
    mechanical and exception-free.
 
-**The one defect class this repo keeps producing, now three times over.** A keyed lookup built as a
-plain object literal, read with a key that can come from a manifest. `getCatalogEntry("constructor")`
-returned the `Object` function; then `GLYPHS["constructor"]` blanked the entire viewer with no error
-UI; `ROLLUP_LABELS` would have been the third. **`role: constructor` is schema-valid, `validate`
-accepts it and `graph` prints it.** Every existing test passed each time, because the tests named
-keys that were *absent* rather than *inherited* — those are different things and only one of them is
-a bug. **Any new keyed lookup gets `Object.create(null)` and a test naming `constructor`.** One
-remains reachable-but-gated: `StatusPill`'s `LABELS[status]`/`styles[status]`, safe only because
-`status` is a schema enum and `view` refuses invalid manifests. That is a guard one layer away from
-the bug, not an absence of it.
+**The one defect class this repo keeps producing — five instances now, and the last two were found
+by going looking rather than by being bitten.** A keyed lookup built as a plain object literal, read
+with a key that can come from outside. `getCatalogEntry("constructor")` returned the `Object`
+function; then `GLYPHS["constructor"]` blanked the entire viewer with no error UI; `ROLLUP_LABELS`
+would have been the third. **`role: constructor` is schema-valid, `validate` accepts it and `graph`
+prints it.** Every existing test passed each time, because the tests named keys that were *absent*
+rather than *inherited* — those are different things and only one of them is a bug.
+
+Both remaining instances are now closed, and the second was a live CLI bug rather than a
+precaution:
+
+- **`StatusPill`'s `LABELS[status]`** was recorded as reachable-but-gated — safe only because
+  `status` is a schema enum and `view` refuses invalid manifests. Correct, and still a guard one
+  layer away from the bug: it held because of a property of the rest of the app, not of that file.
+  Now null-prototype, with `StatusPill.test.tsx` naming `constructor`, watched red first.
+- **`catalogus set`'s `FIELDS`** was not gated at all. `field` comes straight off the command line,
+  so `catalogus set constructor boom` took the *known-field* branch, built an edit with an undefined
+  path, and reported **`[schema] / must be object` at exit 1** — pointing the caller at their
+  manifest, which was the one thing that was fine — instead of `Unknown field "constructor"` at exit
+  2. Same for `toString`, `valueOf`, `__proto__` and `hasOwnProperty`. **Found by auditing for the
+  class after closing StatusPill, reproduced against the built binary, fixed, and re-run against the
+  built binary.** Not destructive: `manifest-edit.ts` validates before it writes and that guard held
+  throughout, so the cost was a wrong diagnosis, not a damaged file.
+
+**Any new keyed lookup gets `Object.create(null)` and a test naming `constructor`.** The audit that
+found the `set` bug also cleared the rest, and the reasoning is recorded at each site rather than
+left to be re-derived: `ICON_OVERLAY` and `EXACT_MARKERS` are only ever iterated with
+`Object.entries`, never indexed; `MIME_TYPES` is indexed with `path.extname()`, whose every return
+value is `""` or starts with `"."` and so can never name a prototype member; and `ServiceNode`'s
+`styles[`status-${...}`]` prefixes the manifest value, which has the same effect.
 
 **Open, ranked by consequence.** Details in the Phase 3.7 section below.
 
@@ -91,17 +170,32 @@ the bug, not an absence of it.
    described does not exist (checked directly). Either onboard a real project first, or build the
    layout against a deliberately hard synthetic manifest and *say so* — do not declare it done on
    the 14-node example and imply otherwise.
-2. **`skill-drift.test.ts` has less coverage than it appears to.** It walks only `SKILL.md`'s single
-   yaml fragment, so the shell command lines an agent copies are unchecked — proven by a validator
-   rewriting them to teach removed commands with the suite still green. It also ignores `pattern`,
-   so it would ship a fragment `parseManifest` rejects.
-3. **The traversal corpus is not committed.** ~50 raw-socket vectors have been re-proven three times
-   by scripts inside agent sessions that no longer exist.
+2. ~~**`skill-drift.test.ts` has less coverage than it appears to.**~~ Closed — both halves. See the
+   two ticked boxes in Phase 3.7 below for what was built and which mutations were watched go red.
+3. ~~**The traversal corpus is not committed.**~~ Closed — 65 vectors now live in
+   `packages/cli/src/test-support/traversal-vectors.ts`, executed against a live server by
+   `view-traversal.test.ts`. See Phase 3.7 below.
 4. **`App.tsx` has no tests** — every browser-only behaviour (hash routing, focus restore, Escape
-   listener lifetime) lives there and is covered only by manual browser runs.
+   listener lifetime) lives there and is covered only by manual browser runs. **Now the largest
+   untested surface in the repo**, since the two items above stopped being.
 5. Smaller, all recorded below: focus drops to `<body>` when closing a deep-linked panel; every
    open and close pushes a history entry; the selected state's two visual cues are both colour; two
    entries of the same vendor in one group are indistinguishable on the node.
+6. **`SKILL.md` never teaches `catalogus view` — and the obvious fix is wrong.** Surfaced while
+   building the shell-command drift check, which deliberately does not fail on it: the reverse
+   direction (a command the skill never teaches) is a scope decision, not a drift bug.
+
+   **Not scheduled, and it is not a one-line addition.** `runView` returns exit 0 as soon as the
+   server is listening, but the listening socket holds the event loop open — the process runs until
+   Ctrl+C, which is what its own `press Ctrl+C to stop` line says. **An agent that runs
+   `catalogus view` in a client repo blocks its own tool call until it times out or is killed.**
+   Adding it to the skill's fenced command list, where every other line is something the agent runs
+   itself, would teach exactly that.
+
+   The shape that works is the skill telling the agent to *hand the command to the user* — the
+   viewer is for the human, the way `catalogus graph` (ASCII, exits immediately) is the agent's own
+   sanity check and is already taught. That is a wording decision about the skill's closing section,
+   not a new command. **Owner's call; do not just add the line.**
 
 **Read Phase 3.6.1 before touching the skill, the schema or a CLI flag.** It is the most recent
 work and it changed three things a fresh session would otherwise get wrong: entries now carry
@@ -1378,41 +1472,186 @@ database node gets a database icon whoever the vendor is.
       unreadable `index.html`; and a `Host` check that made `--port 80` reject every request a real
       browser sends. Bound to `127.0.0.1`, `Host` validated against DNS rebinding, traversal proven
       over raw sockets with a planted canary, `nosniff` on every response.
-- [ ] **Compact nodes and a URL-addressed detail panel.** Owner decision after seeing the first
-      render: a node carries an icon and a name only — plus a status colour and an uncatalogued
-      marker, the two signals that must survive without a click — and everything else moves into a
-      side panel addressed by `#/service/<id>`. Hover is a tooltip, never the detail content.
-      Chosen over a popover and over a sub-page because the detail content is expected to grow
-      (edges, notes, then Layer 3 cost, EOL, blast radius): a panel scrolls, keeps the graph in
-      view, and the same route renders full-page later if it outgrows the panel. This is also the
-      shape a DAG node needs, so the layout slice swaps the container for a canvas rather than
-      rebuilding the node.
-- [ ] **Rollup display labels.** `role: coding-agent` rolls up to `coding`, so the section heading
-      reads "CODING" — the one rollup in the vocabulary that is a truncation rather than a word.
-      Settled as a viewer-side label table (`coding` → "Coding agents", and so on) falling back to
-      the raw rollup, keeping presentation in presentation: no schema change, no exception in the
-      one-line rollup rule. `SKILL.md` states outright that `coding-agent` rolls up to `coding`,
-      which resolves its own contradiction between "fixed two-word base word" and "group on the
-      part before the first `-`".
-- [ ] **The skill-drift test does not cover what it now needs to.** Found by validating the schema
-      migration: `skill-drift.test.ts` walks only `SKILL.md`'s single `<!-- catalogus:fragment -->`
-      yaml block, so a validator rewrote the skill's fenced *shell* blocks to teach
-      `catalogus set project.coding_agents ...` and `catalogus set project.vcs.provider ...` — both
-      removed commands, in the lines an agent copies — and **all 645 tests stayed green**. The hole
-      is pre-existing; this migration made it bite, because `project.pm` used to be a yaml field the
-      fragment covered and its replacement is a shell line nothing checks. `CLAUDE.md` names this
-      test as the mechanism that keeps the shipped skill honest, so it has to cover the commands.
-- [ ] **Commit the traversal corpus as a fixture.** The static server's containment is the
-      strongest security property here and it has been re-proven three times by throwaway scripts
-      inside agent sessions that no longer exist — ~50 raw-socket vectors (backslash separators,
-      double-encoding, overlong UTF-8, drive-absolute, UNC, NTFS ADS, absolute-form). None of it is
-      in the repo, so every future change re-earns it by hand or silently loses it. "Verified by an
-      agent that no longer exists" is not verification.
-- [ ] Per-project DAG: elkjs layout, React Flow render, `simple-icons` brand icons with a
-      category-icon fallback from the start. **Group on the segment of `role` before the first
-      `-`** — that is the convention settled in the 3.6 follow-ups, and the viewer is the first
-      consumer of it.
-- [ ] Status colours — active, `phasing_out`, deprecated — and `replaced_by` targets shown
+- [x] **Compact nodes and a URL-addressed detail panel.** Built and shipped in `f256d72`, and this
+      box was left unticked by the session that wrote it rather than because anything is missing:
+      `ServiceNode.tsx`, `ServiceDetailPanel.tsx`, `hash-route.ts` and `App.tsx`'s routing are in
+      the repo with `ServiceNode.test.tsx` (11), `ServiceDetailPanel.test.tsx` (7) and
+      `hash-route.test.ts` (11) behind them. **What the tick rests on, stated so it is not taken as
+      wider than it is:** those committed tests, plus the separate validation pass whose findings
+      are the five smaller defects listed below — not a fresh browser run in this session.
+
+      As designed: a node carries an icon and a name only — plus a status colour and an
+      uncatalogued marker, the two signals that must survive without a click — and everything else
+      lives in a side panel addressed by `#/service/<id>`. Hover is a `title` tooltip, never the
+      detail content. Chosen over a popover and over a sub-page because the detail content is
+      expected to grow (edges, notes, then Layer 3 cost, EOL, blast radius): a panel scrolls, keeps
+      the graph in view, and the same route renders full-page later if it outgrows the panel. This
+      is also the shape a DAG node needs, so the layout slice swaps the container for a canvas
+      rather than rebuilding the node.
+- [x] **Rollup display labels.** Built and shipped in `f256d72` — `apps/web/src/rollup-labels.ts`,
+      on `Object.create(null)`, with a test naming `constructor`, which is the third instance of
+      the keyed-lookup defect class this repo keeps producing and the first one caught before it
+      shipped. A viewer-side label table falling back to the raw rollup, keeping presentation in
+      presentation: no schema change, no exception in the one-line rollup rule. It turned out to
+      fix more than the one case this box named: `coding` was not the only rollup that reads as a
+      truncation — `ingress`, `telemetry`, `ui`, `runtime` and `language` are in the same shape,
+      and the viewer was rendering INGRESS and TELEMETRY as headings.
+- [ ] **Five smaller viewer defects, all found by the validation pass, none fixed.** Split out of
+      the two boxes above so ticking those does not quietly carry them: focus drops to `<body>`
+      when a deep-linked panel is closed (`lastFocusedRef` was never set, because nothing was
+      clicked to open it); every open and close pushes a history entry, because `App.tsx` assigns
+      `window.location.hash` rather than calling `replaceState`, so Back walks the panel instead
+      of leaving the page; the selected state's two *visual* cues are both colour (`aria-pressed`
+      carries it for assistive tech, so this is a low-vision gap rather than an AT one); and two
+      entries of the same vendor in one group are indistinguishable on the node, since the node
+      shows the catalog display name and not the local id. **Both routing claims re-checked
+      against `App.tsx` directly on 2026-08-24 rather than trusted from this file** — this
+      document has gone stale on its own numbers twice.
+- [x] **The skill-drift test now covers what it needs to.** Two separate holes, both closed, both
+      watched go red against the real `SKILL.md` before being trusted.
+
+      **The shell lines.** `packages/cli/src/skill-commands-drift.test.ts` — new file, in
+      `packages/cli` rather than beside the yaml check because the facts it needs (which commands
+      exist, which flags each registers, which fields `set` accepts) are the CLI's, and
+      `packages/schema` cannot import them without inverting the dependency. **Every fact is read
+      off the live commander program** via a newly-exported `createProgram()`, so there is no
+      hand-copied roster of command names to drift — that would be one more artifact of exactly
+      the kind under test. It extracts all **35** fenced `catalogus ...` lines and checks four
+      things per line: the command exists, every flag is one that command registers, every
+      mandatory option and required positional is supplied, and (for `set`) every field is in
+      `SETTABLE_FIELDS`, with `services.<anything>.role` folded onto the `services.<id>.role`
+      placeholder. **Five mutation classes were applied to `SKILL.md` and each observed red**,
+      including the two that started this: `catalogus set project.coding_agents claude-code` and
+      `catalogus set project.vcs.provider github` both fail now, naming the
+      `catalogus add <slug> --role ...` line that replaced them. Also proven red: an unregistered
+      command, an unknown flag, a missing `--role`, and `catalogus link` with one argument instead
+      of two.
+
+      **The fragment's values.** The yaml walk checked that every field the fragment names still
+      *exists* and stopped there — `pattern`, `format`, `minLength` and `maxLength` were walked
+      straight past, so `id: Board` or `added: 24/08/2026` would have shipped green. It now checks
+      them, `format: date` against a real calendar (2026-02-30 fails), and a new
+      "the fragment walk itself catches drift" block exercises the walk against synthetic
+      fragments so the tripwire has cases that do not depend on the real file staying wrong. Both
+      new checks were confirmed red by mutating the real fragment, then restored.
+
+      **Scope stated in the file, not left to be assumed:** fenced blocks only (prose mentions
+      `catalogus push --private`, a deliberate Phase 5 forward reference, and checking prose would
+      demand a list of commands allowed not to exist — the shape of thing that stops being read);
+      and no reverse direction, so a command `SKILL.md` never teaches does not fail it. `view` is
+      one such command today — see open item 6 above.
+- [x] **The traversal corpus is committed.** **65 vectors** in
+      `packages/cli/src/test-support/traversal-vectors.ts`, grouped into families with a comment on
+      each saying what it is testing for — literal, naive-strip bypass, encoded separators,
+      backslash, double-encoding, overlong UTF-8, null byte, drive-absolute, UNC, NTFS ADS, Windows
+      trailing dot/space, absolute-form, and traversal wearing an `/api` prefix. The runner is a
+      nested `describe` at the end of `packages/cli/src/commands/view.test.ts` — see the
+      co-location finding below for why it is not its own file — and it drives every vector
+      against a live `createViewServer`, over bare sockets: node's own http client validates and
+      can reject
+      several of these targets before they reach the wire, and `fetch()`/WHATWG URL collapse `..`
+      client-side, so either would be a test that never sent its vector.
+
+      **The assertion is about content, not status**, because a contained vector can legitimately
+      answer 200 (`/a/../index.html` resolves back inside the root). No response body may contain a
+      marker of any file above the root, and **any 200 must be byte-identical to the SPA shell** —
+      which catches a leak of some file nobody thought to list a marker for.
+
+      **Two negative controls make a green run mean something.** A canary planted one directory
+      above the served root, asserted readable on disk before the vectors run; and a control file
+      planted *inside* the root and fetched successfully, proving the server really does hand out
+      arbitrary files under it. Without those, 65 assertions would also pass against a canary that
+      was never written or a server that 404s everything.
+
+      **The corpus was watched fail, twice, by mutating `resolveStaticPath`.** Deleting the
+      containment check: **32 of 65 go red**. Replacing it with the classic naive guard (a raw,
+      undecoded substring test for `..` on the request target): **9 go red and not one is from the
+      literal family** — six encoded, two backslash, one absolute-form. That second number is the
+      argument for the corpus having families at all; a pile of literal `../` vectors passes that
+      mutation green.
+
+      **One claim in the new fixture was written from reasoning and disproved by executing it**,
+      and the correction is kept in the file rather than deleted: a second `decodeURIComponent`
+      pass does *not* turn the double-encoded vectors into live traversals, because containment
+      runs after decoding and catches the `../` a second pass produces. All 65 stayed green under
+      that mutation. The useful fact is the corrected one — containment does not depend on decode
+      depth.
+
+      **A latent flake this surfaced, and the rule that came out of it.** The corpus started as
+      its own `view-traversal.test.ts` and made the full suite fail on **three of six consecutive
+      `pnpm test` runs** — found by running the suite repeatedly rather than once, which is the
+      only reason it was caught at all. Two tests in `view.test.ts` temporarily rename or
+      overwrite the *real* `packages/cli/dist/web`, because `createViewServer` always resolves its
+      web root from the real package layout and there is no way to hand it a temporary one. vitest
+      runs test *files* in parallel workers but tests *within* a file sequentially, so a second
+      file calling `createViewServer` raced the rename and got "Built web assets not found". **The
+      hazard predates the corpus and applies to any future test file: everything that calls
+      `createViewServer` has to live in `view.test.ts`.** That is now stated in the file itself,
+      next to the block. Re-verified with **eight consecutive green full-suite runs** after the
+      merge, not one.
+- [ ] **Per-project DAG — the next real piece of work.** elkjs layout, React Flow render,
+      `simple-icons` brand icons with a category-icon fallback from the start. **Group on the
+      segment of `role` before the first `-`** — the convention settled in the 3.6 follow-ups.
+
+      **What is already true, so nobody re-derives it.** `GET /api/project` already returns
+      `edges: { from, to }[]` alongside `services` (see `view-payload.ts`'s `ViewPayload`), so this
+      slice needs **no server change at all** — it is entirely `apps/web`. `ServiceNode` was
+      deliberately shrunk to icon-plus-name for this: the plan is to swap the *container*
+      (`ServiceList`/`ServiceGroup`) for a canvas, not to rebuild the node. The detail panel is
+      already URL-addressed at `#/service/<id>` and works unchanged from a canvas.
+
+      **What is not decided, and a brief has to answer before an implementer starts.** These are
+      the questions that will otherwise be answered by whoever types first:
+
+      1. **Does the DAG replace the grouped list, or sit beside it?** A toggle, a route, or a
+         replacement. The list is genuinely better for "what does this project use"; the graph is
+         better for "what breaks if this dies". Both are real questions the viewer exists to answer.
+      2. **Which way do the arrows point?** `dependencies: [[fly-api, supabase-db]]` means fly-api
+         depends on supabase-db. Drawing the arrow along that direction reads as "calls"; reversing
+         it reads as "supports". Pick one and say which, because blast radius is read off it.
+      3. **Does grouping survive on the canvas?** Compound/parent nodes per rollup in elk, or a flat
+         layout that drops the grouping the list has. Not the same picture.
+      4. **Do `kind: component` and `kind: stack` nodes render differently here?** They already do
+         in `graph`'s text output and in the detail panel. A stack node hangs off whatever runs it.
+      5. **Which React Flow?** `reactflow@11` and `@xyflow/react@12` are the same project under two
+         names. **Neither is installed today**, nor is `elkjs` — `apps/web/package.json` has no
+         graph dependency at all, so step one is a deliberate choice, not an `npm i`.
+      6. **Is there a bundle budget?** The client is **161 KB** today, and that number was earned:
+         `simple-icons` was deliberately kept server-side because it is 5.2 MB. elkjs alone is
+         several hundred KB. Worth deciding up front whether that is fine or whether layout should
+         move server-side too — the same reasoning that moved the icons already applies here.
+
+      **And the fixture problem, restated because it is the part most likely to be skipped.** There
+      is still no real manifest (see "There is no real manifest" above). `examples/reference.
+      catalogus.yaml` is 14 entries and 14 edges — enough to prove every *shape* renders, not enough
+      to prove the layout stays readable. **Nobody has built the deliberately-hard synthetic
+      manifest this document keeps saying to build against**, so that is an artifact the DAG slice
+      has to produce, not inherit. It stays synthetic regardless: anything committed here is public.
+- [x] **Status colours and `replaced_by` targets.** Shipped in `f256d72`, unticked until now for
+      the same reason the two boxes above were — nobody went back. `ServiceNode.module.css` carries
+      a ring colour for all four statuses (`removed` included, which this box's own wording
+      omitted), `StatusPill` renders the status word in the detail panel so the cue is not colour
+      alone, and `ServiceDetailPanel` renders `replaced_by` resolved to the replacement's display
+      label rather than its raw id.
+
+      **One fix made while confirming it.** `StatusPill`'s `LABELS[status]` was the last surviving
+      instance of the keyed-lookup defect class — a plain object literal read with a
+      manifest-derived key — and the previous session recorded it as safe rather than fixing it, on
+      the grounds that `status` is a schema enum and `view` refuses invalid manifests. That
+      reasoning is correct and it is still a guard one layer away from the bug: it holds only for
+      as long as every caller comes through a validated payload, which is a property of the rest of
+      the app rather than of that file. It is now on `Object.create(null)` with an own-property
+      test for the CSS Modules lookup beside it, and a new `StatusPill.test.tsx` naming
+      `constructor` — **watched go red against the old literal** (`expected '' to be 'constructor'`:
+      React silently drops the inherited `Object` function, so the real-world symptom would have
+      been a blank pill, not the blank page `GLYPHS` caused).
+
+      **And fixing it turned up a fifth instance that was not a precaution.** Auditing the rest of
+      the repo for the same shape found `catalogus set`'s `FIELDS` table being indexed with raw
+      command-line input — a live bug, reproduced against the built binary, now fixed and re-run
+      against it. Details in "the one defect class this repo keeps producing" near the top of this
+      file. The audit cleared everything else and recorded *why* at each site, so the next person
+      checking this class reads a reason rather than re-deriving one.
 - [ ] Portfolio page: project list, service usage matrix across projects
 - [ ] Migration dashboard: everything `phasing_out` with its replacement
 - [ ] Layer 3 cost panel present, rendering an explicit "not connected" empty state
@@ -1490,6 +1729,36 @@ From HANDOFF §9, plus decisions taken during implementation. Settled — reopen
 7. **Two-tier guard rather than one** — a heuristic that cries wolf gets switched off, and a guard the
    user has disabled is worth less than no guard. Hard tier is high precision only; soft tier warns and
    leaves exit 0 unless `--strict`.
+8. **`packages/schema/schema/catalogus.v1.json` stays committed, not gitignored** — asked because
+   `pnpm build` regenerates it and it looked like a build artifact. It is a *published* one, which is
+   a different thing: `packages/schema/package.json`'s `files` ships `schema/`, and every manifest the
+   CLI writes carries `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json`, so an
+   editor fetches it over HTTP. `dist/` is ignorable precisely because nothing external fetches it by
+   URL.
+
+   **The decisive argument is what ignoring it would do to `schema-sync.test.ts`.** That test exists
+   to catch a `schema.ts` edit that was never followed by `pnpm build`, and it works only because a
+   *committed* copy is capable of being stale. With no committed copy it would compare a file the
+   build just wrote against the source that build read — a tautology, permanently green. Ignoring the
+   file would convert a real tripwire into a no-op, which is the failure shape this document already
+   records three times over.
+9. **Line endings are LF everywhere, pinned by `.gitattributes` (`* text=auto eol=lf`)** — the fix for
+   what prompted decision 8. The generator writes LF unconditionally while `core.autocrlf=true`
+   (Windows default) wants CRLF, so *every build* left that file reported as modified while being
+   byte-identical to `HEAD` — confirmed by hashing both sides to the same object id. **A file that is
+   permanently dirty and never actually changed is a file people learn to skip in `git status`**,
+   which is how a real change to it eventually gets committed unnoticed.
+
+   No renormalization commit was needed: zero committed blobs in this repo contain a CR, so the index
+   was already LF and `git add --renormalize` is a content no-op. One `git update-index
+   --really-refresh` was needed once to clear the stale stat cache; a fresh clone will not need it.
+10. **No raw control characters in source.** Found while doing the above: `packages/cli/src/toposort.ts`
+    held two literal NUL bytes as composite-map-key separators (`` `${from}\0${to}` ``), which made git
+    classify the whole file as binary — **every change to it showed as "Binary files differ" with no
+    reviewable diff.** In a repo whose review step is an agent reading a diff (see CLAUDE.md), that was
+    the one file nobody could review, and nothing would ever have reported it. NUL is still the right
+    separator (the schema's slug pattern cannot produce one); it is spelled `\u0000` now. Behaviour
+    unchanged — `toposort.test.ts`'s 7 tests and the full suite pass — and the file is plain ASCII again.
 
 ## Non-goals
 

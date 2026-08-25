@@ -294,4 +294,33 @@ describe("runSet", () => {
     expect(result.exitCode).toBe(2);
     expect(result.stderr.join("\n")).toContain("services.<id>.role");
   });
+
+  // The prototype-inheritance case. `field` comes straight off the command
+  // line and is looked up in two plain tables (FIELDS, then
+  // MOVED_FIELD_HINTS), so before those were built on Object.create(null)
+  // this took the *known-field* branch: `FIELDS["constructor"]` resolved
+  // through Object.prototype to the `Object` function, which is truthy, so
+  // the command built an edit with an undefined path and got as far as the
+  // pre-write validation -- reporting `[schema] / must be object` at exit 1,
+  // pointing the caller at their manifest, which was the one thing that was
+  // fine. Confirmed against the built binary, not just the source, and
+  // confirmed non-destructive: manifest-edit.ts refuses to write anything
+  // that would fail validate, and that guard held throughout.
+  //
+  // Every name here is a real Object.prototype member and every one of them
+  // is a legal thing to type. The assertion is on the exit code as much as
+  // the message: 2 is `usage error`, which is what a bad field name is; 1 is
+  // "your manifest is invalid", which was the lie.
+  it.each(["constructor", "toString", "valueOf", "__proto__", "hasOwnProperty"])(
+    "reports %s as an unknown field, rather than inheriting it from Object.prototype",
+    async (field) => {
+      const before = await manifestText();
+      const result = await runSet(dir, [field, "boom"]);
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr.join("\n")).toContain(`Unknown field "${field}"`);
+      expect(result.stderr.join("\n")).not.toContain("must be object");
+      expect(await manifestText()).toBe(before);
+    },
+  );
 });

@@ -1,12 +1,18 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { request as httpRequest } from "node:http";
 import { connect } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createTempDir, removeTempDir, writeFixtureFile } from "../test-support/temp-dir.js";
+import {
+  CANARY_CONTENT,
+  CANARY_FILENAME,
+  OUT_OF_ROOT_MARKERS,
+  TRAVERSAL_VECTORS,
+} from "../test-support/traversal-vectors.js";
 import type { ViewServerHandle } from "./view.js";
 import { createViewServer, parsePortOption } from "./view.js";
 
@@ -150,6 +156,56 @@ function rawSocketRequest(port: number, requestLines: string[]): Promise<{ statu
  */
 function realWebIndexHtmlPath(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dist", "web", "index.html");
+}
+
+/** packages/cli/dist/web itself -- the directory createViewServer actually serves. */
+function realWebRoot(): string {
+  return join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dist", "web");
+}
+
+const CONTROL_FILENAME = "catalogus-traversal-control.txt";
+const CONTROL_CONTENT = "CATALOGUS-TRAVERSAL-CONTROL-8f3d2b1a-INSIDE-THE-WEB-ROOT";
+
+/**
+ * Sends `target` as the literal request-line target over a bare socket and
+ * reads the response to completion.
+ *
+ * Distinct from both helpers above, and for reasons neither covers. `rawGet`
+ * goes through node:http's client, which validates the path and would reject
+ * several corpus vectors (`C:/Windows/win.ini` with no leading slash, a bare
+ * `%ff`) before anything reached the wire -- a test that never sent its vector
+ * would pass. `rawSocketRequest` writes literally but resolves at the end of
+ * the header block, and the traversal assertions are about the response
+ * *body*, so it would be looking for a canary in bytes it never received.
+ * `Connection: close` is what makes reading to socket end terminate; without
+ * it this server keeps HTTP/1.1 keep-alive open and the read hangs.
+ */
+function rawTraversalGet(port: number, target: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const socket = connect(port, "127.0.0.1", () => {
+      socket.write(
+        [`GET ${target} HTTP/1.1`, `Host: 127.0.0.1:${port}`, "Connection: close", "", ""].join("\r\n"),
+      );
+    });
+    let data = "";
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk: string) => {
+      data += chunk;
+    });
+    socket.on("end", () => {
+      const headerEnd = data.indexOf("\r\n\r\n");
+      if (headerEnd === -1) {
+        // No complete header block at all: the server closed on us. Report
+        // it as status 0 so the assertions below fail loudly rather than
+        // this resolving into a body of "" that satisfies every check.
+        resolve({ status: 0, body: data });
+        return;
+      }
+      const statusLine = data.slice(0, headerEnd).split("\r\n")[0] ?? "";
+      resolve({ status: Number(statusLine.split(" ")[1] ?? "0"), body: data.slice(headerEnd + 4) });
+    });
+    socket.on("error", reject);
+  });
 }
 
 describe("createViewServer", () => {
@@ -687,6 +743,121 @@ dependencies: []
 
     const html = await rawGet(outcome.value.port, "/");
     expect(html.nosniff).toBe("nosniff");
+  });
+
+  // The committed path-traversal corpus, executed against a live server.
+  //
+  // **This block must stay in this file.** It was written as its own
+  // `view-traversal.test.ts` and that was wrong for a reason worth recording,
+  // because it is a hazard for any future test file too: two tests above
+  // (`dist/web exists but its own index.html is missing`, and the empty-shell
+  // one) temporarily rename or overwrite the *real* `packages/cli/dist/web`,
+  // since createViewServer always resolves its web root from the real package
+  // layout and there is no way to hand it a temporary one. vitest runs test
+  // *files* in parallel workers but tests *within* a file sequentially -- so a
+  // second file calling createViewServer raced the rename and failed with
+  // "Built web assets not found" on roughly half of full-suite runs. Measured,
+  // not guessed: six consecutive `pnpm test` runs, three red. The hazard was
+  // latent before this corpus existed; anything new that calls
+  // createViewServer belongs here too.
+  //
+  // Read ../test-support/traversal-vectors.ts for why the corpus is committed
+  // at all, what each family tests for, and which mutations it was measured to
+  // catch. What matters here is the shape of the assertions:
+  //
+  //   - **Content, not status.** A vector can be contained and still answer
+  //     200 -- `/a/../index.html` resolves back inside the root and serving it
+  //     is correct. "Expect 403" would force the corpus to hold only vectors
+  //     that happen to trip the guard, which is the corpus that proves least.
+  //   - **Any 200 is the SPA shell.** The marker list can only catch a leak of
+  //     a file someone thought to list. This catches the rest: a 200 whose
+  //     bytes are not the shell is a file being served that nothing else here
+  //     would notice.
+  //   - **Two negative controls.** Both assertions above pass trivially
+  //     against a canary that was never written, or a server that 404s
+  //     everything. The two control tests are what make a green run mean
+  //     something.
+  describe("contains every path-traversal vector in the committed corpus", () => {
+    const webRoot = realWebRoot();
+    const canaryPath = join(webRoot, "..", CANARY_FILENAME);
+    const controlPath = join(webRoot, CONTROL_FILENAME);
+    let shellHtml: string;
+
+    beforeAll(async () => {
+      await writeFile(canaryPath, CANARY_CONTENT, "utf8");
+      await writeFile(controlPath, CONTROL_CONTENT, "utf8");
+      shellHtml = await readFile(realWebIndexHtmlPath(), "utf8");
+    });
+
+    afterAll(async () => {
+      await Promise.allSettled([unlink(canaryPath), unlink(controlPath)]);
+    });
+
+    async function startServer(): Promise<ViewServerHandle> {
+      await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
+      const outcome = await createViewServer(dir, { port: 0 });
+      if (!outcome.ok) throw new Error(`expected a server, got: ${outcome.error.stderr.join("\n")}`);
+      servers.push(outcome.value);
+      return outcome.value;
+    }
+
+    it("the canary really exists on disk, one directory above the served root", async () => {
+      // Without this, every containment assertion below would also pass
+      // against a canary that was never written -- a corpus proving nothing,
+      // green.
+      await expect(readFile(canaryPath, "utf8")).resolves.toBe(CANARY_CONTENT);
+    });
+
+    it("serves a control file planted inside the root, proving it does hand out arbitrary files under it", async () => {
+      // The other half of the same problem: a server that 404s everything
+      // contains every vector trivially. This proves the static handler will
+      // really read a file off disk and return its bytes, so the canary's
+      // absence from every response below is containment rather than a server
+      // that does nothing.
+      const server = await startServer();
+      const result = await rawTraversalGet(server.port, `/${CONTROL_FILENAME}`);
+      expect(result.status).toBe(200);
+      expect(result.body).toContain(CONTROL_CONTENT);
+    });
+
+    it.each(TRAVERSAL_VECTORS)("[$family] GET $target leaks nothing from outside the web root", async (vector) => {
+      const server = await startServer();
+      const result = await rawTraversalGet(server.port, vector.target);
+
+      expect(
+        result.status,
+        `GET ${vector.target} produced no parseable HTTP response. A vector that never got a response ` +
+          "is a vector that proved nothing -- check rawTraversalGet, not the server, first.",
+      ).toBeGreaterThan(0);
+
+      expect(
+        result.status,
+        `GET ${vector.target} returned ${result.status}. A 5xx here means the vector got past ` +
+          "resolveStaticPath's containment check and failed later, at the filesystem -- the guard is " +
+          "what should have stopped it, and a path that reaches readFile at all is a path that could " +
+          "have succeeded on a different machine.",
+      ).toBeLessThan(500);
+
+      const leaked = OUT_OF_ROOT_MARKERS.filter((marker) => result.body.includes(marker));
+      expect(
+        leaked,
+        `GET ${vector.target} returned content from outside dist/web: ${leaked.join(", ")}. This is a ` +
+          "live path-traversal vulnerability in resolveStaticPath -- `catalogus view` binds to " +
+          "127.0.0.1, so the reachable attacker is any page in the owner's browser, which is not a " +
+          "small set.",
+      ).toEqual([]);
+
+      if (result.status === 200) {
+        expect(
+          result.body,
+          `GET ${vector.target} was answered 200 with something other than the SPA shell. A 200 to a ` +
+            "traversal vector is only legitimate when the path resolved back inside the root and " +
+            "landed on index.html; any other 200 is a file being served that this test has no marker " +
+            "for, which is the leak this assertion exists to catch rather than the one " +
+            "OUT_OF_ROOT_MARKERS covers.",
+        ).toBe(shellHtml);
+      }
+    });
   });
 });
 

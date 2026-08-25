@@ -54,7 +54,13 @@ function packageVersion(): string {
   return pkg.version ?? "0.0.0";
 }
 
-function createProgram(): Command {
+// Exported for skill-commands-drift.test.ts, which walks the returned
+// program's command and option tables to check that every `catalogus ...`
+// line in the shipped skill still names something this CLI actually
+// registers. Reading that surface off the live program is the point: a
+// hand-copied list of command names in a test is one more artifact that
+// drifts, which is the defect the test exists to catch.
+export function createProgram(): Command {
   const program = new Command();
   program
     .name("catalogus")
