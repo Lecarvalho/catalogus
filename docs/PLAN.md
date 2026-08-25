@@ -1696,26 +1696,44 @@ database node gets a database icon whoever the vendor is.
       (`ServiceList`/`ServiceGroup`) for a canvas, not to rebuild the node. The detail panel is
       already URL-addressed at `#/service/<id>` and works unchanged from a canvas.
 
-      **What is not decided, and a brief has to answer before an implementer starts.** These are
-      the questions that will otherwise be answered by whoever types first:
+      **All six are decided now — owner, 2026-08-25.** Kept in question order, with the reasoning,
+      because a decision recorded without its reasoning gets re-litigated by the next person who
+      would have chosen differently:
 
-      1. **Does the DAG replace the grouped list, or sit beside it?** A toggle, a route, or a
-         replacement. The list is genuinely better for "what does this project use"; the graph is
-         better for "what breaks if this dies". Both are real questions the viewer exists to answer.
-      2. **Which way do the arrows point?** `dependencies: [[fly-api, supabase-db]]` means fly-api
-         depends on supabase-db. Drawing the arrow along that direction reads as "calls"; reversing
-         it reads as "supports". Pick one and say which, because blast radius is read off it.
-      3. **Does grouping survive on the canvas?** Compound/parent nodes per rollup in elk, or a flat
-         layout that drops the grouping the list has. Not the same picture.
-      4. **Do `kind: component` and `kind: stack` nodes render differently here?** They already do
-         in `graph`'s text output and in the detail panel. A stack node hangs off whatever runs it.
-      5. **Which React Flow?** `reactflow@11` and `@xyflow/react@12` are the same project under two
-         names. **Neither is installed today**, nor is `elkjs` — `apps/web/package.json` has no
-         graph dependency at all, so step one is a deliberate choice, not an `npm i`.
-      6. **Is there a bundle budget?** The client is **161 KB** today, and that number was earned:
-         `simple-icons` was deliberately kept server-side because it is 5.2 MB. elkjs alone is
-         several hundred KB. Worth deciding up front whether that is fine or whether layout should
-         move server-side too — the same reasoning that moved the icons already applies here.
+      1. **A toggle, and the list stays the default view.** The list answers "what does this
+         project use" and the graph answers "what breaks if this dies"; both are questions the
+         viewer exists for, and neither has been used against a real manifest yet, so a view switch
+         in the header is the cheapest way to keep both rather than pick one blind. Not its own
+         route: that splits the viewer into two places to look and doubles what a first-time user
+         has to find. `#/service/<id>` keeps addressing the panel from either view.
+      2. **Arrows follow the dependency: `fly-api → supabase-db`.** Reads as "calls", matches the
+         manifest's own direction and every package-graph convention. **Blast radius is therefore
+         read backwards** — what points *at* a node is what breaks when that node dies — and the
+         UI has to say so somewhere, because the reversed reading is the intuitive one.
+      3. **Flat layout; rollup is a visual cue, not a container.** One elk layered pass over every
+         node, with rollup carried by colour and by the node's own label. Rejected compound parent
+         nodes: dependencies cross rollups constantly (an API node depends on database, email and
+         telemetry at once), and containers with many crossing edges lay out worse rather than
+         better. Nothing on disk can prove that either way yet, which is itself the argument for
+         the cheaper option first — revisit once a real manifest exists.
+      4. **`component` and `stack` render differently on the canvas, by shape, and the node keeps
+         carrying it.** They already differ in `graph`'s text output and in the detail panel, and a
+         viewer where infrastructure the owner runs is indistinguishable from a vendor with an
+         invoice is a viewer that cannot answer the cost question later. *This one was settled by
+         reasoning rather than asked, and is the one to reverse first if it reads wrong.* The
+         "a stack node hangs off whatever runs it" idea in the original question is a **layout**
+         claim, not a rendering one, and is deferred: it needs a real manifest to judge, and (3)
+         already committed to a flat pass.
+      5. **`@xyflow/react@12` plus `elkjs`, both client-side.** v12 is the maintained name for the
+         same project `reactflow@11` ships under. elkjs runs in a worker so layout never blocks the
+         frame.
+      6. **The 161 KB budget does not carry over to this slice.** Accepting the growth, and the
+         reasoning is specifically *not* the one that moved icon resolution server-side: this
+         client is served over loopback by the CLI to one local browser, so bundle bytes cost
+         startup parse time rather than network. `simple-icons` was different in kind — 5.2 MB
+         whose cost was the bundle *existing*, and which tree-shakes to nothing under a
+         manifest-driven lookup. **Record the new number when the slice lands**, so the next
+         person inherits a measured figure rather than a permission to grow.
 
       **And the fixture problem, restated because it is the part most likely to be skipped.** There
       is still no real manifest (see "There is no real manifest" above). `examples/reference.
