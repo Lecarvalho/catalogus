@@ -19,7 +19,6 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { ViewPayload, ViewService } from "@catalogus/cli";
 
 import type { VendorGroup } from "./bands.js";
-import { dependentCounts } from "./bands.js";
 
 import styles from "./App.module.css";
 import { ErrorState } from "./components/ErrorState.js";
@@ -387,7 +386,8 @@ export function App() {
               group={peek.group}
               readAt={state.payload.readAt}
               position={peek.position}
-              dependentsById={dependentCounts(state.payload.edges)}
+              dependsOn={(id) => edgeMaps.dependsOn.get(id) ?? []}
+              dependedOnBy={(id) => edgeMaps.dependedOnBy.get(id) ?? []}
               labelForId={edgeMaps.labelForId}
               onOpen={handleSelect}
               onPointerEnter={cancelClose}
