@@ -86,6 +86,30 @@ describe("mapSpecfySlug", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("maps the three monitoring rows added closing the Phase 3.7 catalog-gap slice, healthchecksio's added hyphen in particular", () => {
+    expect(mapSpecfySlug("grafana", "Grafana")).toEqual({
+      slug: "grafana",
+      category: "monitoring",
+      name: "Grafana",
+      kind: "service",
+      unmapped: false,
+    });
+    expect(mapSpecfySlug("prometheus", "Prometheus")).toEqual({
+      slug: "prometheus",
+      category: "monitoring",
+      name: "Prometheus",
+      kind: "service",
+      unmapped: false,
+    });
+    expect(mapSpecfySlug("healthchecksio", "Healthchecks.io")).toEqual({
+      slug: "healthchecks-io",
+      category: "monitoring",
+      name: "Healthchecks.io",
+      kind: "service",
+      unmapped: false,
+    });
+  });
+
   it("every mapping table entry has a non-empty slug, name, a valid category, and a valid kind", () => {
     // From SERVICE_CATEGORIES rather than retyped here: a second copy of the
     // enum passes green while the spec moves underneath it, which is what

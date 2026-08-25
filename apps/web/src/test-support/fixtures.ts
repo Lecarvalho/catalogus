@@ -9,6 +9,12 @@ export function makeViewService(overrides: Partial<ViewService> & Pick<ViewServi
     name: overrides.name ?? "Some Service",
     known: overrides.known ?? true,
     icon: overrides.icon ?? null,
+    // Defaults to null rather than deriving from `icon`, so a fixture that
+    // sets a path without a hex is expressible. The payload guarantees the
+    // two arrive together (view-payload.ts), but a test that wants to prove
+    // the viewer degrades to `currentColor` on a missing hex needs to be able
+    // to construct the pair the payload will not produce.
+    iconHex: overrides.iconHex ?? null,
     role: overrides.role,
     rollup: overrides.rollup ?? overrides.role.split("-")[0]!,
     kind: overrides.kind ?? "service",

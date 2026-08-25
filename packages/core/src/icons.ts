@@ -19,6 +19,13 @@
 // Resolution is deliberately lazy and per-slug, never a bulk load: this
 // reads exactly the icon files a manifest's own services actually
 // reference, not the full 3,453-icon set.
+//
+// resolveIcon, added alongside resolveIconPath, is the one exception to
+// "never a bulk load", and says so at its own definition: a brand's hex
+// colour exists only in simple-icons' one bulk data export, not as a
+// separate per-icon file the way SVG path data is, so there is no lazier
+// shape available -- that one file is read once per process and cached,
+// not once per call.
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
 
@@ -91,4 +98,98 @@ export async function resolveIconPath(icon: string | undefined): Promise<string 
   }
 
   return extractPathData(svg);
+}
+
+/**
+ * One record as it appears in simple-icons' bulk data export
+ * (`simple-icons/icons.json`, verified below to resolve to
+ * `data/simple-icons.json` in the installed v16.28.0 package) -- only the
+ * two fields this module reads. Every one of the package's 3,453 records
+ * carries both, confirmed directly against the installed data file rather
+ * than assumed from the package's types.
+ */
+interface SimpleIconRecord {
+  readonly slug?: string;
+  readonly hex: string;
+}
+
+/**
+ * Lazily-built, process-lifetime cache of every installed simple-icons
+ * slug's brand hex. Unlike resolveIconPath's per-icon SVG read, there is no
+ * per-icon file to read for hex -- it lives only in this one bulk JSON
+ * export -- so the first call reads and parses that one file (~450 KB,
+ * 3,453 records) and every later call in this process reuses the resulting
+ * Map, regardless of how many distinct icons a manifest actually
+ * references. A rejected load is not cached: a transient read failure gets
+ * a fresh attempt on the next call rather than being pinned to "no hex"
+ * for the rest of the process.
+ */
+let hexBySlug: Promise<Map<string, string>> | undefined;
+
+function loadHexBySlug(): Promise<Map<string, string>> {
+  if (!hexBySlug) {
+    hexBySlug = (async () => {
+      const dataPath = require.resolve("simple-icons/icons.json");
+      const raw = await readFile(dataPath, "utf8");
+      const records = JSON.parse(raw) as SimpleIconRecord[];
+      const bySlug = new Map<string, string>();
+      for (const record of records) {
+        if (record.slug) {
+          bySlug.set(record.slug, record.hex);
+        }
+      }
+      return bySlug;
+    })().catch((err: unknown) => {
+      hexBySlug = undefined;
+      throw err;
+    });
+  }
+  return hexBySlug;
+}
+
+/**
+ * The hex half of resolveIcon. Split out so the ref-safety and lookup-miss
+ * cases can be reasoned about independently of the SVG path lookup, while
+ * still reusing SAFE_ICON_REF rather than a second copy of that check.
+ * Never throws, same as resolveIconPath: a data-file read failure or a slug
+ * with no hex record both degrade to null.
+ */
+async function resolveIconHex(icon: string | undefined): Promise<string | null> {
+  if (!icon || !SAFE_ICON_REF.test(icon)) {
+    return null;
+  }
+
+  let bySlug: Map<string, string>;
+  try {
+    bySlug = await loadHexBySlug();
+  } catch {
+    return null;
+  }
+
+  const hex = bySlug.get(icon);
+  return hex ? `#${hex}` : null;
+}
+
+/**
+ * Resolves a verified simple-icons ref to both its SVG path data and its
+ * brand hex colour, or null when either half can't be resolved -- the same
+ * never-throws, degrade-to-the-generic-glyph contract as resolveIconPath,
+ * which this function calls directly rather than duplicating its
+ * ref-safety and file-resolution logic.
+ *
+ * Additive on purpose: resolveIconPath is untouched above, so every
+ * existing caller keeps working exactly as it does today. This exists so a
+ * caller that wants brand colour (rendering a node in its own colour rather
+ * than monochrome) has one verified place to get it -- verified out of the
+ * installed package the same way the path data is, never a hand-typed hex.
+ * A hardcoded "#635BFF" for Stripe is exactly the plausible-unchecked guess
+ * CLAUDE.md's "ask, never guess" rule is about, and worse than a wrong
+ * icon slug: nobody notices a brand colour that's slightly off.
+ */
+export async function resolveIcon(icon: string | undefined): Promise<{ path: string; hex: string } | null> {
+  const [path, hex] = await Promise.all([resolveIconPath(icon), resolveIconHex(icon)]);
+  if (path === null || hex === null) {
+    return null;
+  }
+  return { path, hex };
 }

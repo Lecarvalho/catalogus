@@ -13,7 +13,7 @@
 // a shared helper; this file does not re-derive the rule from the schema
 // description on its own.
 import { edgeEndpoints, type CatalogusManifestV1, type ServiceEntry } from "@catalogus/schema";
-import { getCatalogEntry, resolveIconPath } from "@catalogus/core";
+import { getCatalogEntry, resolveIcon } from "@catalogus/core";
 
 export interface ViewPayload {
   /** Absolute path of the manifest file being served. */
@@ -52,6 +52,19 @@ export interface ViewService {
   known: boolean;
   /** simple-icons path data (the `d` attribute), resolved server-side; null when there is no verified icon */
   icon: string | null;
+  /**
+   * The brand's own colour, as `#RRGGBB`, resolved server-side alongside the
+   * path; null exactly when `icon` is null.
+   *
+   * Carried so the viewer can render a mark in colour where colour helps
+   * recognition -- a service page, a hover panel -- while keeping the board
+   * monochrome. That split is deliberate and measured rather than aesthetic:
+   * a large fraction of catalog slugs have no verified icon at all, so a
+   * fully coloured board would separate into real logos and grey fallbacks
+   * and make a correct render look half-broken. Every row that has an icon
+   * has a hex, so this never introduces a third state.
+   */
+  iconHex: string | null;
   role: string;
   /** the segment of role before the first "-" */
   rollup: string;
@@ -79,14 +92,15 @@ function rollupOf(role: string): string {
  */
 async function buildViewService(entry: ServiceEntry): Promise<ViewService> {
   const catalogEntry = getCatalogEntry(entry.service);
-  const icon = await resolveIconPath(catalogEntry?.icon);
+  const resolved = await resolveIcon(catalogEntry?.icon);
 
   return {
     id: entry.id,
     service: entry.service,
     name: catalogEntry?.name ?? entry.service,
     known: catalogEntry !== undefined,
-    icon,
+    icon: resolved?.path ?? null,
+    iconHex: resolved?.hex ?? null,
     role: entry.role,
     rollup: rollupOf(entry.role),
     kind: entry.kind ?? "service",

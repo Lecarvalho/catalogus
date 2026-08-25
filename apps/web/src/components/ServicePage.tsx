@@ -72,7 +72,7 @@ export function ServicePage({
 
       <header className={styles.header}>
         <span className={styles.glyph} aria-hidden="true">
-          <Icon iconPath={service.icon} rollup={service.rollup} label={service.name} />
+          <Icon iconPath={service.icon} iconHex={service.iconHex} rollup={service.rollup} label={service.name} colour />
         </span>
 
         <div className={styles.identity}>

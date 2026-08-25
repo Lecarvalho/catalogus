@@ -86,7 +86,7 @@ export function ServicePopover({
     >
       <header className={styles.header}>
         <span className={styles.glyph} aria-hidden="true">
-          <Icon iconPath={group.icon} rollup={group.rollup} label={group.name} />
+          <Icon iconPath={group.icon} iconHex={group.iconHex} rollup={group.rollup} label={group.name} colour />
         </span>
 
         <span className={styles.identity}>

@@ -200,6 +200,16 @@ const EXTRA_ROWS: CatalogEntry[] = [
   { slug: "codex", name: "Codex" },
   { slug: "cursor", name: "Cursor" },
   { slug: "github-copilot", name: "GitHub Copilot" },
+  // Grafana Labs' log-aggregation product, added closing the Phase 3.7
+  // catalog-gap slice. No @specfy/stack-analyser rule exists for it at all
+  // -- checked directly against the installed package's rules/ tree, no
+  // register() call under any "loki"-shaped tech key, unlike grafana and
+  // prometheus (mapping.ts) which do have one -- so detect() can
+  // structurally never produce it; a manifest can still legitimately name
+  // it by hand, the same shape of gap namecheap and trello fill above. No
+  // icon: simple-icons has no "loki" entry at all, bare or near-match,
+  // checked directly including aliases.aka.
+  { slug: "loki", name: "Loki" },
 ];
 
 /**
@@ -273,8 +283,11 @@ const EXTRA_ROWS: CatalogEntry[] = [
  * retired, unrelated product), codex (no entry at all, bare or near-match --
  * checked 2026-08-24 alongside the coding-agent rows below), csharp, aspnet,
  * java, cobol, matlab, objectivec, visualbasicnet, and a long tail of
- * smaller frameworks. See this slice's implementation report for the full
- * list checked.
+ * smaller frameworks. Also slack, healthchecks-io and loki (no entry at
+ * all, bare or near-match, including aliases.aka -- checked closing the
+ * Phase 3.7 catalog-gap slice, 2026-08-25) -- grafana and prometheus were
+ * checked in the same pass and, unlike those three, do have a mark. See
+ * this slice's implementation report for the full list checked.
  */
 const ICON_OVERLAY: Record<string, string> = {
   ada: "ada",
@@ -322,6 +335,7 @@ const ICON_OVERLAY: Record<string, string> = {
   "google-analytics": "googleanalytics",
   "google-cloud-storage": "googlecloudstorage",
   "google-gemini": "googlegemini",
+  grafana: "grafana",
   gridsome: "gridsome",
   haskell: "haskell",
   hexojs: "hexo",
@@ -364,6 +378,7 @@ const ICON_OVERLAY: Record<string, string> = {
   postgresql: "postgresql",
   posthog: "posthog",
   preactjs: "preact",
+  prometheus: "prometheus",
   qwikjs: "qwik",
   r: "r",
   rabbitmq: "rabbitmq",
