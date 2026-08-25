@@ -191,20 +191,33 @@ export function App() {
     replaceHash("");
   }, [replaceHash]);
 
-  // Hover peek and click-to-open, settled by the owner 2026-08-25: hovering
-  // a tile shows a popover near it, clicking opens the page. Where a tile
-  // stands for several entries of one vendor -- Clapline's four Fly.io apps
-  // -- clicking cannot open "the" page because there isn't one, so it pins
-  // the popover and the reader picks an entry from it.
+  // Hover peek and click-to-open, settled by the owner 2026-08-25:
+  // **hovering a tile shows the popover; clicking opens the page.** An
+  // earlier build pinned the popover on click, and that was wrong -- it made
+  // the click do the cheap thing and left the reader without the expensive
+  // one.
   //
-  // Position is measured here rather than in the popover, and measured from
-  // the anchor at the moment of the event, because the tiles live inside a
-  // CSS multi-column container: a column fragment is not a containing block
-  // an absolutely-positioned child can be trusted against, so the popover is
-  // `position: fixed` and wants viewport coordinates. getBoundingClientRect()
-  // already returns those.
+  // The hover model has one hazard that is easy to ship broken: the popover
+  // has to survive the pointer travelling *into* it. Clearing the peek
+  // straight from the tile's pointerleave closes it in the gap between tile
+  // and popover, so its rows -- which are the destinations for a vendor with
+  // several entries -- can never be clicked. Hence the close is scheduled
+  // rather than immediate, and the popover cancels it on enter.
+  //
+  // Position is measured here rather than in the popover because the tiles
+  // live inside a CSS multi-column container: a column fragment is not a
+  // containing block an absolutely-positioned child can be trusted against,
+  // so the popover is `position: fixed` and wants viewport coordinates,
+  // which is what getBoundingClientRect() already returns.
   const [peek, setPeek] = useState<{ group: VendorGroup; position: { top: number; left: number } } | null>(null);
-  const [expandedService, setExpandedService] = useState<string | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
 
   const positionFor = useCallback((anchor: HTMLElement) => {
     const rect = anchor.getBoundingClientRect();
@@ -225,38 +238,42 @@ export function App() {
 
   const handlePeek = useCallback(
     (group: VendorGroup, anchor: HTMLElement) => {
-      // A pinned popover outranks hover: moving the pointer across the board
-      // must not silently replace the thing the reader deliberately opened.
-      if (expandedService !== null) return;
+      cancelClose();
       setPeek({ group, position: positionFor(anchor) });
     },
-    [expandedService, positionFor]
+    [cancelClose, positionFor]
   );
 
+  // Scheduled, not immediate -- see the hover-bridge note above. The delay is
+  // the time a pointer needs to cross a 6px gap, not a deliberate dwell.
   const handlePeekEnd = useCallback(() => {
-    if (expandedService !== null) return;
-    setPeek(null);
-  }, [expandedService]);
+    cancelClose();
+    closeTimerRef.current = window.setTimeout(() => {
+      setPeek(null);
+      closeTimerRef.current = null;
+    }, 120);
+  }, [cancelClose]);
+
+  useEffect(() => cancelClose, [cancelClose]);
 
   const handleActivate = useCallback(
-    (group: VendorGroup, anchor: HTMLElement) => {
+    (group: VendorGroup) => {
+      // One entry: the tile *is* the page, so open it.
+      //
+      // Several entries: there is no page to open -- "Fly.io" is not a
+      // document, five Fly.io deployments are -- so the tile does not
+      // navigate and the popover's rows stay the destinations. The popover is
+      // already open, because hover opened it.
       if (group.entries.length === 1) {
-        setExpandedService(null);
         setPeek(null);
         handleSelect(group.entries[0].id);
-        return;
       }
-      // Several entries: pin the popover so it survives the pointer leaving
-      // the tile, and toggle it closed if this tile is already pinned.
-      setExpandedService((current) => (current === group.service ? null : group.service));
-      setPeek({ group, position: positionFor(anchor) });
     },
-    [handleSelect, positionFor]
+    [handleSelect]
   );
 
   useEffect(() => {
     setPeek(null);
-    setExpandedService(null);
   }, [selectedId, mode]);
 
   // Escape closes the panel, only while one is open -- the listener is
@@ -337,7 +354,6 @@ export function App() {
                 services={state.payload.services}
                 readAt={state.payload.readAt}
                 selectedId={selectedId}
-                expandedService={expandedService}
                 onActivate={handleActivate}
                 onPeek={handlePeek}
                 onPeekEnd={handlePeekEnd}
@@ -374,6 +390,8 @@ export function App() {
               dependentsById={dependentCounts(state.payload.edges)}
               labelForId={edgeMaps.labelForId}
               onOpen={handleSelect}
+              onPointerEnter={cancelClose}
+              onPointerLeave={handlePeekEnd}
             />
           )}
           {/* The text edge list used to render under the list view, on the

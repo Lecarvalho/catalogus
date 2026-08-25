@@ -41,9 +41,7 @@ export interface ProjectBoardProps {
   /** Server-stamped moment the manifest was read; every recency mark measures from it. */
   readAt: string;
   selectedId: string | null;
-  /** Catalog slug of the tile whose popover is pinned open, if any. */
-  expandedService: string | null;
-  onActivate: (group: VendorGroup, anchor: HTMLElement) => void;
+  onActivate: (group: VendorGroup) => void;
   onPeek: (group: VendorGroup, anchor: HTMLElement) => void;
   onPeekEnd: () => void;
 }
@@ -52,7 +50,6 @@ export function ProjectBoard({
   services,
   readAt,
   selectedId,
-  expandedService,
   onActivate,
   onPeek,
   onPeekEnd,
@@ -72,7 +69,6 @@ export function ProjectBoard({
           services={group.services}
           readAt={readAt}
           selectedId={selectedId}
-          expandedService={expandedService}
           onActivate={onActivate}
           onPeek={onPeek}
           onPeekEnd={onPeekEnd}

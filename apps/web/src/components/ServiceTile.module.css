@@ -45,14 +45,6 @@
   border-color: var(--color-line-strong);
 }
 
-/* A multi-entry tile whose popover is pinned open by a click. Same treatment
-   as selection, because it is the same statement: this is the one you are
-   looking at. */
-.expanded {
-  background: var(--color-surface-sunken);
-  border-color: var(--color-line-strong);
-}
-
 /*
  * The status mark: a bar across the top edge, full width, 3px. Length and
  * position carry the meaning, so it reads with colour removed entirely.

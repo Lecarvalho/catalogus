@@ -21,9 +21,16 @@
   border: 1px solid var(--color-line-strong);
   background: var(--color-surface);
   box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.12);
-  /* The pointer is travelling toward a tile, not toward this: it must never
-     intercept a hover meant for the board underneath. Rows re-enable it. */
-  pointer-events: none;
+  /*
+   * The popover accepts the pointer. An earlier version set
+   * `pointer-events: none` here to keep it from intercepting hovers meant
+   * for the board, and that made its rows unreachable: the pointer left the
+   * tile, the peek cleared, and the popover was gone before it could be
+   * entered. It now hosts the hover bridge instead -- entering cancels the
+   * scheduled close (see App.tsx) -- which is both reachable and correct,
+   * because a popover under the pointer is a popover the reader is using.
+   */
+  pointer-events: auto;
 }
 
 .header {
@@ -69,9 +76,6 @@
   font-family: inherit;
   text-align: left;
   cursor: pointer;
-  /* Re-enabled against the container's `none`: the rows are the one part of
-     this that is meant to be clickable. */
-  pointer-events: auto;
 }
 
 .entries li:first-child .entry {

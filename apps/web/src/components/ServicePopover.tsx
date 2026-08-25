@@ -11,8 +11,12 @@
 //   - **One entry:** the summary of that entry. Hovering has already told the
 //     reader what clicking will open, which is what makes the click cheap.
 //   - **Several entries:** a chooser. The vendor is not itself a page --
-//     there is no "Fly.io" document, there are four Fly.io deployments --
+//     there is no "Fly.io" document, there are five Fly.io deployments --
 //     so this lists them and each row is the destination.
+//
+// It appears on **hover**, not on click. An earlier build pinned it on click
+// and the owner corrected that: the click is for opening the page, and
+// spending it on a preview leaves the reader no gesture for the real thing.
 //
 // It carries no close button and traps no focus, because it is a peek, not a
 // dialog. The page is where a reader lands and stays; anything that makes
@@ -33,6 +37,16 @@ export interface ServicePopoverProps {
   /** Resolves an entry id to a readable label, for a `replaced_by` target. */
   labelForId: (id: string) => string;
   onOpen: (id: string) => void;
+  /**
+   * The hover bridge. The tile schedules this popover's close on pointer
+   * leave rather than clearing it outright, and these two cancel and
+   * re-arm that timer -- without them the popover closes in the gap between
+   * the tile and itself, and its rows can never be reached. For a vendor
+   * with several entries those rows are the only route to a page, so this
+   * is load-bearing rather than a nicety.
+   */
+  onPointerEnter: () => void;
+  onPointerLeave: () => void;
 }
 
 export function ServicePopover({
@@ -42,6 +56,8 @@ export function ServicePopover({
   dependentsById,
   labelForId,
   onOpen,
+  onPointerEnter,
+  onPointerLeave,
 }: ServicePopoverProps) {
   const multiple = group.entries.length > 1;
 
@@ -53,6 +69,8 @@ export function ServicePopover({
       // already names through its own accessible label, so announcing it
       // again would read the same thing twice. It exists for the eye.
       role="presentation"
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
       <header className={styles.header}>
         <span className={styles.name}>{group.name}</span>
@@ -103,12 +121,13 @@ export function ServicePopover({
       </ul>
 
       {/*
-        The one instruction, and only where it is not obvious. A single-entry
-        popover's tile opens on click, which the reader is about to discover
-        for free. A multi-entry tile does not open anything, so the rows are
-        the destinations and that has to be said once.
+        Said once, and only where it is not already obvious. A single-entry
+        tile opens on click, which the reader discovers for free the first
+        time. A multi-entry tile deliberately does not navigate -- there is no
+        vendor page to navigate to -- so the rows being the destinations has
+        to be stated.
       */}
-      <p className={styles.hint}>{multiple ? "Choose one to open its page." : "Click to open its page."}</p>
+      <p className={styles.hint}>{multiple ? "Choose one to open its page." : "Click the tile to open its page."}</p>
     </div>
   );
 }

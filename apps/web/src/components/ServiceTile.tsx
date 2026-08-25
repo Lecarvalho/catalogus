@@ -40,14 +40,12 @@ export interface ServiceTileProps {
   readAt: string;
   /** True when any entry in this group is the currently selected one. */
   selected: boolean;
-  /** Expanded means this tile's popover is pinned open by a click. */
-  expanded: boolean;
-  onActivate: (group: VendorGroup, anchor: HTMLElement) => void;
+  onActivate: (group: VendorGroup) => void;
   onPeek: (group: VendorGroup, anchor: HTMLElement) => void;
   onPeekEnd: () => void;
 }
 
-export function ServiceTile({ group, readAt, selected, expanded, onActivate, onPeek, onPeekEnd }: ServiceTileProps) {
+export function ServiceTile({ group, readAt, selected, onActivate, onPeek, onPeekEnd }: ServiceTileProps) {
   const count = group.entries.length;
 
   // The mark is derived from a synthetic entry carrying the group's worst
@@ -69,14 +67,10 @@ export function ServiceTile({ group, readAt, selected, expanded, onActivate, onP
     <button
       type="button"
       id={serviceTileDomId(group.service)}
-      className={`${styles.tile} ${selected ? styles.selected : ""} ${expanded ? styles.expanded : ""}`}
+      className={`${styles.tile} ${selected ? styles.selected : ""}`}
       aria-label={label}
-      // A multi-entry tile opens a popover listing its entries rather than
-      // navigating, so it is a disclosure control and says so. A
-      // single-entry tile navigates, and carries no expanded state.
-      aria-expanded={count > 1 ? expanded : undefined}
       aria-current={selected ? "true" : undefined}
-      onClick={(event) => onActivate(group, event.currentTarget)}
+      onClick={() => onActivate(group)}
       // Pointer events rather than mouseenter/mouseleave so a touch device,
       // which has no hover at all, never gets a popover it cannot dismiss.
       // On touch the click path is the whole interaction, which is the right

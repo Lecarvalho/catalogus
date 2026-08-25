@@ -26,9 +26,7 @@ export interface BandModuleProps {
   services: ViewService[];
   readAt: string;
   selectedId: string | null;
-  /** Catalog slug of the tile whose popover is pinned open, if any. */
-  expandedService: string | null;
-  onActivate: (group: VendorGroup, anchor: HTMLElement) => void;
+  onActivate: (group: VendorGroup) => void;
   onPeek: (group: VendorGroup, anchor: HTMLElement) => void;
   onPeekEnd: () => void;
 }
@@ -38,7 +36,6 @@ export function BandModule({
   services,
   readAt,
   selectedId,
-  expandedService,
   onActivate,
   onPeek,
   onPeekEnd,
@@ -75,7 +72,6 @@ export function BandModule({
             group={group}
             readAt={readAt}
             selected={group.entries.some((entry) => entry.id === selectedId)}
-            expanded={group.service === expandedService}
             onActivate={onActivate}
             onPeek={onPeek}
             onPeekEnd={onPeekEnd}
