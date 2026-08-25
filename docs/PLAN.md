@@ -1772,6 +1772,14 @@ database node gets a database icon whoever the vendor is.
       (removing the `measured` line above), which is the honest way to say that fix has no
       automated coverage rather than implying the suite covers everything.
 
+      **NOT VALIDATED BY A SEPARATE AGENT, and that is the one gap in this box.** CLAUDE.md's
+      process is orchestrate / implement / validate, with the validation done by a subagent that
+      did not write the code, because the failure mode here has always been plausible code checked
+      by whoever wrote it. This slice was written and checked by the same session. The mutations
+      and the live run are real evidence and they are all first-party evidence. **Treat every
+      claim in this box as unverified until an independent pass reproduces it**, and run that pass
+      before building anything on top of the canvas.
+
       **The bundle budget survived, and by a better route than the decision expected.** Decision 6
       accepted growth; the default view took none. `@xyflow/react` and elkjs are both behind
       dynamic imports, so the initial chunk is **161.65 KB** against the 161 KB it was before this
