@@ -88,4 +88,54 @@ describe("ServiceList", () => {
     render(<ServiceList services={[]} selectedId={null} onSelect={vi.fn()} />);
     expect(screen.getByText("No services declared.")).not.toBeNull();
   });
+
+  // Two entries of one vendor under one heading used to render as the same
+  // node twice -- same icon, same display name, nothing to tell them apart
+  // until one was clicked (docs/PLAN.md, Phase 3.7's five smaller viewer
+  // defects).
+  it("shows the local id on both nodes when two entries in a group share a display name", () => {
+    render(
+      <ServiceList
+        services={[
+          makeViewService({ id: "supabase-db", role: "database-primary", rollup: "database", name: "Supabase" }),
+          makeViewService({ id: "supabase-auth", role: "database-auth", rollup: "database", name: "Supabase" }),
+        ]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("button", { name: /Supabase.*supabase-auth/ })).not.toBeNull();
+    expect(screen.getByRole("button", { name: /Supabase.*supabase-db/ })).not.toBeNull();
+  });
+
+  it("leaves the id off a name only one entry in the group carries", () => {
+    render(
+      <ServiceList
+        services={[
+          makeViewService({ id: "supabase-db", role: "database", rollup: "database", name: "Supabase" }),
+          makeViewService({ id: "fly-api", role: "hosting", rollup: "hosting", name: "Fly.io" }),
+        ]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("button", { name: "Supabase" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Fly.io" })).not.toBeNull();
+  });
+
+  // The scope is the group, not the manifest: two headings already tell
+  // these two apart, and showing the id anyway is noise on every node.
+  it("leaves the id off when the shared display name is split across two groups", () => {
+    render(
+      <ServiceList
+        services={[
+          makeViewService({ id: "supabase-db", role: "database", rollup: "database", name: "Supabase" }),
+          makeViewService({ id: "supabase-auth", role: "auth", rollup: "auth", name: "Supabase" }),
+        ]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getAllByRole("button", { name: "Supabase" })).toHaveLength(2);
+  });
 });
