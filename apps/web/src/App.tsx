@@ -7,8 +7,9 @@
 // calls the panel's open/close needs. Every component this renders is pure -- props in, no fetch, no
 // window/location, no node import, no module-level singleton -- which is
 // what lets them move to a shared package later as a file move rather than
-// a rewrite (docs/PLAN.md's Phase 3.7 styling decisions), and what the next
-// slice relies on when it swaps ServiceList's list container for a canvas.
+// a rewrite (docs/PLAN.md's Phase 3.7 styling decisions), and what let the
+// canvas and the migration board each drop in beside ServiceList without
+// touching how selection or data loading work.
 //
 // No router dependency: one route doesn't warrant react-router, so this is
 // plain `hashchange` plus the one hook below (hash-route.ts carries the
@@ -21,6 +22,7 @@ import styles from "./App.module.css";
 import { EdgesList } from "./components/EdgesList.js";
 import { ErrorState } from "./components/ErrorState.js";
 import { LoadingState } from "./components/LoadingState.js";
+import { MigrationList } from "./components/MigrationList.js";
 import { ProjectHeader } from "./components/ProjectHeader.js";
 import { ServiceDetailPanel } from "./components/ServiceDetailPanel.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
@@ -84,7 +86,8 @@ export function App() {
   // Plain state, deliberately not a second route: docs/PLAN.md's Phase 3.7
   // DAG decision 1 chose a toggle over `#/graph` precisely so the viewer
   // stays one addressable page, and `#/service/<id>` keeps addressing the
-  // panel from either view.
+  // panel from any of the three views -- the migration board joined the
+  // same toggle for the same reason (ViewToggle.tsx's top comment).
   const [mode, setMode] = useState<ViewMode>("list");
 
   // Panel focus management: a click captures whatever had focus (the node
@@ -254,7 +257,7 @@ export function App() {
           <div className={styles.body}>
             {mode === "list" ? (
               <ServiceList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
-            ) : (
+            ) : mode === "graph" ? (
               <Suspense fallback={<p>Loading the graph…</p>}>
                 <GraphCanvas
                   services={state.payload.services}
@@ -264,6 +267,8 @@ export function App() {
                   layout={layoutWithElk}
                 />
               </Suspense>
+            ) : (
+              <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
             )}
             {selectedService && (
               <ServiceDetailPanel
@@ -278,7 +283,12 @@ export function App() {
           </div>
           {/* The text edge list is the list view's way of showing edges at
               all. On the canvas the same edges are drawn, so repeating them
-              underneath is the same information twice. */}
+              underneath is the same information twice. On the migration
+              board it is noise a different way: that board is about which
+              *nodes* still need a decision, not the whole dependency graph,
+              and the replacement each row already names is the one edge a
+              migration reader cares about -- the full edge list answers a
+              question this mode isn't asking. */}
           {mode === "list" && <EdgesList edges={state.payload.edges} labelForId={edgeMaps.labelForId} />}
         </>
       )}

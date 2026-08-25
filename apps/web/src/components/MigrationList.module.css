@@ -1,0 +1,125 @@
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Same treatment as ServiceGroup.module.css's `.heading` -- one vocabulary
+   for a section label across the list and this board, not two. */
+.heading {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* A row's own service, as a button -- ServiceNode's shape, reused here for
+   the same reason: keyboard operability and the accessible name come from a
+   native control, not a styled span with a click handler bolted on. */
+.service {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.service:hover {
+  border-color: var(--color-accent);
+}
+
+.service:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Selected, mirroring ServiceNode.module.css's `.selected`: border colour,
+   background tint and the heavier inset ring together, so the cue survives
+   a viewer who cannot separate the accent hue from the border hue. */
+.service[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+.name {
+  font-weight: 600;
+}
+
+/* Same monospace-and-muted treatment ServiceNode.module.css's `.id` and
+   ServiceDetailPanel.module.css's `.id` give a raw slug -- one vocabulary
+   for "this is an id", not a third one invented here. */
+.id {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--color-text-muted);
+}
+
+.arrow {
+  color: var(--color-text-muted);
+}
+
+.replacement {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+/* Reads as an unanswered question, not an error -- italic and muted rather
+   than the status colours, which are already spoken for by StatusPill. */
+.noReplacement {
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.sectionEmpty,
+.empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* Visually hidden, not display:none -- still read by assistive tech, just not
+   painted. Copied rather than shared with ServiceNode.module.css: CSS Modules
+   scope class names per file, so there is no cross-file selector to reuse
+   without a global stylesheet this app does not have. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

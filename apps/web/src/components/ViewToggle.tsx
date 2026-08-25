@@ -1,35 +1,44 @@
-// Pure. The one control that switches between the grouped list and the DAG.
+// Pure. The one control that switches between the grouped list, the DAG,
+// and the migration board.
 //
 // A toggle rather than a second route or a replacement, per docs/PLAN.md's
-// Phase 3.7 DAG decision 1: the list answers "what does this project use" and
-// the graph answers "what breaks if this dies", both are questions the viewer
-// exists for, and neither has been used against a real manifest yet. The list
-// stays the default.
+// Phase 3.7 DAG decision 1: the list answers "what does this project use"
+// and the graph answers "what breaks if this dies", both are questions the
+// viewer exists for, and neither has been used against a real manifest yet.
+// The migrations view joined the same toggle rather than a fourth route for
+// the same reason, answering a third question this viewer exists for --
+// "what still needs a decision" -- when the scope widened on 2026-08-25.
+// The list stays the default.
 //
-// A radio group, not two buttons or a checkbox: the two views are mutually
+// A radio group, not a row of buttons or a checkbox: the views are mutually
 // exclusive options of one setting. `role="radiogroup"`/`role="radio"`
 // announce that relationship to assistive tech, but a role only describes --
 // it does not implement. Native `<input type="radio">` gets arrow-key
 // navigation and a single tab stop from the browser's own key handling for
-// free; a `<button>` wearing the same role gets none of it. Measured:
-// ArrowRight moved neither focus nor selection, both buttons carried
-// `tabindex` null, and both sat in the tab order -- a widget announcing
-// itself as one control and behaving as two unrelated ones, which is exactly
-// the mismatch the role was supposed to head off.
+// free; a `<button>` wearing the same role gets none of it. Measured, back
+// when this group had two options: ArrowRight moved neither focus nor
+// selection, both buttons carried `tabindex` null, and both sat in the tab
+// order -- a widget announcing itself as one control and behaving as
+// unrelated ones, which is exactly the mismatch the role was supposed to
+// head off.
 //
 // So the roving-tabindex pattern is implemented here by hand: the checked
 // option is the only one with `tabIndex={0}` (the group's single tab stop),
-// the other is `tabIndex={-1}` (still reachable once the group has focus,
-// just not from Tab), and the arrow keys move both focus and selection
-// between them with wraparound. A checkbox would say "graph: on/off", which
-// is not what this is, and two independent buttons -- the thing this would
-// have been without the fix above -- announce no relationship at all.
+// every other option is `tabIndex={-1}` (still reachable once the group has
+// focus, just not from Tab), and the arrow keys move both focus and
+// selection along the group with wraparound. The invariant is "exactly one
+// tab stop", not "the other of two" -- it was written for two options and
+// held unchanged when the third arrived, because everything here is derived
+// from MODES rather than from a count. A checkbox would say "graph: on/off",
+// which is not what this is, and a row of independent buttons -- the thing
+// this would have been without the fix above -- announces no relationship at
+// all.
 import { useEffect, useRef } from "react";
 import type { KeyboardEvent } from "react";
 
 import styles from "./ViewToggle.module.css";
 
-export type ViewMode = "list" | "graph";
+export type ViewMode = "list" | "graph" | "migrations";
 
 export interface ViewToggleProps {
   mode: ViewMode;
@@ -39,6 +48,7 @@ export interface ViewToggleProps {
 const MODES: { value: ViewMode; label: string; hint: string }[] = [
   { value: "list", label: "List", hint: "Everything this project uses, grouped by rollup" },
   { value: "graph", label: "Graph", hint: "The dependency graph, laid out left to right" },
+  { value: "migrations", label: "Migrations", hint: "Everything phasing out or deprecated, with its replacement" },
 ];
 
 export function ViewToggle({ mode, onChange }: ViewToggleProps) {
@@ -115,7 +125,8 @@ export function ViewToggle({ mode, onChange }: ViewToggleProps) {
             title={option.hint}
             className={`${styles.option} ${checked ? styles.current : ""}`}
             // The roving half of roving tabindex: only the checked option is
-            // in the Tab order, so the group is one tab stop rather than two.
+            // in the Tab order, so the group is one tab stop rather than one
+            // per option.
             tabIndex={checked ? 0 : -1}
             onClick={() => onChange(option.value)}
             onKeyDown={(event) => handleKeyDown(event, index)}

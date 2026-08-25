@@ -54,15 +54,17 @@ design decisions; this file tracks *what has been built* against it and what rem
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **969 tests / 56 files**, plus `pnpm typecheck`
+Run `pnpm build && pnpm test` first and confirm **1001 tests / 58 files**, plus `pnpm typecheck`
 clean across all four packages, before trusting anything below. (Phases 0–3.6 and the 3.6.1
 correction pass predate this at 549/38, the viewer-foundations session ended at 679/50, and the
 drift-and-corpus session that followed ended at 879/52 — 200 of those tests are two committed
 corpora plus two components' first test files, not 200 new behaviours. The 30 added on 2026-08-25
 are the five smaller viewer defects and `App.tsx`'s first test file, and the 42 after that are the
 DAG slice: `graph-layout.test.ts`, `GraphCanvas.test.tsx`, `ViewToggle.test.tsx`, the kind cues on
-the node, and one more example manifest for the schema drift test to validate. The last 6 are the
-Layer 3 empty state, which adds no file — it is a section of `ServiceDetailPanel`.)
+the node, and one more example manifest for the schema drift test to validate. Then 6 for the
+Layer 3 empty state, which adds no file — it is a section of `ServiceDetailPanel`. The last 32 are
+the migration dashboard: 22 from the slice itself in two new files, and 10 more added by its
+validation pass, which is the more interesting number of the two.)
 
 **Run it more than once before believing it.** That session's own corpus made the suite fail on
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
@@ -321,11 +323,24 @@ off. `catalogus graph` already renders all three as text — `nginx (ingress-pro
 `dotnet (runtime-backend, stack, v10)` — which is the cheapest reference for what the web viewer
 has to say too.
 
-**Two things it does not exercise, and the viewer needs both.** It carries no `status`/`replaced_by`
-entries, so nothing on disk covers status colours or the migration view — use
-`examples/reference.catalogus.yaml`, which does. And it predates `kind`, so every node in it is a
-`service`: the component and stack rendering has no real input yet either. Check the counts above
-against the file before relying on them; the numbers in this document have already been stale once.
+**Two things the Clapline manifest did not exercise, and the viewer needed both.** It carried no
+`status`/`replaced_by` entries, so nothing on disk covered status colours or the migration view,
+and it predated `kind`, so every node in it was a `service`.
+
+**Rewritten 2026-08-25 to say which manifest it means, because the antecedent had come loose.**
+This paragraph said "it", and the nearest manifest named above it is now
+`examples/layout-stress.catalogus.yaml` — which carries five `status` entries and four
+`replaced_by` targets and has every `kind`, so the sentence read as flatly false about the file a
+reader would naturally attach it to. The validation pass on the migration dashboard read it exactly
+that way and reported it as a stale claim about layout-stress. It was not: `git log -S` puts it in
+`1d9b9cc`, where the subject was the real 26-service Clapline manifest — which has since been
+**deleted** (checked 2026-08-24, see above). So both halves are now past tense, and the fixture
+guidance is stated directly rather than by pronoun: **for status colours and the migration board,
+`examples/layout-stress.catalogus.yaml` is the better fixture** — 2 `phasing_out`, 2 `deprecated`
+(one of them with no `replaced_by` at all, which is the row the board exists to surface) and 1
+`removed`, against `examples/reference.catalogus.yaml`'s single `phasing_out`. Check the counts
+above against the files before relying on them; the numbers in this document have gone stale more
+than once, and a pronoun with no live referent is how one of them did it.
 
 Phase 4 (backend) stays deferred by owner decision. Phase 6 (MCP) and Phase 5 (auth/push) are
 untouched.
@@ -1944,7 +1959,87 @@ database node gets a database icon whoever the vendor is.
       file. The audit cleared everything else and recorded *why* at each site, so the next person
       checking this class reads a reason rather than re-deriving one.
 - [ ] Portfolio page: project list, service usage matrix across projects
-- [ ] Migration dashboard: everything `phasing_out` with its replacement
+- [x] **Migration dashboard: everything `phasing_out` with its replacement.** Shipped as a third
+      `ViewToggle` mode beside List and Graph — same one-addressable-page reasoning as DAG decision
+      1, and the roving-tabindex radiogroup absorbed a third option without a line of its key
+      handling changing, because it was written over `MODES` rather than over a count.
+      **1001 tests / 58 files** on three consecutive runs, `pnpm typecheck` clean across four
+      packages.
+
+      **Scope widened by the owner, 2026-08-25, and this box is the record the code cites.** The
+      board lists `phasing_out` *and* `deprecated`, in two sections — "In flight" and "Overdue".
+      `removed` is not listed: that migration is finished. `active` never enters the conversation.
+      The wording in this checkbox and in HANDOFF §4.2 query 4 both say `phasing_out` alone; the
+      widening is deliberate and this line is what makes `migrations.ts`'s citation of it true.
+      Against `examples/layout-stress.catalogus.yaml` that is 4 rows, and the one that argues for
+      the widening is `legacy-ledger` — **deprecated with no `replaced_by` at all**, a migration
+      with no destination, which the narrow reading would have hidden.
+
+      **Half of HANDOFF §4.2 query 4 is not answerable and the code says so.** The query asks for
+      "all edges/**nodes** marked `phasing_out`". An edge carries no status: the manifest's object
+      edge form allows `from`, `to` and `notes` and nothing else, and by the time an edge reaches
+      the viewer it is `{from, to}`. So the nodes half ships and the edges half stays uncovered
+      until Layer 2 grows a field for it. `migrations.ts`'s header states that rather than letting
+      a reader assume the query was met.
+
+      **The validation pass found one live bug, and it was a regression of a bug this file already
+      records as fixed.** `App.tsx` restores focus when the detail panel closes by looking up
+      `serviceNodeDomId(id)`; the board's rows carried no such id, so on the migration board — and
+      only there — closing a panel dropped focus to `<body>`. That is the exact state `App.tsx`'s
+      own focus comment describes finding and fixing once, and `serviceNodeDomId`'s doc comment had
+      already predicted the shape of it in writing: *"a focus restore that silently finds nothing is
+      invisible in a passing test suite."* Two independent A/B runs pinned it to migrations mode
+      alone. Fixed, and now held end to end by a test that goes red when the id is removed.
+
+      **The more useful finding was what the green suite did not know.** Four mutations to
+      `App.tsx` — swapping the board for the service list, swapping it for a bare paragraph,
+      widening the page in the wrong mode, and un-suppressing the text edge list — each left all
+      991 tests passing. `App.test.tsx` had not been touched by the slice; its describe block still
+      read "the list/graph toggle" and it never clicked the third option. All four now fail.
+
+      **And one assertion was inert in a way worth writing down.** The new `constructor` test —
+      guarding the prototype-pollution class this repo has produced five times — seeded a service
+      whose id *was* `constructor`, making the key an **own** property, which an object literal
+      shadows just as a `Map` does. Swapping the `Map` for a keyed literal left all 991 tests green.
+      The distinction `StatusPill.tsx` already draws is the whole point: *absent* and *inherited*
+      keys are different things and only one is a bug. The test now uses an absent target, and the
+      swap fails it — `constructor (function Object() { [native code] })` against the expected
+      `constructor`. Worth noting that the schema's id pattern rejects `__proto__`, so `constructor`
+      is the only `Object.prototype` key a manifest can express: the one reachable case was the one
+      the test was not exercising.
+
+      **Three more untested behaviours, now held:** `ViewToggle`'s `contains` focus-thief guard
+      (removing it had left the suite green — the effect must follow focus, never acquire it), the
+      row's `StatusPill`, and the overdue section's sort, which had been covered only in the pure
+      module. Each was mutated and each mutation now goes red on the test naming it.
+
+      **One accessibility fix the pass reasoned to rather than heard.** The replacement sits outside
+      the row's button on purpose, so that clicking it cannot select the wrong service — which left
+      it out of the button's accessible name entirely, reachable only in a screen reader's browse
+      mode. It is now the row's `aria-describedby` target, with a visually-hidden "replaced by"
+      prefix because the arrow that carries that meaning for a sighted reader is `aria-hidden`.
+      **Not heard on an actual screen reader**, and that is the honest status of it.
+
+      **Comments corrected rather than deleted.** `ViewToggle.tsx`'s header still described a
+      two-option group in four places ("the *other* is `tabIndex={-1}`", "two independent buttons")
+      while the component had three; the implementer had fixed one such comment ninety lines below
+      and left the header. `migrations.ts` overstated the edge shape by one field. `App.tsx` still
+      pointed forward to a slice that had already shipped. This is the same failure the DAG's
+      validation pass named: *every wrong thing was a reason sitting in a comment that read more
+      authoritatively than the code under it.*
+
+      **Verified without a browser, and the gap is the same one as the box above.** All 14 CSS
+      Module keys `MigrationList.tsx` references resolve to real selectors in the built stylesheet —
+      which no test can check, because the vitest proxy answers *every* key (probed directly: an
+      undefined key comes back as `_doesNotExist_<hash>`). Contrast was computed for every
+      foreground/background pair the component produces: worst case 5.35:1, all AA. **Nobody has
+      looked at this board.** Whether a long replacement label wraps, and whether the two sections
+      read as one board rather than two lists, are open.
+
+      **A process note, because it is the point of running two passes.** The validation agent, while
+      cleaning up its own background servers, ran `taskkill /F /IM node.exe` and killed every node
+      process on the machine. No repo or file damage — the tree and the suite were verified green
+      afterwards — but a validator is not supposed to be the most destructive thing in the session.
 - [x] **Layer 3 cost panel present, rendering an explicit "not connected" empty state.** A
       `Cost & account` section at the foot of `ServiceDetailPanel`: the state line, one paragraph
       saying what Layer 3 is and that nothing is missing from the manifest, and one naming
@@ -2020,9 +2115,12 @@ CTE against a real Postgres before choosing a host. It powers nothing in the vie
 
 Everything below needs Layer 3 and cross-user data, so it waits on Phase 4.
 
-**Read the first three items as "backed by the platform", not as unbuilt.** The app, the DAG and
-the status colours all exist as of Phase 3.7 and read manifests directly; what Phase 7 adds is the
-store behind them. They are listed again here because the data path is the whole difference.
+**Read four of these as "backed by the platform", not as unbuilt.** The app, the DAG, the status
+colours and the migration dashboard all exist as of Phase 3.7 and read manifests directly; what
+Phase 7 adds is the store behind them. They are listed again here because the data path is the
+whole difference. (This said "the first three" until 2026-08-25, when the migration dashboard
+shipped and made it wrong — the same drift the fixture paragraph above records, and worth the
+same correction rather than a quiet edit.)
 
 - [ ] React + Vite app
 - [ ] Per-project DAG: elkjs layout, React Flow render, `simple-icons` brand icons

@@ -15,6 +15,7 @@ import type { ViewPayload, ViewService } from "@catalogus/cli";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App.js";
+import appStyles from "./App.module.css";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
 import { makeViewService } from "./test-support/fixtures.js";
 
@@ -228,7 +229,7 @@ describe("App -- focus when the panel closes", () => {
 
 // The toggle, per docs/PLAN.md's Phase 3.7 DAG decision 1: a view switch, the
 // list as default, and one addressable page rather than a second route.
-describe("App -- the list/graph toggle", () => {
+describe("App -- the view toggle", () => {
   it("starts on the list", async () => {
     await renderLoaded();
     expect(screen.getByRole("radio", { name: "List" }).getAttribute("aria-checked")).toBe("true");
@@ -259,6 +260,94 @@ describe("App -- the list/graph toggle", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /Fly\.io/ }).getAttribute("aria-pressed")).toBe("true"));
     expect(screen.getByRole("region")).not.toBeNull();
     expect(window.location.hash).toBe("#/service/fly-api");
+  });
+
+  // The migration board's App-level wiring. Every assertion below was added
+  // because the validation pass mutated the corresponding line in App.tsx and
+  // watched all 991 tests stay green: the board could have been swapped for
+  // the service list, or for a bare paragraph, and nothing would have said so.
+  // The board's own behaviour is MigrationList.test.tsx's; what these hold is
+  // that App renders it, in the right mode, with the right neighbours.
+  //
+  // A payload with something to migrate: the default fixture is all-active,
+  // which renders the board's all-clear state and would make "is the board
+  // there" indistinguishable from "is anything there".
+  const migratingPayload = () =>
+    payload({
+      services: [
+        makeViewService({ id: "fly-api", role: "hosting-api", rollup: "hosting", name: "Fly.io" }),
+        makeViewService({ id: "supabase-db", role: "database", rollup: "database", name: "Supabase", status: "phasing_out", replaced_by: "fly-api" }),
+      ],
+    });
+
+  it("swaps the list for the migration board, and back", async () => {
+    await renderLoaded(migratingPayload());
+    fireEvent.click(screen.getByRole("radio", { name: "Migrations" }));
+
+    // The board's section headings are its own; the rollup headings are the
+    // list's, and exactly one of the two sets is on the page at a time.
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull());
+    expect(screen.queryByRole("heading", { level: 2, name: "Overdue" })).not.toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: "Hosting" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "List" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "Hosting" })).not.toBeNull());
+    expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).toBeNull();
+  });
+
+  it("drops the text edge list on the migration board too", async () => {
+    await renderLoaded(migratingPayload());
+    expect(screen.queryByRole("heading", { level: 2, name: "Dependencies" })).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Migrations" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull());
+    // The board names the replacement in its own row; what is gone is the
+    // whole-manifest edge list underneath, which answers a different question
+    // than the one this view was opened to ask.
+    expect(screen.queryByRole("heading", { level: 2, name: "Dependencies" })).toBeNull();
+  });
+
+  // The wide page is the canvas's alone -- a graph needs the horizontal room,
+  // a list and a board do not. This asserts the class App actually applies,
+  // not that the stylesheet defines a rule for it: vitest's CSS Module proxy
+  // synthesises a class name for *any* key (probed: an undefined key comes
+  // back as `_doesNotExist_<hash>`), so no test in this suite can see whether
+  // `.wide` still exists in App.module.css.
+  it("widens the page for the canvas only", async () => {
+    // `!` because the base tsconfig sets noUncheckedIndexedAccess and
+    // vite/client types a CSS Module as an index signature -- the same reason
+    // MODES[...]! reads that way in ViewToggle.tsx. Under vitest the proxy
+    // answers every key, which is exactly the weakness this test's comment
+    // above owns up to.
+    const wide = appStyles.wide!;
+    await renderLoaded(migratingPayload());
+    const main = () => document.querySelector("main")!;
+    expect(main().classList.contains(wide)).toBe(false);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
+    await waitFor(() => expect(main().classList.contains(wide)).toBe(true));
+
+    fireEvent.click(screen.getByRole("radio", { name: "Migrations" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull());
+    expect(main().classList.contains(wide)).toBe(false);
+  });
+
+  // A regression guard, and the bug it guards was live: the board's rows had
+  // no `serviceNodeDomId`, so the close-focus fallback below found nothing and
+  // focus fell to `<body>` -- in this view and no other. That is the exact
+  // state App.tsx's own focus comment says was already found and fixed once,
+  // which is what makes it worth a test rather than a fix alone.
+  it("hands focus back to the board's row when a deep-linked panel closes", async () => {
+    window.history.replaceState(null, "", "/#/service/supabase-db");
+    await renderLoaded(migratingPayload());
+    fireEvent.click(screen.getByRole("radio", { name: "Migrations" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull());
+
+    // Nothing on the page opened this panel -- the hash did -- so the opener
+    // ref is null and the id lookup is the only path left.
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(document.activeElement).toBe(document.getElementById(serviceNodeDomId("supabase-db"))));
+    expect(document.activeElement).not.toBe(document.body);
   });
 
   it("drops the text edge list on the canvas, where the same edges are drawn", async () => {
