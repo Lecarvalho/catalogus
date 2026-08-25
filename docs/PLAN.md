@@ -54,14 +54,15 @@ design decisions; this file tracks *what has been built* against it and what rem
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **963 tests / 56 files**, plus `pnpm typecheck`
+Run `pnpm build && pnpm test` first and confirm **969 tests / 56 files**, plus `pnpm typecheck`
 clean across all four packages, before trusting anything below. (Phases 0–3.6 and the 3.6.1
 correction pass predate this at 549/38, the viewer-foundations session ended at 679/50, and the
 drift-and-corpus session that followed ended at 879/52 — 200 of those tests are two committed
 corpora plus two components' first test files, not 200 new behaviours. The 30 added on 2026-08-25
 are the five smaller viewer defects and `App.tsx`'s first test file, and the 42 after that are the
 DAG slice: `graph-layout.test.ts`, `GraphCanvas.test.tsx`, `ViewToggle.test.tsx`, the kind cues on
-the node, and one more example manifest for the schema drift test to validate.)
+the node, and one more example manifest for the schema drift test to validate. The last 6 are the
+Layer 3 empty state, which adds no file — it is a section of `ServiceDetailPanel`.)
 
 **Run it more than once before believing it.** That session's own corpus made the suite fail on
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
@@ -1944,7 +1945,51 @@ database node gets a database icon whoever the vendor is.
       checking this class reads a reason rather than re-deriving one.
 - [ ] Portfolio page: project list, service usage matrix across projects
 - [ ] Migration dashboard: everything `phasing_out` with its replacement
-- [ ] Layer 3 cost panel present, rendering an explicit "not connected" empty state
+- [x] **Layer 3 cost panel present, rendering an explicit "not connected" empty state.** A
+      `Cost & account` section at the foot of `ServiceDetailPanel`: the state line, one paragraph
+      saying what Layer 3 is and that nothing is missing from the manifest, and one naming
+      `catalogus push --private` as what fills it once the overlay exists. **969 tests / 56 files**,
+      `pnpm typecheck` clean across four packages, **6 mutations each red on exactly the test that
+      names them** and every one restored.
+
+      **Placement settled by the owner, 2026-08-25: the detail panel only.** HANDOFF §4.2's query 3
+      also wants a per-project total, and it has no home yet — the panel is per-service, and a
+      project-level Costs block was declined for now rather than invented. `ServiceDetailPanel.tsx`
+      had already recorded this destination in its own header comment, and HANDOFF §7 says
+      "private-overlay panel (cost/account ref)", so this is the placement the repo already named.
+
+      **It renders only for `kind: "service"`, and that is a rule rather than a layout choice.**
+      HANDOFF.md's 2026-08-23 amendment settled that only `service` rows can carry a cost or an
+      account reference, so a "not connected" box under a component or a stack would promise a
+      field that is never coming. Two tests hold the line, one per other kind.
+
+      **No data shape was invented, and that is the whole design.** There is no `PrivateOverlay`
+      interface, no prop, no field added to `ViewPayload`, and no runtime probe — `catalogus view`
+      serves the local manifest and has no second source, so there is nothing to check and nothing
+      to sign in to. An empty state offering a Connect button would be this project's own
+      plausible-default failure wearing a feature's clothes; Phase 4 is still blocked on a
+      decision, so the copy says the overlay does not exist *yet*. A test asserts the panel's only
+      control is still its close button.
+
+      **What was verified without a browser, and what that leaves open.** The suite covers the
+      claim, not the look: the wording, the absent action, the kind rule, the `h3` that keeps the
+      panel's outline unbroken, and the fact that the section adds no second ARIA region — the
+      panel is the one labelled region, and a mutation to a named `<section>` was run and breaks
+      *both* that new test and the pre-existing "is a labelled region" one, which is why the
+      section is a plain `<div>`.
+
+      Beyond jsdom, the built and served assets were checked directly, because this file already
+      records that vitest's CSS Module proxy synthesises a class name for any key and so cannot
+      see a typo: all five `overlay*` keys the component references resolve to real selectors in
+      the shipped stylesheet, and `catalogus view` on the reference manifest serves an entry chunk
+      carrying the heading, the state line, the command and the kind guard exactly once each.
+
+      **The gap is visual and it is stated rather than papered over.** The Chrome extension was not
+      connected in this session, so nobody has *looked* at this panel. Whether the section reads as
+      quiet rather than as an error, and whether `catalogus push --private` wraps inside a 320px
+      column instead of pushing the panel sideways — `.overlayCommand` sets `overflow-wrap:
+      anywhere` for exactly that and it is cascade-derived, not measured — are open. The previous
+      slice's live run is the precedent: it is where the dead `.node > button` selector was caught.
 
       **Order settled by the owner, 2026-08-25: the cost panel first.** It is the only one of the
       three blocked on nothing — single project, no new manifest, and no Layer 3 data touched,
