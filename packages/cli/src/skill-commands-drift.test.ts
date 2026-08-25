@@ -35,9 +35,12 @@
 //     read. What an agent copies is what is fenced, so that is what is
 //     checked.
 //   - **Not the reverse direction.** Nothing here fails when the CLI grows
-//     a command SKILL.md never teaches (`view` is one today). Whether the
-//     skill should teach the viewer is a scope decision for the owner, not
-//     something a drift test gets to decide by going red.
+//     a command SKILL.md never teaches. Whether the skill should teach a
+//     given command is a scope decision for the owner, not something a
+//     drift test gets to decide by going red. `catalogus view` used to be
+//     the standing example; it is now the opposite one -- SKILL.md covers
+//     it deliberately in prose only, and the last test in this file is
+//     what keeps it there.
 //   - **Names and shapes, not semantics.** That `catalogus link fly-api
 //     supabase-db` names two ids which exist in some manifest is not
 //     knowable from here; that `link` takes two required arguments is.
@@ -312,6 +315,44 @@ describe("skills/catalogus/SKILL.md's `catalogus ...` shell lines vs. this CLI's
         "drifted under the skill once already, so its examples disappearing entirely is a change worth " +
         "looking at rather than a green test.",
     ).toBeGreaterThan(0);
+  });
+
+  // `catalogus view` is deliberately absent from every fenced block, and
+  // this is the assertion that keeps it absent.
+  //
+  // It is a server: `runView` returns exit 0 as soon as the socket is
+  // listening, but the listening socket holds the event loop open, so the
+  // process runs until Ctrl+C -- which is what its own `press Ctrl+C to
+  // stop` line says. Every other fenced line in SKILL.md is a command the
+  // agent runs itself, so a fenced `catalogus view` teaches an agent to
+  // block its own tool call until it times out, with everything after it in
+  // the agent's plan silently not happening.
+  //
+  // Nothing else would catch that. The four checks above would all pass on
+  // it: `view` is a registered command, `--port` and `--no-open` are real
+  // options, and it takes no required argument. It is a *correct* command
+  // line and still the wrong thing to teach, which is precisely the kind of
+  // decision that gets quietly undone by the next person who notices the
+  // viewer is missing from the skill and helpfully adds it. SKILL.md's own
+  // "### 8. Hand the viewer to the user" section states the rule this
+  // enforces: fenced means the agent runs it, prose means it is for the
+  // user.
+  //
+  // Scoped to the blocking commands rather than written as a general
+  // allowlist: a list of commands the skill is forbidden to teach would
+  // need maintaining, and would go stale the way everything else this file
+  // exists to catch does.
+  it("never teaches a long-running server command in a fenced block, where an agent would run it", () => {
+    const blocking = new Set(["view"]);
+    const offenders = commandLines.filter((line) => line.tokens[0] !== undefined && blocking.has(line.tokens[0]));
+    expect(
+      offenders.map((line) => `SKILL.md:${line.lineNumber} ${line.text}`),
+      "a fenced `catalogus view` tells the agent to run the viewer itself. It is a server -- it holds " +
+        "the event loop open until Ctrl+C, so the agent's tool call never returns and nothing after it " +
+        "in the agent's plan runs. The viewer is for the human: mention it in prose and let the user " +
+        "run it, which is what SKILL.md's \"Hand the viewer to the user\" section says. `catalogus " +
+        "graph` is the agent's own check -- it prints and exits.",
+    ).toEqual([]);
   });
 
   it.each(setLines)("SKILL.md:$lineNumber `$text` sets only fields `catalogus set` accepts", (line) => {

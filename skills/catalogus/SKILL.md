@@ -500,6 +500,21 @@ fails `validate` on its own and needs no flag.
 a signal to reword the user's text.** Report it. The manifest should say what is true, and a guard
 that pushes users into worse prose needs fixing rather than accommodating.
 
+### 8. Hand the viewer to the user — do not run it yourself
+
+There is a web viewer, `catalogus view`, which serves the manifest as a browsable graph on
+`127.0.0.1:4180` and opens a browser. When you are done, tell the user it exists and let them run
+it. **Never run it yourself.**
+
+It is a server: it returns nothing and holds the terminal until `Ctrl+C`, exactly as its own
+`press Ctrl+C to stop` line says. An agent that runs it stops there — the command never completes,
+and nothing after it in your plan happens.
+
+This is the one thing in this document you are told about but not told to run, so the rule that
+separates them is worth stating: **every command in a fenced block here is one you run; anything
+written only in prose, like this one, is for the user.** Your own check on the shape of what you
+built is `catalogus graph`, which prints and exits.
+
 ## Common mistakes
 
 - **Hand-writing the manifest** because the CLI was missing. Stop and say so instead.
@@ -517,6 +532,8 @@ that pushes users into worse prose needs fixing rather than accommodating.
   <id>`, not by clearing the file. It refuses (exit 1, nothing written) when another entry's
   `replaced_by` still names the one you're removing — re-point or clear that first with
   `catalogus deprecate`.
+- **Running `catalogus view` to check your work.** It is a server and it will not return. Use
+  `catalogus graph`, and hand the viewer to the user.
 
 ## Layer 3
 
