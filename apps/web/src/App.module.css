@@ -7,6 +7,14 @@
   gap: var(--space-6);
 }
 
+/* The graph wants the window. The list is a column of tiles that reads badly
+   past a comfortable measure, which is what the 960px above is for; a
+   left-to-right layered DAG is the opposite -- every extra pixel of width is
+   another rank visible without panning. */
+.wide {
+  max-width: none;
+}
+
 /* The list and the detail panel side by side -- the list never disappears
    or gets covered when a node is selected (docs/PLAN.md's Phase 3.7
    restructure: "the graph/list stays visible and the selected node stays

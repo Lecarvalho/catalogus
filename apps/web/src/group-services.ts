@@ -42,3 +42,35 @@ export function groupByRollup(services: readonly ViewService[]): ServiceGroupDat
   groups.sort((a, b) => ordinal(a.rollup, b.rollup));
   return groups;
 }
+
+/**
+ * The display names that occur more than once within one rendered set.
+ *
+ * A compact node shows the catalog display name and not the local id, so
+ * two entries of the same vendor -- a `supabase-db` and a `supabase-auth`,
+ * both rendering as "Supabase" -- are indistinguishable on screen. The
+ * caller shows the id alongside the name for exactly the names this
+ * returns and no others: showing every id would undo the shrink the
+ * compact node exists for (docs/PLAN.md, Phase 3.7).
+ *
+ * Takes the set actually being rendered rather than the whole manifest,
+ * because what matters is which names collide *where a viewer can see them
+ * side by side*: the list renders one rollup group at a time, and the
+ * canvas slice may partition the same services differently again.
+ *
+ * A Set rather than a keyed object literal, so a service displayed as
+ * `constructor` cannot resolve through Object.prototype -- the defect class
+ * this repo keeps producing (docs/PLAN.md).
+ */
+export function duplicateNames(services: readonly ViewService[]): Set<string> {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const service of services) {
+    if (seen.has(service.name)) {
+      duplicates.add(service.name);
+    } else {
+      seen.add(service.name);
+    }
+  }
+  return duplicates;
+}

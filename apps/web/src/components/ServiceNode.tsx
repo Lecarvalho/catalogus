@@ -24,12 +24,37 @@
 //    see ServiceNode.module.css's `.uncataloguedDot` comment for why a dot
 //    rather than a badge.
 //
-// A control, not a card: rendered as a real `<button>` so keyboard
-// operability (Tab to focus, Enter/Space to activate) and the accessible
-// name come from native semantics rather than a hand-rolled click handler
-// on a `<div>` or `<li>`. `aria-pressed` conveys the selected state to
-// assistive tech -- the visual `.selected` styling is never the only signal
-// for it.
+// A third that is always present but only ever *differs* for two entries in
+// three: `kind`. A vendor with an invoice, infrastructure the owner runs, and
+// the language the code is written in are not interchangeable on screen --
+// a cost rollup has to exclude the middle one rather than show it as zero --
+// so the node carries the kind as a shape (see the `.kind-*` rules in
+// ServiceNode.module.css), as a `data-kind` attribute, and, for the two
+// non-default kinds, as visually-hidden text. Three carriers because the
+// shape alone is unreadable to a screen reader and untestable without
+// computed styles.
+//
+// And one that appears only when it has to: the local id, rendered under
+// the name when `showId` says another node beside this one shows the same
+// display name. Two entries of one vendor (`supabase-db` and
+// `supabase-auth`, both "Supabase") are otherwise the same node twice, on
+// screen and in the accessible name. Conditional rather than always-on
+// because the id is the thing the compact node was shrunk to drop.
+//
+// A control, not a card: rendered as a real `<button>` -- the root element
+// this component returns, not wrapped in a `<div>` or `<li>` of its own here
+// -- so keyboard operability (Tab to focus, Enter/Space to activate) and the
+// accessible name come from native semantics rather than a hand-rolled click
+// handler. `aria-pressed` conveys the selected state to assistive tech --
+// the visual `.selected` styling is never the only signal for it.
+//
+// The `<li>` a list needs around each node is the container's to add, not
+// this component's: ServiceGroup.tsx wraps this button in one for its `<ul>`,
+// while GraphCanvas.tsx wraps the same button in a plain `<div>` for the
+// canvas. It used to be the other way around -- this component returned its
+// own `<li>`, correct inside ServiceGroup's list and invalid on the canvas,
+// where it was an `<li>` with no `<ul>` around it at all. Hoisting the `<li>`
+// out to the one caller that actually has a list is what fixed that.
 import type { ViewService } from "@catalogus/cli";
 
 import { Icon } from "./Icon.js";
@@ -38,33 +63,78 @@ import styles from "./ServiceNode.module.css";
 export interface ServiceNodeProps {
   service: ViewService;
   isSelected: boolean;
+  /**
+   * True when another entry rendered beside this one carries the same
+   * display name, in which case the local id renders under it -- two
+   * entries of the same vendor are otherwise the same node twice. The
+   * container decides, because only it knows what is on screen together
+   * (see group-services.ts's `duplicateNames`); required rather than
+   * optional so the canvas slice has to answer it rather than inherit a
+   * default that silently drops the disambiguation.
+   */
+  showId: boolean;
   /** Called with the service id when this node is activated (click or keyboard). App.tsx turns this into a hash change -- this component never touches `window` itself. */
   onSelect: (id: string) => void;
 }
 
-export function ServiceNode({ service, isSelected, onSelect }: ServiceNodeProps) {
+/**
+ * The DOM id this node's button carries, so App.tsx can hand focus back to
+ * it when a detail panel closes that nothing on the page opened -- a deep
+ * link, where there is no previously-focused element to restore. Exported
+ * rather than duplicated as a template string at the call site: the format
+ * is one fact, and a focus restore that silently finds nothing is invisible
+ * in a passing test suite.
+ *
+ * Read back with `document.getElementById`, never a CSS selector: a service
+ * id is manifest text and would need selector escaping, which is the kind
+ * of detail that works until the first id with a dot in it.
+ */
+export function serviceNodeDomId(id: string): string {
+  return `service-node-${id}`;
+}
+
+export function ServiceNode({ service, isSelected, showId, onSelect }: ServiceNodeProps) {
   return (
-    <li className={styles.item}>
-      <button
-        type="button"
-        className={`${styles.node} ${isSelected ? styles.selected : ""}`}
-        aria-pressed={isSelected}
-        // Hover is a tooltip only -- name and role, nothing more. Never the
-        // detail content: hover-to-open fights a pannable canvas (the next
-        // slice) and is dead weight on a touch device, which is why this is
-        // a plain `title` attribute rather than a custom hover panel.
-        title={`${service.name} — ${service.role}`}
-        onClick={() => onSelect(service.id)}
-      >
-        <span className={`${styles.ring} ${styles[`status-${service.status}`]}`}>
-          <Icon iconPath={service.icon} rollup={service.rollup} label={service.name} />
-          {!service.known && <span className={styles.uncataloguedDot} aria-hidden="true" />}
-        </span>
+    <button
+      type="button"
+      id={serviceNodeDomId(service.id)}
+      // `?? ""`, because `kind: service` has no rule by design (see the
+      // `.kind-*` comment in the stylesheet) and CSS Modules return
+      // undefined for a class that does not exist -- which template-literals
+      // into the literal string "undefined" as a class name. Harmless to
+      // look at and wrong in a way that survives every test that checks
+      // behaviour rather than markup; found by reading the live DOM.
+      className={`${styles.node} ${styles[`kind-${service.kind}`] ?? ""} ${isSelected ? styles.selected : ""}`}
+      aria-pressed={isSelected}
+      // The shape cue below is CSS, which no test can read and no screen
+      // reader announces. This is the machine-readable half of the same
+      // fact: one attribute, asserted by the tests, and the only way the
+      // three kinds are distinguishable without computing styles.
+      data-kind={service.kind}
+      // Hover is a tooltip only -- name and role, nothing more. Never the
+      // detail content: hover-to-open fights a pannable canvas (the next
+      // slice) and is dead weight on a touch device, which is why this is
+      // a plain `title` attribute rather than a custom hover panel.
+      title={`${service.name} — ${service.role}`}
+      onClick={() => onSelect(service.id)}
+    >
+      <span className={`${styles.ring} ${styles[`status-${service.status}`]}`}>
+        <Icon iconPath={service.icon} rollup={service.rollup} label={service.name} />
+        {!service.known && <span className={styles.uncataloguedDot} aria-hidden="true" />}
+      </span>
+      <span className={styles.label}>
         <span className={`${styles.name} ${service.known ? "" : styles.uncataloguedName}`}>
           {service.name}
           {!service.known && <span className={styles.srOnly}> (uncatalogued -- no catalog entry for this slug)</span>}
         </span>
-      </button>
-    </li>
+        {showId && <span className={styles.id}>{service.id}</span>}
+        {service.kind !== "service" && (
+          <span className={styles.srOnly}>
+            {" "}
+            ({service.kind === "component" ? "component -- infrastructure this project runs itself" : "stack -- what the code is written in"})
+          </span>
+        )}
+      </span>
+    </button>
   );
 }

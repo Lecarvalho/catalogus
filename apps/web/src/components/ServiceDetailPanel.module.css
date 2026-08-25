@@ -131,6 +131,56 @@
   font-weight: 600;
 }
 
+/* The Layer 3 empty state. Deliberately quiet -- muted text, no accent, no
+   affordance -- because it is the absence of a layer rather than a call to
+   act on one: there is nothing to connect to yet, so anything that reads as
+   a button would be lying about what a click does. Same top-border rule as
+   .deps, so it reads as one more section of the panel and not as a banner
+   sitting on top of it. */
+.overlay {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.overlayHeading {
+  margin: 0;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+}
+
+.overlayState {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.overlayBody {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+/* overflow-wrap, not the panel's usual overflow: the command is a single
+   unbreakable token wider than one line of a 320px column, so without this
+   it pushes the panel's own scrollbar sideways. */
+.overlayCommand {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-1);
+  overflow-wrap: anywhere;
+}
+
 /* Narrow viewport: the two-column list-plus-panel layout (App.module.css's
    `.body`) stacks instead, so `position: sticky` here would pin the panel
    awkwardly against a full-width column beneath the list -- drop back to

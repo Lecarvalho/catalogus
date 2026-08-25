@@ -1,29 +1,46 @@
 // The only place data enters this app -- fetches GET /api/project once on
 // mount and derives the per-service dependency maps the detail panel needs
 // -- and, since the Phase 3.7 restructure, the only place `window` is
-// touched at all: reading and writing `location.hash` for the
-// `#/service/<id>` detail-panel route, and listening for `hashchange` and
-// `Escape`. Every component this renders is pure -- props in, no fetch, no
+// touched at all: reading `location.hash` and replacing it through
+// `history.replaceState` for the `#/service/<id>` detail-panel route,
+// listening for `hashchange` and `Escape`, and the two `document` focus
+// calls the panel's open/close needs. Every component this renders is pure -- props in, no fetch, no
 // window/location, no node import, no module-level singleton -- which is
 // what lets them move to a shared package later as a file move rather than
-// a rewrite (docs/PLAN.md's Phase 3.7 styling decisions), and what the next
-// slice relies on when it swaps ServiceList's list container for a canvas.
+// a rewrite (docs/PLAN.md's Phase 3.7 styling decisions), and what let the
+// canvas and the migration board each drop in beside ServiceList without
+// touching how selection or data loading work.
 //
 // No router dependency: one route doesn't warrant react-router, so this is
 // plain `hashchange` plus the one hook below (hash-route.ts carries the
 // pure parsing, kept out of this file and out of `window` the same way
 // group-services.ts is kept out of the render tree).
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ViewPayload } from "@catalogus/cli";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ViewPayload, ViewService } from "@catalogus/cli";
 
 import styles from "./App.module.css";
 import { EdgesList } from "./components/EdgesList.js";
 import { ErrorState } from "./components/ErrorState.js";
 import { LoadingState } from "./components/LoadingState.js";
+import { MigrationList } from "./components/MigrationList.js";
 import { ProjectHeader } from "./components/ProjectHeader.js";
 import { ServiceDetailPanel } from "./components/ServiceDetailPanel.js";
+import { serviceNodeDomId } from "./components/ServiceNode.js";
 import { ServiceList } from "./components/ServiceList.js";
+import { ViewToggle, type ViewMode } from "./components/ViewToggle.js";
 import { hashForServiceId, serviceIdFromHash } from "./hash-route.js";
+
+// Both halves of the graph view load on demand, and for two different
+// reasons. React Flow is several hundred KB that a viewer who never leaves
+// the list should not download, so the canvas is a lazy chunk. elkjs is
+// worse than large: it reaches its worker through a Vite `?worker` import
+// that cannot be evaluated outside a browser at all, so a static import here
+// would make every test in this file fail at module load. Neither is loaded
+// until someone actually asks for the graph.
+const GraphCanvas = lazy(() => import("./components/GraphCanvas.js").then((module) => ({ default: module.GraphCanvas })));
+
+const layoutWithElk = (services: readonly ViewService[], edges: readonly { from: string; to: string }[]) =>
+  import("./elk-layout.js").then((module) => module.layoutGraph(services, edges));
 
 type LoadState = { kind: "loading" } | { kind: "error"; message: string } | { kind: "loaded"; payload: ViewPayload };
 
@@ -66,6 +83,12 @@ function currentHash(): string {
 export function App() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [hash, setHash] = useState<string>(currentHash);
+  // Plain state, deliberately not a second route: docs/PLAN.md's Phase 3.7
+  // DAG decision 1 chose a toggle over `#/graph` precisely so the viewer
+  // stays one addressable page, and `#/service/<id>` keeps addressing the
+  // panel from any of the three views -- the migration board joined the
+  // same toggle for the same reason (ViewToggle.tsx's top comment).
+  const [mode, setMode] = useState<ViewMode>("list");
 
   // Panel focus management: a click captures whatever had focus (the node
   // button just activated) so Escape can hand focus back to it, and the
@@ -131,16 +154,39 @@ export function App() {
     [state, selectedId]
   );
 
-  const handleSelect = useCallback((id: string) => {
-    if (document.activeElement instanceof HTMLElement) {
-      lastFocusedRef.current = document.activeElement;
-    }
-    window.location.hash = hashForServiceId(id);
+  // Opening and closing the panel *replaces* the current history entry
+  // instead of pushing one. The panel is a view of this page, not a page of
+  // its own: assigning `window.location.hash` pushed an entry per open and
+  // per close, so Back walked the user's clicks one at a time instead of
+  // leaving the viewer -- and a close pushed an entry whose only content is
+  // "no panel", which Back then undoes by reopening it. The hash stays in
+  // the URL, so a deep link, a reload and a copied address still address a
+  // panel; it just stops accumulating.
+  //
+  // `replaceState` fires no `hashchange`, which is why this sets the state
+  // itself. The listener above is still the only path for back/forward and
+  // for a hash edited by hand -- this is the one navigation that bypasses
+  // it, deliberately, and it is the reason this component keeps `hash` in
+  // state at all rather than reading `window.location.hash` at render.
+  const replaceHash = useCallback((next: string) => {
+    const base = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, "", next ? `${base}${next}` : base);
+    setHash(next);
   }, []);
 
+  const handleSelect = useCallback(
+    (id: string) => {
+      if (document.activeElement instanceof HTMLElement) {
+        lastFocusedRef.current = document.activeElement;
+      }
+      replaceHash(hashForServiceId(id));
+    },
+    [replaceHash]
+  );
+
   const handleClose = useCallback(() => {
-    window.location.hash = "";
-  }, []);
+    replaceHash("");
+  }, [replaceHash]);
 
   // Escape closes the panel, only while one is open -- the listener is
   // added and removed with the panel's own lifetime rather than sitting on
@@ -159,32 +205,71 @@ export function App() {
   }, [selectedService, handleClose]);
 
   // Moves focus into the panel the moment it opens (click or deep link),
-  // and hands focus back to whatever opened it once it closes. Keyed on
-  // the resolved service's id, not on the raw (possibly stale/unknown)
-  // hash id, so an unmatched hash never tries to focus a panel that isn't
-  // rendered.
+  // and hands it somewhere sensible once it closes. Keyed on the resolved
+  // service's id, not on the raw (possibly stale/unknown) hash id, so an
+  // unmatched hash never tries to focus a panel that isn't rendered.
+  //
+  // Closing has two cases and only one of them used to work. A panel opened
+  // by a click restores the element that opened it. A panel opened by a
+  // *deep link* had no opener -- nothing was clicked, so `lastFocusedRef`
+  // was still null and focus fell to `<body>`, which is the state where the
+  // next Tab starts from the top of the document and a screen reader loses
+  // its place entirely. There is still an obvious target in that case: the
+  // node for the service that was open, which is where a click would have
+  // left focus anyway. Hence the DOM-id lookup.
+  //
+  // The opener is cleared once used, so a click, a close, and then a deep
+  // link to some *other* service cannot restore focus to the first
+  // service's node -- a stale ref is worse than none, because it moves
+  // focus somewhere confidently wrong.
   useEffect(() => {
     const matchedId = selectedService?.id ?? null;
-    if (matchedId === previousSelectedIdRef.current) {
+    const closedId = previousSelectedIdRef.current;
+    if (matchedId === closedId) {
       return;
     }
     previousSelectedIdRef.current = matchedId;
+
     if (matchedId) {
       panelRef.current?.focus();
-    } else if (lastFocusedRef.current && document.contains(lastFocusedRef.current)) {
-      lastFocusedRef.current.focus();
+      return;
+    }
+
+    const opener = lastFocusedRef.current;
+    lastFocusedRef.current = null;
+    if (opener && document.contains(opener)) {
+      opener.focus();
+      return;
+    }
+    if (closedId) {
+      document.getElementById(serviceNodeDomId(closedId))?.focus();
     }
   }, [selectedService]);
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${mode === "graph" ? styles.wide : ""}`}>
       {state.kind === "loading" && <LoadingState />}
       {state.kind === "error" && <ErrorState message={state.message} />}
       {state.kind === "loaded" && edgeMaps && (
         <>
           <ProjectHeader project={state.payload.project} manifestPath={state.payload.manifestPath} />
+          <ViewToggle mode={mode} onChange={setMode} />
           <div className={styles.body}>
-            <ServiceList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+            {mode === "list" ? (
+              <ServiceList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+            ) : mode === "graph" ? (
+              <Suspense fallback={<p>Loading the graph…</p>}>
+                <GraphCanvas
+                  services={state.payload.services}
+                  edges={state.payload.edges}
+                  selectedId={selectedId}
+                  onSelect={handleSelect}
+                  layout={layoutWithElk}
+                />
+              </Suspense>
+            ) : (
+              <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+            )}
             {selectedService && (
               <ServiceDetailPanel
                 service={selectedService}
@@ -196,7 +281,15 @@ export function App() {
               />
             )}
           </div>
-          <EdgesList edges={state.payload.edges} labelForId={edgeMaps.labelForId} />
+          {/* The text edge list is the list view's way of showing edges at
+              all. On the canvas the same edges are drawn, so repeating them
+              underneath is the same information twice. On the migration
+              board it is noise a different way: that board is about which
+              *nodes* still need a decision, not the whole dependency graph,
+              and the replacement each row already names is the one edge a
+              migration reader cares about -- the full edge list answers a
+              question this mode isn't asking. */}
+          {mode === "list" && <EdgesList edges={state.payload.edges} labelForId={edgeMaps.labelForId} />}
         </>
       )}
     </main>

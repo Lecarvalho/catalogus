@@ -27,6 +27,22 @@ design decisions; this file tracks *what has been built* against it and what rem
   React Flow), and the portfolio/migration/cost pages that want more than one project.** Phase 4
   stays deferred by owner decision.
 
+  **Phase 3.7's last big item is done: the per-project DAG is built** (2026-08-25). elkjs in a
+  worker, `@xyflow/react`, a List/Graph toggle with the list as default, and the
+  deliberately-hard synthetic manifest this file kept asking for and nobody had written —
+  `examples/layout-stress.catalogus.yaml`, 35 services and 48 edges with an 18-edge fan-out hub.
+  The six DAG decisions the plan had carried for two sessions were put to the owner and answered.
+  **Three defects came out of running it that no test could see**, all of which render a
+  plausible-looking graph; they are written up in the DAG box.
+
+  **The five smaller viewer defects are closed** in the same session — deep-link focus, a stale
+  focus ref found while fixing it, history entries on every panel open and close, a selection
+  state cued only by colour, and two entries of one vendor rendering as the same node twice.
+  `App.tsx` went from no tests to 15.
+
+  **What is left in Phase 3.7 is the three multi-project pages** — portfolio, migration dashboard,
+  Layer 3 cost panel — and two of the three want more than one manifest, which does not exist.
+
   **The session after the viewer foundations spent itself on verification rather than features**,
   and that was the right trade because it found things. The two committed corpora now exist (the
   skill's shell commands checked against the live CLI surface; 65 path-traversal vectors executed
@@ -34,20 +50,79 @@ design decisions; this file tracks *what has been built* against it and what rem
   would have caught**: a suite flake that made `pnpm test` fail half the time while every
   single-file run passed, and a live `catalogus set` bug that reported a schema error against a
   perfectly valid manifest. Both are written up below.
-- **Last updated:** 2026-08-24
+- **Last updated:** 2026-08-25
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **879 tests / 52 files**, plus `pnpm typecheck`
+Run `pnpm build && pnpm test` first and confirm **1001 tests / 58 files**, plus `pnpm typecheck`
 clean across all four packages, before trusting anything below. (Phases 0–3.6 and the 3.6.1
-correction pass predate this at 549/38, and the viewer-foundations session ended at 679/50; the
-number moved a long way again in the drift-and-corpus session that followed — 200 of those tests
-are two committed corpora plus two components' first test files, not 200 new behaviours.)
+correction pass predate this at 549/38, the viewer-foundations session ended at 679/50, and the
+drift-and-corpus session that followed ended at 879/52 — 200 of those tests are two committed
+corpora plus two components' first test files, not 200 new behaviours. The 30 added on 2026-08-25
+are the five smaller viewer defects and `App.tsx`'s first test file, and the 42 after that are the
+DAG slice: `graph-layout.test.ts`, `GraphCanvas.test.tsx`, `ViewToggle.test.tsx`, the kind cues on
+the node, and one more example manifest for the schema drift test to validate. Then 6 for the
+Layer 3 empty state, which adds no file — it is a section of `ServiceDetailPanel`. The last 32 are
+the migration dashboard: 22 from the slice itself in two new files, and 10 more added by its
+validation pass, which is the more interesting number of the two.)
 
 **Run it more than once before believing it.** That session's own corpus made the suite fail on
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
+
+### Handoff — 2026-08-25, end of the small-defects-and-DAG session
+
+**What happened.** Two things, in this order: the five smaller viewer defects (the one Phase 3.7
+item that needed no decision from the owner), and then the per-project DAG, once the six decisions
+it was blocked on were put to the owner and answered. Baseline **879/52 confirmed over four runs
+before touching anything**; the session ends at **951/56**.
+
+**What is actually different on screen.** A deep-linked panel now hands focus back to a node
+instead of to `<body>`; opening and closing panels no longer grows history, so Back leaves the
+viewer rather than walking the last dozen clicks; a selected node's edge is 3px against every other
+node's 1px, which is the first selection cue that survives greyscale; and two entries of one vendor
+in one group show their local ids. Full detail, including the fifth defect that was hiding inside
+the first, is in the ticked box in Phase 3.7.
+
+**The verification is the part worth copying, not the fixes.** Seven mutations, each applied to the
+fixed code and each watched go red on exactly the tests that name it — the counts are in the box.
+That harness is `$CLAUDE_JOB_DIR/tmp/mutate.py`-shaped and took ten minutes to write; it is the
+cheapest way to find out that a new test asserts nothing, which is the failure this file keeps
+recording.
+
+**And the browser run finally happened, twice.** Two consecutive handoffs said the owner would run
+`catalogus view` from a real repo and that nothing here reflected such a run. This session ran it
+against a scratch copy of `examples/reference.catalogus.yaml` and again against the new stress
+fixture, in real Chrome, reading computed styles, `history.length`, node positions and edge counts
+out of the live page. That is **not** the owner's run on a real client repo — it is synthetic data
+in a scratch directory, and it says nothing about how the viewer reads against a real inventory.
+The owner's run still outranks it and still has not happened.
+
+**One habit this session earned the hard way.** A DOM query in an automated browser is not evidence
+until something has forced a paint: three separate "the edges are missing" readings were a tab that
+had not repainted between injected-JavaScript calls, and each screenshot made 48 edges appear. Two
+of those readings sent a fix in the wrong direction before the pattern showed itself.
+
+**Then the DAG, once its six decisions came back.** They had been carried for two sessions —
+list-versus-graph, arrow direction, grouping on the canvas, how `component` and `stack` nodes
+render, which React Flow, and whether elkjs fits the bundle budget — and they were the owner's to
+make, not an implementer's. Asking took one exchange; the two sessions of not asking cost more
+than that. All six are recorded with their reasoning in the DAG box, which is the part that stops
+them being re-litigated by whoever would have chosen differently.
+
+**The DAG is built and the fixture problem is closed with it.** Nobody had written the
+deliberately-hard manifest this file kept naming as a prerequisite, so it was the slice's first
+artifact rather than something it inherited. Three defects came out of running the result, none of
+them visible to a green suite and all of them producing a graph that looks fine at a glance — the
+best argument in this file for why the live run is not optional.
+
+**One thing to know before writing more `apps/web` tests.** Under jsdom the global `URL` resolves a
+relative reference against the *document* base, so `new URL("./x", import.meta.url)` returns
+`http://localhost:3000/...` and `node:fs` rejects it with "The URL must be of scheme file". Derive
+paths from `fileURLToPath(import.meta.url)` by string replacement instead — and not from
+`process.cwd()`, which is the repo root under `pnpm test` and `apps/web` under a per-package vitest
+run. `ServiceNode.test.tsx` carries the comment.
 
 ### Handoff — 2026-08-24, end of the drift-and-corpus session
 
@@ -68,13 +143,15 @@ previous handoff ranked second and third, and both closures found defects on the
    `dist/web` in parallel workers), and **`catalogus set constructor`** taking the known-field
    branch through `Object.prototype` and blaming the user's manifest for it.
 
-**What was deliberately not done, and why.** The five smaller viewer defects (focus, history
-entries, colour-only selection cue, duplicate-vendor nodes) are still open and now have their own
-checkbox rather than being hidden inside a ticked one. `App.tsx` still has no tests and is now the
-largest untested surface in the repo. **The DAG is still the next real piece of work**, and the
-previous handoff's warning about it stands unchanged: there is no real manifest to judge layout
-against, so either onboard a project first or build against a deliberately hard synthetic one and
-say plainly that that is what happened.
+**What was deliberately not done, and why.** *(Both halves of this paragraph were closed on
+2026-08-25 — see the handoff above. Left as written, because a dated handoff that gets edited to
+stay true stops being a record of what was known when.)* The five smaller viewer defects (focus,
+history entries, colour-only selection cue, duplicate-vendor nodes) are still open and now have
+their own checkbox rather than being hidden inside a ticked one. `App.tsx` still has no tests and
+is now the largest untested surface in the repo. **The DAG is still the next real piece of work**,
+and the previous handoff's warning about it stands unchanged: there is no real manifest to judge
+layout against, so either onboard a project first or build against a deliberately hard synthetic
+one and say plainly that that is what happened.
 
 **One habit worth keeping from this session.** Every claim below that says "watched go red" means
 the code was mutated, the test was observed failing, and the mutation was reverted — and the suite
@@ -216,8 +293,10 @@ building on it rather than for writing the warning.
 
 Consequences, and they are real rather than bookkeeping:
 
-- **The only manifest that exists is `examples/reference.catalogus.yaml`**, which is synthetic and
-  small — 14 entries, 14 edges. It covers every *shape* (`kind: component`, `kind: stack` with a
+- **The only manifest that existed when this was written was `examples/reference.catalogus.yaml`**,
+  which is synthetic and small — 14 entries, 14 edges. (A second one exists now:
+  `examples/layout-stress.catalogus.yaml`, also synthetic, written for layout rather than for
+  reference — see the note two bullets down.) It covers every *shape* (`kind: component`, `kind: stack` with a
   version, `status: phasing_out` with `replaced_by`, one vendor under two roles, and since the
   2026-08-24 amendment a `role: coding-agent` entry) but it is not a layout stress test. Nothing on
   disk currently proves elkjs handles a fourteen-edge fan-out readably.
@@ -225,6 +304,12 @@ Consequences, and they are real rather than bookkeeping:
   first, or build the layout against a synthetic manifest deliberately shaped to be hard and say
   plainly that that is what happened. Do not declare the layout done on a 14-node example and
   imply it was tested on something harder.
+
+  *Resolved the second way, 2026-08-25:* `examples/layout-stress.catalogus.yaml` is that
+  deliberately-hard synthetic manifest — 35 services, 48 edges, an 18-edge fan-out hub — and the
+  DAG was judged against it in a live browser. **It is still synthetic.** It says elk handles this
+  topology; it says nothing about whether a real inventory reads well, and the sentence above
+  about not implying otherwise still stands.
 - **Tests and fixtures stay synthetic regardless.** Anything committed here is public, which is the
   reasoning that made the reference example synthetic in the first place (see Phase 3.6) and is
   unaffected by any of the above.
@@ -238,11 +323,24 @@ off. `catalogus graph` already renders all three as text — `nginx (ingress-pro
 `dotnet (runtime-backend, stack, v10)` — which is the cheapest reference for what the web viewer
 has to say too.
 
-**Two things it does not exercise, and the viewer needs both.** It carries no `status`/`replaced_by`
-entries, so nothing on disk covers status colours or the migration view — use
-`examples/reference.catalogus.yaml`, which does. And it predates `kind`, so every node in it is a
-`service`: the component and stack rendering has no real input yet either. Check the counts above
-against the file before relying on them; the numbers in this document have already been stale once.
+**Two things the Clapline manifest did not exercise, and the viewer needed both.** It carried no
+`status`/`replaced_by` entries, so nothing on disk covered status colours or the migration view,
+and it predated `kind`, so every node in it was a `service`.
+
+**Rewritten 2026-08-25 to say which manifest it means, because the antecedent had come loose.**
+This paragraph said "it", and the nearest manifest named above it is now
+`examples/layout-stress.catalogus.yaml` — which carries five `status` entries and four
+`replaced_by` targets and has every `kind`, so the sentence read as flatly false about the file a
+reader would naturally attach it to. The validation pass on the migration dashboard read it exactly
+that way and reported it as a stale claim about layout-stress. It was not: `git log -S` puts it in
+`1d9b9cc`, where the subject was the real 26-service Clapline manifest — which has since been
+**deleted** (checked 2026-08-24, see above). So both halves are now past tense, and the fixture
+guidance is stated directly rather than by pronoun: **for status colours and the migration board,
+`examples/layout-stress.catalogus.yaml` is the better fixture** — 2 `phasing_out`, 2 `deprecated`
+(one of them with no `replaced_by` at all, which is the row the board exists to surface) and 1
+`removed`, against `examples/reference.catalogus.yaml`'s single `phasing_out`. Check the counts
+above against the files before relying on them; the numbers in this document have gone stale more
+than once, and a pronoun with no live referent is how one of them did it.
 
 Phase 4 (backend) stays deferred by owner decision. Phase 6 (MCP) and Phase 5 (auth/push) are
 untouched.
@@ -1484,17 +1582,74 @@ database node gets a database icon whoever the vendor is.
       fix more than the one case this box named: `coding` was not the only rollup that reads as a
       truncation — `ingress`, `telemetry`, `ui`, `runtime` and `language` are in the same shape,
       and the viewer was rendering INGRESS and TELEMETRY as headings.
-- [ ] **Five smaller viewer defects, all found by the validation pass, none fixed.** Split out of
-      the two boxes above so ticking those does not quietly carry them: focus drops to `<body>`
-      when a deep-linked panel is closed (`lastFocusedRef` was never set, because nothing was
-      clicked to open it); every open and close pushes a history entry, because `App.tsx` assigns
-      `window.location.hash` rather than calling `replaceState`, so Back walks the panel instead
-      of leaving the page; the selected state's two *visual* cues are both colour (`aria-pressed`
-      carries it for assistive tech, so this is a low-vision gap rather than an AT one); and two
-      entries of the same vendor in one group are indistinguishable on the node, since the node
-      shows the catalog display name and not the local id. **Both routing claims re-checked
-      against `App.tsx` directly on 2026-08-24 rather than trusted from this file** — this
-      document has gone stale on its own numbers twice.
+- [x] **Five smaller viewer defects, all fixed.** The box's title said five and its prose listed
+      four; the fifth is item 2 below, found while fixing item 1 rather than by the validation
+      pass. Split out of the two boxes above so ticking those did not quietly carry them, and
+      closed on 2026-08-25:
+
+      1. **Focus dropped to `<body>` when a deep-linked panel was closed** — `lastFocusedRef` is
+         captured on click, and a deep link involves no click, so the restore branch had nothing to
+         restore to and silently did nothing. From `<body>` the next Tab restarts at the top of the
+         document and a screen reader has lost its place entirely. Fixed by giving every node a
+         stable DOM id (`serviceNodeDomId`, exported from `ServiceNode.tsx` rather than duplicated
+         as a template string at the call site) and falling back to the node the closed panel was
+         addressing — where a click would have left focus anyway. Read back with
+         `document.getElementById`, never a selector, because a service id is manifest text and a
+         selector would need escaping.
+      2. **The opener ref could go stale.** Not in the original list, found while fixing (1): a
+         click, a close, and then a deep link to a *different* service restored focus to the first
+         service's node. `lastFocusedRef` is now cleared once used — a stale ref is worse than
+         none, because it moves focus somewhere confidently wrong rather than nowhere.
+      3. **Every open and close pushed a history entry.** `App.tsx` assigned
+         `window.location.hash`; it now calls `history.replaceState` and sets its own state, since
+         `replaceState` fires no `hashchange`. The `hashchange` listener is still the only path for
+         back/forward and for a hand-edited hash. Closing also leaves no bare `#` behind. The panel
+         is a view of the page, not a page of its own — and the close entry was the worse half of
+         this: its only content was "no panel", which Back then undid by reopening it.
+      4. **The selected state's two visual cues were both colour.** Now three, of which one is not:
+         an inset 2px ring stacks on the 1px border, so a selected node's edge reads as 3px against
+         every other node's 1px in pure greyscale. An inset `box-shadow` deliberately, not a wider
+         `border-width`, which would reflow the tile by 2px and make the row twitch as the
+         selection moves.
+      5. **Two entries of one vendor in a group were the same node twice.** `host-api` and
+         `host-web` in `examples/reference.catalogus.yaml` are both `service: fly-io`, both roll up
+         to `hosting`, and both rendered as "Fly.io" with the same icon and nothing else. The local
+         id now renders under the name for exactly the names that collide — `duplicateNames()` in
+         `group-services.ts`, computed per rendered group by `ServiceGroup`, never manifest-wide:
+         the two Supabase entries sit under `AUTH` and `DATABASE`, are already told apart by the
+         headings, and correctly show no id. `showId` is a **required** prop rather than an
+         optional one defaulting to false, so the canvas slice has to answer it instead of silently
+         inheriting a default that drops the disambiguation.
+
+      **What the tick rests on.** `pnpm build && pnpm test` at **909 tests / 53 files**, run six
+      consecutive times (up from 879/52; +30 tests, and the one new file is `App.test.tsx`), plus
+      `pnpm typecheck` clean across all four packages. **Seven mutations applied and each watched
+      go red on exactly the tests that name it** — push-instead-of-replace (2 red), the deep-link
+      focus fallback deleted (2), the opener not cleared (1), the node's DOM id removed (4), the
+      group never disambiguating (1), the id rendered unconditionally (5), and the non-colour
+      selection cue deleted from the CSS (1).
+
+      **And a live browser run, which this document had been missing for two sessions.**
+      `catalogus view` against a scratch copy of `examples/reference.catalogus.yaml`, driven in
+      real Chrome, not jsdom: both Fly.io nodes render their ids and both Supabase nodes render
+      none; computed styles confirm `1px border + 2px inset ring` on the selected node against
+      `1px, none` on its neighbour; `history.length` is **2 before and 2 after three
+      open-then-close cycles**, with the address back to a clean `/`; and closing a panel opened by
+      a deep link (hash set directly, `document.body` focused first) lands focus on
+      `service-node-supabase-auth` rather than on `<body>`.
+
+      **`App.tsx` is no longer the largest untested surface in the repo.** It had no tests at all;
+      it now has 15, covering the load/error paths, the hash route, both history fixes and all four
+      focus cases. One thing worth knowing before writing more of them: under jsdom the global
+      `URL` resolves a relative reference against the *document* base, so
+      `new URL("./x.css", import.meta.url)` returns `http://localhost:3000/...` and `node:fs`
+      rejects it — `ServiceNode.test.tsx` derives its stylesheet path from
+      `fileURLToPath(import.meta.url)` by string replacement instead, and says why.
+
+      **One limit, stated rather than left to be assumed:** the greyscale claim in (4) is reasoned
+      from the declared CSS and confirmed against computed styles, not measured with a contrast
+      tool or checked by a low-vision reader. The test behind it is a source-level tripwire that
+      fails when the non-colour cue is deleted; it cannot tell whether the result looks right.
 - [x] **The skill-drift test now covers what it needs to.** Two separate holes, both closed, both
       watched go red against the real `SKILL.md` before being trusted.
 
@@ -1577,44 +1732,207 @@ database node gets a database icon whoever the vendor is.
       `createViewServer` has to live in `view.test.ts`.** That is now stated in the file itself,
       next to the block. Re-verified with **eight consecutive green full-suite runs** after the
       merge, not one.
-- [ ] **Per-project DAG — the next real piece of work.** elkjs layout, React Flow render,
-      `simple-icons` brand icons with a category-icon fallback from the start. **Group on the
-      segment of `role` before the first `-`** — the convention settled in the 3.6 follow-ups.
+- [x] **Per-project DAG — built, and judged against a manifest built to be hard.** elkjs layout in a
+      worker, `@xyflow/react` render, the existing `ServiceNode` unchanged inside the canvas, and a
+      List/Graph toggle with the list as default. Entirely `apps/web`, as this box predicted: no
+      server change at all.
 
-      **What is already true, so nobody re-derives it.** `GET /api/project` already returns
-      `edges: { from, to }[]` alongside `services` (see `view-payload.ts`'s `ViewPayload`), so this
-      slice needs **no server change at all** — it is entirely `apps/web`. `ServiceNode` was
-      deliberately shrunk to icon-plus-name for this: the plan is to swap the *container*
-      (`ServiceList`/`ServiceGroup`) for a canvas, not to rebuild the node. The detail panel is
-      already URL-addressed at `#/service/<id>` and works unchanged from a canvas.
+      **The fixture this box kept asking for now exists.**
+      `examples/layout-stress.catalogus.yaml` — synthetic, valid under `--strict`, and shaped to
+      break a layout rather than to demonstrate a manifest. Its header states each property and why;
+      the numbers there were **measured off the file, not asserted**: 35 services, 48 edges, 21
+      rollups, a fan-out hub with 18 outgoing edges, a fan-in hub with 6 incoming from 4 rollups, a
+      longest path of 6 nodes, three entries with no edges at all, three Fly.io entries in one
+      rollup, every kind, every status, and one uncatalogued slug. **46 of the 48 edges cross a
+      rollup boundary — 96%** — which is the measured evidence behind decision 3's flat layout:
+      compound containers would have been crossed by all but two lines on screen.
 
-      **What is not decided, and a brief has to answer before an implementer starts.** These are
-      the questions that will otherwise be answered by whoever types first:
+      **What the live run showed.** All 35 nodes placed across 9 ranks with no overlapping boxes,
+      the 17-wide fan-out rank readable, the three orphans packed together rather than scattered,
+      all 48 edges drawn, and selecting the hub highlighting **exactly its 21 incident edges** (18
+      out + 3 in, matching the manifest). elk handles this topology; that question is now answered
+      with a picture rather than a hope. The honest limit: 2634x1607px of graph fits a large window
+      only at ~0.5 zoom, so labels are small at full-graph view and reading it means zooming. That
+      is inherent to 35 nodes, not a layout defect.
 
-      1. **Does the DAG replace the grouped list, or sit beside it?** A toggle, a route, or a
-         replacement. The list is genuinely better for "what does this project use"; the graph is
-         better for "what breaks if this dies". Both are real questions the viewer exists to answer.
-      2. **Which way do the arrows point?** `dependencies: [[fly-api, supabase-db]]` means fly-api
-         depends on supabase-db. Drawing the arrow along that direction reads as "calls"; reversing
-         it reads as "supports". Pick one and say which, because blast radius is read off it.
-      3. **Does grouping survive on the canvas?** Compound/parent nodes per rollup in elk, or a flat
-         layout that drops the grouping the list has. Not the same picture.
-      4. **Do `kind: component` and `kind: stack` nodes render differently here?** They already do
-         in `graph`'s text output and in the detail panel. A stack node hangs off whatever runs it.
-      5. **Which React Flow?** `reactflow@11` and `@xyflow/react@12` are the same project under two
-         names. **Neither is installed today**, nor is `elkjs` — `apps/web/package.json` has no
-         graph dependency at all, so step one is a deliberate choice, not an `npm i`.
-      6. **Is there a bundle budget?** The client is **161 KB** today, and that number was earned:
-         `simple-icons` was deliberately kept server-side because it is 5.2 MB. elkjs alone is
-         several hundred KB. Worth deciding up front whether that is fine or whether layout should
-         move server-side too — the same reasoning that moved the icons already applies here.
+      **Three defects the tests could not see, all found by running it.** Recorded because the
+      pattern matters more than the fixes: every one of them renders a *plausible* graph.
 
-      **And the fixture problem, restated because it is the part most likely to be skipped.** There
-      is still no real manifest (see "There is no real manifest" above). `examples/reference.
-      catalogus.yaml` is 14 entries and 14 edges — enough to prove every *shape* renders, not enough
-      to prove the layout stays readable. **Nobody has built the deliberately-hard synthetic
-      manifest this document keeps saying to build against**, so that is an artifact the DAG slice
-      has to produce, not inherit. It stays synthetic regardless: anything committed here is public.
+      1. **No edges at all, and nothing said so.** React Flow's root is `height: 100%`, and a
+         percentage height resolves against a parent's *definite* height — which the `min-height`
+         this canvas started with does not provide. The container measured 921px and the element
+         inside it measured 0. Nodes still painted, because they are absolutely positioned; every
+         edge needs the measurement, so the graph rendered as a field of unconnected tiles. The
+         library says so through `onError` and nowhere else, which is why `onError` is now wired to
+         the console permanently: `[react-flow 004] The parent container needs a width and a
+         height`.
+      2. **A literal `undefined` in every node's class list.** `kind: service` has no `.kind-*` rule
+         by design, and CSS Modules return `undefined` for a class that does not exist, which
+         template-literals straight into the DOM. Invisible to every test that checks behaviour
+         rather than markup.
+      3. **Handle bounds discarded on every selection change.** `parseHandles` in `@xyflow/system`
+         drops a node's handle bounds — the anchors edges resolve against — whenever a node object
+         arrives without `measured` set, and this canvas rebuilds its node array on every
+         selection. Read out of the installed library rather than reproduced end to end, and fixed
+         with one line, because the failure it forecloses is a silently edgeless graph.
+
+      **And one non-defect worth writing down, because it cost more than any of them.** Edges
+      appear only after the renderer paints, and a Chrome tab driven entirely through injected
+      JavaScript does not reliably paint between calls. Three separate "the edges are missing"
+      readings were this artifact, not the product; each screenshot made the edges appear. **A
+      DOM query in an automated browser is not evidence until something has forced a paint.**
+
+      **Verification.** `pnpm build && pnpm test` at **951 tests / 56 files**, `pnpm typecheck`
+      clean across four packages, and **16 mutations each watched go red on exactly the tests that
+      name them** — including one deliberately left in the list that produced *zero* failures
+      (removing the `measured` line above), which is the honest way to say that fix has no
+      automated coverage rather than implying the suite covers everything. **The honesty was
+      real and the count was not:** the pass below found two more shipped lines in the same
+      state, which is what a mutation list assembled by the author of the code looks like — it
+      covers what its author thought to doubt.
+
+      **The independent validation pass ran (2026-08-25) and the split in its verdict is the
+      point.** Every claim about *behaviour* reproduced: the suite at 951/56 on five consecutive
+      runs with no sign of the shared-directory flake, typecheck clean, the layout rules, the
+      id agreement between elk and React Flow, the dangling-endpoint filter, the effect stability,
+      all five smaller fixes covered by tests that go red when reverted, the bundle split, every
+      asset served without a 404, and the whole live-run geometry reproduced *headlessly* by
+      running elkjs over the fixture directly — 9 ranks sized [1,1,1,2,3,7,17,2,1], zero
+      overlapping node pairs, 2646x1619px (the claimed 2634x1607 plus elk's 12px inset), and
+      `host-api` with exactly 21 incident edges.
+
+      **What did not survive was a set of explanations.** Three comments and two numbers, and
+      they failed in the same direction every time — read out of a library or carried forward
+      from an older line rather than executed:
+
+      - The `measured` comment claimed the line prevents a silently edgeless graph. Half right:
+        `adoptUserNodes` really does drop handle bounds without it, and `width`/`height` do not
+        substitute. But React Flow **self-heals** — `useNodeObserver` re-`observe()`s the element
+        when the bounds go missing, and a spec-accurate ResizeObserver delivers a fresh callback
+        whether or not the size changed. Measured: bounds gone for one frame, back ~50ms later,
+        edges and all. The library's own comment three lines from the one that was read says
+        exactly that. The line stays for what it does buy; the comment is rewritten.
+      - "elk rejects a duplicate edge id outright" is false — real elkjs 0.12.0 lays out duplicate
+        edge *and* duplicate node ids without complaint. What it does reject is a dangling
+        endpoint. The uniqueness is needed by React Flow's edge registry, and the false reason
+        was embedded in a test name. Both corrected.
+      - `ViewToggle`'s comment claimed `role="radiogroup"` gives arrow-key navigation "for free
+        from native semantics". ARIA describes, it does not implement: arrow keys moved nothing
+        and both buttons sat in the tab order.
+      - The fan-in hub is **4 rollups, not 5** — wrong in the fixture header, in an inline comment
+        beside the edges, and in this box, in a set of numbers whose selling point was that they
+        were measured. Recomputed twice, independently, off `role` rather than `id` (which is what
+        `rollupOf` actually keys on).
+      - The bundle baseline was stale: see the paragraph below.
+
+      **And it found the disclosure understated.** This box said 16 mutations produced *one*
+      zero-failure result. There are at least three shipped lines with no automated coverage:
+      `measured`, the `onError` wiring the box calls permanent, and the incident-edge highlight —
+      deleting the ternary so selecting a node highlights nothing fails no test. Two new defects
+      came with them: `.node > button` in the canvas stylesheet was **dead**, because the button
+      was a grandchild rather than a child, so the visible tile never filled the 216x64 box its
+      handles are anchored against; and every canvas node was an **orphan `<li>`**, since
+      `ServiceNode` returned a list item and the canvas wrapped it in a plain `<div>`. **All of
+      that is fixed in the box below** — past tense deliberately, because the first draft of this
+      paragraph shipped in the present tense alongside the commit that fixed it.
+
+      **The lesson is narrower than "check the work" and worth stating exactly.** Nothing built
+      here was wrong. What was wrong was every place a *reason* had been reached by reading rather
+      than running — and each of those reasons read as more authoritative than the code it sat
+      above, because it cited a library internal by name.
+
+      **The bundle budget survived, and by a better route than the decision expected.** Decision 6
+      accepted growth; the default view took none. `@xyflow/react` and elkjs are both behind
+      dynamic imports, so the initial chunk is **162.23 KB** (measured after the fix pass below;
+      it was 161.65 KB when the DAG landed), and the graph pulls **186.35 KB
+      (React Flow) plus a 1.43 MB elk worker** only when someone switches to it. The entry chunk
+      contains zero occurrences of `xyflow`, `react-flow`, `ReactFlow`, `nodeLookup` or
+      `handleBounds`; all of them appear only in the lazy chunk. (`elkjs` appears in *no* built
+      asset — it is a module specifier that does not survive bundling, so it was never evidence
+      of anything.)
+
+      **The comparison this originally drew was wrong, and it is the stale-number failure this
+      file keeps producing.** It said "against the 161 KB it was before this slice", which was a
+      figure carried forward from line 1524 rather than re-measured. The validation pass built the
+      pre-slice tree in a throwaway worktree at `738d5c8` on the same vite 6.4.3 and got
+      **158.64 KB**. So the DAG slice cost **+3.01 KB (+1.9%)**, not +0.65 KB, and the fix pass
+      below took it to **+3.59 KB (+2.3%)** total. The conclusion holds —
+      no library bytes reached the default view — but the arithmetic behind it did not. The worker is also the reason elk cannot be imported by a test: it arrives
+      through a Vite `?worker` import that does not evaluate outside a browser, which is why
+      `GraphCanvas` takes its layout function as a prop.
+
+      **What is deliberately not in it.** Compound nodes per rollup (decision 3 chose flat, and the
+      96% figure above is the evidence). Edge routing from elk — elk is asked for node positions
+      only and React Flow draws its own lines, so there is one source of truth for where a line
+      goes. Dragging, connecting and React Flow's own selection model: an edge is a fact in
+      `catalogus.yaml` and the CLI is the only writer, so the canvas is strictly read-only and the
+      one selection model is the `#/service/<id>` route the list already used.
+
+- [x] **The DAG's validation pass, and the fixes it forced.** Two independent passes ran against
+      the slice above (2026-08-25), neither by the session that wrote it. **963 tests / 56 files**
+      on three consecutive full runs, `pnpm typecheck` clean across four packages.
+
+      **What the first pass found is in the box above.** What matters about it is the shape: every
+      claim about *behaviour* reproduced, and five *explanations* did not. Nothing built was
+      wrong. Every wrong thing was a reason reached by reading a library or carrying a number
+      forward, sitting in a comment that read as more authoritative than the code under it
+      because it cited an internal by name.
+
+      **Six fixes, each with the mutation that proves its test.** All six went red on exactly the
+      test naming them, and every mutation was restored:
+
+      1. **The orphan `<li>` and the dead selector, which were one bug.** `ServiceNode` now
+         returns a bare `<button>` and each caller supplies its own wrapper — `<li>` in
+         `ServiceGroup`'s list, React Flow's div on the canvas. That removes a list item that had
+         no list around it *and* makes `.node > button` a selector that matches, since the button
+         was a grandchild before and the rule had never once applied. Proved both ways by loading
+         both production stylesheets into a CSSOM: the old chain computes `max-width: 220px`, the
+         new one `max-width: none`.
+      2. **`onError` is now asserted**, and the assertion's own footing is written down: it passes
+         only because React Flow's 004 fires in an unmeasured jsdom pane, so it would go red for
+         an unrelated reason if this file ever measures. Better to say that than to discover it.
+      3. **The incident-edge highlight is now tested end to end** — real edges in jsdom, via a
+         spec-accurate `ResizeObserver`, element-size stubs and a `DOMMatrixReadOnly` polyfill,
+         each of which the second pass confirmed load-bearing by removing it.
+      4. **`ViewToggle` implements the radiogroup it announces**: roving tabindex, arrow keys with
+         wraparound, Home/End, and `preventDefault` so ArrowUp/ArrowDown stop scrolling the page
+         out from under the user.
+      5. **And a bug the second pass found in that fix.** It focused the *requested* option rather
+         than the committed one, so a parent that declined `onChange` left focus on the
+         `tabIndex={-1}` button while the other kept the group's only tab stop — roving tabindex's
+         single invariant, inverted. `App.tsx` always honours `onChange`, so it was never live. It
+         was still wrong, and a controlled component has to get that state right.
+      6. **The false comments and the wrong numbers**, listed in the box above, all corrected in
+         place rather than deleted — a comment that records what it got wrong is worth more here
+         than one that quietly reads correctly.
+
+      **Two limits, stated because the alternative is implying coverage that does not exist.**
+      Removing `measured` still fails no test, and no browser-free test can reach it. And no test
+      in this suite can see whether `.node > button` is still *in* the stylesheet — vitest's CSS
+      Module proxy synthesises a class name for any key, so only the DOM shape is guarded, not the
+      rule.
+
+      **The third limit was closed by running it.** Whether the button visually fills its 216x64
+      box is a layout question and jsdom does no layout, so it was cascade-derived until a live
+      run measured it: `catalogus view` against the stress fixture, all **35 nodes**, every one
+      with `button.getBoundingClientRect()` matching its `.react-flow__node` box to within half a
+      pixel — **ratio 1.000 on both axes**, computed `max-width: none`, and **zero `<li>` elements
+      anywhere on the canvas**. 48 edges drawn, clean console. The roving tabindex was driven with
+      a real keyboard too: ArrowLeft from Graph moved both the selection and the visible focus
+      ring to List, with `tabindex` reading `0`/`-1` on the checked and unchecked options.
+
+      **One live-run note that is not a defect, and cost time anyway.** A click that lands on the
+      already-selected option leaves `document.activeElement` on `<body>`, so the arrow key that
+      follows goes nowhere and reads exactly like a broken key handler. The keyboard path is fine;
+      the *click* did not focus. This is the same class as the previous session's unpainted-tab
+      artifact — **in an automated browser, confirm what has focus before concluding a key did
+      nothing.**
+
+      **The pattern worth carrying forward.** The second pass found a defect in the first pass's
+      own fixes, and this box's first draft described four defects in the present tense in the
+      same commit that fixed them. Validation is not a gate you pass once — each pass is written
+      by someone who now believes something, which is the condition the next one exists to check.
+
 - [x] **Status colours and `replaced_by` targets.** Shipped in `f256d72`, unticked until now for
       the same reason the two boxes above were — nobody went back. `ServiceNode.module.css` carries
       a ring colour for all four statuses (`removed` included, which this box's own wording
@@ -1641,8 +1959,143 @@ database node gets a database icon whoever the vendor is.
       file. The audit cleared everything else and recorded *why* at each site, so the next person
       checking this class reads a reason rather than re-deriving one.
 - [ ] Portfolio page: project list, service usage matrix across projects
-- [ ] Migration dashboard: everything `phasing_out` with its replacement
-- [ ] Layer 3 cost panel present, rendering an explicit "not connected" empty state
+- [x] **Migration dashboard: everything `phasing_out` with its replacement.** Shipped as a third
+      `ViewToggle` mode beside List and Graph — same one-addressable-page reasoning as DAG decision
+      1, and the roving-tabindex radiogroup absorbed a third option without a line of its key
+      handling changing, because it was written over `MODES` rather than over a count.
+      **1001 tests / 58 files** on three consecutive runs, `pnpm typecheck` clean across four
+      packages.
+
+      **Scope widened by the owner, 2026-08-25, and this box is the record the code cites.** The
+      board lists `phasing_out` *and* `deprecated`, in two sections — "In flight" and "Overdue".
+      `removed` is not listed: that migration is finished. `active` never enters the conversation.
+      The wording in this checkbox and in HANDOFF §4.2 query 4 both say `phasing_out` alone; the
+      widening is deliberate and this line is what makes `migrations.ts`'s citation of it true.
+      Against `examples/layout-stress.catalogus.yaml` that is 4 rows, and the one that argues for
+      the widening is `legacy-ledger` — **deprecated with no `replaced_by` at all**, a migration
+      with no destination, which the narrow reading would have hidden.
+
+      **Half of HANDOFF §4.2 query 4 is not answerable and the code says so.** The query asks for
+      "all edges/**nodes** marked `phasing_out`". An edge carries no status: the manifest's object
+      edge form allows `from`, `to` and `notes` and nothing else, and by the time an edge reaches
+      the viewer it is `{from, to}`. So the nodes half ships and the edges half stays uncovered
+      until Layer 2 grows a field for it. `migrations.ts`'s header states that rather than letting
+      a reader assume the query was met.
+
+      **The validation pass found one live bug, and it was a regression of a bug this file already
+      records as fixed.** `App.tsx` restores focus when the detail panel closes by looking up
+      `serviceNodeDomId(id)`; the board's rows carried no such id, so on the migration board — and
+      only there — closing a panel dropped focus to `<body>`. That is the exact state `App.tsx`'s
+      own focus comment describes finding and fixing once, and `serviceNodeDomId`'s doc comment had
+      already predicted the shape of it in writing: *"a focus restore that silently finds nothing is
+      invisible in a passing test suite."* Two independent A/B runs pinned it to migrations mode
+      alone. Fixed, and now held end to end by a test that goes red when the id is removed.
+
+      **The more useful finding was what the green suite did not know.** Four mutations to
+      `App.tsx` — swapping the board for the service list, swapping it for a bare paragraph,
+      widening the page in the wrong mode, and un-suppressing the text edge list — each left all
+      991 tests passing. `App.test.tsx` had not been touched by the slice; its describe block still
+      read "the list/graph toggle" and it never clicked the third option. All four now fail.
+
+      **And one assertion was inert in a way worth writing down.** The new `constructor` test —
+      guarding the prototype-pollution class this repo has produced five times — seeded a service
+      whose id *was* `constructor`, making the key an **own** property, which an object literal
+      shadows just as a `Map` does. Swapping the `Map` for a keyed literal left all 991 tests green.
+      The distinction `StatusPill.tsx` already draws is the whole point: *absent* and *inherited*
+      keys are different things and only one is a bug. The test now uses an absent target, and the
+      swap fails it — `constructor (function Object() { [native code] })` against the expected
+      `constructor`. Worth noting that the schema's id pattern rejects `__proto__`, so `constructor`
+      is the only `Object.prototype` key a manifest can express: the one reachable case was the one
+      the test was not exercising.
+
+      **Three more untested behaviours, now held:** `ViewToggle`'s `contains` focus-thief guard
+      (removing it had left the suite green — the effect must follow focus, never acquire it), the
+      row's `StatusPill`, and the overdue section's sort, which had been covered only in the pure
+      module. Each was mutated and each mutation now goes red on the test naming it.
+
+      **One accessibility fix the pass reasoned to rather than heard.** The replacement sits outside
+      the row's button on purpose, so that clicking it cannot select the wrong service — which left
+      it out of the button's accessible name entirely, reachable only in a screen reader's browse
+      mode. It is now the row's `aria-describedby` target, with a visually-hidden "replaced by"
+      prefix because the arrow that carries that meaning for a sighted reader is `aria-hidden`.
+      **Not heard on an actual screen reader**, and that is the honest status of it.
+
+      **Comments corrected rather than deleted.** `ViewToggle.tsx`'s header still described a
+      two-option group in four places ("the *other* is `tabIndex={-1}`", "two independent buttons")
+      while the component had three; the implementer had fixed one such comment ninety lines below
+      and left the header. `migrations.ts` overstated the edge shape by one field. `App.tsx` still
+      pointed forward to a slice that had already shipped. This is the same failure the DAG's
+      validation pass named: *every wrong thing was a reason sitting in a comment that read more
+      authoritatively than the code under it.*
+
+      **Verified without a browser, and the gap is the same one as the box above.** All 14 CSS
+      Module keys `MigrationList.tsx` references resolve to real selectors in the built stylesheet —
+      which no test can check, because the vitest proxy answers *every* key (probed directly: an
+      undefined key comes back as `_doesNotExist_<hash>`). Contrast was computed for every
+      foreground/background pair the component produces: worst case 5.35:1, all AA. **Nobody has
+      looked at this board.** Whether a long replacement label wraps, and whether the two sections
+      read as one board rather than two lists, are open.
+
+      **A process note, because it is the point of running two passes.** The validation agent, while
+      cleaning up its own background servers, ran `taskkill /F /IM node.exe` and killed every node
+      process on the machine. No repo or file damage — the tree and the suite were verified green
+      afterwards — but a validator is not supposed to be the most destructive thing in the session.
+- [x] **Layer 3 cost panel present, rendering an explicit "not connected" empty state.** A
+      `Cost & account` section at the foot of `ServiceDetailPanel`: the state line, one paragraph
+      saying what Layer 3 is and that nothing is missing from the manifest, and one naming
+      `catalogus push --private` as what fills it once the overlay exists. **969 tests / 56 files**,
+      `pnpm typecheck` clean across four packages, **6 mutations each red on exactly the test that
+      names them** and every one restored.
+
+      **Placement settled by the owner, 2026-08-25: the detail panel only.** HANDOFF §4.2's query 3
+      also wants a per-project total, and it has no home yet — the panel is per-service, and a
+      project-level Costs block was declined for now rather than invented. `ServiceDetailPanel.tsx`
+      had already recorded this destination in its own header comment, and HANDOFF §7 says
+      "private-overlay panel (cost/account ref)", so this is the placement the repo already named.
+
+      **It renders only for `kind: "service"`, and that is a rule rather than a layout choice.**
+      HANDOFF.md's 2026-08-23 amendment settled that only `service` rows can carry a cost or an
+      account reference, so a "not connected" box under a component or a stack would promise a
+      field that is never coming. Two tests hold the line, one per other kind.
+
+      **No data shape was invented, and that is the whole design.** There is no `PrivateOverlay`
+      interface, no prop, no field added to `ViewPayload`, and no runtime probe — `catalogus view`
+      serves the local manifest and has no second source, so there is nothing to check and nothing
+      to sign in to. An empty state offering a Connect button would be this project's own
+      plausible-default failure wearing a feature's clothes; Phase 4 is still blocked on a
+      decision, so the copy says the overlay does not exist *yet*. A test asserts the panel's only
+      control is still its close button.
+
+      **What was verified without a browser, and what that leaves open.** The suite covers the
+      claim, not the look: the wording, the absent action, the kind rule, the `h3` that keeps the
+      panel's outline unbroken, and the fact that the section adds no second ARIA region — the
+      panel is the one labelled region, and a mutation to a named `<section>` was run and breaks
+      *both* that new test and the pre-existing "is a labelled region" one, which is why the
+      section is a plain `<div>`.
+
+      Beyond jsdom, the built and served assets were checked directly, because this file already
+      records that vitest's CSS Module proxy synthesises a class name for any key and so cannot
+      see a typo: all five `overlay*` keys the component references resolve to real selectors in
+      the shipped stylesheet, and `catalogus view` on the reference manifest serves an entry chunk
+      carrying the heading, the state line, the command and the kind guard exactly once each.
+
+      **The gap is visual and it is stated rather than papered over.** The Chrome extension was not
+      connected in this session, so nobody has *looked* at this panel. Whether the section reads as
+      quiet rather than as an error, and whether `catalogus push --private` wraps inside a 320px
+      column instead of pushing the panel sideways — `.overlayCommand` sets `overflow-wrap:
+      anywhere` for exactly that and it is cascade-derived, not measured — are open. The previous
+      slice's live run is the precedent: it is where the dead `.node > button` selector was caught.
+
+      **Order settled by the owner, 2026-08-25: the cost panel first.** It is the only one of the
+      three blocked on nothing — single project, no new manifest, and no Layer 3 data touched,
+      because the whole of it is the empty state that says the private layer is not connected.
+      The migration dashboard is second and is renderable against the reference manifest today.
+
+      **And the manifest gap closes by onboarding real repos, not by writing more synthetics.**
+      Owner decision, same date, superseding this file's habit of proposing another synthetic:
+      the portfolio page and the usage matrix are judged against real topology or not at all.
+      What that does *not* change is `examples/` — those stay synthetic on purpose (CLAUDE.md),
+      so an onboarded project's manifest lives in its own repo and never lands here.
 - [x] **Unblocked, on the synthetic example only.** This box used to claim a real 26-service
       manifest existed alongside the reference example; it does not (see "There is no real
       manifest" above — checked 2026-08-24). What is actually available is
@@ -1661,6 +2114,13 @@ CTE against a real Postgres before choosing a host. It powers nothing in the vie
 ## Phase 7 — Viewer, backed by the platform ⬜
 
 Everything below needs Layer 3 and cross-user data, so it waits on Phase 4.
+
+**Read four of these as "backed by the platform", not as unbuilt.** The app, the DAG, the status
+colours and the migration dashboard all exist as of Phase 3.7 and read manifests directly; what
+Phase 7 adds is the store behind them. They are listed again here because the data path is the
+whole difference. (This said "the first three" until 2026-08-25, when the migration dashboard
+shipped and made it wrong — the same drift the fixture paragraph above records, and worth the
+same correction rather than a quiet edit.)
 
 - [ ] React + Vite app
 - [ ] Per-project DAG: elkjs layout, React Flow render, `simple-icons` brand icons

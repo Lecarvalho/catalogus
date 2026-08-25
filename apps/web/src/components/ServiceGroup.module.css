@@ -13,6 +13,14 @@
   color: var(--color-text-muted);
 }
 
+/* The `<li>` this component wraps each ServiceNode in -- moved here from
+   ServiceNode.module.css along with the wrapper itself (see ServiceNode.tsx's
+   top comment): a list item's styling belongs with whoever puts it in a
+   list. */
+.item {
+  list-style: none;
+}
+
 /* Wrapping flex, not the previous grid-of-cards: a compact node's width is
    its own content (icon + name), not a column width every other node in
    the row has to share, so a row of short names and one long uncatalogued

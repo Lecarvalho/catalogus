@@ -1,0 +1,332 @@
+# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+#
+# A layout fixture, deliberately synthetic and deliberately hard. It names no
+# real project, and it is NOT a reference for what a manifest should look
+# like -- examples/reference.catalogus.yaml is that. This one exists to be
+# difficult to draw.
+#
+# docs/PLAN.md kept saying the DAG could not be judged against
+# examples/reference.catalogus.yaml, because 14 entries and 14 edges prove
+# every *shape* renders and prove nothing about whether the layout stays
+# readable. It also kept saying nobody had built the hard one. This is it.
+#
+# Measured against the file itself rather than asserted: **35 services, 48
+# edges, 21 rollups**, 29 `service` / 2 `component` / 4 `stack`, and 30
+# `active` / 2 `phasing_out` / 2 `deprecated` / 1 `removed`. Re-measure rather
+# than trust these if you change the file -- every stale number in
+# docs/PLAN.md got there by being right once.
+#
+# What it is shaped to break, one property per line, so a change to it can be
+# checked against the reason it was written:
+#
+#   - A fan-out hub. `host-api` has 18 outgoing edges. This is the property
+#     the old Clapline manifest had (fourteen out of one node) and the only
+#     one that reliably turns a layered layout into a fan of crossings.
+#   - A fan-in hub. `db-primary` is depended on by six entries from four
+#     different rollups (`hosting`, `auth`, `analytics`, `ai`). The count was
+#     five here until an independent pass recomputed it off the file; the
+#     header's whole claim is that these numbers are measured, so it is worth
+#     recording that one of them was not.
+#   - Depth. ingress-edge -> host-web -> host-api -> auth-users -> db-primary
+#     -> obs-trace is six nodes deep, and is *a* longest path in the graph --
+#     `ci -> host-web -> ...` ties it -- so a layout that only ever draws two
+#     ranks is visibly wrong here.
+#   - Diamonds. host-web reaches db-cache by two disjoint paths (via host-api
+#     and via host-edge), which is the shape that makes a naive tree layout
+#     duplicate a node or drop an edge.
+#   - Rollups that do not partition the edges. **46 of the 48 edges cross a
+#     rollup boundary** -- 96% -- which is the measured evidence behind the
+#     flat-layout decision in docs/PLAN.md's Phase 3.7: compound containers
+#     would be crossed by all but two lines on screen.
+#   - Three entries of one vendor in one rollup (`host-api`, `host-web`,
+#     `host-worker`, all Fly.io) and two more elsewhere -- the duplicate-name
+#     case the node's id line exists for.
+#   - Every kind and every status, including `removed`, plus four
+#     `replaced_by` pairs (`db-legacy` -> `db-primary`, `auth-legacy` ->
+#     `auth-users`, `pay-legacy` -> `pay-cards`, `mail-legacy` -> `mail-tx`),
+#     one of which points at the fan-in hub. This line used to claim two
+#     pairs and a three-entry lifecycle; the file has never held either.
+#   - Three entries with no edges at all (`board`, `agent-claude`,
+#     `agent-cursor`), which a layout that walks the edge list rather than the
+#     service list will silently drop. Three rather than one deliberately: a
+#     single orphan can be special-cased into a corner, and a handful cannot.
+#   - An uncatalogued slug (`acme-ledger`), which has no catalog row and so
+#     renders as a raw slug with the fallback glyph. 38% of real slugs take
+#     this path (docs/PLAN.md), so a fixture where every node has a brand
+#     icon is not representative of anything.
+#
+# Layer 2 only, and safe to commit. Cost, billing and account references are
+# Layer 3: they live in the private overlay, never here.
+
+catalogus: 1
+
+project:
+  name: Layout Stress
+  slug: layout-stress
+  architecture: "deliberately overgrown: an API hub with eighteen outgoing dependencies, two lifecycle migrations in flight, and one entry nothing depends on"
+  vcs:
+    visibility: private
+
+services:
+  # Hosting. Three Fly.io entries in one rollup on purpose -- the node shows
+  # a display name, so without the id line these are the same tile three
+  # times.
+  - id: host-api
+    service: fly-io
+    role: hosting-api
+    added: 2025-11-02
+    notes: "the fan-out hub: 18 outgoing edges"
+  - id: host-web
+    service: fly-io
+    role: hosting-web
+    added: 2025-11-02
+  - id: host-worker
+    service: fly-io
+    role: hosting-worker
+    added: 2026-01-08
+  - id: host-edge
+    service: cloudflare-workers
+    role: hosting-edge
+    added: 2026-03-01
+
+  # Database. Two postgres entries (a second duplicate-name pair, in a
+  # different rollup from the Fly.io one), plus the deprecated store the
+  # primary replaced.
+  - id: db-primary
+    service: postgresql
+    role: database-primary
+    added: 2025-11-02
+    notes: "the fan-in hub: six dependents across five rollups"
+  - id: db-replica
+    service: postgresql
+    role: database-replica
+    added: 2026-02-10
+  - id: db-cache
+    service: redis
+    role: database-cache
+    added: 2025-11-02
+  - id: db-search
+    service: elasticsearch
+    role: database-search
+    added: 2026-01-20
+  - id: db-legacy
+    service: mongodb
+    role: database-document
+    added: 2025-01-05
+    status: deprecated
+    replaced_by: db-primary
+
+  # Auth, one migration in flight.
+  - id: auth-users
+    service: clerk
+    role: auth-users
+    added: 2026-02-01
+  - id: auth-legacy
+    service: auth0
+    role: auth-legacy
+    added: 2025-01-05
+    status: phasing_out
+    replaced_by: auth-users
+
+  # Payments, a second migration in flight.
+  - id: pay-cards
+    service: stripe
+    role: payments-cards
+    added: 2025-11-02
+  - id: pay-legacy
+    service: paypal
+    role: payments-legacy
+    added: 2025-01-05
+    status: phasing_out
+    replaced_by: pay-cards
+
+  - id: queue-jobs
+    service: rabbitmq
+    role: queue-jobs
+    added: 2026-01-08
+
+  - id: mail-tx
+    service: resend
+    role: email-transactional
+    added: 2026-01-15
+  - id: mail-legacy
+    service: mailgun
+    role: email-legacy
+    added: 2025-03-14
+    status: removed
+    replaced_by: mail-tx
+
+  # Observability. Two vendors and one component -- the component is on the
+  # request path and has no invoice behind it.
+  - id: obs-errors
+    service: sentry
+    role: monitoring-errors
+    added: 2025-11-02
+  - id: obs-metrics
+    service: datadog
+    role: monitoring-metrics
+    added: 2026-02-01
+  - id: obs-trace
+    service: opentelemetry
+    kind: component
+    role: telemetry-transport
+    added: 2026-02-01
+
+  - id: ingress-edge
+    service: nginx
+    kind: component
+    role: ingress-proxy
+    added: 2025-11-02
+
+  - id: blob-store
+    service: google-cloud-storage
+    role: storage-blob
+    added: 2025-11-02
+
+  - id: ai-chat
+    service: anthropic
+    role: ai-inference
+    added: 2026-03-01
+  - id: ai-embed
+    service: hugging-face
+    role: ai-embeddings
+    added: 2026-03-01
+
+  - id: analytics-product
+    service: posthog
+    role: analytics-product
+    added: 2026-01-20
+
+  - id: vcs
+    service: github
+    role: vcs
+    added: 2025-11-02
+  - id: ci
+    service: github-actions
+    role: ci
+    added: 2025-11-02
+
+  - id: dns
+    service: cloudflare
+    role: dns
+    added: 2025-11-02
+
+  # Nothing depends on this and it depends on nothing. A layout that walks
+  # the edge list rather than the service list loses it silently.
+  - id: board
+    service: trello
+    role: pm
+    added: 2025-11-02
+
+  # Stacks. Not on the request path, but each carries a version and so a real
+  # end-of-life date.
+  - id: stack-runtime
+    service: dotnet
+    kind: stack
+    version: "10"
+    role: runtime-backend
+    added: 2025-11-02
+  - id: stack-ui
+    service: react
+    kind: stack
+    version: "19"
+    role: ui-framework
+    added: 2025-11-02
+  - id: stack-lang
+    service: typescript
+    kind: stack
+    version: "5"
+    role: language-shared
+    added: 2025-11-02
+  - id: stack-mobile
+    service: expojs
+    kind: stack
+    version: "52"
+    role: ui-mobile
+    added: 2026-03-01
+
+  - id: agent-claude
+    service: claude-code
+    role: coding-agent
+    added: 2025-11-02
+  - id: agent-cursor
+    service: cursor
+    role: coding-review
+    added: 2026-02-01
+
+  # No catalog row for this slug, so it renders as a raw slug with the
+  # fallback glyph rather than a brand icon.
+  - id: legacy-ledger
+    service: acme-ledger
+    role: finance-ledger
+    added: 2025-01-05
+    status: deprecated
+    notes: "an in-house ledger service nobody has a catalog row for"
+
+dependencies:
+  # Edges point from the depender to the dependency, the direction settled in
+  # docs/PLAN.md's Phase 3.7 DAG decisions.
+
+  # The fan-out hub: 18 edges out of one node.
+  - [host-api, db-primary]
+  - [host-api, db-replica]
+  - [host-api, db-cache]
+  - [host-api, db-search]
+  - [host-api, db-legacy]
+  - [host-api, auth-users]
+  - [host-api, auth-legacy]
+  - [host-api, pay-cards]
+  - [host-api, pay-legacy]
+  - [host-api, queue-jobs]
+  - [host-api, mail-tx]
+  - [host-api, mail-legacy]
+  - [host-api, obs-errors]
+  - [host-api, obs-metrics]
+  - [host-api, blob-store]
+  - [host-api, ai-chat]
+  - [host-api, stack-runtime]
+  - [host-api, stack-lang]
+
+  # Depth, and the diamond: host-web reaches db-cache two ways.
+  - [ingress-edge, host-web]
+  - [host-web, host-api]
+  - [host-web, host-edge]
+  - [host-edge, db-cache]
+  - [auth-users, db-primary]
+  - [db-primary, obs-trace]
+
+  # The rest of the fan-in on db-primary. Four distinct rollups across the
+  # six edges, not five -- see the header.
+  - [host-worker, db-primary]
+  - [host-edge, db-primary]
+  - [analytics-product, db-primary]
+  - [ai-embed, db-primary]
+
+  # Workers and edge functions have their own dependencies, so the second
+  # rank is not just one node wide.
+  - [host-worker, queue-jobs]
+  - [host-worker, mail-tx]
+  - [host-worker, blob-store]
+  - [host-worker, stack-runtime]
+  - [host-edge, stack-lang]
+  - [ai-embed, blob-store]
+  - [ai-chat, obs-trace]
+  - [analytics-product, obs-trace]
+
+  # CI reaches everything it deploys, which crosses every hosting rollup.
+  - [ci, vcs]
+  - [ci, host-api]
+  - [ci, host-web]
+  - [ci, host-worker]
+  - [ci, host-edge]
+
+  # Front ends and their stacks.
+  - [host-web, stack-ui]
+  - [host-web, stack-lang]
+  - [stack-mobile, host-api]
+  - [stack-mobile, stack-lang]
+
+  # Off-repo and in-house.
+  - [host-web, dns]
+  - [legacy-ledger, pay-legacy]
+  - [legacy-ledger, db-legacy]

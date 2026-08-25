@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { groupByRollup } from "./group-services.js";
+import { duplicateNames, groupByRollup } from "./group-services.js";
 import { makeViewService as service } from "./test-support/fixtures.js";
 
 describe("groupByRollup", () => {
@@ -40,5 +40,58 @@ describe("groupByRollup", () => {
 
   it("returns an empty array for no services", () => {
     expect(groupByRollup([])).toEqual([]);
+  });
+});
+
+describe("duplicateNames", () => {
+  it("names a display name carried by two entries -- the case a compact node cannot show apart", () => {
+    const duplicates = duplicateNames([
+      service({ id: "supabase-db", role: "database", name: "Supabase" }),
+      service({ id: "supabase-auth", role: "database", name: "Supabase" }),
+    ]);
+    expect([...duplicates]).toEqual(["Supabase"]);
+  });
+
+  it("leaves a name carried by exactly one entry out, so the id only appears where it is needed", () => {
+    const duplicates = duplicateNames([
+      service({ id: "supabase-db", role: "database", name: "Supabase" }),
+      service({ id: "fly-api", role: "hosting", name: "Fly.io" }),
+    ]);
+    expect([...duplicates]).toEqual([]);
+  });
+
+  it("names every colliding name when there is more than one collision", () => {
+    const duplicates = duplicateNames([
+      service({ id: "a1", role: "database", name: "Supabase" }),
+      service({ id: "a2", role: "database", name: "Supabase" }),
+      service({ id: "b1", role: "hosting", name: "Fly.io" }),
+      service({ id: "b2", role: "hosting", name: "Fly.io" }),
+      service({ id: "c1", role: "payments", name: "Stripe" }),
+    ]);
+    expect([...duplicates].sort()).toEqual(["Fly.io", "Supabase"]);
+  });
+
+  it("reports a name three entries share exactly once", () => {
+    const duplicates = duplicateNames([
+      service({ id: "a", role: "database", name: "Supabase" }),
+      service({ id: "b", role: "database", name: "Supabase" }),
+      service({ id: "c", role: "database", name: "Supabase" }),
+    ]);
+    expect([...duplicates]).toEqual(["Supabase"]);
+  });
+
+  // The keyed-lookup defect class this repo keeps producing (docs/PLAN.md):
+  // a display name is manifest-derived text, and `constructor` resolves
+  // through Object.prototype in a plain object literal. A Set does not,
+  // which is why this is a Set -- with the test that says so.
+  it("handles a display name of 'constructor' as ordinary text", () => {
+    expect([...duplicateNames([service({ id: "a", role: "x", name: "constructor" })])]).toEqual([]);
+    expect([
+      ...duplicateNames([service({ id: "a", role: "x", name: "constructor" }), service({ id: "b", role: "x", name: "constructor" })]),
+    ]).toEqual(["constructor"]);
+  });
+
+  it("returns an empty set for no services", () => {
+    expect(duplicateNames([]).size).toBe(0);
   });
 });
