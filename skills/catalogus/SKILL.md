@@ -39,6 +39,7 @@ catalogus init --yes [--visibility <v>]  # create the manifest: project fields o
 catalogus add <service> --role <r> [--kind <k>] [--version <v>] [--depends-on <id>...] [--id <id>]
 catalogus set <field> <value> [<field> <value> ...]  # project fields, or a service's role/kind/version
 catalogus link <from> <to> # one edge between services that already exist
+catalogus unlink <from> <to> # remove that one edge, leaving both entries in place
 catalogus deprecate <id> [--status phasing_out] [--replaced-by <id>]
 catalogus remove <id>      # delete a wrong entry, and every edge naming it
 catalogus rename <old> <new> # change a local id, moving its edges and replaced_by with it
@@ -73,7 +74,10 @@ value is a directory name, which is a guess, and this is how you correct it once
 A service's `role` is settable the same way — a wrong role is a `set`, not a remove-and-re-add.
 A wrong *id* is a `catalogus rename <old> <new>`, not a remove-and-re-add either: it moves both
 endpoints of every edge and any other entry's `replaced_by` along with the entry, which is the part
-a delete-and-recreate loses.
+a delete-and-recreate loses. A single edge that has gone stale — an entry's role changed and one of
+its dependencies no longer applies — is a `catalogus unlink <from> <to>`, not a remove-and-re-add of
+the entry either: the entry itself is still correct, and `remove` would delete it along with every
+other edge that names it.
 
 `project.vcs` carries only `visibility` now — the PM tool, the VCS provider and each coding agent
 are service entries (`role: pm`, `role: vcs`, `role: coding-agent`), added with `catalogus add`, not
@@ -475,10 +479,10 @@ service genuinely does two jobs, that is two entries (which is the same rule as 
 
 Project-level answers through the CLI too — architecture, VCS visibility, and a corrected project
 name or slug via `catalogus set`; PM tooling, the VCS provider and each coding agent via `catalogus
-add <slug> --role pm|vcs|coding-agent`; an edge you remember later via `catalogus link`; a phase-out
-via `catalogus deprecate`; a wrong `add` undone via `catalogus remove`; a wrong role corrected via
-`catalogus set services.<id>.role` rather than by removing and re-adding the entry. Nothing gets
-hand-edited.
+add <slug> --role pm|vcs|coding-agent`; an edge you remember later via `catalogus link`, or one that
+no longer applies taken back out via `catalogus unlink`; a phase-out via `catalogus deprecate`; a
+wrong `add` undone via `catalogus remove`; a wrong role corrected via `catalogus set
+services.<id>.role` rather than by removing and re-adding the entry. Nothing gets hand-edited.
 
 ### 7. Validate
 
@@ -532,6 +536,9 @@ built is `catalogus graph`, which prints and exits.
   <id>`, not by clearing the file. It refuses (exit 1, nothing written) when another entry's
   `replaced_by` still names the one you're removing — re-point or clear that first with
   `catalogus deprecate`.
+- **Removing and re-adding a whole entry to drop one stale edge.** `catalogus unlink <from> <to>`
+  takes out one edge without touching either entry; `remove` would also delete every other edge
+  naming the entry, which is more than a stale edge asks for.
 - **Running `catalogus view` to check your work.** It is a server and it will not return. Use
   `catalogus graph`, and hand the viewer to the user.
 

@@ -21,6 +21,7 @@ import { runLink } from "./commands/link.js";
 import { runRemove } from "./commands/remove.js";
 import { runRename } from "./commands/rename.js";
 import { runSet, SETTABLE_FIELDS } from "./commands/set.js";
+import { runUnlink } from "./commands/unlink.js";
 import { runValidate } from "./commands/validate.js";
 import { DEFAULT_VIEW_PORT, runView } from "./commands/view.js";
 import { looksLikePrivateFlagName, privateFlagRefusalMessage } from "./private-guard.js";
@@ -229,6 +230,16 @@ export function createProgram(): Command {
     .argument("[path]", "target directory (defaults to the current directory)")
     .action(async (from: string, to: string, path: string | undefined) => {
       emit(await runLink(path, from, to));
+    });
+
+  program
+    .command("unlink")
+    .description("remove one dependency edge between two services")
+    .argument("<from>", "local id that depended on <to>")
+    .argument("<to>", "local id <from> depended on")
+    .argument("[path]", "target directory (defaults to the current directory)")
+    .action(async (from: string, to: string, path: string | undefined) => {
+      emit(await runUnlink(path, from, to));
     });
 
   program

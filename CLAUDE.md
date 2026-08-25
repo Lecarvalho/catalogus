@@ -19,7 +19,7 @@ pnpm workspace monorepo, ESM throughout, TypeScript strict.
 - `packages/schema` (`@catalogus/schema`) — the JSON Schema for `catalogus.yaml` and its validator.
 - `packages/core` (`@catalogus/core`) — the detection engine, built on `@specfy/stack-analyser`.
 - `packages/cli` (`@catalogus/cli`) — the offline CLI: `init`, `detect`, `diff`, `add`, `set`, `link`,
-  `deprecate`, `remove`, `rename`, `validate`, `graph`. Depends on `@catalogus/schema` and
+  `unlink`, `deprecate`, `remove`, `rename`, `validate`, `graph`. Depends on `@catalogus/schema` and
   `@catalogus/core`. Every command that writes goes through `src/manifest-edit.ts`, which edits the
   parsed YAML Document (comments and the `$schema` modeline survive) and refuses to write anything
   that would fail `validate`. The CLI is the only writer: there is no supported hand-edit path.
@@ -85,7 +85,27 @@ assumed, or not reported at all.
 
 **Parallel agents must not share files.** Each brief carries the explicit list of files the other
 running agents are touching, and says not to edit them. An audit of a file that changes underneath
-it produces a confident report about a version that no longer exists.
+it produces a confident report about a version that no longer exists. When the main session changes
+a file mid-flight that a running agent depends on, it *tells* that agent rather than letting it
+discover the change — a brief is a snapshot, and a stale one produces confident work against a
+version that no longer exists just as surely as a shared file does.
+
+**A subagent may delegate to its own subagents, and should when the work is genuinely wide.** A brief
+that turns out to hold eight independent pieces is better fanned out than ground through serially,
+and the agent holding it is better placed to see that than the session that wrote the brief. Two
+things bind a delegating agent, and both exist because delegation is where verification quietly goes
+missing:
+
+- **It owns the file partition for its children, and can only hand out files from its own
+  allocation.** The main session's list of who-touches-what stops at its direct children, so a
+  grandchild editing a file outside its parent's allocation is invisible to the only party who could
+  have caught the collision.
+- **It verifies its children's claims rather than relaying them.** "The tests pass" arriving from a
+  child is an unverified claim until the parent has run them itself, and a parent that forwards it
+  upward has laundered it through one extra layer — which is precisely the failure this project's
+  whole review loop exists to catch. The rule that a validator did not write the code it validates
+  survives delegation too: a parent cannot validate its own children's work by reading their
+  reports.
 
 ## Hard rule: ask, never guess
 
