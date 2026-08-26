@@ -190,6 +190,39 @@ by side at 812/812 now, and collapse to one column below 640px.
    `data-kind` and the visually-hidden text carry the fact regardless, so nothing is lost — but the
    shape cue is not one.
 
+#### The `/impeccable` run is still open, and this pointer has now been missed twice
+
+**Do not read this handoff and stop.** Two handoffs below, the 2026-08-25 redesign section carries
+a heading that says *"The next session must re-enter `/impeccable`, and this is its state"*, and
+`apps/web/docs/DIRECTION.md` is the contract it names. **Two sessions have since run without
+doing so** — the brand interview and this one — because each new handoff was written at the top
+saying "read this first" and neither carried the instruction forward. That is the failure mode, not
+an oversight by either session: an instruction that only exists below three "read this first"
+banners is an instruction that does not get read.
+
+Four required steps of that flow have never run: the contract is not embedded in the emitted
+markup, the finish review has not happened, `DESIGN.md` does not exist, and the mechanical detector
+has not been run over the changed targets.
+
+**One condition governs whether it can close, and it is the owner's to lift.** `DIRECTION.md`'s
+2026-08-25 revision says the finish review *should still wait, because the mark is not in yet* —
+and the mark is deferred indefinitely by the owner ("the logo is something I need to think on my
+time"). So the run cannot close on its own terms until either the mark exists or the owner says the
+review may proceed over a `BrandMark` that deliberately draws no glyph. **The rest of the flow does
+not wait on that**: embedding the contract in the markup and running the mechanical detector are
+both unblocked today, and the design they would review is no longer the one the owner rejected —
+the shell and header shipped, and the graph and migrations views have since joined the world.
+
+**Decided by the owner on 2026-08-26, when this was put to them directly: run the two unblocked
+steps, and leave the other two waiting.** So the next session embeds the contract in the emitted
+markup (an HTML comment surviving the production build, greppable by seed key `ac1ba604`) and runs
+the mechanical detector over the changed targets. It does **not** run the finish review and does
+**not** write `DESIGN.md`: the documenter writes that from the *built* world, and a world whose
+identity is a labelled placeholder is not that world yet. The condition stands until the mark
+exists or the owner lifts it — and the two options that were declined are recorded here rather than
+omitted, because "closed the run over the placeholder" and "left it entirely" were both live and a
+later reader should see they were weighed rather than missed.
+
 #### Two traps worth carrying forward
 
 - **`catalogus view` reads `index.html` once at startup**, and the bundle is content-hashed, so a
