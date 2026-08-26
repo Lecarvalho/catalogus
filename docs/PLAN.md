@@ -59,14 +59,24 @@ design decisions; this file tracks *what has been built* against it and what rem
   would have caught**: a suite flake that made `pnpm test` fail half the time while every
   single-file run passed, and a live `catalogus set` bug that reported a schema error against a
   perfectly valid manifest. Both are written up below.
-- **Last updated:** 2026-08-25
+- **Last updated:** 2026-08-26
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **1125 tests / 70 files**, plus `pnpm typecheck`
-clean across all four packages, before trusting anything below. (2026-08-25 added 7 for `AppShell`
-and `BrandMark`, the app chrome, and removed 13 with the dead `ServiceDetailPanel`; the 1131/69
-before that was the viewer redesign.)
+Run `pnpm build && pnpm test` first and confirm **1169 tests / 71 files**, plus `pnpm typecheck`
+clean across all four packages, before trusting anything below. (2026-08-26 took it from 1125/70:
+the graph and migrations views moving into the design world, `ServicePage`'s first test file, one
+new cross-cutting guard file, and the tests the validation pass demanded. The 1125/70 it replaces
+was 2026-08-25's, which added 7 for `AppShell` and `BrandMark` and removed 13 with the dead
+`ServiceDetailPanel`; the 1131/69 before that was the viewer redesign.)
+
+**One number here is legitimately not fixed, and it is worth knowing before you distrust the
+rest.** `packages/cli/src/workspace-scan.test.ts` guards six junction/symlink tests behind
+`describe.skipIf(!canCreateDirLinks)`, probed at module load by trying to create a directory
+junction. Where Windows refuses the process that privilege, those six skip and the summary says so
+— a run reporting 1163 passed and 6 skipped is the same tree as one reporting 1169. Five
+consecutive runs on 2026-08-26 all reported 1169; an agent working the same tree concurrently saw
+both figures and read it as a flake, which is how this got noticed.
 The pre-redesign figure this paragraph carried was **1001 tests / 58 files**, and the rest of the
 parenthesis below is the history of how it got there. (Phases 0–3.6 and the 3.6.1
 correction pass predate this at 549/38, the viewer-foundations session ended at 679/50, and the
@@ -83,6 +93,114 @@ validation pass, which is the more interesting number of the two.)
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
+
+### Handoff — 2026-08-26, the graph and the migrations board join the world
+
+**Read this first.** It closes the last open item that needed no decision from the owner, and it
+leaves three that do.
+
+**What happened.** On 2026-08-25 the board was rebuilt into the `japanese-high-density-web` world
+and the other two views were not, so toggling List → Graph or List → Migrations changed the app
+underneath the reader: rounded tiles, a colour-only status ring, solid pills on every row. Both are
+now citizens of the same world, `StatusPill` is deleted, and **`tokens.css`'s legacy alias block is
+gone** — which is the completion test that block's own header set for itself: "deleting the last of
+them is how this migration is known to be finished."
+
+Baseline confirmed first at **1125 tests / 70 files** on a clean tree; the session ends at
+**1169 / 71**, green on five consecutive runs, `pnpm typecheck` clean across four packages.
+
+#### What is different on screen
+
+- **The graph node lost its status ring.** It was colour-only, with one rule per status
+  *including* `active` — a pre-rewrite leftover. Status is now the board tile's own 3px top bar, so
+  a 35-service manifest shows **five** marks rather than thirty-five, and the four departures are
+  the only marked things on the canvas. Selection and the incident-edge cue moved to ink: red is
+  spent on departures in the data, not on where the cursor happens to be.
+- **The migrations board became two modules**, hairline-boxed with filled header bars and counts in
+  the signal colour, and it renders the design contract's own idiom for a lifecycle swap — struck
+  old name, replacement in signal red for `phasing_out`, plain ink for `deprecated`. Per-row status
+  marks went, because every row in a section already has the status its heading names.
+- **`StatusPill` is deleted**, and this is the change with the widest reach. It marked `active` on
+  31 entries in 35, and on the service page it pinned a solid red PHASING OUT block to the header's
+  far edge — on a wide window, half a screen from the service it described. `service-tags.ts` and
+  `Tag` are now the only status vocabulary in the app; on the page the marks sit under the name,
+  and they bring recency and `kind` with them, which the pill could not say at all.
+
+#### Two defects that a green suite could never have shown
+
+- **A guard that guarded nothing, for the second time in this file's history.** `Tag` looked its
+  tone class up with `Object.prototype.hasOwnProperty.call(styles, tone)`. Measured directly rather
+  than argued: under this repo's vitest CSS-modules handling `styles["ink-solid"]` returns a class
+  string, `styles["not-a-real-class"]` returns one just as happily, `hasOwnProperty` answers
+  **false** for both, and `Object.keys` reports **0**. So every `Tag` in every test rendered with
+  **no tone class**, and no test could notice, because none asserted one. Both `Tag` and
+  `ServiceNode` use a `Map` now, and the missing assertion exists. `Tag.tsx`'s header carries the
+  measurement, having absorbed the account that lived in the deleted `StatusPill.tsx`.
+- **A dead-token guard that covered two stylesheets out of twenty-one.** Deleting the alias block
+  means a stylesheet still naming `--color-accent` gets nothing — no error, no failing test, and in
+  a screenshot it looks like a design choice. `apps/web/src/token-references.test.ts` now discovers
+  every `*.module.css` and derives the forbidden set from `tokens.css`'s own declarations, so it
+  catches the whole class rather than these nine names. The reproduction that motivated it —
+  reintroducing `--color-surface-raised` into a stylesheet and watching the suite stay green — now
+  fails red naming the file and the token.
+
+#### What the validation pass found, and why it was worth its cost
+
+A separate agent on the strongest model, which wrote none of the code, reproduced every claim by
+execution and returned **seven defects**. Six are fixed. The three test defects are the ones worth
+copying, because all three are the same shape this project keeps producing:
+
+- Deleting `${isSelected ? styles.selected : ""}` from `ServiceNode` left the suite green. The
+  `describe` block that looked like it covered this reads the *stylesheet file* and asserts the
+  rule's text — it would stay green if the class never reached an element.
+- Removing `kind: "service"` from `ServiceNode`'s `tagsFor` call left it green too, and its
+  consequence is invisible twice over: an active `component` node grows a status bar whose tone
+  class does not exist in that stylesheet, so it paints a **transparent** 3px bar. A screenshot
+  would not have caught it either.
+- The migrations board dropped the status *word* along with the pill, which is right for a sighted
+  reader who keeps the heading in view and wrong for the common screen-reader mode of tabbing
+  button to button: "phasing out" appeared nowhere on the board — not in a row's name, its
+  description, or its heading. Rows carry it in the accessible name now
+  (`"Auth0, auth-legacy, phasing out"`) while the board stays wordless, which is what
+  `ServiceTile` already did.
+
+The layout defect it confirmed is a good argument for reading a copied rule in its new context:
+`MigrationList` inherited `align-self: start` from `BandModule`, where it sits in a multi-column
+container and does nothing. In a flex *column* it becomes live on the horizontal axis, and the two
+sections rendered **297px and 358px wide on a 2514px viewport**, stacked and ragged. They tile side
+by side at 812/812 now, and collapse to one column below 640px.
+
+#### Three things left open, and each is the owner's
+
+1. **Four selected-state treatments are dead code in the shipped app.** `App.tsx` renders
+   `selectedService ? <ServicePage/> : <board|graph|migrations>`, and `selectedId` comes from the
+   same hash that produces `selectedService` — so a selected node is never on screen while the view
+   that draws it is. `ServiceNode`'s `.selected`, `GraphCanvas`'s `.edgeIncident`,
+   `MigrationList`'s `[aria-pressed="true"]` and `ServiceTile`'s `.selected` are all unreachable,
+   confirmed by driving the app with both real and bogus hashes. This dates from the 2026-08-25
+   "the page replaces the board" decision and is not a regression, but it means two agents spent
+   part of this session restyling states nobody can see. **Whether a view should keep showing where
+   you came from is a design decision, not a cleanup**, so nothing was deleted.
+2. **Status is absent from the graph view entirely, for a screen reader.** The node's mark is
+   colour-only by design and always was — the ring it replaced had no text either. The board tile
+   solves the same problem in its `aria-label`, so the fix is cheap; whether the graph should say
+   it is a judgement about how much a canvas should narrate.
+3. **`.kind-stack`'s cue is invisible.** It is a 2px corner-radius delta against a 2px default,
+   which at node size reads as nothing, where `.kind-component`'s dashed border reads immediately.
+   `data-kind` and the visually-hidden text carry the fact regardless, so nothing is lost — but the
+   shape cue is not one.
+
+#### Two traps worth carrying forward
+
+- **`catalogus view` reads `index.html` once at startup**, and the bundle is content-hashed, so a
+  `pnpm build` under a running server leaves the cached shell pointing at filenames the build
+  deleted. The symptom is a **blank page and a 404**, not the older-looking page "stale shell"
+  suggests. Two people read it as "my change did not take effect" on the same day. `view.ts` says
+  so at the call site now.
+- **The repaint trap has a second form.** This file already records that a DOM query in an
+  automated browser is not evidence until something forces a paint. It applies to
+  `getComputedStyle` too: the validator's first read of the selection cue returned a zeroed
+  transparent shadow, because it caught a transition at t=0.
 
 ### Handoff — 2026-08-25, the brand interview and the shell
 
@@ -414,12 +532,42 @@ The short version:
    reachable, whether or not it serves user traffic. The band *id* was renamed
    `serves` -> `production` in the same pass so the code and the label agree,
    and `bands.ts` carries why. The per-service exception stayed ruled out.
-2. **The service page does not exist.** Click currently opens the old
-   `ServiceDetailPanel`. The page is the next piece of work and it is the whole
-   point of the product; its *content model* is an open question in `PRODUCT.md`
-   and must not be invented.
-3. **Graph and Migrations views still wear the old world.** They work; they do not
-   match.
+2. ~~**The service page does not exist.**~~ ✅ **it does** -- `ServicePage`
+   shipped in `f2b9044`, "a service is a page, and clicking one opens it", and
+   the panel this item says a click opens was deleted a commit later. **Both
+   sentences were already false when this list was written**, which is the
+   familiar shape: the item was drafted before the work and never re-read
+   after it. Corrected 2026-08-26 rather than deleted, because the half that
+   is still true is the important half -- the page ships a *shell* and an
+   empty state, its **content model is still an open question in `PRODUCT.md`,
+   and it must not be invented.** `ServicePage.tsx`'s header says the same
+   thing to anyone about to fill it in.
+
+   One real gap went with it, and it was closed later the same day:
+   `ServicePage` had **no test file of its own** -- `App.test.tsx`'s routing
+   assertions and `ServiceSummary.test.tsx`'s facts column covered everything
+   except the page's own chrome, so the breadcrumb, the uncatalogued line and
+   the Layer 3 empty state were asserted by nobody. `ServicePage.test.tsx`
+   now covers exactly those, and the validation pass killed all eight of its
+   assertions with eight separate mutations.
+
+   *(The two sentences above were written in the past tense on 2026-08-26,
+   hours after the present-tense version of them stopped being true. The
+   validator caught it. Recording it because this is the third correction on
+   this one item today, and the pattern is always the same: a note written
+   about work that is about to happen, and never re-read once it has.)*
+3. ~~**Graph and Migrations views still wear the old world.**~~ ✅ **closed
+   2026-08-26.** Both rebuilt in the world's own grammar, `StatusPill` deleted
+   with the last of the old vocabulary, and the completion test met on its own
+   terms: `tokens.css`'s legacy alias block is empty and gone, which its
+   header named as how this migration would be known to be finished. Verified
+   in a real browser against the stress fixture, not only by the suite, and
+   audited by a validator that wrote none of it -- seven defects, six fixed.
+   The full account is in this session's handoff at the top of this file,
+   including **three things it deliberately did not decide**, of which the
+   first matters most: four selected-state treatments are unreachable in the
+   shipped app, because the service page replaces the view rather than sitting
+   beside it.
 4. ~~**`ServiceDetailPanel` is dead code.**~~ ✅ **deleted 2026-08-25**, with its
    stylesheet and its 13 tests, after confirming nothing unique went with them:
    the panel's content assertions are all covered by `ServiceSummary.test.tsx`
@@ -2678,6 +2826,28 @@ the checkbox list.
    the date is visible one service at a time and the query as written is not answerable. **This one
    is single-project and is not blocked on anything** — it is simply unbuilt, and it is the cheapest
    remaining §4.2 item by a distance.
+
+   *Corrected 2026-08-26, and it had gone stale in two directions at once.* The panel it names was
+   deleted with the redesign, so the "renders per service" half pointed at a file that no longer
+   exists. And the redesign built more of this query than anyone recorded: `service-tags.ts` has a
+   named `RECENT_WINDOW_DAYS = 30` and a `new` tag, measured from the payload's server-stamped
+   `readAt` rather than from `Date.now()` so every mark on a screen is measured from one instant.
+   Its own header says it answers this query. **It is still not answerable, and for a reason worth
+   knowing:** the mark is never on more than one service at a time. `ServiceTile` passes
+   `added: undefined` deliberately — a collapsed vendor tile stands for several entries and a
+   single bar cannot say "some of these are new" honestly — so the board, the one surface that
+   shows every service at once, carries no recency mark at all. The answer exists per service, one
+   hover or one page at a time, which is the same shape of "not answerable" the paragraph above
+   describes. What is left is to surface recency somewhere scannable, not to build the recency rule.
+
+   *Corrected again the same day, by the validation pass.* The sentence above read "the mark only
+   appears in the hover popover" and "`ServicePage` renders no tag vocabulary at all". Both were
+   true when written and false four hours later: retiring `StatusPill` put the full tag vocabulary
+   on the service page, recency included — `#/service/<id>` on a service added inside the window
+   renders `new`, and `ServicePage.test.tsx` has a test named for it. **The conclusion survives the
+   correction and the reasoning did not**, which is the more useful half: "not answerable" now
+   rests on the board being the only place that shows every service, not on the page showing
+   nothing.
 6. **Which projects use coding agent Z / architecture W / PM tool V — no.** Cross-project; deferred
    with the portfolio page. The `role`-based grouping that would answer it *within* one project is
    already there, which is why this is a transport gap rather than a modelling one.
