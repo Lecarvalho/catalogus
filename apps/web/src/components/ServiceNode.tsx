@@ -1,7 +1,7 @@
 // Pure. One compact node: brand icon (or the rollup's fallback glyph) plus
 // the display name, and nothing else -- role, kind, version, `added`,
 // `replaced_by`, notes and edges all moved to the detail panel (see
-// ServiceDetailPanel.tsx). This is deliberately the whole node now, not a
+// the service page). This is deliberately the whole node now, not a
 // trimmed-down card: docs/PLAN.md's Phase 3.7 restructure shrinks the node
 // so the next slice can swap the list container this renders inside for an
 // elkjs/React Flow canvas without rebuilding the node itself.

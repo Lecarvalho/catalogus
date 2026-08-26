@@ -9,7 +9,7 @@
 // what was in it.
 //
 // The header counts **entries**, not tiles, and those differ wherever a
-// vendor is collapsed: Clapline's "Serves requests" holds seven entries
+// vendor is collapsed: Clapline's "Runs in production" holds seven entries
 // rendered as four tiles. The entry count is the manifest's own number and
 // the one that reconciles with the graph and the CLI, so it is what the
 // header states; each collapsed tile carries its own `xN` so the arithmetic

@@ -9,6 +9,20 @@
 **Amendments since 2026-08-22.** This document is the source of truth, so a change to it is recorded
 here rather than made silently.
 
+- *2026-08-25, §6* — the **v1 command list was corrected against `catalogus --help`** and split into
+  built and unbuilt. It had listed ten commands, four of which do not exist yet, and omitted
+  `set`, `link`, `unlink`, `deprecate`, `remove`, `rename` and `view` — seven shipped commands,
+  five of which had been shipped for days. Nothing about the design changed; the document had
+  simply stopped describing the CLI. Transcribed from the binary's own output rather than
+  rewritten from intention, for the reason the omission demonstrates.
+
+  The block also still called the manifest `stack.yaml`. That is **left alone outside §6**, because
+  it is not the same kind of staleness: §9 decision 3 records the filename as an *open decision with
+  a leaning*, and what actually shipped is that leaning — `init` writes `catalogus.yaml`, and
+  `findManifest` accepts `stack.yaml` as a fallback read. So §5's heading and §9 decision 3 are a
+  decision that was never formally closed rather than a list that drifted, and closing it is the
+  owner's call, not a transcription.
+
 - *2026-08-23, §4* — the `services.category` enum gained `monitoring`, `queue` and `messaging`.
   Dogfooding put Sentry, Datadog, New Relic, SQS, RabbitMQ, Resend, SendGrid, Mailgun and Twilio all
   in `other` despite every one of them being a service by this document's own test: it can go down,
@@ -363,17 +377,33 @@ The published JSON Schema **must reject private-looking keys** in this file: `co
 ## 6. CLI — `catalogus`
 
 ### Commands (v1 surface)
+
+Built and shipped — this block is transcribed from `catalogus --help` rather than written from
+intention, because the list below it went stale for five commands without anyone noticing:
+
 ```
-catalogus init                 # scaffold stack.yaml (interactive or --yes)
-catalogus detect               # scan repo, print detected stack (Layer 1)
-catalogus diff                 # detected vs stack.yaml — what's missing/stale
-catalogus add <service> --role=<r> [--depends-on=<id>...]   # edit stack.yaml
-catalogus validate             # schema + acyclicity check (CI-friendly, exit codes)
-catalogus graph                # ASCII/mermaid render of the project DAG
-catalogus push                 # sync stack.yaml + detection to platform
-catalogus push --private key=value ...   # write to private overlay (authenticated)
-catalogus login                # device flow auth (see below)
-catalogus mcp                  # run as MCP server (stdio)
+catalogus init [path]                     # scaffold a catalogus.yaml in the target directory
+catalogus detect [path]                   # scan a repo and print the detected stack (Layer 1)
+catalogus diff [path]                     # detection vs manifest — what's missing, what's stale
+catalogus validate [path]                 # schema + acyclicity check (CI entrypoint, exit codes)
+catalogus graph [path]                    # render the project dependency DAG
+catalogus add <service> [path]            # add a service entry, and any dependency edges
+catalogus set <field> <value> [pairs...]  # set a manifest field: project-level, or a service's
+catalogus link <from> <to> [path]         # add one dependency edge between existing services
+catalogus unlink <from> <to> [path]       # remove one dependency edge
+catalogus deprecate <id> [path]           # mark an entry deprecated or phasing out
+catalogus remove <id> [path]              # delete an entry and every edge that names it
+catalogus rename <old> <new> [path]       # change an entry's local id, moving its edges with it
+catalogus view [path]                     # serve the web viewer for this repo's manifest
+```
+
+Specified here, not yet built — all four need the backend, which §7 covers:
+
+```
+catalogus push                            # sync manifest + detection to platform
+catalogus push --private key=value ...    # write to private overlay (authenticated)
+catalogus login                           # device flow auth (see below)
+catalogus mcp                             # run as MCP server (stdio)
 ```
 
 ### Auth design (decided)

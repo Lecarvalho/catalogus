@@ -176,3 +176,66 @@ finish review now would review something the owner has already rejected.
 `docs/HANDOFF.md` §2 records the logo as open, because the previous one was a pun
 on a dropped name. A shell needs something to be built around. Ask; do not invent
 one and let it harden into the real thing by default.
+
+
+---
+
+## Revision — 2026-08-25: the ground is cream, and the mark is being drawn
+
+Recorded here rather than edited into the contract above, because the contract
+is what the owner chose and a silent rewrite of it would erase the fact that it
+changed.
+
+**OWN-WORLD's first line is superseded.** It says "Bright white ground
+(#FFFFFF), ink (#111111)". The ground is now warm cream `#f4f1ea` and the ink a
+warm charcoal `#24211c`, with the whole grey ramp warmed to match. Everything
+else in OWN-WORLD stands: one utility red and nothing else chromatic, hairline
+rules, sharp corners with no radius above 2px, no shadow, no gradient, compact
+sans at 11-13px.
+
+**Why:** the owner's brand references -- collected in an interview on the same
+day, after two rounds of generated marks were rejected -- were uniformly warm
+cream with soft charcoal line work. Asked directly whether the brand should
+follow the app's committed world or the app should follow the brand, the owner
+chose **the app follows the brand**. The seed key and the direction are
+untouched: `ac1ba604`, challenger `japanese-high-density-web`. This is a
+temperature change inside that world, not a new one.
+
+The computed contrast for every pair is in `apps/web/src/tokens.css`'s header,
+including the one that does not reach AA and why it was left.
+
+**FIRST VIEWPORT gained a shell it did not specify.** `AppShell` renders a
+full-bleed sticky bar above everything -- product identity left, manifest path
+right. The contract's left rail (240px, project identity plus a band index) is
+**still unbuilt**, and the bottom two-thirds of the screen is still empty; both
+remain open.
+
+**The mark is deferred**, by the owner, after three directions were explored and
+none chosen: abstract precision instruments, a coffee cup holding a catalog, and
+the board's own tiles arranged as a C. `PRODUCT.md`'s Brand Commitments carries
+what each attempt taught. `BrandMark` sets the wordmark and renders no glyph,
+marked `data-mark="placeholder"` in the DOM with a test pinning it.
+
+What survived the exploration as settled: **ink only** -- the utility red stays a
+signal colour and is never spent on the brand -- a **primary mark plus a derived
+reduced variant** rather than one asset constrained by the favicon case, and the
+drawing register of the owner's references: uniform stroke weight, rounded caps,
+no fill, warm charcoal on cream.
+
+### Run status, updated
+
+Of the four steps recorded as not done above, none has been completed, and one
+has changed shape:
+
+1. The contract is still not embedded in the emitted markup.
+2. The finish review still has not run -- and should still wait, because the
+   mark is not in yet.
+3. `DESIGN.md` still does not exist.
+4. The mechanical detector still has not been run.
+
+**Mobile has now been looked at**, which the note above said had never happened.
+It was measured in a 390px same-origin iframe rather than on a device: no
+horizontal overflow on the board or the service page, and the board is about 2.1
+screens tall. That is a weaker instrument than a real device and the popover's
+touch behaviour is still unverified, but it is no longer true that nobody has
+looked.

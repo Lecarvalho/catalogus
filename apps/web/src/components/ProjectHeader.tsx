@@ -11,16 +11,22 @@
 // in the same small grey as the file path.
 //
 // So the masthead states, in order: what this is, what shape it is, and how
-// much of it there is. The counts belong here rather than only on the band
-// modules, because they are the first honest answer to "how big is this
-// thing" and a reader forms that judgement before reading a single name.
+// much of it there is. The absolute manifest path left this component on 2026-08-25 and moved to
+// `AppShell`. It is a fact about the `catalogus view` invocation -- which file
+// is being served -- not a fact about the project, and it had been sitting at
+// the foot of the masthead in the faintest text on the page, immediately under
+// the architecture sentence. Chrome carries the session, the document carries
+// the project.
+//
+// The counts belong here rather than only on the band modules, because they
+// are the first honest answer to "how big is this thing" and a reader forms
+// that judgement before reading a single name.
 import type { ViewPayload } from "@catalogus/cli";
 
 import styles from "./ProjectHeader.module.css";
 
 export interface ProjectHeaderProps {
   project: ViewPayload["project"];
-  manifestPath: string;
   /** Entry count, stated because it is the first thing a reader wants to size. */
   serviceCount: number;
   /** Declared dependency edges. */
@@ -44,7 +50,7 @@ export function readDate(readAt: string): string {
   return separator === -1 ? readAt : readAt.slice(0, separator);
 }
 
-export function ProjectHeader({ project, manifestPath, serviceCount, edgeCount, readAt }: ProjectHeaderProps) {
+export function ProjectHeader({ project, serviceCount, edgeCount, readAt }: ProjectHeaderProps) {
   // Only `visibility` is left at project level. The VCS provider, the PM
   // tool and every coding agent are service entries now (role: vcs, pm,
   // coding-agent), so they arrive through `services` and render in their
@@ -90,8 +96,6 @@ export function ProjectHeader({ project, manifestPath, serviceCount, edgeCount, 
           <dd>{readDate(readAt)}</dd>
         </div>
       </dl>
-
-      <p className={styles.manifestPath}>{manifestPath}</p>
     </header>
   );
 }

@@ -21,6 +21,7 @@ import type { ViewPayload, ViewService } from "@catalogus/cli";
 import type { VendorGroup } from "./bands.js";
 
 import styles from "./App.module.css";
+import { AppShell } from "./components/AppShell.js";
 import { ErrorState } from "./components/ErrorState.js";
 import { LoadingState } from "./components/LoadingState.js";
 import { MigrationList } from "./components/MigrationList.js";
@@ -334,95 +335,96 @@ export function App() {
   }, [selectedService]);
 
   return (
-    <main className={`${styles.page} ${mode === "graph" && !selectedService ? styles.wide : ""}`}>
-      {state.kind === "loading" && <LoadingState />}
-      {state.kind === "error" && <ErrorState message={state.message} />}
-      {state.kind === "loaded" && edgeMaps && (
-        <>
-          {/*
-            The masthead is the board's, not the app's. On a service page the
-            breadcrumb already names the project, and rendering both put two
-            `<h1>`s on one document -- the project's and the service's -- which
-            is wrong for a page whose subject is the service. A reader on a
-            service page needs the way back, which the breadcrumb is, not the
-            project's entry counts.
-          */}
-          {!selectedService && (
-            <ProjectHeader
-              project={state.payload.project}
-              manifestPath={state.payload.manifestPath}
-              serviceCount={state.payload.services.length}
-              edgeCount={state.payload.edges.length}
-              readAt={state.payload.readAt}
-            />
-          )}
+    <AppShell manifestPath={state.kind === "loaded" ? state.payload.manifestPath : undefined}>
+      <main className={`${styles.page} ${mode === "graph" && !selectedService ? styles.wide : ""}`}>
+        {state.kind === "loading" && <LoadingState />}
+        {state.kind === "error" && <ErrorState message={state.message} />}
+        {state.kind === "loaded" && edgeMaps && (
+          <>
+            {/*
+              The masthead is the board's, not the app's. On a service page the
+              breadcrumb already names the project, and rendering both put two
+              `<h1>`s on one document -- the project's and the service's -- which
+              is wrong for a page whose subject is the service. A reader on a
+              service page needs the way back, which the breadcrumb is, not the
+              project's entry counts.
+            */}
+            {!selectedService && (
+              <ProjectHeader
+                project={state.payload.project}
+                serviceCount={state.payload.services.length}
+                edgeCount={state.payload.edges.length}
+                readAt={state.payload.readAt}
+              />
+            )}
 
-          {/*
-            The page replaces the board rather than docking beside it. That is
-            the difference between a panel and a page, and leaving the old
-            panel on the click path produced a visible defect once the same
-            content became the hover popover: hovering a tile and then
-            clicking it rendered the identical facts twice, once floating and
-            once docked on the right.
+            {/*
+              The page replaces the board rather than docking beside it. That is
+              the difference between a panel and a page, and leaving the old
+              panel on the click path produced a visible defect once the same
+              content became the hover popover: hovering a tile and then
+              clicking it rendered the identical facts twice, once floating and
+              once docked on the right.
 
-            The toggle goes with the board. It selects between three views of
-            the *project*, and a service page is not one of them -- leaving it
-            on screen would offer to switch a view that is no longer showing.
-          */}
-          {selectedService ? (
-            <ServicePage
-              service={selectedService}
-              projectName={state.payload.project.name}
-              dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
-              dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
-              labelForId={edgeMaps.labelForId}
-              onBack={handleClose}
-              pageRef={panelRef}
-            />
-          ) : (
-            <>
-              <ViewToggle mode={mode} onChange={setMode} />
-              <div className={styles.body}>
-                {mode === "list" ? (
-                  <ProjectBoard
-                    services={state.payload.services}
-                    readAt={state.payload.readAt}
-                    selectedId={selectedId}
-                    onActivate={handleActivate}
-                    onPeek={handlePeek}
-                    onPeekEnd={handlePeekEnd}
-                  />
-                ) : mode === "graph" ? (
-                  <Suspense fallback={<p>Loading the graph…</p>}>
-                    <GraphCanvas
+              The toggle goes with the board. It selects between three views of
+              the *project*, and a service page is not one of them -- leaving it
+              on screen would offer to switch a view that is no longer showing.
+            */}
+            {selectedService ? (
+              <ServicePage
+                service={selectedService}
+                projectName={state.payload.project.name}
+                dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
+                dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
+                labelForId={edgeMaps.labelForId}
+                onBack={handleClose}
+                pageRef={panelRef}
+              />
+            ) : (
+              <>
+                <ViewToggle mode={mode} onChange={setMode} />
+                <div className={styles.body}>
+                  {mode === "list" ? (
+                    <ProjectBoard
                       services={state.payload.services}
-                      edges={state.payload.edges}
+                      readAt={state.payload.readAt}
                       selectedId={selectedId}
-                      onSelect={handleSelect}
-                      layout={layoutWithElk}
+                      onActivate={handleActivate}
+                      onPeek={handlePeek}
+                      onPeekEnd={handlePeekEnd}
                     />
-                  </Suspense>
-                ) : (
-                  <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+                  ) : mode === "graph" ? (
+                    <Suspense fallback={<p>Loading the graph…</p>}>
+                      <GraphCanvas
+                        services={state.payload.services}
+                        edges={state.payload.edges}
+                        selectedId={selectedId}
+                        onSelect={handleSelect}
+                        layout={layoutWithElk}
+                      />
+                    </Suspense>
+                  ) : (
+                    <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+                  )}
+                </div>
+                {peek && mode === "list" && (
+                  <ServicePopover
+                    group={peek.group}
+                    readAt={state.payload.readAt}
+                    position={peek.position}
+                    dependsOn={(id) => edgeMaps.dependsOn.get(id) ?? []}
+                    dependedOnBy={(id) => edgeMaps.dependedOnBy.get(id) ?? []}
+                    labelForId={edgeMaps.labelForId}
+                    onOpen={handleSelect}
+                    onPointerEnter={cancelClose}
+                    onPointerLeave={handlePeekEnd}
+                  />
                 )}
-              </div>
-              {peek && mode === "list" && (
-                <ServicePopover
-                  group={peek.group}
-                  readAt={state.payload.readAt}
-                  position={peek.position}
-                  dependsOn={(id) => edgeMaps.dependsOn.get(id) ?? []}
-                  dependedOnBy={(id) => edgeMaps.dependedOnBy.get(id) ?? []}
-                  labelForId={edgeMaps.labelForId}
-                  onOpen={handleSelect}
-                  onPointerEnter={cancelClose}
-                  onPointerLeave={handlePeekEnd}
-                />
-              )}
-            </>
-          )}
-        </>
-      )}
-    </main>
+              </>
+            )}
+          </>
+        )}
+      </main>
+    </AppShell>
   );
 }

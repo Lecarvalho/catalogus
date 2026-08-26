@@ -1,6 +1,6 @@
 /*
  * The mosaic. A masonry-ish multi-column grid rather than a row grid,
- * because bands are wildly uneven -- Clapline's "Serves requests" holds
+ * because bands are wildly uneven -- Clapline's "Runs in production" holds
  * seven services and "Registered at" holds two -- and a row grid would
  * stretch every module in a row to the tallest one, reintroducing exactly
  * the equal-weight problem this layout exists to fix.

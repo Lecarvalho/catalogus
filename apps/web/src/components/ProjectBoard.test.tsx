@@ -40,7 +40,7 @@ describe("ProjectBoard -- reading order", () => {
       />
     );
     const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(headings).toEqual(["Serves requests", "Watched by", "Registered at"]);
+    expect(headings).toEqual(["Runs in production", "Watched by", "Registered at"]);
   });
 
   it("has no rank module -- 'Most depended on' is not on the board", () => {
@@ -80,7 +80,7 @@ describe("ProjectBoard -- collapsing is per band, never global", () => {
     expect(tiles).toHaveLength(2);
     // Neither tile shows ×2 -- each stands for exactly one entry in its band.
     expect(screen.queryByText(/×/)).toBeNull();
-    expect(screen.getByRole("heading", { level: 2, name: "Serves requests" })).not.toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Holds data" })).not.toBeNull();
   });
 });

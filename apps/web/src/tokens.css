@@ -27,6 +27,38 @@
  * dropping a working preference would be a regression nobody asked for --
  * but it is a translation of this design, never a separate one.
  *
+ * ---------------------------------------------------------------------
+ * Warmed 2026-08-25, by owner decision, and it reverses one thing the
+ * rewrite above committed to. The ground was `#ffffff` and the ink
+ * `#111111` -- a cold, neutral, maximally-contrasted pair, because the
+ * world is `japanese-high-density-web` and that world is bright white. The
+ * owner's brand references were all warm cream with a soft charcoal ink,
+ * and asked directly whether the brand follows the app or the app follows
+ * the brand, the answer was **the app follows the brand.**
+ *
+ * So the ground is cream and the ink a warm charcoal, and every grey in the
+ * ramp carries the same warmth rather than being a neutral grey laid over a
+ * warm ground -- which is what makes a warmed palette read as dirty instead
+ * of as warm. Nothing structural moved: one signal colour, the same
+ * hairline mosaic, the same zero rounding, the same type scale. A
+ * temperature change, not a second world.
+ *
+ * Every pair was computed rather than eyeballed, against the cream ground
+ * `#f4f1ea` (relative luminance 0.881):
+ *
+ *   text     #24211c   14.2:1  AAA
+ *   muted    #5e5a50    6.1:1  AA
+ *   faint    #7e7a6e    3.8:1  below AA -- and it was 3.1:1 before the
+ *                              warming, so this is improved, not fixed. It
+ *                              carries de-emphasised metadata only, and
+ *                              raising it to AA collapses it into `muted`.
+ *                              That trade is the owner's call, not mine.
+ *   signal   #d40010    4.9:1  AA
+ *   hairline #d5cebe   1.39:1  against the ground, matching the 1.40:1 the
+ *                              neutral `#e0e0e0` had on white. The mosaic's
+ *                              rules are exactly as visible as they were,
+ *                              which a lighter cream would not have held.
+ *
  * No webfont. `catalogus view` serves from 127.0.0.1 and has to work with
  * no network at all, so a remote face would fail exactly where the tool is
  * most useful. Density is bought with size, tracking and leading instead of
@@ -37,22 +69,22 @@
  */
 :root {
   /* Ground and ink. */
-  --color-bg: #ffffff;
-  --color-surface: #ffffff;
-  --color-surface-sunken: #f7f7f8;
-  --color-header-fill: #f2f2f2;
-  --color-text: #111111;
-  --color-text-muted: #6b6b70;
-  --color-text-faint: #96969c;
+  --color-bg: #f4f1ea;
+  --color-surface: #fbf9f4;
+  --color-surface-sunken: #ece8de;
+  --color-header-fill: #e9e4d8;
+  --color-text: #24211c;
+  --color-text-muted: #5e5a50;
+  --color-text-faint: #7e7a6e;
 
   /* Rules. The mosaic is built almost entirely out of these two. */
-  --color-line: #e0e0e0;
-  --color-line-strong: #111111;
+  --color-line: #d5cebe;
+  --color-line-strong: #24211c;
 
   /* The one signal colour. */
   --color-signal: #d40010;
-  --color-signal-ink: #ffffff;
-  --color-signal-wash: #fdeced;
+  --color-signal-ink: #fdf8f4;
+  --color-signal-wash: #fae7e3;
 
   /*
    * Status is expressed as a tag, not as a hue per state -- see Tag.tsx.
@@ -62,10 +94,10 @@
    * ink/grey/red rather than a traffic-light ramp so that meaning survives
    * greyscale, which colour-coded status never did.
    */
-  --tag-deprecated-bg: #111111;
-  --tag-deprecated-ink: #ffffff;
-  --tag-removed-bg: #d6d6d6;
-  --tag-removed-ink: #3a3a3e;
+  --tag-deprecated-bg: #24211c;
+  --tag-deprecated-ink: #f4f1ea;
+  --tag-removed-bg: #d9d2c4;
+  --tag-removed-ink: #46423a;
   --tag-phasing-line: var(--color-signal);
   --tag-phasing-ink: var(--color-signal);
   --tag-new-line: var(--color-signal);
@@ -79,9 +111,9 @@
    * catalog slugs have no verified icon, so this must look deliberate
    * rather than like a failed image.
    */
-  --icon-fallback-fill: #8a8a90;
-  --icon-fallback-bg: #f2f2f2;
-  --icon-tile-line: #e0e0e0;
+  --icon-fallback-fill: #8a8478;
+  --icon-fallback-bg: #ece8de;
+  --icon-tile-line: #d5cebe;
 
   /* Sharp. The world has no rounding above a hairline's worth. */
   --radius-sm: 0px;
@@ -139,29 +171,29 @@
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-bg: #0e0e10;
-    --color-surface: #141416;
-    --color-surface-sunken: #101012;
-    --color-header-fill: #1c1c1f;
-    --color-text: #f2f2f3;
-    --color-text-muted: #9a9aa1;
-    --color-text-faint: #6e6e75;
+    --color-bg: #14120f;
+    --color-surface: #1b1815;
+    --color-surface-sunken: #100e0c;
+    --color-header-fill: #24201b;
+    --color-text: #f2eee4;
+    --color-text-muted: #a39d90;
+    --color-text-faint: #7a7568;
 
-    --color-line: #2a2a2e;
-    --color-line-strong: #f2f2f3;
+    --color-line: #332f28;
+    --color-line-strong: #f2eee4;
 
-    --color-signal: #ff5a5f;
-    --color-signal-ink: #14090a;
-    --color-signal-wash: #2a1416;
+    --color-signal: #ff6b60;
+    --color-signal-ink: #1a0c0a;
+    --color-signal-wash: #2c1815;
 
-    --tag-deprecated-bg: #f2f2f3;
-    --tag-deprecated-ink: #0e0e10;
-    --tag-removed-bg: #3a3a40;
-    --tag-removed-ink: #c8c8ce;
+    --tag-deprecated-bg: #f2eee4;
+    --tag-deprecated-ink: #14120f;
+    --tag-removed-bg: #423d34;
+    --tag-removed-ink: #ccc5b6;
 
-    --icon-fallback-fill: #8b8b93;
-    --icon-fallback-bg: #1c1c1f;
-    --icon-tile-line: #2a2a2e;
+    --icon-fallback-fill: #8d8778;
+    --icon-fallback-bg: #24201b;
+    --icon-tile-line: #332f28;
 
     color-scheme: dark;
   }
@@ -180,29 +212,29 @@
  * A design nobody can view is a design nobody has checked.
  */
 :root[data-theme="dark"] {
-  --color-bg: #0e0e10;
-  --color-surface: #141416;
-  --color-surface-sunken: #101012;
-  --color-header-fill: #1c1c1f;
-  --color-text: #f2f2f3;
-  --color-text-muted: #9a9aa1;
-  --color-text-faint: #6e6e75;
+  --color-bg: #14120f;
+  --color-surface: #1b1815;
+  --color-surface-sunken: #100e0c;
+  --color-header-fill: #24201b;
+  --color-text: #f2eee4;
+  --color-text-muted: #a39d90;
+  --color-text-faint: #7a7568;
 
-  --color-line: #2a2a2e;
-  --color-line-strong: #f2f2f3;
+  --color-line: #332f28;
+  --color-line-strong: #f2eee4;
 
-  --color-signal: #ff5a5f;
-  --color-signal-ink: #14090a;
-  --color-signal-wash: #2a1416;
+  --color-signal: #ff6b60;
+  --color-signal-ink: #1a0c0a;
+  --color-signal-wash: #2c1815;
 
-  --tag-deprecated-bg: #f2f2f3;
-  --tag-deprecated-ink: #0e0e10;
-  --tag-removed-bg: #3a3a40;
-  --tag-removed-ink: #c8c8ce;
+  --tag-deprecated-bg: #f2eee4;
+  --tag-deprecated-ink: #14120f;
+  --tag-removed-bg: #423d34;
+  --tag-removed-ink: #ccc5b6;
 
-  --icon-fallback-fill: #8b8b93;
-  --icon-fallback-bg: #1c1c1f;
-  --icon-tile-line: #2a2a2e;
+  --icon-fallback-fill: #8d8778;
+  --icon-fallback-bg: #24201b;
+  --icon-tile-line: #332f28;
 
   color-scheme: dark;
 }

@@ -45,7 +45,7 @@
 import type { ViewService } from "@catalogus/cli";
 
 export type BandId =
-  | "serves"
+  | "production"
   | "holds"
   | "calls"
   | "runs"
@@ -78,7 +78,14 @@ export interface BandDefinition {
  * project and is impossible to miss on a malformed one.
  */
 export const BANDS: readonly BandDefinition[] = [
-  { id: "serves", label: "Serves requests", note: "" },
+  // Was `serves` / "Serves requests" until 2026-08-25. Renamed by the owner
+  // after the real manifest showed what the rule actually collects: every
+  // `hosting-*` role lands here, including the three Fly apps that run the
+  // monitoring stack, and none of those serves a request. A per-service
+  // exception was ruled out in the same decision -- the banding rule is
+  // mechanical and stays that way, so the label has to be true of everything
+  // deployed and reachable rather than of the common case.
+  { id: "production", label: "Runs in production", note: "" },
   { id: "holds", label: "Holds data", note: "" },
   { id: "calls", label: "Calls out to", note: "Third-party capabilities this project invokes." },
   { id: "runs", label: "Runs on", note: "" },
@@ -104,11 +111,11 @@ export const BANDS: readonly BandDefinition[] = [
  * viewer once already (see fallback-icons.tsx).
  */
 const BAND_OF: Record<string, BandId> = Object.assign(Object.create(null) as Record<string, BandId>, {
-  // The front door and the tier that answers it.
-  ingress: "serves",
-  cdn: "serves",
-  hosting: "serves",
-  auth: "serves",
+  // The front door, the tier that answers it, and anything else deployed.
+  ingress: "production",
+  cdn: "production",
+  hosting: "production",
+  auth: "production",
 
   // What the project keeps. `secrets` sits here rather than under RUNS ON
   // because a secrets manager is a store the app reads at runtime, which is
@@ -249,7 +256,7 @@ const STATUS_SEVERITY = new Map<string, number>([
  *
  * **Collapsing is per band, never global**, and that is the constraint that
  * makes it correct rather than merely tidier. Supabase is `supabase-auth`
- * (role `auth`, so band "Serves requests") and `supabase-db` (role
+ * (role `auth`, so band "Runs in production") and `supabase-db` (role
  * `database`, so band "Holds data"). Collapsing across bands would render
  * one Supabase tile and force it into one band, which would state that
  * Supabase does one job in this project when the manifest says it does two.

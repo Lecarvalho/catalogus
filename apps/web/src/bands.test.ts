@@ -18,7 +18,7 @@ import { makeViewService as service } from "./test-support/fixtures.js";
 
 describe("bandOf", () => {
   it("resolves a rollup from every category in SKILL.md's base-word list", () => {
-    expect(bandOf("hosting")).toBe("serves");
+    expect(bandOf("hosting")).toBe("production");
     expect(bandOf("database")).toBe("holds");
     expect(bandOf("ai")).toBe("calls");
     expect(bandOf("runtime")).toBe("runs");
@@ -61,8 +61,8 @@ describe("groupIntoBands", () => {
     ]);
 
     expect(groups).toHaveLength(2);
-    const serves = groups.find((g) => g.band.id === "serves");
-    expect(serves?.services.map((s) => s.id)).toEqual(["fly-api", "fly-web"]);
+    const production = groups.find((g) => g.band.id === "production");
+    expect(production?.services.map((s) => s.id)).toEqual(["fly-api", "fly-web"]);
   });
 
   // Reading order is the argument of the page: it must follow BANDS, not the
@@ -73,7 +73,7 @@ describe("groupIntoBands", () => {
       service({ id: "supabase-db", role: "database", rollup: "database" }),
       service({ id: "fly-api", role: "hosting-api", rollup: "hosting" }),
     ]);
-    expect(groups.map((g) => g.band.id)).toEqual(["serves", "holds", "registered"]);
+    expect(groups.map((g) => g.band.id)).toEqual(["production", "holds", "registered"]);
     // And that is genuinely BANDS's order, not a coincidence of this input.
     const bandOrder = BANDS.map((b) => b.id);
     const resultOrder = groups.map((g) => g.band.id);
@@ -83,7 +83,7 @@ describe("groupIntoBands", () => {
   // A project with no queue should show no hole where a queue would go.
   it("drops a band nothing lands in, rather than rendering it empty", () => {
     const groups = groupIntoBands([service({ id: "fly-api", role: "hosting-api", rollup: "hosting" })]);
-    expect(groups.map((g) => g.band.id)).toEqual(["serves"]);
+    expect(groups.map((g) => g.band.id)).toEqual(["production"]);
     expect(groups.some((g) => g.services.length === 0)).toBe(false);
   });
 

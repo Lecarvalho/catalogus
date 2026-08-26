@@ -63,8 +63,12 @@ design decisions; this file tracks *what has been built* against it and what rem
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **1001 tests / 58 files**, plus `pnpm typecheck`
-clean across all four packages, before trusting anything below. (Phases 0–3.6 and the 3.6.1
+Run `pnpm build && pnpm test` first and confirm **1125 tests / 70 files**, plus `pnpm typecheck`
+clean across all four packages, before trusting anything below. (2026-08-25 added 7 for `AppShell`
+and `BrandMark`, the app chrome, and removed 13 with the dead `ServiceDetailPanel`; the 1131/69
+before that was the viewer redesign.)
+The pre-redesign figure this paragraph carried was **1001 tests / 58 files**, and the rest of the
+parenthesis below is the history of how it got there. (Phases 0–3.6 and the 3.6.1
 correction pass predate this at 549/38, the viewer-foundations session ended at 679/50, and the
 drift-and-corpus session that followed ended at 879/52 — 200 of those tests are two committed
 corpora plus two components' first test files, not 200 new behaviours. The 30 added on 2026-08-25
@@ -79,6 +83,151 @@ validation pass, which is the more interesting number of the two.)
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
+
+### Handoff — 2026-08-25, the brand interview and the shell
+
+**Read this before the redesign handoff below it.** It does not supersede that
+document, but it settles three things that document left open and it reverses
+one decision that document committed to.
+
+**Baseline confirmed first:** 1131 tests / 69 files green, `pnpm typecheck`
+clean across four packages, on `main` at the `phase-3.7-close` merge. Ended at
+**1138 / 71**.
+
+#### The brand interview, and what it settled
+
+The owner asked to be interviewed rather than shown candidates, and to be handed
+image-generation prompts to run themselves. Two rounds of questions, three
+rounds of generated candidates. What is now decided:
+
+- **Register: instrument, then documentation.** The first brief was "precision
+  instrument, monochrome, needs a beat" and produced three minimalist marks the
+  owner rejected as **"too simple"**. The second brief added density -- engraved
+  technical plates with dimension lines -- and produced a theodolite the owner
+  did not connect with either. The reference images the owner then sent settled
+  it: an open book with lines fanning from the spine, a coffee cup, warm cream
+  grounds, uniform friendly line work.
+- **The diagnosis was wrong for two whole rounds, and this is the useful part.**
+  "Too simple" was read as "not enough elements", and it was not: the owner's own
+  references are *simpler* than the marks that were rejected -- one of them is
+  four shapes. What was missing was **warmth and recognisability**, not
+  complexity. Two rounds of adding density were spent solving the wrong problem.
+- **Form: symbol + wordmark lockup**, primary mark plus a derived reduced
+  variant for the 16px favicon and the CLI. Constraining the primary by the
+  favicon case is what produced the first rejected set.
+- **Subject: reference 1's fanning document.** An open document with lines
+  radiating from the spine -- a page that fans into what it connects to, which
+  is a page plus a topology, which is what Catalogus is. The owner accepted that
+  this **reverses their own earlier anti-pattern ruling** against book imagery;
+  the reversal was surfaced and asked about rather than taken silently.
+- **"Dev's world" means dev *feeling*, not dev iconography.** No terminals, no
+  braces, no angle brackets. Confirmed explicitly.
+- **The mark is deferred by the owner**, explicitly: "the logo is something I
+  need to think on my time." Nothing shipped. `BrandMark` renders the wordmark
+  alone and declares itself a placeholder in the DOM.
+
+#### Three logo directions, none chosen, and what each one taught
+
+Recorded because each narrowed the brief and re-running them costs a day.
+`PRODUCT.md`'s Brand Commitments carries the durable version.
+
+1. **Abstract precision instruments.** Rejected as "too simple", then rejected
+   again after two rounds of *adding density*. **That was my misdiagnosis and it
+   cost two rounds:** "too simple" did not mean "too few elements" -- the owner's
+   own references are simpler than the marks they rejected. The missing thing was
+   warmth.
+2. **Coffee and catalog** -- a cup holding a short list, drawn from the owner's
+   references. Direction liked, execution judged "not unique", and correctly: an
+   outlined cup with rules in it is near-stock. Pushing for distinctiveness (the
+   list forming the cup wall; a rule that becomes the handle) traded 16px
+   legibility for it every time.
+3. **The board's own tiles**, the owner's idea -- "this is our distinct mark".
+   Strongest of the three, because the mosaic is a shape the product already
+   owns. Converged on two module bars and a tile arranged as a **C** -- the app's
+   grammar forming the initial, holding to 16px. Deferred with the rest.
+
+**A finished candidate was deleted rather than parked.** The cup had been drawn
+as hand-authored SVG, given nine tests, a reduced 16px variant, a favicon and a
+drift test binding the two, and was wired into the header. All of it came out on
+the deferral. Keeping it "for now" is how a mark nobody chose becomes the mark.
+
+**Two defects from that work are worth carrying even though the code is gone**,
+because both are about method rather than about a logo:
+
+- **A favicon that served HTTP 200 and never rendered.** The comment block in
+  the SVG contained `--`, which is illegal inside an XML comment, and an SVG
+  referenced from an `img` element is parsed as XML rather than sniffed as HTML.
+  Nothing upstream complained. **The drift test did not catch it** -- it pulled
+  attributes out with a regex, which is perfectly happy to read a document no
+  parser would accept. Only rendering it in a browser found it.
+- **Geometry that passed every test and looked wrong.** A 2.2-unit pitch against
+  a 1.6-unit stroke leaves a 0.6 gap, so the interior filled in and the mark read
+  as a blob below 32px. Green suite, wrong drawing. Rendering at 16/24/48/96 was
+  the only thing that could have caught it.
+
+Both are the same lesson this file keeps relearning in different clothes: a test
+proves the thing you asserted, not the thing you wanted.
+
+#### The decision that changes the app, not just the logo
+
+**The app follows the brand.** Asked directly whether the brand should follow
+the committed `japanese-high-density-web` world (bright white, ink, one utility
+red) or the app should follow the warm cream of the references, the owner chose
+the app. `tokens.css` is warmed: ground `#f4f1ea`, ink `#24211c`, and every grey
+in the ramp carries the same warmth rather than being a neutral grey over a warm
+ground -- which is the difference between warm and dirty.
+
+**This revises a direction the owner had pinned**, so it is recorded as a
+revision with its reasoning rather than as a colour edit. Nothing structural
+moved: one signal colour, the same hairline mosaic, zero rounding, the same type
+scale. Every pair was computed, not eyeballed, and the numbers are in
+`tokens.css`'s header -- including the one that **does not pass**: `--color-text-faint`
+is 3.8:1, up from 3.1:1 before the warming. Improved, not fixed, and stated as
+such, because raising it to AA collapses it into `--color-text-muted` and that
+trade is the owner's.
+
+#### What shipped
+
+- **`AppShell` + `BrandMark`** -- the app chrome that did not exist, carrying
+  the wordmark and no glyph. 7 tests,
+  each proved by mutation (drop the placeholder attribute, swap the lockup
+  order, render the path unconditionally, pull children inside the banner --
+  all four caught, all four reverted).
+- **The band rename**, `serves` -> `production` / "Runs in production".
+- **`docs/HANDOFF.md` §6**, transcribed from the binary rather than rewritten
+  from intention.
+- **The dead panel removed** -- `ServiceDetailPanel` and `EdgesList`, with their
+  stylesheets and 13 tests. See open item 4 below for what was checked first and
+  what was deliberately left.
+- **A defect the shell introduced and a screenshot caught.** Making `.shell` a
+  column flex container meant `.page`'s `margin: 0 auto` absorbed the free space
+  instead of centring a full-width item, so `<main>` shrank to its content width
+  and thirty-five services rendered as **a single 300px column down the middle
+  of the screen**. Nothing errored. No test failed. It looked like a design
+  decision. Recorded in `AppShell.module.css` because the next person to reach
+  for flex there will reintroduce it.
+
+#### Mobile: measured for the first time, and it is not what this file assumed
+
+The redesign handoff below predicted mobile would collapse into "a very long
+single stack of band modules -- the scrolling index the whole redesign exists to
+replace". **Measured, that is mostly wrong.** At 388 CSS px:
+
+- **No horizontal overflow anywhere** -- board or service page.
+- The board is 1801px tall, about 2.1 screens. Band modules stack one per row,
+  but tiles still tile four-across *inside* each band, so it reads as a sequence
+  of band cards rather than as a 35-item list.
+- The service page stacks cleanly and is readable.
+- The shell bar drops the manifest path at ≤640px, as designed.
+
+**Two caveats, and they matter more than the findings.** First, this was
+measured in a **same-origin 390px iframe, not on a device and not in device
+emulation** -- the CSS viewport is real, the touch input and mobile UA are not.
+The popover's touch story is still unverified. Second, **every "1440px"
+screenshot in the handoff below is wrong about its own width**: `resize_window`
+reports success against a maximised Chrome window and silently does nothing, so
+those captures were ~2514 CSS px. That is worth knowing before trusting any
+width claim in this file.
 
 ### Handoff — 2026-08-25, the viewer redesign
 
@@ -248,27 +397,57 @@ The short version:
 
 #### Open, and what to do about each
 
-0. **The shell, the header and the mark** -- see the box directly above. The
-   mark is a brand decision the owner has not made, so it is a question before
-   it is a task.
-1. **Is "Serves requests" the right band label?** It now holds three Fly apps that
-   run the monitoring stack, because all of them are `hosting-*`. That is the
-   banding rule working as designed. Either rename the band to something truer of
-   everything `hosting-*`, or accept it. **Owner's call — do not invent a
-   per-service exception.**
+0. **The shell, the header and the mark** -- ✅ **shell and header shipped**
+   2026-08-25; the mark is still open and the dead space is untouched.
+   `AppShell` + `BrandMark` render a full-bleed sticky bar carrying the product
+   identity, and the absolute manifest path moved into it out of the masthead's
+   foot (chrome carries the session, the document carries the project).
+   **`BrandMark` deliberately draws no glyph** and says so in the DOM via
+   `data-mark="placeholder"`, with a test pinning that -- the brand interview
+   ran on 2026-08-25 and the mark is being generated from its brief, and an
+   invented stand-in is exactly the plausible default that hardens into the
+   real thing. What is still open here: the mark itself, and the bottom
+   two-thirds of the screen.
+1. ~~**Is "Serves requests" the right band label?**~~ ✅ **closed 2026-08-25 by
+   owner decision: renamed to "Runs in production".** True of everything
+   `hosting-*`, `ingress`, `cdn` and `auth` -- the tier that is deployed and
+   reachable, whether or not it serves user traffic. The band *id* was renamed
+   `serves` -> `production` in the same pass so the code and the label agree,
+   and `bands.ts` carries why. The per-service exception stayed ruled out.
 2. **The service page does not exist.** Click currently opens the old
    `ServiceDetailPanel`. The page is the next piece of work and it is the whole
    point of the product; its *content model* is an open question in `PRODUCT.md`
    and must not be invented.
 3. **Graph and Migrations views still wear the old world.** They work; they do not
    match.
-4. **`ServiceDetailPanel` is dead code.** Nothing renders it since the service
-   page landed. Its test still passes on its own, so it was left rather than
-   deleted under a running agent. Delete both, or move what the test really
-   covers onto `ServicePage`.
-5. **`docs/HANDOFF.md` §6's command list is stale** — missing `set`, `link`,
-   `deprecate`, `remove`, `rename`. Found while adding `unlink`; deliberately not
-   half-fixed.
+4. ~~**`ServiceDetailPanel` is dead code.**~~ ✅ **deleted 2026-08-25**, with its
+   stylesheet and its 13 tests, after confirming nothing unique went with them:
+   the panel's content assertions are all covered by `ServiceSummary.test.tsx`
+   (the body was lifted out of it), its chrome by `App.test.tsx`, and the
+   uncatalogued marker by `ServiceNode.test.tsx`. **`EdgesList` went too** --
+   callerless, untested, and the panel was the last thing that had ever
+   rendered it. `App.test.tsx`'s "no view renders a flat text edge list" test
+   was kept and reframed: it is a statement about the design rather than about
+   the component, so it should still fail if someone reintroduces one.
+
+   **Two things deliberately left, and neither is an oversight.**
+   `RankModule` / `mostDependedOn` are callerless *by owner decision* -- "we
+   should first work on the catalog before start judging" -- so they are kept,
+   not dead. And `ServiceList` + `ServiceGroup` **are** dead (nothing but their
+   own tests imports them), but deleting them orphans `rollupLabel` and
+   `groupByRollup`, and `rollup-labels.ts` is named in `PRODUCT.md` as where
+   display labels live. That makes it a documented product fact rather than a
+   cleanup, so it is the owner's call.
+5. ~~**`docs/HANDOFF.md` §6's command list is stale**~~ ✅ **closed 2026-08-25.**
+   It was worse than recorded: seven shipped commands missing (`set`, `link`,
+   `unlink`, `deprecate`, `remove`, `rename`, `view`) and four listed that do
+   not exist. Now transcribed from `catalogus --help` and split into built and
+   specified-not-built, with an amendment-log entry. **One thing deliberately
+   left:** §5's heading and §9 decision 3 still say `stack.yaml`. That is not
+   the same defect -- decision 3 records the filename as *open with a leaning*,
+   and what shipped is that leaning, so closing it is the owner's call rather
+   than a transcription. Named in the amendment entry so it is not mistaken for
+   an oversight twice.
 6. **Two writers on one page**, and **what a page is made of** — both recorded as
    open in `PRODUCT.md`, neither blocking the redesign.
 

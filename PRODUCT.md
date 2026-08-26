@@ -170,10 +170,46 @@ question.
 
 - **Name:** Catalogus. `catalogus.dev` is registered and owned, and is load-bearing — the schema
   `$id` and the `$schema` modeline the CLI writes into every manifest both point at it.
-- **Logo:** open. The previous mark was a pun on a dropped name and does not carry over. Nothing has
-  been chosen.
+- **Logo:** open, and **deferred by the owner on 2026-08-25** -- "the logo is something I need to
+  think on my time". Nothing is drawn; `apps/web/src/components/BrandMark.tsx` renders the wordmark
+  alone and marks itself `data-mark="placeholder"` in the DOM, with a test pinning that.
+
+  Three directions were explored and none chosen. They are recorded because each one narrowed the
+  brief, and re-running them would cost a day:
+
+  1. **Abstract precision instruments** -- registration marks, a caliper, an engraved theodolite
+     plate. Rejected as **"too simple"**, then, after two rounds of adding density, rejected again.
+     The lesson, and it is the useful one: "too simple" did **not** mean "too few elements". The
+     owner's own reference images are *simpler* than the marks they rejected -- one is four shapes.
+     What was missing was **warmth and recognisability**. Two rounds were spent solving the wrong
+     problem.
+  2. **Coffee and catalog** -- a cup whose interior holds a short list, from the owner's reference
+     images. The direction was liked; the execution was judged **"not unique"**, correctly: an
+     outlined cup with rules in it is close to a stock icon. Variants that pushed for
+     distinctiveness (the list forming the cup's wall, a rule that becomes the handle) each traded
+     legibility at 16px for it.
+  3. **The board's own tiles**, proposed by the owner -- "this is our distinct mark". The strongest
+     of the three, because the mosaic is a shape the product already owns. It converged on two
+     module bars and a tile arranged as a **C**: the app's grammar forming the initial, holding down
+     to 16px. Deferred with the rest.
+
+  Settled along the way and still standing: **ink only**, because `#d40010` is a signal colour in
+  the data and spending it on the brand costs it that meaning; a **primary mark plus a derived
+  reduced variant**, rather than one asset constrained by the favicon; and the drawing style of the
+  owner's references -- uniform stroke weight, rounded caps, no fill, warm charcoal on cream.
+
+  **A candidate was deleted rather than left in place**, and that is deliberate. One had been drawn,
+  tested, wired into the header and given a favicon before the deferral. Keeping it "for now" is
+  exactly how a mark nobody chose becomes the mark, which is principle 3 applied to the product's
+  own identity.
+
 - **Quality bar, set by the owner:** Confluence and Notion. Named as competitors on craft, not as
   visual references to copy.
+- **Temperature: warm.** Owner decision, 2026-08-25. Asked whether the brand should follow the app's
+  committed bright-white world or the app should follow the warm cream of the brand references, the
+  owner chose **the app follows the brand**. The viewer's ground is `#f4f1ea` and its ink `#24211c`.
+  This revised a direction the owner had previously pinned; `apps/web/docs/DIRECTION.md` carries the
+  revision and `apps/web/src/tokens.css` carries the computed contrast for every pair.
 
 ## Evidence on Hand
 

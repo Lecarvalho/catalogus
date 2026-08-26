@@ -12,7 +12,7 @@ import { BandModule } from "./BandModule.js";
 
 const readAt = "2026-08-24T00:00:00.000Z";
 
-const band: BandDefinition = { id: "serves", label: "Serves requests", note: "" };
+const band: BandDefinition = { id: "production", label: "Runs in production", note: "" };
 const notedBand: BandDefinition = { id: "unplaced", label: "Unplaced", note: "These roles are not in SKILL.md's base-word list." };
 
 afterEach(() => cleanup());
@@ -37,7 +37,7 @@ describe("BandModule -- the header count", () => {
         onPeekEnd={vi.fn()}
       />
     );
-    expect(screen.getByRole("heading", { level: 2, name: "Serves requests" })).not.toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull();
     expect(screen.getByText("3")).not.toBeNull();
     // Two vendors -- flyio (2 entries) and supabase (1) -- so two tiles.
     expect(screen.getAllByRole("button")).toHaveLength(2);

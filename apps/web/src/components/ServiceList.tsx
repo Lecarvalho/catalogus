@@ -3,7 +3,7 @@
 // shape. Only carries what a compact node needs (`selectedId`/`onSelect`);
 // the per-service edge maps and `labelForId` moved to App.tsx, which now
 // resolves them only for whichever one service is selected (see
-// ServiceDetailPanel.tsx) rather than threading them through every node in
+// the service page) rather than threading them through every node in
 // the list.
 import type { ViewService } from "@catalogus/cli";
 
