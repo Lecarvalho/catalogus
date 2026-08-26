@@ -77,7 +77,7 @@
 }
 
 /* Same monospace-and-muted treatment ServiceNode.module.css's `.id` and
-   ServiceDetailPanel.module.css's `.id` give a raw slug -- one vocabulary
+   ServiceSummary.module.css's `.id` give a raw slug -- one vocabulary
    for "this is an id", not a third one invented here. */
 .id {
   font-family: var(--font-mono);

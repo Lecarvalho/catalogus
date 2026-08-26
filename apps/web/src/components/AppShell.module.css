@@ -1,0 +1,97 @@
+/*
+ * A full-bleed bar with a hairline under it, and an inner measure that lines
+ * up with the page's.
+ *
+ * Full-bleed rather than inset because a shell that stops where the content
+ * stops is not a shell -- it reads as one more module in the mosaic, which is
+ * the thing this exists to sit above. The bar spans the window; only its
+ * contents are held to the 1680px measure `App.module.css` uses, so the
+ * wordmark sits directly over the first band module rather than floating
+ * somewhere left of it.
+ *
+ * `--color-header-fill` rather than the ground: the same fill the band module
+ * headers use. The shell and the module headers are the same kind of surface
+ * -- a strip that names what is under it -- so they get the same treatment,
+ * which is what makes the chrome look like part of this world rather than
+ * like a bar bolted on top of it.
+ */
+/*
+ * Block layout, deliberately, and this is a defect worth recording because
+ * it renders as a plausible page rather than as a broken one.
+ *
+ * The first version made this a column flex container. `.page` in
+ * App.module.css centres itself with `margin: 0 auto`, and in a *flex*
+ * column an auto inline margin absorbs the free space instead of centring a
+ * full-width item -- so the main element shrank to its content width, the
+ * board's `column-width` mosaic had one column's worth of space to work
+ * with, and thirty-five services rendered as a single 300px stack down the
+ * middle of a 1440px screen. Nothing errored, no test failed, and it looked
+ * like a design decision.
+ *
+ * A block container has no free space to absorb, so `margin: 0 auto` means
+ * what it means everywhere else. If this ever needs flex again -- a footer
+ * pinned to the bottom is the obvious reason -- `.page` needs `width: 100%`
+ * in the same change, not afterwards.
+ */
+.shell {
+  min-height: 100vh;
+}
+
+.bar {
+  background: var(--color-header-fill);
+  border-bottom: 1px solid var(--color-line);
+  /* Sticky, not fixed: fixed would need the page to reserve its height and
+     would cover content on any short viewport. */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* The measure and the horizontal padding both match `.page` in
+   App.module.css. Two files describing one alignment -- if the page's
+   measure changes, this changes with it. */
+.inner {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+/*
+ * The manifest path. Mono because it is a literal a reader may need to copy,
+ * which is the same reason the slug and every local id in this app are mono.
+ *
+ * It truncates from the left rather than the right: these are absolute paths
+ * and the informative end is the filename, so clipping the tail would hide
+ * the only part that differs between two projects. `direction: rtl` with
+ * `text-align: left` is the CSS-only way to move an ellipsis to the front;
+ * the `bdi` isolation is what stops it reordering the path's own characters.
+ */
+.source {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  color: var(--color-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
+  min-width: 0;
+}
+
+/*
+ * Below this the path is the first thing to go. It is the least important
+ * element in the bar -- the brand has to survive every width, the path does
+ * not -- and keeping both on a phone would either wrap the bar to two rows or
+ * squeeze the wordmark, and the wordmark is the whole reason the bar exists.
+ */
+@media (max-width: 640px) {
+  .source {
+    display: none;
+  }
+}

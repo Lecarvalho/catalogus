@@ -103,16 +103,3 @@
   font-feature-settings: var(--numeric-features);
 }
 
-/*
- * The absolute path, demoted to the quietest thing here. It matters -- it is
- * how a reader knows which checkout they are looking at, and this viewer can
- * be pointed at any of them -- but it is reference, not content, and it had
- * been rendering at the same weight as the architecture sentence.
- */
-.manifestPath {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--color-text-faint);
-  overflow-wrap: anywhere;
-}

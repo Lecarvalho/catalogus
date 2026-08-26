@@ -48,7 +48,7 @@
  * before reading a single service name.
  *
  * aria-hidden on the element itself -- the heading it sits beside already
- * names the band, and a screen reader announcing "Serves requests 7" as a
+ * names the band, and a screen reader announcing "Runs in production 7" as a
  * heading would be reading a decoration as content. The rows carry the
  * real information.
  */

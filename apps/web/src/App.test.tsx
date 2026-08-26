@@ -55,7 +55,7 @@ beforeAll(() => {
  * ("some-service" for both) -- collapseByService keys a tile's DOM id on the
  * slug, and two entries sharing one would collide in the DOM the moment they
  * land in the same band. The two default fixture entries land in different
- * bands (hosting -> serves, database -> holds) so it would not bite here,
+ * bands (hosting -> production, database -> holds) so it would not bite here,
  * but naming a real slug for each is what every test below actually means.
  */
 function payload(overrides: { services?: ViewService[]; edges?: { from: string; to: string }[] } = {}): ViewPayload {
@@ -505,7 +505,7 @@ describe("App -- the view toggle", () => {
   it("starts on the list", async () => {
     await renderLoaded();
     expect(screen.getByRole("radio", { name: "List" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByRole("heading", { level: 2, name: "Serves requests" })).not.toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull();
   });
 
   it("swaps the list for the canvas, and back", async () => {
@@ -514,10 +514,10 @@ describe("App -- the view toggle", () => {
 
     // The band headings are the board's; the legend is the canvas's.
     await waitFor(() => expect(screen.queryByText(/Arrows point from a service to what it depends on/)).not.toBeNull());
-    expect(screen.queryByRole("heading", { level: 2, name: "Serves requests" })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).toBeNull();
 
     fireEvent.click(screen.getByRole("radio", { name: "List" }));
-    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "Serves requests" })).not.toBeNull());
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull());
     expect(screen.queryByText(/Arrows point from a service to what it depends on/)).toBeNull();
   });
 
@@ -544,7 +544,7 @@ describe("App -- the view toggle", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(servicePage()).toBeNull());
     expect(screen.getByRole("radio", { name: "Graph" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.queryByRole("heading", { level: 2, name: "Serves requests" })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).toBeNull();
   });
 
   const migratingPayload = () =>
@@ -569,10 +569,10 @@ describe("App -- the view toggle", () => {
 
     await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull());
     expect(screen.queryByRole("heading", { level: 2, name: "Overdue" })).not.toBeNull();
-    expect(screen.queryByRole("heading", { level: 2, name: "Serves requests" })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).toBeNull();
 
     fireEvent.click(screen.getByRole("radio", { name: "List" }));
-    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "Serves requests" })).not.toBeNull());
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull());
     expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).toBeNull();
   });
 
@@ -580,16 +580,21 @@ describe("App -- the view toggle", () => {
   // board too" / "...on the canvas") each asserted a *before* state -- a
   // "Dependencies" heading, or edge text like "supabase-db", visible on the
   // list view -- and then that switching view dropped it. Neither premise is
-  // true any more: EdgesList has no caller anywhere in this app (App.tsx's
-  // own trailing comment says so directly), not just off the migration board
-  // and the canvas. There is nothing left to contrast a removal against, so
-  // this is reframed as the fact both older tests were actually protecting:
-  // no view in the app renders the flat text transcript of the manifest's
-  // edges.
+  // true any more: `EdgesList` had no caller anywhere in this app, not just
+  // off the migration board and the canvas, and it was **deleted** on
+  // 2026-08-25 along with `ServiceDetailPanel`, the last thing that had ever
+  // rendered it. There is nothing left to contrast a removal against, so this
+  // is reframed as the fact both older tests were actually protecting: no view
+  // in the app renders the flat text transcript of the manifest's edges.
+  //
+  // The assertion outlives the component on purpose. It is a statement about
+  // the design -- edges are shown as structure, on the canvas and in the
+  // summary, never as a wall of `id (Name) -> id (Name)` lines -- so it should
+  // fail if someone reintroduces one, whatever they call it.
   it("renders no flat text edge list ('Dependencies' heading, or 'id (Name) -> id (Name)' lines) on any view", async () => {
     await renderLoaded(migratingPayload());
     const asserts = () => {
-      // "Dependencies" is EdgesList's own heading and nothing else's --
+      // "Dependencies" was EdgesList's own heading and is nothing else's --
       // MigrationList has its own, unrelated "→ replaced by" arrow between a
       // migrating service and its replacement, so the check has to be this
       // specific rather than keying on the arrow glyph itself.
