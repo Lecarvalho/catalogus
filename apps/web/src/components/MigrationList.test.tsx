@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { makeViewService } from "../test-support/fixtures.js";
@@ -130,10 +130,17 @@ describe("MigrationList", () => {
     ]);
   });
 
-  // The row's status is shown through StatusPill rather than a second status
-  // vocabulary invented here -- and until the validation pass, deleting the
-  // pill entirely left the whole suite green.
-  it("shows each row's status through the same pill the rest of the app uses", () => {
+  // Replaces "shows each row's status through the same pill the rest of the
+  // app uses". That test pinned `StatusPill` on every row -- the exact thing
+  // `service-tags.ts`'s header says produced "thirty-five pills, thirty-one
+  // of them saying 'active'": a status mark repeated on a set the reader
+  // already knows the status of. Here the redundancy is total rather than
+  // partial -- `migrations.ts` filters "In flight" to exactly `phasing_out`
+  // and "Overdue" to exactly `deprecated`, so a per-row status word states
+  // what the heading two lines up already states, for every row, with no
+  // exception a mark could ever earn. The section heading is the one place
+  // that names the status now.
+  it("does not repeat a row's status as text -- the section heading is the only place that names it", () => {
     render(
       <MigrationList
         services={[
@@ -144,8 +151,140 @@ describe("MigrationList", () => {
         onSelect={vi.fn()}
       />
     );
-    expect(screen.getByRole("button", { name: /old-db/ }).textContent).toContain("phasing out");
-    expect(screen.getByRole("button", { name: /old-auth/ }).textContent).toContain("deprecated");
+    expect(screen.getByRole("button", { name: /old-db/ }).textContent).not.toMatch(/phasing/i);
+    expect(screen.getByRole("button", { name: /old-auth/ }).textContent).not.toMatch(/deprecated/i);
+  });
+
+  // The status word dropped with StatusPill has to land somewhere a
+  // screen-reader user still hears it -- the previous test proves it is off
+  // the *visible* row, this one proves it is not gone altogether. Found by a
+  // validation agent driving the built app: tabbing button to button, a row
+  // announced only "Auth0 auth-legacy" and nothing that said which section
+  // it was in. `aria-label` is the fix, built from service-tags.ts's own
+  // vocabulary (the same one ServiceTile.tsx draws its identical wordless
+  // mark from), not a fourth set of status strings invented here.
+  it("names the row's status in its accessible name, even though no row prints the word", () => {
+    render(
+      <MigrationList
+        services={[
+          makeViewService({ id: "old-db", role: "database", status: "phasing_out", name: "Old DB" }),
+          makeViewService({ id: "old-auth", role: "auth", status: "deprecated", name: "Old Auth" }),
+        ]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("button", { name: "Old DB, old-db, phasing out" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Old Auth, old-auth, deprecated" })).not.toBeNull();
+  });
+
+  // The row the board exists to surface -- a migration with no destination --
+  // must not lose its status word for lacking one. The name and the
+  // description are built independently (aria-label vs. aria-describedby),
+  // so this is the case most likely to have been missed by a fix that
+  // conflated the two.
+  it("still names the status in the accessible name when there is no replacement to describe", () => {
+    render(
+      <MigrationList
+        services={[makeViewService({ id: "orphan", role: "hosting", status: "deprecated", name: "Orphan" })]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("button", { name: "Orphan, orphan, deprecated" })).not.toBeNull();
+  });
+
+  // The world's own idiom for this fact (docs/DIRECTION.md, "Mapped from the
+  // world's own grammar, not invented"): a struck old price beside a red new
+  // one, for `phasing_out` specifically -- the row is a live swap in
+  // progress. A `deprecated` row makes a different claim ("should not be
+  // used, still present," not "is being replaced this instant") and keeps
+  // its name intact.
+  it("strikes through a phasing_out row's name, and leaves a deprecated row's name intact", () => {
+    render(
+      <MigrationList
+        services={[
+          makeViewService({ id: "old-db", role: "database", status: "phasing_out" }),
+          makeViewService({ id: "old-auth", role: "auth", status: "deprecated" }),
+        ]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />
+    );
+    const phasingName = screen.getByText("Some Service", { selector: `#${serviceNodeDomId("old-db")} *` });
+    expect(phasingName.className).toContain("superseded");
+
+    const deprecatedName = screen.getByText("Some Service", { selector: `#${serviceNodeDomId("old-auth")} *` });
+    expect(deprecatedName.className).not.toContain("superseded");
+  });
+
+  // The other half of the same idiom: the replacement, when a phasing_out
+  // row has one on record, carries the signal colour -- the "red new price".
+  // A deprecated row's replacement stays ink: DIRECTION maps `deprecated` to
+  // a solid *black* tag, not the signal colour, and colouring every row on
+  // this board red would be the "35 identical pills" defect wearing new
+  // paint, just in one hue instead of four.
+  it("marks a phasing_out row's replacement with the signal colour, and a deprecated row's replacement without it", () => {
+    render(
+      <MigrationList
+        services={[
+          makeViewService({ id: "old-db", role: "database", status: "phasing_out", replaced_by: "new-db" }),
+          makeViewService({ id: "new-db", role: "database", name: "New DB" }),
+          makeViewService({ id: "old-auth", role: "auth", status: "deprecated", replaced_by: "new-auth" }),
+          makeViewService({ id: "new-auth", role: "auth", name: "New Auth" }),
+        ]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />
+    );
+    const phasingReplacement = screen.getByText("new-db (New DB)");
+    expect(phasingReplacement.className).toContain("replacementNew");
+
+    const deprecatedReplacement = screen.getByText("new-auth (New Auth)");
+    expect(deprecatedReplacement.className).not.toContain("replacementNew");
+  });
+
+  // Each section states its own row count in its header, in the same
+  // grammar BandModule.module.css's `.count` uses -- a number worth reading
+  // before the names, spent in the signal colour. Two rows in one section
+  // and one in the other, so a hardcoded 0 or a swapped total is caught.
+  it("states each section's row count in its header", () => {
+    render(
+      <MigrationList
+        services={[
+          makeViewService({ id: "a-svc", role: "hosting", status: "phasing_out" }),
+          makeViewService({ id: "b-svc", role: "hosting", status: "phasing_out" }),
+          makeViewService({ id: "c-old", role: "hosting", status: "deprecated" }),
+        ]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />
+    );
+    const inFlightSection = screen.getByRole("heading", { level: 2, name: "In flight" }).closest("section")!;
+    const overdueSection = screen.getByRole("heading", { level: 2, name: "Overdue" }).closest("section")!;
+    expect(within(inFlightSection).getByText("2")).not.toBeNull();
+    expect(within(overdueSection).getByText("1")).not.toBeNull();
+  });
+
+  // The prototype-inheritance defect (CLAUDE.md; Tag.tsx's header)
+  // has landed five times in this repo, always through a keyed lookup on a
+  // manifest-derived string. This file has no such lookup left -- the
+  // phasing_out/deprecated split below is a strict-equality branch, and
+  // every DOM id is built by template string, not by indexing a shared
+  // object -- but a manifest id of "constructor" is still a legitimate
+  // input, and this proves the rendering path never routes it through
+  // `Object.prototype` regardless.
+  it("renders a service id of 'constructor' as an ordinary row, not as an inherited Object.prototype member", () => {
+    render(
+      <MigrationList
+        services={[makeViewService({ id: "constructor", role: "hosting", status: "phasing_out" })]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />
+    );
+    const row = screen.getByRole("button", { name: /constructor/ });
+    expect(row.getAttribute("id")).toBe(serviceNodeDomId("constructor"));
+    expect(row.textContent).not.toContain("function");
   });
 
   // App.tsx restores focus on panel close by looking this id up. A row

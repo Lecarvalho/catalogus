@@ -1,6 +1,15 @@
+/*
+ * Ink, not the signal colour. This read `--status-deprecated` until
+ * 2026-08-26, which resolved to plain ink through the legacy alias block --
+ * so the swap keeps the exact rendering and drops a borrowed name. Borrowing
+ * a *status* token for an *error* was the wrong vocabulary anyway: a
+ * deprecated service and an unreachable server are unrelated facts that
+ * happened to want the same colour. Red stays spent on departures in the
+ * data (tokens.css), so an error that shouted in it would compete with them.
+ */
 .state {
   padding: var(--space-6) 0;
-  color: var(--status-deprecated);
+  color: var(--color-text);
 }
 
 .heading {

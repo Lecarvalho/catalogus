@@ -31,7 +31,6 @@ import type { VendorGroup } from "../bands.js";
 import { tagsFor } from "../service-tags.js";
 import { Icon } from "./Icon.js";
 import { ServiceSummary } from "./ServiceSummary.js";
-import { StatusPill } from "./StatusPill.js";
 import { Tag } from "./Tag.js";
 import styles from "./ServicePopover.module.css";
 
@@ -72,6 +71,10 @@ export function ServicePopover({
 }: ServicePopoverProps) {
   const multiple = group.entries.length > 1;
   const single = group.entries[0];
+  // Only read on the single-entry branch; the multi-entry branch tags each
+  // entry separately, because a group's entries can differ in every one of
+  // the three things a tag reports.
+  const singleTags = tagsFor(single, readAt);
 
   return (
     <div
@@ -102,7 +105,21 @@ export function ServicePopover({
           <span className={styles.slug}>{multiple ? `${group.entries.length} entries` : single.id}</span>
         </span>
 
-        {!multiple && <StatusPill status={single.status} />}
+        {/*
+          The same vocabulary the multi-entry branch below already uses. This
+          was a `StatusPill`, which meant one vendor's popover marked its
+          status one way and a vendor with two entries marked it another --
+          and, because the pill had a rule for `active` too, put a filled
+          "ACTIVE" block on the common case that `service-tags.ts` exists to
+          leave unmarked.
+        */}
+        {!multiple && singleTags.length > 0 && (
+          <span className={styles.tags}>
+            {singleTags.map((tag) => (
+              <Tag key={tag.id} tag={tag} />
+            ))}
+          </span>
+        )}
       </header>
 
       {multiple ? (

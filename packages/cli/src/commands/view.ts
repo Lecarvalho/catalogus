@@ -222,6 +222,15 @@ async function pickStaticFile(resolved: string, root: string, pathname: string):
  * browser -- a blank page, not a server error. Catching that would mean
  * this module parsing and following the shell's own asset references,
  * which nobody has asked for.
+ *
+ * Worth knowing, because two people hit it on 2026-08-26 and both read it
+ * as "my change did not take effect": for anyone developing the viewer,
+ * that paragraph describes the *normal* outcome of rebuilding, not an edge
+ * case. scripts/bundle-web.mjs clears the destination before copying and
+ * the assets are content-hashed, so a `pnpm build` under a running server
+ * leaves the cached shell pointing at filenames that no longer exist. The
+ * symptom is a blank page and a 404 on the bundle -- not the older-looking
+ * page a "stale shell" suggests. Restart the server after a build.
  */
 async function serveStatic(root: string, pathname: string, res: ServerResponse, indexHtml: Buffer): Promise<void> {
   const resolved = resolveStaticPath(root, pathname);

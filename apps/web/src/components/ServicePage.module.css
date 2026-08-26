@@ -64,6 +64,17 @@
   min-width: 0;
 }
 
+/* The status/recency/kind marks, under the id rather than opposite the name.
+   `.identity` grows to fill the header, so a mark placed as the header's
+   last child lands hard against the right edge of whatever window it is
+   read on -- at 2514px that put the mark half a screen from its service. */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+
 .name {
   margin: 0;
   font-size: var(--text-title);

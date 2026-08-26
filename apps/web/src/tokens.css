@@ -240,33 +240,22 @@
 }
 
 /*
- * Migration bridge, 2026-08-25. The rewrite renamed the palette, and eight
- * CSS modules still reference the old names across 37 declarations. Rather
- * than leave those components rendering a blue accent and a traffic-light
- * status ramp until each is rewritten, the old names survive here **aliased
- * onto the new palette** -- so a component nobody has touched yet is already
- * in the new world, just not yet in the new layout.
+ * The migration bridge that stood here is gone, 2026-08-26. It aliased eight
+ * renamed custom properties -- `--color-border`, `--color-accent`,
+ * `--color-accent-soft`, `--color-surface-raised`, `--radius-lg` and the four
+ * `--status-*` ramp entries -- onto the new palette so that components the
+ * 2026-08-25 rewrite had not reached yet still rendered something correct.
+ * Its own instruction was that deleting the last alias is how the migration
+ * is known to be finished, and this is that deletion: the graph view, the
+ * migration board and the error state were the last three holders, and the
+ * status ramp went with `StatusPill`, whose job `service-tags.ts` and `Tag`
+ * now do for the whole app.
  *
- * Note what the status aliases do: `active` loses its green and becomes
- * muted text, because the norm should not be coloured; `phasing_out` takes
- * the signal; `deprecated` becomes plain ink. That is the tag semantics
- * arriving ahead of the tag components.
- *
- * Every one of these is deletable, and deleting the last of them is how this
- * migration is known to be finished. Do not add to this block.
+ * Recorded rather than silently removed because the block is the evidence
+ * that the rename actually completed. If one of those names reappears in a
+ * stylesheet, it is a typo or a paste from an old file, not a token: there is
+ * nothing left to resolve it, so it will render as nothing at all.
  */
-:root {
-  --color-border: var(--color-line);
-  --color-accent: var(--color-signal);
-  --color-accent-soft: var(--color-signal-wash);
-  --color-surface-raised: var(--color-surface);
-  --radius-lg: var(--radius-md);
-
-  --status-active: var(--color-text-muted);
-  --status-phasing_out: var(--color-signal);
-  --status-deprecated: var(--color-text);
-  --status-removed: var(--color-text-faint);
-}
 
 * {
   box-sizing: border-box;

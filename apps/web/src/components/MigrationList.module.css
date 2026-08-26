@@ -1,87 +1,230 @@
+/*
+ * Brought into the dense-module world on 2026-08-26 -- the board (ProjectBoard
+ * / BandModule / ServiceTile) was rebuilt the day before and this view was
+ * not, so toggling Board -> Migrations used to land in a different app:
+ * rounded pill buttons on legacy token aliases (see tokens.css's migration
+ * bridge block), and a 0.85rem caps heading invented independently of
+ * BandModule's own header bar.
+ *
+ * `.module`/`.header`/`.title`/`.count` below are a deliberate duplicate of
+ * BandModule.module.css's chrome, not an import of it -- BandModule takes
+ * band-specific props (`BandDefinition`) that do not fit a migration section,
+ * and another agent owns that file while this slice is being built. Copying
+ * the four rules is cheaper and safer than adding a shared base file mid-flight
+ * two agents are editing; if a third rebuild of this chrome is ever needed,
+ * *that* is the signal to extract it, not this one.
+ *
+ * The row list borrows RankModule.module.css's shape instead of a tile grid --
+ * a migration row is a line of text, not a mark to recognise -- and that file
+ * says outright that it "shares the module chrome with BandModule; only the
+ * row differs," which is exactly the reuse this file is doing by hand.
+ */
+/*
+ * 2026-08-26: found by a validation agent driving the built app at 2514px --
+ * `.board` measured 358px inside a 1648px row, and its two sections 297px
+ * and 358px, ragged and stacked, on a screen wide enough to hold both side
+ * by side four times over. Two independent causes, both below.
+ *
+ * Cause 1 was `.board` claiming no width. Its two sibling view roots both
+ * do -- ProjectBoard.module.css's `.board` is `flex: 1 1 auto; min-width: 0`
+ * and GraphCanvas.module.css's `.canvas` is `flex: 1; min-width: 0` -- and
+ * this one was left at the flex default, so `.body` (App.module.css) gave it
+ * the row and it declined to take it, sizing itself to its content instead.
+ * Fixed the same way both siblings are: `flex: 1 1 auto; min-width: 0`.
+ */
 .board {
-  display: flex;
-  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+
+  /*
+   * Cause 2 was `.section { align-self: start }`, copied from
+   * BandModule.module.css's `.module`, whose comment says "the grid places
+   * them" -- true there, because that module sits inside a *multi-column*
+   * container where a child's cross-axis size is never in question at all.
+   * Copied into this file's old `flex-direction: column` board, the same
+   * property landed on the live axis instead of an inert one: it is what
+   * stopped each section from stretching to the column's width, which is
+   * what produced the two different, too-narrow numbers above. A rule that
+   * did nothing where it came from and does something where it landed is a
+   * defect, not a grammar choice -- see MigrationList.tsx's file header for
+   * the accessible-name defect found alongside this one.
+   *
+   * The fix is not just to un-shrink them -- two sections is the smallest
+   * possible case of the uneven grid the design contract already describes
+   * for the mosaic proper (docs/DIRECTION.md: modules "sized to their
+   * contents" and "tile edge to edge in an uneven grid"), and a wide screen
+   * stacking two short sections on top of each other wastes exactly the
+   * horizontal room that argument is about. So: side by side, not stacked.
+   *
+   * ProjectBoard.module.css's own mechanism for that -- CSS multi-column,
+   * `column-width` plus `column-gap` -- was tried here first and rejected.
+   * That property is a hint, not a count: the browser picks however many
+   * column tracks the hint and the available width allow (three, at this
+   * board's usual widths), and balances content across all of them. With an
+   * arbitrary number of bands that is the whole point; with exactly two
+   * fixed sections it reintroduces this same defect one level up, as an
+   * empty third column and the row only two-thirds claimed. A grid with a
+   * fixed two-column template has no count to second-guess: there are
+   * always exactly two sections, so there are always exactly two tracks.
+   * `align-items: start` is `.module`'s "never grow taller than their
+   * contents" rule, carried over to a container that actually needs to
+   * state it -- a bare grid stretches every row to its tallest cell by
+   * default, which the mosaic itself never does either.
+   */
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  align-items: start;
   gap: var(--space-6);
+}
+
+/* Two fixed-purpose columns is a desktop argument, same as the mosaic
+   proper -- ProjectBoard.module.css collapses to one column at the same
+   640px for the same reason. The honest mobile answer is one section above
+   the other, in the reading order migrations.ts already fixes (in flight,
+   then overdue) -- not a squeezed two-up grid on a phone screen. */
+@media (max-width: 640px) {
+  .board {
+    grid-template-columns: 1fr;
+  }
 }
 
 .section {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  /* No `align-self: start` here -- see `.board`'s comment above for why the
+     property that used to sit on this rule is gone rather than kept as a
+     second inert copy of one it no longer needs: the board is what states
+     the "don't stretch to match the tallest" rule now, because the board is
+     what the mosaic states it on too. */
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
+  min-height: 24px;
+  padding: 0 var(--space-3);
+  background: var(--color-header-fill);
+  border-bottom: 1px solid var(--color-line);
 }
 
-/* Same treatment as ServiceGroup.module.css's `.heading` -- one vocabulary
-   for a section label across the list and this board, not two. */
-.heading {
+.title {
   margin: 0;
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
-.list {
-  list-style: none;
+/* The row count, in the signal colour -- BandModule's count exists so a
+   reader takes in the shape of a band before reading a row, and the same
+   argument applies here: how many still need a decision is the number worth
+   seeing before the names. aria-hidden for the same reason BandModule hides
+   its count -- the heading already names the section, and the rows below
+   carry the real information. */
+.count {
+  flex: 0 0 auto;
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  color: var(--color-signal);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--numeric-features);
+}
+
+.rows {
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  list-style: none;
 }
 
+/* One hairline between rows, never after the last -- the adjacent-sibling
+   form rather than `:first-child` because `.row` is the `<li>` itself here
+   (RankModule puts its border on the button inside the `<li>` because its
+   whole row is one button; this row is a button plus text beside it, so the
+   divider belongs to the `<li>` that holds both). */
 .row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+  padding: var(--space-2) var(--space-4);
 }
 
-/* A row's own service, as a button -- ServiceNode's shape, reused here for
-   the same reason: keyboard operability and the accessible name come from a
-   native control, not a styled span with a click handler bolted on. */
+.row + .row {
+  border-top: 1px solid var(--color-line);
+}
+
+/*
+ * The row's own service. A plain control now, not the rounded pill that used
+ * to mimic ServiceNode's old graph-node shape -- this list has no icon and no
+ * status ring, so a pill here was borrowing another component's silhouette
+ * for no reason of its own.
+ *
+ * `border: 1px solid transparent` reserves the width `aria-pressed="true"`
+ * spends below, so pressing a row does not reflow its neighbours by a pixel.
+ */
 .service {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
   padding: var(--space-2) var(--space-3);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
   font: inherit;
   color: var(--color-text);
   cursor: pointer;
-  min-width: 0;
+  /* The app-wide focus ring (tokens.css) is left alone deliberately -- "one
+     focus treatment for the whole app, defined once" is that file's own
+     rule, and this button has no reason to be the exception. */
 }
 
 .service:hover {
-  border-color: var(--color-accent);
+  background: var(--color-surface-sunken);
 }
 
-.service:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-/* Selected, mirroring ServiceNode.module.css's `.selected`: border colour,
-   background tint and the heavier inset ring together, so the cue survives
-   a viewer who cannot separate the accent hue from the border hue. */
+/*
+ * Selected: a fill plus a border stepping from transparent to full ink --
+ * the same two-cue shape ServiceTile.module.css's `.selected` uses, and for
+ * the same reason. The row this replaces stacked a border colour, a
+ * background tint and a 2px inset ring, all three spent on the same hue, so
+ * a viewer who cannot read that hue saw one cue where a sighted one saw
+ * three. Fill and border-*presence* both survive greyscale; nothing here
+ * relies on the signal colour or any other hue to read as "selected".
+ */
 .service[aria-pressed="true"] {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  box-shadow: inset 0 0 0 2px var(--color-accent);
+  background: var(--color-surface-sunken);
+  border-color: var(--color-line-strong);
 }
 
 .name {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
+  font-size: var(--text-row);
 }
 
-/* Same monospace-and-muted treatment ServiceNode.module.css's `.id` and
-   ServiceSummary.module.css's `.id` give a raw slug -- one vocabulary
-   for "this is an id", not a third one invented here. */
 .id {
   font-family: var(--font-mono);
-  font-size: 0.8em;
+  font-size: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+/*
+ * The world's own idiom for this exact fact (docs/DIRECTION.md, "Mapped from
+ * the world's own grammar, not invented"): a struck old price beside a red
+ * new one. Applied only to `phasing_out` rows -- the ones actively being
+ * swapped for a named replacement right now. A `deprecated` row is a
+ * different claim ("should not be used, still present," not "is being
+ * replaced this instant"), so it keeps its name intact; see MigrationList.tsx
+ * for the rest of that reasoning.
+ */
+.superseded {
+  text-decoration: line-through;
   color: var(--color-text-muted);
 }
 
@@ -91,27 +234,55 @@
 
 .replacement {
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: var(--text-row);
+  font-weight: var(--weight-bold);
+  color: var(--color-text);
   overflow-wrap: anywhere;
 }
 
-/* Reads as an unanswered question, not an error -- italic and muted rather
-   than the status colours, which are already spoken for by StatusPill. */
+/* The "red new price" half of the same idiom -- `phasing_out` only. A
+   `deprecated` row's replacement (if one is on record) stays ink: DIRECTION's
+   own mapping gives `deprecated` a solid-black tag rather than the signal
+   colour, and spending red there too would make every row on this board red,
+   which is the "35 identical pills" defect wearing new paint. */
+.replacementNew {
+  color: var(--color-signal);
+}
+
+/* An absent `replaced_by` is an unanswered question, not an error (CLAUDE.md;
+   migrations.ts's own comment on `replacementLabel`) -- italic and muted,
+   never the signal colour, on either section. Spending red here would read
+   as a problem, when the honest reading is that nobody has recorded an
+   answer yet. */
 .noReplacement {
   font-style: italic;
+  font-size: var(--text-row);
   color: var(--color-text-muted);
 }
 
-.sectionEmpty,
+.sectionEmpty {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-body);
+  color: var(--color-text-muted);
+}
+
+/* The all-clear state, boxed the same way ProjectBoard.module.css boxes its
+   own empty state -- a good state for a project, not an error, and not a
+   bare unstyled sentence either. */
 .empty {
   margin: 0;
+  padding: var(--space-6);
+  border: 1px solid var(--color-line);
   color: var(--color-text-muted);
+  font-size: var(--text-body);
 }
 
-/* Visually hidden, not display:none -- still read by assistive tech, just not
-   painted. Copied rather than shared with ServiceNode.module.css: CSS Modules
-   scope class names per file, so there is no cross-file selector to reuse
-   without a global stylesheet this app does not have. */
+/* Visually hidden, not display:none -- still read by assistive tech, just
+   not painted. Copied rather than shared with ServiceNode.module.css or
+   RankModule.module.css: CSS Modules scope class names per file, so there is
+   no cross-file selector to reuse without a global stylesheet this app does
+   not have. */
 .srOnly {
   position: absolute;
   width: 1px;

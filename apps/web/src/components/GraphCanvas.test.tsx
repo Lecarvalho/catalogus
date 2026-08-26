@@ -110,6 +110,28 @@ describe("GraphCanvas -- the nodes", () => {
   });
 });
 
+describe("GraphCanvas -- the status-mark world", () => {
+  // The canvas used to paint a coloured ring around every node's icon, one
+  // rule per status including `active` -- the world ServiceNode.module.css
+  // moved off of. This is the canvas-level proof that the swap actually
+  // reaches a rendered node here, not only the ServiceNode unit tests: the
+  // 31-of-35-active manifest this design is built against would still look
+  // wrong if GraphCanvas wired the node up some other way.
+  it("marks a departure-status node and marks none of the active majority", async () => {
+    const services: ViewService[] = [
+      ...SERVICES,
+      makeViewService({ id: "old-thing", role: "hosting-legacy", rollup: "hosting", name: "Old Thing", status: "deprecated" }),
+    ];
+    render(<GraphCanvas services={services} edges={EDGES} selectedId={null} onSelect={vi.fn()} layout={stubLayout} />);
+
+    const deprecatedButton = await screen.findByRole("button", { name: /Old Thing/ });
+    expect(deprecatedButton.querySelector('[aria-hidden="true"]')).not.toBeNull();
+
+    const activeButton = screen.getByRole("button", { name: /Trello/ });
+    expect(activeButton.querySelector('[aria-hidden="true"]')).toBeNull();
+  });
+});
+
 describe("GraphCanvas -- the legend", () => {
   // Decision 2 in docs/PLAN.md's Phase 3.7 fixed the arrow direction and
   // noted that blast radius is then read backwards, which is the reverse of
@@ -328,3 +350,13 @@ describe("GraphCanvas -- the incident edge highlight", () => {
     expect(byPair("host-api", "db-primary")?.classList.contains(styles.edgeIncident ?? "")).toBe(false);
   });
 });
+
+// The per-stylesheet legacy-alias guard that used to live here (and its
+// twin in ServiceNode.test.tsx) is gone: each checked only the one
+// stylesheet it was written against, so the guard covered 2 of the
+// component stylesheets under apps/web/src and nothing written after it.
+// One discovery-based guard now covers all of them --
+// apps/web/src/token-references.test.ts, which walks every `*.module.css`
+// file rather than naming files, and fails on any `var(--x)` this
+// stylesheet (or any other) references that tokens.css no longer defines.
+// See that file's header for what it does and does not catch.
