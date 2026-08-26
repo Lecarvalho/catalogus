@@ -374,6 +374,7 @@ export function App() {
               <ServicePage
                 service={selectedService}
                 projectName={state.payload.project.name}
+                readAt={state.payload.readAt}
                 dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
                 dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
                 labelForId={edgeMaps.labelForId}

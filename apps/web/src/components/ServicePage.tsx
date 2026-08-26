@@ -23,15 +23,23 @@
 import type { Ref } from "react";
 import type { ViewService } from "@catalogus/cli";
 
+import { tagsFor } from "../service-tags.js";
 import { Icon } from "./Icon.js";
 import { ServiceSummary } from "./ServiceSummary.js";
-import { StatusPill } from "./StatusPill.js";
+import { Tag } from "./Tag.js";
 import styles from "./ServicePage.module.css";
 
 export interface ServicePageProps {
   service: ViewService;
   /** Project name, for the breadcrumb back to the board. */
   projectName: string;
+  /**
+   * Server-stamped moment the manifest was read, from the payload. Every
+   * recency mark on a screen measures from the same instant rather than from
+   * whenever each component happened to render -- see service-tags.ts, which
+   * takes it for exactly that reason and never calls `Date.now()`.
+   */
+  readAt: string;
   dependsOn: string[];
   dependedOnBy: string[];
   labelForId: (id: string) => string;
@@ -50,12 +58,15 @@ const headingId = (id: string) => `service-page-heading-${id}`;
 export function ServicePage({
   service,
   projectName,
+  readAt,
   dependsOn,
   dependedOnBy,
   labelForId,
   onBack,
   pageRef,
 }: ServicePageProps) {
+  const tags = tagsFor(service, readAt);
+
   return (
     <article className={styles.page} aria-labelledby={headingId(service.id)} tabIndex={-1} ref={pageRef}>
       {/*
@@ -87,9 +98,25 @@ export function ServicePage({
             their project.
           */}
           {!service.known && <p className={styles.uncatalogued}>No catalog entry for this slug.</p>}
-        </div>
 
-        <StatusPill status={service.status} />
+          {/*
+            The marks sit with the name they describe, not opposite it. This
+            was a `StatusPill` pinned to the header's far edge, which on a
+            wide window put a solid red "PHASING OUT" block a thousand pixels
+            away from the service it was about -- and put an "ACTIVE" block on
+            the thirty-one entries in three that are simply normal.
+            `service-tags.ts` settles both: one vocabulary, and the norm earns
+            no mark. Recency and `kind` arrive with it, which is more than the
+            pill could say and is the same set the popover already shows.
+          */}
+          {tags.length > 0 && (
+            <p className={styles.tags}>
+              {tags.map((tag) => (
+                <Tag key={tag.id} tag={tag} />
+              ))}
+            </p>
+          )}
+        </div>
       </header>
 
       <div className={styles.columns}>

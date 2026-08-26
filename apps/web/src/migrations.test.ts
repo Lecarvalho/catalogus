@@ -82,7 +82,7 @@ describe("buildMigrationDashboard", () => {
 
   // The keyed-lookup defect class this repo keeps producing (docs/PLAN.md).
   //
-  // The distinction StatusPill.tsx's header draws is the whole point here:
+  // The distinction Tag.tsx's header draws is the whole point here:
   // an *absent* key and an *inherited* one are different things, and only
   // one of them is a bug. The first version of this test seeded a service
   // whose id actually was `constructor`, which makes the key an *own*

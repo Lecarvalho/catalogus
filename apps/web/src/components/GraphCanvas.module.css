@@ -22,8 +22,8 @@
   position: relative;
   height: 70vh;
   min-height: 420px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-surface);
 }
@@ -84,18 +84,23 @@
   pointer-events: none;
 }
 
-/* Muted text rather than the border colour: a border is a 1px line against a
-   surface it sits on, and an edge is a line crossing open canvas -- at
-   --color-border it is nearly invisible at zoom-out, which is the zoom the
+/* Muted text rather than the hairline rule colour: a border is a 1px line
+   against a surface it sits on, and an edge is a line crossing open canvas --
+   at --color-line it is nearly invisible at zoom-out, which is the zoom the
    whole graph is looked at from. */
 .edge {
   stroke: var(--color-text-muted);
 }
 
-/* An edge touching the selected node. Two changes, only one of them colour,
-   for the same reason the selected node itself carries a weight cue: an
-   accent stroke alone is invisible to a viewer who cannot separate the hues. */
+/* An edge touching the selected node. Ink, not the signal colour -- this
+   marks the current *focus*, not a departure from normal, and red is spent
+   on the latter only (tokens.css's header; ServiceNode.module.css's
+   `.selected` makes the identical choice for the node itself, for the
+   identical reason). Two changes, only one of them colour: the stroke
+   widens as well as darkens, because a colour change alone is invisible to
+   a viewer who cannot separate two hues -- the same defect the node's own
+   selected state was fixed for. */
 .edgeIncident {
-  stroke: var(--color-accent);
+  stroke: var(--color-line-strong);
   stroke-width: 2.5;
 }

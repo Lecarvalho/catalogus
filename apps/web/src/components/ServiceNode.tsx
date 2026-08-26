@@ -9,13 +9,19 @@
 // Two signals stay on the node on purpose -- do not move either into the
 // panel to "declutter" further:
 //
-//  - Status colour (the ring around the icon). Lifecycle at a glance is
-//    what the whole viewer exists for; a migration view where every node
-//    has to be clicked to find the deprecated one is not a migration view.
-//    Colour only, no text, here -- the panel is where the status word
-//    itself renders (StatusPill), which is what keeps this accessible: the
-//    text equivalent exists and is reachable, just not painted onto every
-//    node.
+//  - Status, as a bar across the top edge. This used to be a coloured ring
+//    around the icon with one rule per exact status value, including
+//    `active` -- a leftover from before the 2026-08-25 world rewrite, which
+//    settled a different rule: `active` is the norm (31 of 35 entries on a
+//    real manifest) and the norm earns no mark at all, or the four
+//    departures that actually matter are drowned out by thirty-one that
+//    don't (service-tags.ts's own header). The bar is `ServiceTile.module
+//    .css`'s `.mark` -- the board's own precedent for showing a status on a
+//    small element without text -- reused rather than a third vocabulary
+//    invented for the node. Colour only, no text, same as the ring it
+//    replaces: the panel is where the status word itself renders
+//    (as a Tag), which is what keeps this accessible without painting it
+//    onto every node.
 //  - The uncatalogued marker, when `known` is false. `service.name` is
 //    already the raw slug in that case (view-payload.ts's fallback), and a
 //    raw slug must never read as if it were a real catalogued display
@@ -57,6 +63,7 @@
 // out to the one caller that actually has a list is what fixed that.
 import type { ViewService } from "@catalogus/cli";
 
+import { tagsFor } from "../service-tags.js";
 import { Icon } from "./Icon.js";
 import styles from "./ServiceNode.module.css";
 
@@ -93,7 +100,40 @@ export function serviceNodeDomId(id: string): string {
   return `service-node-${id}`;
 }
 
+/**
+ * The status mark's tone -> class lookup.
+ *
+ * A `Map` over the three tones a status tag can actually produce here
+ * (`signal-outline`/`ink-solid`/`grey-solid` -- phasing_out/deprecated/
+ * removed) -- the same technique, for the same reason, as Tag.tsx's own
+ * tone lookup below it. This comment used to contrast the two, back when
+ * Tag.tsx still read `styles` through an `Object.prototype.hasOwnProperty`
+ * guard; Tag.tsx was rewritten to this identical `Map` form on 2026-08-26,
+ * after which there was no more contrast left to draw. The measurement that
+ * motivated both -- what this project's CSS-module handling under vitest
+ * actually does to a property-existence check versus a `Map` lookup -- lives
+ * in Tag.tsx's header; this file does not restate it.
+ */
+const MARK_TONE_CLASSES: ReadonlyMap<string, string | undefined> = new Map([
+  ["signal-outline", styles["signal-outline"]],
+  ["ink-solid", styles["ink-solid"]],
+  ["grey-solid", styles["grey-solid"]],
+]);
+
 export function ServiceNode({ service, isSelected, showId, onSelect }: ServiceNodeProps) {
+  // The status mark, reduced from tagsFor's full three-tag vocabulary to the
+  // one this node has room for. `kind: "service"` and `added: undefined`
+  // suppress the kind tag and the recency tag -- this node already carries
+  // kind as a shape (the `.kind-*` rules below) and has nowhere to spend a
+  // "new" mark, so asking for all three and discarding two would be the
+  // same defect as never asking, just spelled differently. Exactly
+  // ServiceTile.tsx's own technique for the board's mark, reused rather
+  // than re-derived. `readAt` is a required parameter but not a load-bearing
+  // one here: `isRecentlyAdded` returns false the moment `added` is
+  // `undefined`, before it ever reads `readAt`, so any value satisfies it.
+  const [mark] = tagsFor({ ...service, kind: "service", added: undefined }, "");
+  const markToneClass = mark ? MARK_TONE_CLASSES.get(mark.tone) : undefined;
+
   return (
     <button
       type="button"
@@ -118,7 +158,18 @@ export function ServiceNode({ service, isSelected, showId, onSelect }: ServiceNo
       title={`${service.name} — ${service.role}`}
       onClick={() => onSelect(service.id)}
     >
-      <span className={`${styles.ring} ${styles[`status-${service.status}`]}`}>
+      {/*
+        The mark carries no `title` of its own, unlike ServiceTile.module
+        .css's board tile, whose button has no competing title attribute.
+        This button already has one (name — role, immediately above), and
+        Icon.tsx's own header already rejected stacking a second, narrower
+        tooltip region on the same control for exactly this reason: it made
+        hover answer a different question depending on which few pixels the
+        pointer happened to be over. The status word itself stays reachable
+        on the service page (as a Tag), same as when this was a ring.
+      */}
+      {mark && <span className={`${styles.mark} ${markToneClass ?? ""}`} aria-hidden="true" />}
+      <span className={styles.iconWrap}>
         <Icon iconPath={service.icon} rollup={service.rollup} label={service.name} />
         {!service.known && <span className={styles.uncataloguedDot} aria-hidden="true" />}
       </span>

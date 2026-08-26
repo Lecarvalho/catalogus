@@ -74,7 +74,7 @@ export function isRecentlyAdded(added: string | undefined, readAt: string, windo
  *
  * A Map rather than a keyed object literal: `status` is manifest-derived,
  * and this repo has produced the Object.prototype defect five times now
- * (see StatusPill.tsx's header for the full account). A Map has no
+ * (see Tag.tsx's header for the full account). A Map has no
  * prototype chain to fall through, so an absent key is absent.
  */
 const STATUS_TAGS = new Map<string, Tag>([

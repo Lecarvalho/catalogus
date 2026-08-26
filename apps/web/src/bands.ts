@@ -104,7 +104,7 @@ export const BANDS: readonly BandDefinition[] = [
 /**
  * rollup -> band. Null-prototype, and every keyed lookup in this repo now is,
  * for the reason recorded at CATALOGUS_CATALOG, GLYPHS, ROLLUP_LABELS and
- * StatusPill's LABELS: the schema's slug pattern admits `constructor` as a
+ * the old StatusPill's LABELS: the schema's slug pattern admits `constructor` as a
  * legal role, so a plain object literal would resolve `BAND_OF["constructor"]`
  * through Object.prototype to the `Object` function -- truthy, so a naive
  * `?? "unplaced"` fallback would never fire. That exact shape blanked this
@@ -269,7 +269,7 @@ const STATUS_SEVERITY = new Map<string, number>([
  *
  * A Map, not a keyed object literal: `service` is manifest-derived and
  * `service: constructor` is schema-valid. Fifth instance of that class in
- * this repo; see StatusPill.tsx.
+ * this repo; see Tag.tsx's header.
  */
 export function collapseByService(services: readonly ViewService[]): VendorGroup[] {
   const byService = new Map<string, ViewService[]>();

@@ -18,11 +18,25 @@ describe("Tag", () => {
     expect(el.getAttribute("title")).toBe("Should not be used.");
   });
 
+  // The counterpart to the guard test below, and the one that was missing:
+  // it pins that a *real* tone actually reaches the class attribute. Nothing
+  // asserted that until 2026-08-26, which is how `Tag` shipped an
+  // own-property guard that answered false for every key under this harness
+  // -- so every tag in every test rendered with no tone class, and the suite
+  // was silent about it. The lookup is a `Map` now; this is what would go red
+  // if it stopped resolving. See `Tag.tsx`'s header for the measurement.
+  it("applies the tone's own class, not only the base class", () => {
+    const tag: TagData = { id: "phasing_out", label: "phasing out", tone: "signal-outline", title: "Being replaced." };
+    const { container } = render(<Tag tag={tag} />);
+    const className = container.firstElementChild?.getAttribute("class") ?? "";
+    expect(className).toContain("signal-outline");
+  });
+
   // `tone` is a closed union rather than manifest data, so this cannot
-  // happen through a real payload -- the same argument StatusPill.tsx's
-  // header records was made once before and was wrong. The own-property
-  // guard is a belt kept regardless of whether this particular caller is
-  // safe today.
+  // happen through a real payload -- the same argument recorded once before
+  // (now in `Tag.tsx`'s header, which absorbed it when `StatusPill` was
+  // deleted) and wrong then. The guard is a belt kept regardless of whether
+  // this particular caller is safe today.
   // The stylesheet is mocked to a **real plain object** for this one test, and
   // that substitution is the entire point of it.
   //
@@ -37,10 +51,12 @@ describe("Tag", () => {
   // A plain `{}` has a real prototype chain, so `styles["toString"]` resolves to
   // `Function.prototype.toString` and React is handed a function to render into
   // a class attribute -- which is the actual defect being guarded against, and
-  // the reason `Tag.tsx` uses an own-property test rather than a bare index.
+  // the reason `Tag.tsx` looks a tone up through a `Map` rather than indexing
+  // the stylesheet directly.
   //
-  // **The identical test in `StatusPill.test.tsx` has the same flaw**, and is
-  // fixed the same way in the same commit.
+  // (`StatusPill.test.tsx` carried an identical test with an identical flaw
+  // and was fixed the same way. The pill itself was deleted on 2026-08-26,
+  // when this component became the only status vocabulary.)
   it("does not resolve an Object.prototype member name through the prototype chain into the class attribute", async () => {
     vi.doMock("./Tag.module.css", () => ({ default: {} }));
     vi.resetModules();
