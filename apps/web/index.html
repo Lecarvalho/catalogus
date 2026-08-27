@@ -1,5 +1,191 @@
 <!doctype html>
 <html lang="en">
+  <!--
+    IMPECCABLE DIRECTION CONTRACT
+    Seed key: ac1ba604 · direction: challenger `japanese-high-density-web`
+    (user-chosen; a user pick beats the roll). Mode: **Read**.
+
+    Embedded here, in the markup the app actually emits, because a contract that
+    lives only in a docs file and in component headers is a contract nobody
+    reading the shipped page can check the page against. The Impeccable flow
+    requires it as an HTML comment surviving the production build and greppable
+    by seed key: `grep -r ac1ba604 apps/web/dist packages/cli/dist/web` finds it
+    in what `catalogus view` serves, not only in the source tree.
+    `apps/web/docs/DIRECTION.md` remains the source of truth and carries the
+    parts that are prose rather than contract — the owner's captured decisions,
+    the revision log, and the run's own status.
+
+    **Every contract section below is verbatim from that file**, save for the
+    departures listed under DEPARTURES, and
+    `apps/web/src/direction-contract.test.ts` fails if any *undeclared* wording
+    difference appears in either direction. That guard is the point of the
+    verbatim rule: a contract quietly edited to match what got built is worth
+    less than no contract, because the gap it should have exposed is the thing
+    the edit removes.
+
+    Deliberately no counts in this paragraph. It said "the five contract
+    sections" and "the six differences" until 2026-08-26, when a validator
+    pointed out that the first had *already* gone stale — the guard compares
+    seven — and that nothing tied either number to anything. Both are stated
+    once, further down, where the guard checks them. A count restated in a
+    second place is a count that will disagree with itself.
+
+    THESIS
+
+    A project's whole operational reality on one screen, dense enough that you never search for anything.
+    It refuses the category default this app once shipped — the dark dashboard of evenly-weighted
+    cards under alphabetical headings — and refuses its predictable opposite, the airy white docs page
+    with thin grey rules and a blue link. Density is the argument: 35 services, 41 edges, five
+    architecture bands, no scrolling to find a thing.
+
+    OWN-WORLD
+
+    Warm cream ground (#f4f1ea), ink (#24211c), one utility red (#d40010) and nothing else chromatic.
+    Hairline grey (#d5cebe) rules every module; light grey (#e9e4d8) fills header tabs. Boxed modules
+    tile edge to edge in an uneven grid — a wide spine module beside narrow stacked ones — each with a
+    small header bar carrying a title left and a count right. Sharp corners throughout, no radius above
+    2px, no shadow, no gradient. Compact sans at 11–13px with tight leading; a heavier face for numerals.
+    Tags are small sharp rectangles in four weights: red solid, red outline, black solid, grey solid.
+    Icons are 1.5px line work. Recognizable with all content removed by: hairline module mosaic, red
+    header tabs, tabular numerals, zero rounding.
+
+    STORY
+
+    The reader opens a project they have not touched in six months, or hands it to someone who has never
+    seen it. In one viewport they understand the shape — what serves requests, what it runs on, what
+    holds the data, what watches it, what builds it — and they can see which few services everything
+    else hangs off. They click one and land on its page.
+
+    FIRST VIEWPORT
+
+    Left rail (240px): project identity, then the band index with counts, no search field. Main field: a
+    two-row header (project name + architecture sentence, then the List/Graph/Migrations rail with a red
+    underline on the active one). Below it the module mosaic — ON THE REQUEST PATH spans the full width
+    as the spine, drawn as a routed chain rather than a list; beneath it RUNS ON, HOLDS DATA, WATCHED BY,
+    BUILT AND SHIPPED BY tile in an uneven grid sized to their contents; MOST DEPENDED ON sits right as a
+    numbered rank module. No primary action — this is Read mode; the action is clicking a service.
+
+    FORM
+
+    Dense module mosaic, candidate 2 of the challenger hand, chosen by the user over the assigned
+    grounded direction (the manifest/bill-of-lading world). Seed key ac1ba604.
+
+    MAPPED FROM THE WORLD'S OWN GRAMMAR, NOT INVENTED
+
+    - struck old price + red new price -> `phasing_out` with its `replaced_by`
+    - numbered ranking module -> most depended on, by inbound edge count
+    - red outline "NEW" tag -> recently added (answers HANDOFF §4.2 query 5)
+    - `active` carries **no tag**: tagging the norm is what produced 35 identical pills
+    - `deprecated` -> black solid tag; `removed` -> grey solid; `phasing_out` -> red outline
+
+    CONSTRAINTS CARRIED IN FROM PRODUCT.md
+
+    - No search. "It should fit." (owner)
+    - Organize by architecture, not alphabet. (owner)
+    - First screen = the shape of the system. (owner)
+    - Hover -> popover near the item; click -> the service page. (owner, supersedes
+      viewer-foundations decision 4)
+    - Read-only: no editing affordance anywhere. Editing arrives with Phase 4.
+    - 38% of services have no brand icon; the category fallback must look deliberate.
+    - Keep meaning out of colour alone — greyscale must survive.
+
+    DEPARTURES: where the text above differs from DIRECTION.md's contract
+
+    Six differences, each declared in the guard so that a seventh cannot appear
+    unnoticed, and each quoted below in the contract's own words so the guard can
+    check the page and the table say the same thing. Every hex here is checked
+    against `apps/web/src/tokens.css`'s own light `:root` declarations rather
+    than against a list typed into a test, so the contract and the token layer
+    cannot drift apart silently.
+
+    **What the guard cannot do, so that nobody trusts it further than it goes.**
+    It proves the two copies agree; it cannot prove either one is what the owner
+    chose. An edit made carefully to *both* files passes — a validator
+    demonstrated it by inverting the contract's search constraint in both and
+    watching the suite stay green. Nor can any test tell whether prose is
+    truthful: the same validator left the paragraph below intact and appended one
+    sentence claiming the question in it had since been resolved, and nothing
+    failed. Git history is the only backstop for either, this repo has no CI, and
+    review of the diff is the control, not the test. The owner's hardest named
+    constraints are additionally pinned as literals in the guard, which makes
+    those a three-way agreement rather than a two-way one — but five lines are
+    not the contract.
+
+      - THESIS: "this app currently ships" -> "this app once shipped". The dark
+        dashboard of evenly-weighted cards is gone; the sentence described the
+        present when it was written and describes the past now.
+      - OWN-WORLD, four warmed values: "Bright white ground (#FFFFFF)" -> "Warm
+        cream ground (#f4f1ea)", "ink (#111111)" -> "ink (#24211c)", "Hairline
+        grey (#E0E0E0)" -> "Hairline grey (#d5cebe)", "light grey (#F2F2F2)" ->
+        "light grey (#e9e4d8)".
+        This is the 2026-08-25 warming, an owner decision recorded in
+        DIRECTION.md's own revision: their brand references were uniformly warm
+        cream with soft charcoal line work, and asked directly whether the brand
+        should follow the app's world or the app the brand, they chose the app
+        follows the brand. A temperature change inside the same direction — the
+        seed key and the direction are untouched. tokens.css's header carries
+        every recomputed contrast pair, including the one that does not reach AA
+        and why it was left.
+      - OWN-WORLD, the fifth: "one utility red (#E60012)" -> "one utility red
+        (#d40010)", and this one is **not** the warming. `--color-signal` has been #d40010 since the commit that
+        introduced the token (`e92761d`) — before the warming commit, while the
+        ground was still #ffffff — and the palette before that one had no signal
+        token at all, only a blue accent. `#E60012` has never appeared in any
+        stylesheet in this repo's history, on any branch, in any commit: only in
+        the contract itself. So the red did not move with the
+        ramp: it was implemented differently from the contract on day one, and
+        nothing in the repo records a decision to do that. **The value here is
+        the shipped one because a contract embedded in the page must describe
+        the page — but the divergence is unexplained, and it is the owner's to
+        rule on**, either by accepting #d40010 into the contract or by moving
+        the token to #E60012. Recorded as an open question rather than narrated
+        into a reason, which is what a first draft of this comment did.
+
+    WHAT THIS CONTRACT DOES NOT YET DESCRIBE
+
+    Stated here rather than left for a reader to discover as a discrepancy —
+    each of these is a place where the built world and the contract disagree and
+    the contract has not been amended.
+
+      - **The left rail is unbuilt.** FIRST VIEWPORT specifies 240px of project
+        identity and a band index; `AppShell` renders a sticky identity bar the
+        contract did not specify, and the rail is not there.
+      - **The spine is a list, not a routed chain.** FIRST VIEWPORT asks for the
+        request-path band to be drawn as a routed chain; it renders as an
+        ordinary `BandModule` like every other band.
+      - **MOST DEPENDED ON is not on screen at all.** The owner removed the
+        ranking on 2026-08-25. `RankModule.tsx` and `bands.ts`'s
+        `mostDependedOn` are kept rather than deleted, with no caller, so the
+        component and its stylesheet are tree-shaken out of the bundle.
+      - **The band names are not the contract's.** It names ON THE REQUEST PATH,
+        RUNS ON, HOLDS DATA, WATCHED BY, BUILT AND SHIPPED BY — five. `bands.ts`
+        ships seven plus `Unplaced`: the request-path band was renamed "Runs in
+        production" by the owner on 2026-08-25, and "Calls out to" and
+        "Registered at" have no counterpart in the contract at all.
+      - **There is no heavier face for numerals.** OWN-WORLD asks for one;
+        `catalogus view` serves from 127.0.0.1 and has to work with no network,
+        so there is no webfont and numerals are the system face's tabular
+        figures. That trade is recorded in tokens.css's header.
+      - **The mark is deferred** by the owner after three directions were
+        explored and none chosen. `BrandMark` sets the wordmark and draws no
+        glyph, marked `data-mark="placeholder"`. What survived as settled: ink
+        only — the utility red stays a signal colour and is never spent on the
+        brand — a primary mark plus a derived reduced variant, and the drawing
+        register of the owner's references (uniform stroke weight, rounded caps,
+        no fill).
+      - **"Red header tabs" is not what the build does**, and the recognizability
+        claim survives anyway. Header bars are grey-filled, per OWN-WORLD's own
+        preceding sentence. Where the red lands on the rail is the *underline*
+        under the active List/Graph/Migrations tab, drawn on the hairline it sits
+        on. Across the whole board the signal colour is spent in three places:
+        that underline, the module header counts, and red-outline tag marks.
+
+    FINISH: unreviewed and undocumented is unfinished. The finish review and
+    DESIGN.md are deliberately still open, and waiting on the mark by the owner's
+    standing condition. This comment and the mechanical detector run are the two
+    steps of the flow the owner released on 2026-08-26; the other two were not
+    run, and `docs/PLAN.md` records why.
+  -->
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

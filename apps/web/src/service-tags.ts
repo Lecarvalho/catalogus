@@ -8,7 +8,7 @@
 // departures get a mark, which is what makes a mark worth looking at.
 //
 // The tag *styles* are borrowed wholesale from the world this viewer is
-// built in (see the direction contract in App.tsx): solid signal, outline
+// built in (see the direction contract in apps/web/index.html): solid signal, outline
 // signal, solid ink, solid grey. Four weights, no more, and no traffic-light
 // ramp -- meaning has to survive greyscale, which a green/amber/red status
 // colour never did.

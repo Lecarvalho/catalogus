@@ -239,3 +239,178 @@ horizontal overflow on the board or the service page, and the board is about 2.1
 screens tall. That is a weaker instrument than a real device and the popover's
 touch behaviour is still unverified, but it is no longer true that nobody has
 looked.
+
+---
+
+## Revision -- 2026-08-26: two steps closed, two still waiting on the owner
+
+Recorded as a revision rather than by editing the list above, for the same reason
+the cream revision was: the list is the record of what a session found, and
+overwriting it erases the fact that it changed.
+
+**The owner was asked directly on 2026-08-26 and released two of the four steps.**
+The condition blocking the other two is unchanged and is theirs: the finish
+review waits on the mark, which they have deferred ("the logo is something I need
+to think on my time"). Two options were live and both were declined -- closing
+the run over the labelled placeholder, and leaving the run entirely -- and they
+are written down here so a later reader can see they were weighed rather than
+missed.
+
+### Step 1 -- the contract is now embedded in the emitted markup. DONE.
+
+It lives in `apps/web/index.html`'s opening comment, above `<head>`, and it
+survives `vite build` into `apps/web/dist/index.html` and from there into
+`packages/cli/dist/web/index.html` -- the copy `catalogus view` actually serves.
+Verified through the serving path rather than the filesystem: `curl -s
+http://127.0.0.1:<port>/ | grep -c ac1ba604` returns 2 against a running
+`catalogus view`, and the comment parses as `<html>`'s first child in the live
+DOM.
+
+`apps/web/src/direction-contract.test.ts` pins all three copies. An HTML comment
+has no failure mode a human notices -- nothing renders differently and no warning
+fires if a future Vite, an added minifier, or a routine edit to the script tag
+takes it away.
+
+**The embedded copy is verbatim, and that is a decision the guard enforces.** All
+seven contract sections match this file word for word, with six declared
+departures listed in the comment's own DEPARTURES section -- in this file's own
+words -- and in the test's `DECLARED_DEPARTURES` table. Any *undeclared* wording
+difference fails the suite, in either direction: the embedded copy edited to
+flatter the build, or this file edited without the page following. A contract
+quietly rewritten to match what got built is worth less than no contract, because
+the gap it should have exposed is exactly what the rewrite removes.
+
+**That shape took five versions and four validation passes, and each attack
+landed in whatever the previous version had left uncompared.** Presence-only
+checks passed all sixteen of their assertions while a validator held the mode
+flipped to Edit, THESIS replaced with prose arguing the opposite direction, the
+disclosure section deleted, and the warmed hairline swapped back to the
+pre-warming neutral -- all at once. The version that replaced it compared five of
+the seven sections, and a second pass walked past *that* four ways: deleting the
+whole CONSTRAINTS section (the one carrying "No search" and "Read-only: no
+editing affordance anywhere"), inverting "no search field" in *both* files,
+declaring an undecided rewording in the departures table, and -- worst --
+rewriting the red's honest account into a fresh invented reason, because the
+DEPARTURES prose was the one region the comparison did not reach. The unchecked
+region and the load-bearing region had become the same region.
+
+The third pass got past it four more times. Two were one shape, and it is about
+*scope* rather than coverage: a pin that reads the whole comment for a string
+occurring twice, so `no search field` was satisfied by the paragraph describing
+the attack on it while the constraint itself was inverted. **A pin shadowed by a
+second occurrence of its own string is not a pin.** The other two were plainer:
+`FINISH: unreviewed and undocumented is unfinished` had stopped being pinned at
+all while everything around it was widened, and the paragraph stating the guard's
+own limits could simply be deleted. The fourth pass found the last uncompared
+region, the comment's preamble, where a count had already gone stale -- it
+claimed five contract sections while the guard compared seven. That one was
+closed by deleting the counts rather than pinning them, since both are stated
+further down where they are checked.
+
+What ships compares all seven sections, scopes each pin to the region it is about,
+pins FINISH and the paragraph stating the guard's own limits, requires every
+declared departure to appear in the page in this file's words, keeps this file
+named as the source of truth in the preamble, and trips on a claim that the red
+question is settled while `--color-signal` is not `#E60012`. All eleven mutations
+from the earlier passes now fail between 1 and 5 tests, applied one at a time with
+a rebuild between, re-measured independently by the validator. **What it still cannot do is stated in the
+page itself**: it proves the two copies agree, not that either is what the owner
+chose, and no test can tell whether prose is truthful. Git history is the only
+backstop, this repo has no CI, and review of the diff is the control.
+
+Five of the six departures are the 2026-08-25 warming (ground, ink, hairline,
+header fill) plus one tense change in THESIS. **The sixth is a defect this pass
+found rather than a decision anyone made** -- see below.
+
+### The red was never `#E60012`, and nobody recorded why
+
+OWN-WORLD names `#E60012`. The shipped `--color-signal` is `#d40010`, and the
+first draft of the embedded contract explained that as part of the warming:
+"the red moved with the rest of the ramp for the same reason and is recorded the
+same way". **That explanation was invented, and validation caught it.**
+
+What the history actually shows:
+
+- `--color-signal` was `#d40010` at `e92761d`, *before* the warming commit
+  `763dba3`, while the ground was still `#ffffff` and the ink `#111111`.
+- `git log --all -S E60012` returns exactly one commit: `45be40f`, the one that
+  rescued this document. `#E60012` has never appeared in a stylesheet here.
+- This file's warming revision names only the ground and the ink as superseded,
+  and says "everything else in OWN-WORLD stands: one utility red". `tokens.css`
+  listing `signal #d40010 4.9:1 AA` among the warming's pairs is a
+  *recomputation of contrast against a new ground*, not evidence the hex changed.
+
+So the red diverged from the contract at first implementation, unexplained. **It
+is the owner's to rule on** -- accept `#d40010` into the contract, or move the
+token to `#E60012` and recompute its contrast against the cream ground. The
+embedded copy carries the shipped value, because a contract inside the page must
+describe the page, and says plainly that the divergence is unexplained.
+`tokens.css` carries the same note at the declaration itself, which is where
+someone changing the red would look.
+
+This is worth reading twice as a process finding rather than a colour one: a
+plausible reason written where a fact was missing, placed in the one document a
+reader would trust, as a comment nothing will ever contradict. `CLAUDE.md` names
+that defect class, and the pass that produced it was the pass whose whole subject
+was honesty about what the build does.
+
+### Step 4 -- the mechanical detector has now been run. DONE, one finding, no change.
+
+`node <impeccable>/skill/scripts/detect.mjs apps/web/index.html apps/web/src`
+returns exactly one anti-pattern: `side-tab` at
+`apps/web/src/components/RankModule.module.css:63` --
+`border-left: 3px solid var(--color-signal)` on `.selected`.
+
+**It is not in the shipped app, and the reason is stronger than "unreachable".**
+`RankModule` has no caller anywhere under `apps/web/src`: the owner removed the
+"most depended on" ranking on 2026-08-25, and `ProjectBoard.tsx` records that the
+component and `bands.ts`'s `mostDependedOn` were kept rather than deleted. The
+component and its stylesheet are tree-shaken out -- `grep -rio "border-left"
+apps/web/dist` returns one hit and it is `@xyflow`'s, and "Most depended" appears
+in no bundle chunk. Driving the live app through no hash, a real service hash, a
+bogus one and a malformed one never renders it.
+
+**A first pass filed this under the four dead selected-state treatments the
+2026-08-26 handoff records as open, and that was wrong.** Those four --
+`ServiceNode.selected`, `GraphCanvas.edgeIncident`, `MigrationList`'s
+`[aria-pressed="true"]`, `ServiceTile.selected` -- live in components that do
+render, and their open question is a design one: should a view show where you
+came from. This one is a rule in a component the owner already removed. Different
+item, different remedy: if the ranking ever returns, the 3px red side border is a
+real hit and should be redrawn in the world's own grammar.
+
+Running the detector over the *built* CSS adds nothing: its single hit is inside
+vendored `@xyflow/react` CSS, a 1px border read out of minified text. The source
+scan is the signal.
+
+### What the contract still does not describe, now written into the page
+
+The disclosure section of the embedded comment names each place the build and the
+contract disagree, so a reader of the shipped page is not left to discover them
+as discrepancies. Three of them were found by this pass and are recorded here for
+the first time:
+
+- **The spine is a list, not a routed chain.** FIRST VIEWPORT asks for the
+  request-path band to be "drawn as a routed chain rather than a list"; it
+  renders as an ordinary `BandModule`.
+- **There is no heavier face for numerals.** OWN-WORLD asks for one; there is no
+  webfont, by the no-network constraint in `tokens.css`'s header, so numerals are
+  the system face's tabular figures.
+- **The band names are not the contract's.** It names five; `bands.ts` ships
+  seven plus `Unplaced`, with the request-path band renamed "Runs in production"
+  by the owner and "Calls out to" / "Registered at" having no counterpart in the
+  contract at all.
+
+The two already known are there too: the left rail is still unbuilt and the mark
+is still deferred. And "red header tabs" describes a filled tab where the build
+spends the red on the active tab's underline -- across the whole board the signal
+colour appears in three places: that underline, the module header counts, and
+red-outline tag marks.
+
+### Steps 2 and 3 remain open, unchanged
+
+The finish review has not run and `DESIGN.md` does not exist. Both wait on the
+mark, by the owner's standing condition -- the documenter writes `DESIGN.md` from
+the built world, and a world whose identity is a labelled placeholder is not that
+world yet. The condition lifts when the mark exists or when the owner says the
+review may proceed over a `BrandMark` that deliberately draws no glyph.

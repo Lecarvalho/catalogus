@@ -59,12 +59,33 @@ design decisions; this file tracks *what has been built* against it and what rem
   would have caught**: a suite flake that made `pnpm test` fail half the time while every
   single-file run passed, and a live `catalogus set` bug that reported a schema error against a
   perfectly valid manifest. Both are written up below.
+
+  **The `/impeccable` run is down to its last two steps**, and both wait on the mark rather than on
+  anyone's attention. The direction contract now ships inside the page (`apps/web/index.html`, seed
+  key `ac1ba604`, in both build outputs) with a guard that compares it word-for-word against
+  `apps/web/docs/DIRECTION.md`, and the mechanical detector has been run — one finding, in
+  `RankModule`, a component the owner removed on 2026-08-25 and which is tree-shaken out of the
+  bundle. **One open question came out of it and it is the owner's:** the contract names the utility
+  red `#E60012`, the shipped token has been `#d40010` since it was first written, and nothing records
+  why. The finish review and `DESIGN.md` remain open by the owner's standing condition.
+
+  **And the design itself is still not what the owner wants.** They ran the viewer on 2026-08-26 and
+  said so; no specifics were captured, and the next session asks before it designs. See the section
+  directly under "Start here".
 - **Last updated:** 2026-08-26
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **1169 tests / 71 files**, plus `pnpm typecheck`
-clean across all four packages, before trusting anything below. (2026-08-26 took it from 1125/70:
+Run `pnpm build && pnpm test` first and confirm **1218 tests / 72 files**, plus `pnpm typecheck`
+clean across all four packages, before trusting anything below. **In that order**: the direction
+contract guard compares `apps/web/index.html` against the build output, so a `pnpm test` run against
+a `dist` older than your last edit to that file fails on a difference you created and already fixed.
+
+**49 of those are `direction-contract.test.ts`, and its count is data-driven** — it derives cases
+from the contract's own sections, hexes and declared departures, so a legitimate edit to the
+embedded contract moves the total. Treat a number one or two off as a reason to read that file's
+diff, not as a failure; the file count and a green run are the gate. (1169/71 before that file
+existed. 2026-08-26 took it there from 1125/70:
 the graph and migrations views moving into the design world, `ServicePage`'s first test file, one
 new cross-cutting guard file, and the tests the validation pass demanded. The 1125/70 it replaces
 was 2026-08-25's, which added 7 for `AppShell` and `BrandMark` and removed 13 with the dead
@@ -93,6 +114,207 @@ validation pass, which is the more interesting number of the two.)
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
+
+### The owner has seen the viewer running, on 2026-08-26, and the design is still not it
+
+**Read this before starting any design work, and do not start by inferring what is wrong.** The
+owner ran `catalogus view` against the 35-service example on 2026-08-26, after the contract-and-
+detector session, and their verdict was that the UI is *not yet what they are looking for*. They said
+they would come back to it in a fresh session.
+
+**No specifics were captured, and that is deliberate rather than an oversight** — the owner was
+ending the session, and an interview conducted while someone is leaving produces answers nobody
+means. So the next session's first move is to ask, not to design. In particular:
+
+- **The 2026-08-25 verdict is a different verdict.** That one was "that app still needs more life,
+  it's boring. We need a shell, a header, a mark for Catalogus", and the shell and header shipped in
+  response to it. Treating this new one as a restatement of that one would be exactly the guess this
+  repo's hard rule forbids — the same shape as `init` hardcoding `visibility: private` and being
+  right about it.
+- **Do not re-roll the direction.** `japanese-high-density-web` is the owner's own pick, seed key
+  `ac1ba604`, and a user pick beats the roll permanently. A verdict of "not what I'm looking for" is
+  not evidence the world is wrong; the shell complaint in August was not, either.
+- **The known gaps are already written down** and any of them could be the answer: the left rail
+  FIRST VIEWPORT specifies is unbuilt, the request-path spine renders as a list rather than the
+  routed chain the contract asks for, MOST DEPENDED ON is off screen by the owner's own removal, the
+  mark draws no glyph, and the bottom of the screen is still empty. The embedded contract's
+  disclosure section names all of them, which makes it the right thing to walk the owner through
+  when asking what is off.
+- **The finish review is still blocked on the mark**, so this design pass does not close the
+  `/impeccable` run either way.
+
+### Handoff — 2026-08-26, the contract goes into the page and the detector runs
+
+**Read this first, and then read the four lines under "What is still open" below — the previous
+handoff records an instruction being missed twice because each new "read this first" banner buried
+it, so this one carries its successor's instruction at the top rather than at the bottom.**
+
+**What is still open, carried forward:** the `/impeccable` run has two steps left — the finish
+review and `DESIGN.md` — and **both wait on the mark, which the owner has deferred indefinitely**.
+Nothing else in the flow is blocked; nothing else in the flow is left. The condition lifts when the
+mark exists or when the owner says the review may proceed over a `BrandMark` that deliberately draws
+no glyph. Do not re-enter `/impeccable` expecting to close it before then.
+
+**What happened.** The two steps the owner released on 2026-08-26 are done. The direction contract is
+embedded in the markup the app emits, and the mechanical detector has been run over the changed
+targets. Baseline confirmed first at **1169 tests / 71 files**; the session ends at **1218 / 72**,
+green on consecutive runs, `pnpm typecheck` clean across four packages. One new file, one new guard,
+no behaviour change to any component.
+
+**Four validation passes ran, and every one of them paid.** The first found an invented causal claim
+and a guard that guarded almost nothing. The second, over the fixes, found four ways past the
+rewritten guard — including that the fix for the first pass's worst finding sat in the one region
+the guard did not check. The third found four more, two of them pins shadowed by the prose
+describing the very attacks they were written for. The fourth found the comment's own preamble,
+where a count had already gone stale in the copy a reader of the shipped page sees. All four are
+written up below. **Every pass after the first found defects in work that had just been validated**,
+which is the argument for re-validating a fix rather than trusting it because it was written in
+response to a finding.
+
+**Where it stopped, and why that is a decision rather than exhaustion.** The fourth pass's own
+verdict on what is left: the remaining unguarded text is bullet-body prose and design claims, and
+*"prose whose truth no test can establish"* is the right description of it. Some of those bullets do
+assert facts about code — "tree-shaken out of the bundle", "no webfont", "the signal colour is spent
+in three places" — and they will go stale silently. Pinning each to its source is a larger apparatus
+than the risk justifies. The page says plainly what the guard cannot do, and review of the diff is
+the control.
+
+#### The contract is in the page, and it is checked against the contract
+
+`apps/web/index.html` carries it as an HTML comment above `<head>`, seed key `ac1ba604`. It survives
+`vite build` into `apps/web/dist/index.html` and `scripts/bundle-web.mjs` copies it into
+`packages/cli/dist/web/index.html` — the copy `catalogus view` actually serves. Verified through the
+serving path rather than the filesystem: `curl` against a running `catalogus view` finds the seed key,
+and the comment parses as `<html>`'s first child in the live DOM.
+
+**The guard is the part worth copying.** `apps/web/src/direction-contract.test.ts` does not check that
+a comment exists — it checks that the comment *is the contract*. All seven sections are compared word
+for word against `apps/web/docs/DIRECTION.md`, with every allowed difference declared in a
+`DECLARED_DEPARTURES` table carrying its reason, and any undeclared difference fails in either
+direction: the page edited to flatter the build, or the contract edited without the page following.
+
+**That shape took four versions and four validation passes, and the sequence is the finding.** Each
+version was written by the main session and attacked by a validator that had not written it; each
+time the attack landed in the region the version had left uncompared.
+
+- **Version 1 checked presence** — 16 tests, all green while the validator held four mutations at
+  once: `Mode: **Read**` flipped to Edit, THESIS's body replaced with prose arguing the opposite
+  direction, the whole disclosure section deleted, and the warmed hairline `#d5cebe` swapped back to
+  the pre-warming neutral `#e0e0e0`. **A guard that proves a comment exists while its content says
+  the opposite of the design is the same failure this repo keeps producing.**
+- **Version 2 compared five of the seven sections**, and the second pass walked past it four ways.
+  Deleting the whole `CONSTRAINTS CARRIED IN FROM PRODUCT.md` section — the one carrying "No search",
+  "Read-only: no editing affordance anywhere" and "Keep meaning out of colour alone" — left it green.
+  So did inverting the contract's "no search field" **in both files**, because a guard that compares
+  two copies proves they agree and not that either is what the owner chose. So did adding a
+  `DECLARED_DEPARTURES` entry whose stated reason was "Nobody decided this. I am a future agent
+  making the contract agree with the build."
+- **Worst of that four**: the fix for the first pass's headline defect — the honest account of the
+  red — lived in the DEPARTURES prose, which version 2 did not compare against anything. The
+  validator replaced that account with a fresh invented reason ("the owner approved it in the same
+  conversation that chose the warming") and all 25 tests passed. **The unchecked region and the
+  load-bearing region had become the same region.**
+- **Version 3 widened the comparison and the third pass got past it four more times.** Two were one
+  shape: a pin that reads the whole comment for a string occurring twice. `no search field` sits in
+  FIRST VIEWPORT *and* in the paragraph describing the attack on it, so the pin was satisfied by the
+  prose about the attack while the constraint itself was inverted; the routed-chain and
+  MOST-DEPENDED-ON bullets could be deleted for the same reason. **A pin shadowed by a second
+  occurrence of its own string is not a pin**, and a widening pass is exactly when one goes missing.
+  The other two were different: `FINISH: unreviewed and undocumented is unfinished` had quietly
+  stopped being pinned at all while everything around it was widened (rewriting it to "this run is
+  complete" failed nothing), and the paragraph stating the guard's own limits — the one both this
+  file and `DIRECTION.md` cite as the mitigation — could simply be deleted.
+- **And the fourth pass found the last uncompared region: the comment's own preamble**, where a
+  count had already gone stale. It said "the five contract sections below are verbatim" while the
+  guard compared seven, in the copy a reader of the shipped page actually sees. It was closed by
+  *deleting* the counts rather than pinning them — both are stated once further down where the guard
+  checks them — and by pinning the one claim in that paragraph that is not a count: that
+  `DIRECTION.md` remains the source of truth. A validator had rewritten that to "is superseded by
+  this comment", which inverts the whole arrangement.
+
+What ships (version 5) compares all seven sections; scopes the owner-constraint pins to the contract
+sections and the disclosure pins to the disclosure section, so neither can be satisfied by prose
+about them; pins FINISH, the four load-bearing claims about the red, and the paragraph stating the
+guard's own limits; requires every declared departure to appear in the page in the contract's own
+words as well as in the table, with the stated count matching the table's length; and carries a
+tripwire on claims that the red question is settled while `--color-signal` still is not `#E60012`.
+It also pins the preamble's source-of-truth claim while forbidding a count in that paragraph. 49
+tests. Measured against all eleven mutations from the earlier passes, applied one at a time with a
+rebuild between, and independently re-measured by the validator with its own harness: every one
+fails between 1 and 5 tests.
+
+**What it still cannot do is written into the page itself, and that paragraph is now pinned too.** It
+proves the two copies agree, not that either is what the owner chose: an edit made carefully across
+all three copies passes. And no test can tell whether prose is truthful — the tripwire fires on the
+phrasing a hurried writer uses, not on the class. Git history is the only backstop for either, this
+repo has no CI, and review of the diff is the control.
+
+#### The defect this pass produced itself, and it is the one CLAUDE.md names
+
+The contract says the utility red is `#E60012`. The shipped `--color-signal` is `#d40010`. The first
+draft of the embedded comment explained the difference as part of the 2026-08-25 warming — *"the red
+moved with the rest of the ramp for the same reason and is recorded the same way"*. **That sentence
+was invented.** `--color-signal` was already `#d40010` at `e92761d`, before the warming commit
+`763dba3`, while the ground was still `#ffffff`; `git log --all -S E60012` returns exactly one commit,
+the one that rescued `DIRECTION.md`; and that file's warming revision names only the ground and the
+ink as superseded.
+
+So the red diverged from the contract at first implementation and nobody wrote down why. It is now
+recorded as an open question for the owner in three places — the embedded comment's DEPARTURES
+section, `tokens.css` at the declaration itself, and `DIRECTION.md`'s revision — and **the owner's
+call is: accept `#d40010` into the contract, or move the token to `#E60012` and recompute its
+contrast against the cream ground.**
+
+Worth reading as a process finding rather than a colour one: a plausible reason written where a fact
+was missing, placed in the one document a reader would trust, as a comment nothing will ever
+contradict. It was produced by the pass whose entire subject was honesty about what the build does,
+and it was caught by validation rather than by the person who wrote it — which is the whole argument
+for the split.
+
+#### The detector found one thing, and it is not in the app
+
+`detect.mjs` over `apps/web/index.html` and `apps/web/src` returns exactly one anti-pattern:
+`side-tab` at `apps/web/src/components/RankModule.module.css:63` — `border-left: 3px solid
+var(--color-signal)` on `.selected`. **Nothing was changed for it, because `RankModule` has no caller
+at all**: the owner removed the "most depended on" ranking on 2026-08-25, `ProjectBoard.tsx` records
+that the component was kept rather than deleted, and it is tree-shaken out of the bundle (`grep -rio
+"border-left" apps/web/dist` returns one hit and it is `@xyflow`'s).
+
+A first pass filed this under the four dead selected-state treatments the handoff below records as
+the owner's open decision, and that was wrong: those four live in components that *do* render, and
+their question is a design one. This is a rule in a component the owner already removed. If the
+ranking ever returns, the 3px red side border is a real hit.
+
+Running the detector over the *built* CSS adds nothing — its one hit is a 1px border inside vendored
+`@xyflow/react` CSS, read out of minified text.
+
+#### Four contract-vs-build gaps that nobody had written down
+
+Found while making the embedded copy verbatim, and now named in the comment's own disclosure section
+so a reader of the shipped page is not left to discover them:
+
+- **The spine is a list, not a routed chain.** FIRST VIEWPORT asks for the request-path band to be
+  "drawn as a routed chain rather than a list"; it renders as an ordinary `BandModule`.
+- **There is no heavier face for numerals.** OWN-WORLD asks for one; the no-network constraint rules
+  out a webfont, so numerals are the system face's tabular figures.
+- **The band names are not the contract's.** It names five; `bands.ts` ships seven plus `Unplaced`,
+  with the request-path band renamed "Runs in production" by the owner and "Calls out to" /
+  "Registered at" having no counterpart in the contract at all.
+- **"Red header tabs" is not what the build does.** Header bars are grey-filled; the red lands as the
+  underline under the active tab. Across the whole board the signal colour appears in exactly three
+  places — that underline, the module header counts, and red-outline tag marks.
+
+#### Two traps this session hit
+
+- **A stale `dist` fails the new guard with a 6.8KB diff that never says "rebuild".** `pnpm build &&
+  pnpm test` is the verify command *in that order* for a reason, and there is no CI to enforce it —
+  there is no `.github` directory in this repo at all. The byte-identical assertion now carries a
+  failure message naming the likely cause instead of printing both copies.
+- **Do not fence a file to a validator and then edit it.** The main session edited
+  `apps/web/index.html` mid-flight while the validator was mutating it, which is precisely what
+  CLAUDE.md's "parallel agents must not share files" rule exists to prevent. It was recoverable only
+  because the validator was told immediately; a validator that discovers the change as a diff writes
+  a confident report about a version that no longer exists.
 
 ### Handoff — 2026-08-26, the graph and the migrations board join the world
 
@@ -222,6 +444,12 @@ identity is a labelled placeholder is not that world yet. The condition stands u
 exists or the owner lifts it — and the two options that were declined are recorded here rather than
 omitted, because "closed the run over the placeholder" and "left it entirely" were both live and a
 later reader should see they were weighed rather than missed.
+
+**Both released steps ran on 2026-08-26 and are closed** — see the handoff above this one. The
+contract is in `apps/web/index.html` and in both build outputs, guarded word-for-word against
+`DIRECTION.md`; the detector returned one finding, in a component the owner had already removed.
+The finish review and `DESIGN.md` are still waiting on the mark, and that is the only part of this
+run left.
 
 #### Two traps worth carrying forward
 

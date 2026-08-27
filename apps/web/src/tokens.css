@@ -7,12 +7,13 @@
  *
  * ---------------------------------------------------------------------
  * Rewritten 2026-08-25 for the dense-module world (see the direction
- * contract in App.tsx's opening comment). The previous palette was a dark
- * near-black ground with a blue accent and four status colours -- the
- * category default for a developer dashboard, and the owner's verdict on
- * seeing it against a real manifest was "too poor and generic". What
- * replaces it is one ground, one ink, one signal colour, and a grey ramp
- * that exists almost entirely to draw hairlines.
+ * contract, embedded in apps/web/index.html's opening comment and greppable
+ * by seed key ac1ba604; apps/web/docs/DIRECTION.md carries its prose). The
+ * previous palette was a dark near-black ground with a blue accent and four
+ * status colours -- the category default for a developer dashboard, and the
+ * owner's verdict on seeing it against a real manifest was "too poor and
+ * generic". What replaces it is one ground, one ink, one signal colour, and
+ * a grey ramp that exists almost entirely to draw hairlines.
  *
  * The discipline that matters: **red is the only chromatic colour in the
  * system.** Not one of several accents -- the only one. It marks what
@@ -81,7 +82,24 @@
   --color-line: #d5cebe;
   --color-line-strong: #24211c;
 
-  /* The one signal colour. */
+  /*
+   * The one signal colour -- and the one value in this file that diverges
+   * from the direction contract with nothing recording why. OWN-WORLD names
+   * `#E60012`; this token has been `#d40010` since it was first written,
+   * before the 2026-08-25 warming and while the ground was still `#ffffff`,
+   * and `#E60012` has never appeared in a stylesheet in this repo's history.
+   * So it is not the warming: the ground and the ink moved by an owner
+   * decision that is written down, and the red was simply implemented as
+   * something else on day one.
+   *
+   * Found 2026-08-26, while embedding the contract into the page, where the
+   * first draft of that comment narrated a plausible reason for it -- which
+   * is the defect class CLAUDE.md names. Left at the shipped value and
+   * flagged instead: **the owner rules on it**, by accepting `#d40010` into
+   * the contract or by moving this token to `#E60012` (which would need its
+   * contrast recomputed against the cream ground, the pair above having been
+   * computed for this value).
+   */
   --color-signal: #d40010;
   --color-signal-ink: #fdf8f4;
   --color-signal-wash: #fae7e3;
