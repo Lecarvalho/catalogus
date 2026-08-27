@@ -69,17 +69,29 @@ design decisions; this file tracks *what has been built* against it and what rem
   red `#E60012`, the shipped token has been `#d40010` since it was first written, and nothing records
   why. The finish review and `DESIGN.md` remain open by the owner's standing condition.
 
-  **And the design itself is still not what the owner wants.** They ran the viewer on 2026-08-26 and
-  said so; no specifics were captured, and the next session asks before it designs. See the section
-  directly under "Start here".
+  **The design is settled, and this is the first time that sentence has been true.** The world was
+  replaced and the form was chosen on 2026-08-26, both by owner decision after an interview and six
+  rendered candidates. `japanese-high-density-web` is retired; what replaces it is a Notion-register
+  world on the same warm cream ground, with the board as a smartphone home screen — bare icons, no
+  card. The app shell is separately approved and frozen. The mockups are committed at
+  `apps/web/docs/candidates/` and are the specification for the component work, **which has not
+  started**. See the newest handoff, directly under "Start here".
 - **Last updated:** 2026-08-26
 
 ## Start here on a fresh session
 
-Run `pnpm build && pnpm test` first and confirm **1218 tests / 72 files**, plus `pnpm typecheck`
-clean across all four packages, before trusting anything below. **In that order**: the direction
-contract guard compares `apps/web/index.html` against the build output, so a `pnpm test` run against
-a `dist` older than your last edit to that file fails on a difference you created and already fixed.
+Run `pnpm build && pnpm test` first, plus `pnpm typecheck` clean across all four packages, before
+trusting anything below. **In that order**: the direction contract guard compares
+`apps/web/index.html` against the build output, so a `pnpm test` run against a `dist` older than your
+last edit to that file fails on a difference you created and already fixed.
+
+**The expected total moved on 2026-08-26 and this line no longer names one.** It said **1218 tests /
+72 files**, which was correct at the start of that session and is the number to compare against if
+you are bisecting into it. The design world was then replaced wholesale, and
+`direction-contract.test.ts` derives its cases from the contract's own sections, hexes and declared
+departures — so replacing the contract moved that file's contribution by design. The newest handoff
+says to take your first green run as the new baseline and record it. Do that rather than hunting for
+a number this file no longer knows.
 
 **49 of those are `direction-contract.test.ts`, and its count is data-driven** — it derives cases
 from the contract's own sections, hexes and declared departures, so a legitimate edit to the
@@ -115,7 +127,244 @@ three of six consecutive runs while every single run *of that file alone* passed
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
 
+### The form is settled: candidate E, the home screen — approved 2026-08-26
+
+**Read this before the interview section below it.** That section records how the world was chosen;
+this one records that the *form* is now chosen too, so nothing about the board's shape is still open
+to a fresh session's judgement.
+
+**The owner's words: "The E home screen direction is approved!"** — after seeing six candidates
+rendered in a browser against the 35-service stress fixture.
+
+**What was approved, precisely.** Services render as a smartphone home screen: **bare icons on the
+ground with their labels beneath, no card, no border, no panel around any service**, grouped under
+the architecture band headings. The icon tile carries a phone-like corner radius; everything else —
+sections, chrome, rails, footer — stays sharp. That radius is a **declared, contained departure**
+from "sharp structure, soft transients", chosen explicitly by the owner, and it is not a repeal:
+letting it spread to anything but icon tiles and transient surfaces would be a defect.
+
+**The app shell is separately approved and frozen.** The owner: *"When I said shell, I said the icon
+shell, not the app shell. Your new app shell is perfect, don't touch it."* So the top bar, the
+help / settings / profile cluster and their menus, the left rail with the band index, the view rail
+and the footer are settled. A later pass that "improves" them has failed, however good the
+improvement. **This also closes the empty-bottom-of-the-screen gap** that has been open since
+2026-08-25: the footer fills it.
+
+**The instruction that produced E was misread once, and the correction is the useful part.** "It
+doesn't need all that shell" was first read as *app* chrome and nearly produced a candidate that
+stripped the thing the owner had just called perfect. They meant the *icon's* shell — the card
+around each service. Both readings were plausible; only one was right; and it was caught because the
+owner restated it rather than because anything in the process detected it.
+
+**Two forms were built rather than one, because the owner declined to choose between them.** Asked
+grid or list, they answered: *"We're brainstorming, we need to be open minded now."* So E (home-screen
+grid) and F (app-drawer list) were built as siblings, each briefed to be its best self rather than a
+strawman for the other, and E won. F remains on disk as the record of what the alternative actually
+looked like.
+
+**The six candidates all measure clean** at 1600 / 1440 / 1280 / 1024 / 768 / 390 — 35/35 services,
+band counts 7/7/6/4/4/5/1/1, all nine tokens exact, no remote assets, no `@import`, no fetch, no
+unexpected hexes outside brand SVGs, no search field and no editing affordance anywhere.
+
+### The design interview ran on 2026-08-26, and the world is being replaced
+
+**This supersedes the section directly below it**, which said the next session must ask before it
+designs. It asked. `japanese-high-density-web` is retired by owner decision and a new world is being
+chosen from candidates.
+
+**What the owner said, unprompted:** *"we need something more professional look. I was looking for
+Notion and Confluence and they look professional, I'd like to capture them as reference."*
+
+**One thing was put to them before any question was asked**, because the record already held a
+contradiction and this repo does not resolve those silently. `apps/web/docs/DIRECTION.md` carries
+"Quality bar named by owner: Confluence and Notion" from 2026-08-25, and three lines later names as
+a rut to avoid *"the airy white docs site, Inter, thin grey rules, blue links"*, with the note
+"Notion/Confluence is the owner's stated bar → at most ONE candidate may read as its literal form".
+So in August it was taken as a **quality** bar and its literal form was deliberately refused. The
+new instruction is to take it as a **visual** reference. That is a reversal, it was named as one,
+and the owner made it anyway. It stands.
+
+**Eight questions, eight answers. These are the contract for the new world:**
+
+| Question | Answer |
+|---|---|
+| Scope | **New visual world.** Not a craft pass, not a structure-only change. |
+| Density | **Breathing room wins.** Scrolling is allowed. |
+| Palette | **Keep cream + red.** Not Notion's cool white. |
+| Reference | **Notion.** Not Confluence. |
+| Search | **Still no search.** Bands and the left rail carry finding. |
+| Form | **Airier boxes.** Modules stay containers, with real padding and real space. |
+| Geometry | **Sharp structure, soft transients.** Radius and shadow only on popovers, menus, hover. |
+| Process | **Candidates first**, then build. |
+
+**Three of those answers are worth reading twice, because each retires something this file has
+treated as settled:**
+
+- **"Breathing room wins" retires "No search. It should fit."** — the owner's own hardest constraint,
+  named on 2026-08-25 as the one that ruled out the scrolling index. Half of it survives: they
+  separately confirmed **no search**, so the viewer scrolls now but still finds by architecture. The
+  THESIS's whole argument — "density is the argument … no scrolling to find a thing" — does not
+  survive.
+- **"Keep cream + red" is the one thing that did not move**, and it is load-bearing. The 2026-08-25
+  ruling that *the app follows the brand* still holds, so the reference is being taken on Notion's
+  register and the brand's ground. Notion-calm surfaces on warm cream with a single red is a blend,
+  not a copy, and it is the thing keeping this out of both named ruts.
+- **"Airier boxes" was described to the owner as the option closer to Confluence's panels than to
+  Notion**, and they picked it alongside naming Notion. Recorded as a blend they chose with that
+  stated, not as an inconsistency to be resolved by whoever builds it.
+
+**Assumed, not asked, and flagged here so it can be corrected:** the contract's unbuilt 240px left
+rail is now in. "Nav is enough" requires nav to exist, and the rail is already specified in
+`DIRECTION.md`'s FIRST VIEWPORT — so this is the contract's own open item being built, not a new
+guess. Say so if the rail is not wanted.
+
+**Where it is:** three static candidates of the board screen are being built against
+`examples/layout-stress.catalogus.yaml` (all 35 services, real counts, no lorem) — a Notion
+*document*, a Notion *grouped database table*, and a Notion *gallery*. The gallery also carries the
+warning that a card grid is the named rut. Brand-icon colour rides along as a secondary axis: the
+document holds the ink-only line, the other two show full-colour marks, so the owner sees once
+whether brand colour costs the red its meaning.
+
+**The shell was added to the candidates mid-flight, at the owner's request**, and it is now part of
+what is being judged rather than scaffolding around the board:
+
+> "What I also need is the shell. Header, footer, profile, settings, help, etc. Even if it's mock
+> for now, that's gonna help us to get the professional state we're looking for, and help me decide
+> the best direction."
+
+So each candidate carries a top bar with a help / settings / profile cluster, a designed profile
+menu, settings and help surfaces, and **a real footer — which is how the empty bottom of the screen,
+recorded as an open gap since 2026-08-25, finally gets addressed**. Mock content is rendered as
+though it were real: no "(mock)" labels, no placeholder greys. The menus are also where the
+"sharp structure, soft transients" answer becomes visible, since they are the only surfaces allowed
+a radius and a shadow.
+
+Two things about the shell are worth keeping straight, because both are decisions rather than
+drawings:
+
+- **No project switcher, and that is the recorded decision rather than an omission.** The owner
+  deferred the portfolio page on 2026-08-25 and ruled the viewer stays single-repo. Multi-project
+  chrome would reverse that, so it was left out and the owner was told it is one instruction away.
+  Phase 7 carries the portfolio and the cross-project blast radius, so the reversal is defensible
+  whenever they want it.
+- **Settings that change display are not editing affordances; anything touching manifest content
+  is.** The read-only constraint still binds, so the mocked settings cover appearance, density,
+  brand-icon colour, default view and the manifest path — and nothing that would write.
+
+The shell is designing ahead of the backend on purpose: accounts and sync are Phases 4–5 and
+unbuilt. That is the owner's call, made explicitly ("even if it's mock for now"), and it is recorded
+here so a later reader does not mistake the mocked profile for a claim that auth exists.
+
+**Mid-flight brief changes were handled by telling the running agents rather than letting them
+discover it**, per CLAUDE.md — the addendum was appended to the shared spec and all live agents were
+messaged. One of the three died on an API server error mid-response having written nothing, and was
+relaunched with the shell in its brief from the start rather than bolted on.
+
+#### The owner has approved the world, on 2026-08-26
+
+**This is the first positive verdict this file has ever recorded**, and it is worth writing plainly
+because the two before it were rejections. Shown candidates A and C rendered in a browser, the owner
+said: *"Honestly, I love what I see now."*
+
+So the world is settled: **cream ground, one red, Notion register, breathing room, no search, sharp
+structure with soft transients, full application shell.** What remains open is *form* — which of the
+candidates the board should take — not direction. A later session should treat a change to the world
+itself as a reopening that needs its own decision, not as ordinary iteration.
+
+**A fourth candidate was requested in the same breath**, and it is the owner's own idea rather than
+one of the three the session proposed: *"a version where we have the icons only, and the name below.
+Like StackShare. Then the popover shows when hover."* Candidate D is that — a wall of brand marks
+under band headings, with the popover carrying everything the tile cannot.
+
+**D's brief names the trap up front, because the fixture was built to expose it.** `host-api`,
+`host-web` and `host-worker` are all Fly.io, and `db-primary` and `db-replica` are both PostgreSQL.
+An icon wall labelled with the vendor name renders three identical "Fly.io" tiles and two identical
+"PostgreSQL" tiles. What the label under the mark says — id, role, or vendor plus qualifier — is the
+load-bearing decision in that candidate, and it was briefed as such rather than left to be
+discovered. The same brief carries the two other things an icon-only form makes harder: a
+`phasing_out` / `deprecated` / `removed` entry has to be findable **without hovering 35 tiles**, and
+in greyscale; and `legacy-ledger`, the one entry with no brand icon, is most exposed in exactly this
+form.
+
+#### Rendering the candidates found three defects that no report caught
+
+Every candidate agent reported its own file verified. Each verification was real — counts, tokens,
+tag balance — and each was done by **reading the file rather than by rendering it**, because no agent
+had a browser it could see. Driving the built pages in a real browser found things all three passes
+missed, which is the same split this repo's whole review loop is built on:
+
+- **Candidate A overflowed horizontally at 390px**, on all 35 rows. `.row-deps` takes
+  `flex-basis: 100%` at the 640px breakpoint so the counts drop to their own line — but `.row` was
+  never given `flex-wrap: wrap`, so instead `.row-main` (which carries `min-width: 0`) collapsed to
+  zero and the deps ran 48px past the row. Fixed and re-measured: 375 against 375.
+- **Candidate B overflows horizontally at 1024px** — scrollWidth 1398 against a clientWidth of 1009,
+  255 elements past the edge. Its agent tested 1440 and 390 and nothing between, which is precisely
+  where a seven-column table stops fitting. Returned to that agent with the measurements and the
+  constraint that the *table* may scroll but the page body may not.
+- **Two candidates invented a CLI version** — `v0.3.0` and `v0.4.0` — where the real one is `0.0.1`.
+  Both flagged it as invented, which is the correct reporting, and both were corrected to the real
+  number. `0.0.1` looks unfinished in a footer; it is unfinished, and that is a truer thing for the
+  owner to be looking at than a confident fake.
+
+**And one suspected defect was not real.** A screenshot appeared to show candidate C's cards clipped
+at the right edge; measured through fixed-width iframes at 1440, 1024 and 390 it does not overflow at
+any of them, and what looked like clipping was the open profile menu sitting over that corner. Worth
+recording alongside the three real ones — the instrument that found the genuine defects also produced
+a false positive, and the difference between them was measuring rather than looking.
+
+**All four now measure clean at 1600 / 1440 / 1280 / 1024 / 768 / 390.** B's fix is the scrolling
+container rather than dropped columns — the *table* scrolls inside `overflow-x: auto` and the page
+body does not, so the shell, the rail and the footer stay put while a wide band is scanned sideways.
+Its agent died to an API server error twice, the second time mid-edit; the file was checked for
+structural damage (tag and brace balance, closing `</html>`) before being trusted, and the fix had
+landed before the crash.
+
+#### Candidate D solved the trap, and corrected the brief that set it
+
+The label carries **two lines: vendor name, then the manifest `id`** — so the three Fly.io tiles read
+`host-api` / `host-web` / `host-worker` and the two PostgreSQL tiles read `db-primary` /
+`db-replica`. The vendor name honours the owner's literal ask ("the name below") and the id, which is
+the only field that actually distinguishes them, sits right under the mark rather than being demoted
+to hover.
+
+Non-active status is carried by **two independent non-hue signals** — a worded bordered tag
+(`PHASING OUT → auth-users`) plus desaturating the brand mark itself — so it survives greyscale, and
+the four dying services are findable without hovering thirty-five tiles. Edge counts sit in a corner
+badge on every tile with edges, in muted ink rather than red, which keeps the signal colour spent on
+lifecycle alone. `legacy-ledger` renders as a sunken dashed tile with an `AL` monogram and no SVG at
+all — the 38% case looking deliberate rather than broken.
+
+**The brief said "the four" dying services and the fixture has five.** `auth-legacy` and `pay-legacy`
+phasing out, `db-legacy` and `legacy-ledger` deprecated, `mail-legacy` removed. The agent rendered
+five, counted them against the data, and said the brief was wrong rather than matching the number it
+had been given — which is the behaviour the brief was asking for everywhere else and got here in the
+one place it had not expected to need it.
+
+**One limitation it reported honestly rather than papering over:** it could not get the shared
+automation browser to report a native 1440px window — it stayed maximised — so its own 1440 figure
+was a CSS-`zoom` simulation rather than a real viewport. That gap was closed independently from the
+main session by the fixed-width iframe probe, which measures D clean at all six widths. Worth
+recording as the pattern: the agent named the weakness of its instrument instead of letting the
+number stand unqualified, which is what made it cheap to close.
+
+**What this will cost when a candidate is picked, so it is priced before it is started:**
+`apps/web/docs/DIRECTION.md`, the contract embedded in `apps/web/index.html`, and
+`direction-contract.test.ts`'s 49 data-driven tests all move together — the guard pins the contract
+word for word in both copies, which is exactly what makes a world change expensive and is the
+feature, not the bug. The seed key `ac1ba604` and the challenger name go with the old world; what
+replaces them is an owner-named direction rather than a re-roll, since a user pick beats the roll
+and this one was picked in an interview.
+
+**Unaffected by any of this, and still open:** the red hex question (`#E60012` in the contract
+versus the shipped `#d40010`) survives the world change intact, because the palette answer kept the
+red. It is still the owner's call. And the `/impeccable` run's last two steps are still blocked on
+the mark.
+
 ### The owner has seen the viewer running, on 2026-08-26, and the design is still not it
+
+**Answered — see the section directly above.** Kept because it is the record of what that session
+found, and because its list of known gaps is still the best inventory of what the new world has to
+solve.
 
 **Read this before starting any design work, and do not start by inferring what is wrong.** The
 owner ran `catalogus view` against the 35-service example on 2026-08-26, after the contract-and-
@@ -142,6 +391,95 @@ means. So the next session's first move is to ask, not to design. In particular:
   when asking what is off.
 - **The finish review is still blocked on the mark**, so this design pass does not close the
   `/impeccable` run either way.
+
+### Handoff — 2026-08-26, the design world was replaced and the form was chosen
+
+**Read this first. The two things a fresh session most needs to know are that the design is settled
+and that the component work has not started.**
+
+**What is settled, and is not to be reopened without the owner:**
+
+- The **world**: Notion register, warm cream ground, one red `#d40010`, breathing room, no search,
+  sharp structure with one declared exception. Approved by interview.
+- The **form**: candidate E, the home screen — bare icons on the ground, no card around any service.
+  Approved on sight: *"The E home screen direction is approved!"*
+- The **app shell**: top bar, help / settings / profile cluster and menus, left rail with the band
+  index, view rail, footer. Frozen: *"Your new app shell is perfect, don't touch it."*
+- The **red**: `#d40010`, ruled by the owner on 2026-08-26. This closes a question that had been open
+  for two sessions. It was decided on a measurement — against the cream ground, `#d40010` is 4.89:1
+  (AA) and the old contract's `#E60012` is 4.26:1 (below AA), so the contract's original value no
+  longer meets AA on the ground the owner chose. **That is not an explanation of the history**:
+  `#d40010` predates the warming, so contrast-on-cream cannot have been the original reason. The
+  origin stays unexplained; the ruling closes the question rather than answering it.
+
+**Where the design lives now.** `apps/web/docs/candidates/` — all six mockups, the shared spec they
+were built from, the switcher, the mechanical checker, and a `README.md` explaining what each one is
+and why E won. **They were committed deliberately**: they are the specification for the component
+work, and they were previously in a session-scoped scratchpad that would have been lost. A fresh
+session implements E against that directory.
+
+**What was done in this session:** the interview, six candidates, the token layer, and the direction
+contract with its guard. **What was not done: any component work.** `apps/web/src/components/` still
+renders the old dense world. That is the whole of the next session's job.
+
+#### The next session's work, in the order it should be done
+
+Each of these is its own brief. `CLAUDE.md`'s sizing rule applies hard here — the last time this
+repo handed one agent a wide brief it spent 422k tokens doing serially what several agents would have
+done in parallel.
+
+1. **The wall** — `ServiceTile`, `BandModule`, `ProjectBoard`. Bare icons on the ground, two-line
+   label (vendor name then `id`), corner status badge, desaturated mark and worded status. This is
+   the biggest piece and the one the owner will look at first.
+2. **The shell** — `AppShell` gains the help / settings / profile cluster, their menus, and the
+   footer. Reproduce the approved mockup rather than reinterpreting it; the owner has already called
+   this design finished.
+3. **The service page** — `ServicePage` in the new world.
+4. **Graph and Migrations** — both are already citizens of the *old* world as of earlier on
+   2026-08-26. They have to move again. Do not skip this: the last time one view moved and the others
+   did not, toggling between them changed the app underneath the reader, and that is written up two
+   handoffs below as a defect worth avoiding twice.
+5. **The popover's edge behaviour** — a real defect inherited from the mockup, named below.
+
+**A defect to fix rather than inherit.** In `candidate-e-homescreen.html`, hover popovers on icons in
+the grid's **edge columns** extend past the viewport between 768 and 1280px. The mockup centres them
+with CSS alone and cannot flip at an edge. In React this is an ordinary positioning problem and should
+be solved, not carried over. The mockup's author found and reported it rather than letting it ship
+quietly, which is why it is written down here.
+
+**Three process notes worth carrying, because each cost something to learn:**
+
+- **Rendering found three defects that reading had not.** Every candidate agent verified its own file
+  by reading it — counts, tokens, tag balance — and every one of those checks was real. Driving the
+  built pages in a browser still found a 390px overflow in A, a 1024px overflow in B, and two
+  invented CLI version numbers. **A file that has been read has not been seen.**
+- **The instrument that found them also produced a false positive.** A screenshot appeared to show
+  candidate C clipped at the right edge; measured through fixed-width iframes it was clean at every
+  width, and the "clipping" was an open menu sitting over that corner. The difference between the
+  three real findings and the false one was measuring rather than looking.
+- **An ambiguous instruction was misread and only the owner caught it.** *"It doesn't need all that
+  shell"* was read as the app chrome; they meant the card around each icon. Both readings were
+  plausible, nothing in the process detected the error, and it was caught only because they restated
+  it. Where an instruction can be read two ways and the readings produce different work, ask.
+
+#### State of the tree at this handoff
+
+**The new baseline is 1212 tests / 72 files**, confirmed green on consecutive runs at the close of
+this session, with `pnpm typecheck` clean across all four packages.
+
+It was **1218 / 72** before this session's changes. The six that went are not a regression and not a
+weakening: `direction-contract.test.ts` derives its cases from the contract's own sections, hexes and
+declared departures, and it went from 49 to 43 because **`DECLARED_DEPARTURES` is now empty**. The old
+contract's six departures existed because the embedded copy was written long after `DIRECTION.md` and
+had drifted from it; the new contract and its embedded copy were authored together, so the two are
+word-for-word identical and there is nothing to declare. The mechanism is unchanged and still fires
+the moment a departure is introduced — there is simply no data in the table today.
+
+Run `pnpm build && pnpm test` **in that order**. A count one or two off is a reason to read that
+file's diff, not a failure; a failure anywhere else is.
+
+`apps/web/docs/candidates/` is documentation and mockups only — nothing under it is imported, built,
+or tested, so it cannot affect the suite.
 
 ### Handoff — 2026-08-26, the contract goes into the page and the detector runs
 

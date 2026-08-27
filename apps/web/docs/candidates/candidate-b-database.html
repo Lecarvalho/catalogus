@@ -1,0 +1,2088 @@
+<!DOCTYPE html>
+<!--
+CANDIDATE B — THE DATABASE VIEW
+Catalogus viewer, new-world candidate. Renders the manifest as a grouped Notion-style
+database table: one real table per band, shared columns, full-colour brand marks in the
+leading column, on the cream + ink + single-red palette from the shared spec.
+
+Four or five decisions another candidate could reasonably have made differently:
+
+1. In/out are two separate, right-aligned columns rather than one combined "6 -> 1"
+   cell. Reason: each direction is independently scannable down its own column (spot
+   every fan-out hub, or every fan-in hub, at a glance) at the cost of two narrow
+   columns instead of one.
+2. `kind` is not tagged like status, but its ink is graded instead of flat: the norm
+   (`service`, 29 of 35 rows) renders in the faintest muted tone and all but disappears;
+   `component` and `stack` render one step darker and heavier, so the rarer values earn
+   a little more attention without spending the one red on them.
+3. `active` status cells are left fully blank rather than printed as quiet grey text.
+   That is the shared spec's "don't tag the norm" rule about pills, taken one step
+   further to the word itself, on the theory that a blank column read consistently
+   across 35 rows never reads as a missing value.
+4. `replaced_by` is not its own column. It rides inside the status cell as a muted
+   "-> id" beside the red status word, since it only ever co-occurs with a non-active
+   status and a dedicated column would sit empty on 31 of 35 rows.
+5. Every row's popover is real and hover-driven, not only db-primary's staged one. It is
+   CSS-only (pointer-events gated on :hover/:focus-within), so "hover shows a popover
+   near the item" is a working affordance across all 35 rows in this file, not a single
+   example standing in for the rule. db-primary's popover is additionally forced open,
+   as the brief asks.
+
+Calls made where the spec and addendum did not answer, flagged as calls and not facts:
+
+- The manifest path moved off the top bar. The addendum's top-bar right cluster is
+  help/settings/profile with no stated room left for it, so it now lives under the
+  project name in the left rail and again in the footer, rather than the original
+  spec's "manifest path right."
+- Mock-only chrome values were invented and are never presented as manifest data: the
+  CLI version string "v0.0.1", the footer's "Read 2026-08-26 at 14:32" timestamp, and
+  the profile menu's "Personal account" plan line.
+- The avatar is a sharp-cornered square chip, not a circle, so the "sharp structure"
+  rule holds for small UI atoms too, not only panels and rows.
+- The List/Graph/Migrations view tabs sit as a horizontal strip above the table, not
+  inside the 240px rail, since the main spec assigns the rail to project identity plus
+  the band index only and never places the view rail inside it.
+
+Transient surfaces shown open (two, the addendum's ceiling): the profile menu, top
+right, and the db-primary popover inside "Holds data" (6 in / 1 out, and the target of
+db-legacy's replaced_by). Settings and Help are fully designed, populated dropdowns,
+reachable by hover or keyboard focus, but closed by default in this static render.
+
+Footer holds three columns: manifest path + read timestamp, the totals line + CLI
+version, and two links (Documentation, the schema URL). It earns a little more than a
+hairline because the addendum calls the empty footer out as unfinished business, but it
+stops short of anything a real read-only tool would not plausibly show.
+
+Revision: the eight-column grid (full desktop widths, generous cell padding) has a real
+minimum width and was overflowing the document between roughly 641px and 1449px, a gap
+the first pass never measured. Fixed by giving each band's own .db-table
+`overflow-x: auto` and deleting the old partial 900px breakpoint that tried to solve it
+by hiding role/kind/version without ever checking whether the remaining five columns
+fit either (they did not). Below 641px through 1440px and up, all eight columns render
+at full width and the table scrolls sideways inside its own box when the viewport is
+narrower than that; the shell, rail and footer do not move. Dropping columns stayed
+reserved for the <=640px phone breakpoint alone, where panning a data table sideways
+with a thumb is a worse read than a shorter table — that remains a deliberate choice
+about what the table is for, not the same fix applied twice. Verified with fixed-width
+iframes at 1440 / 1280 / 1024 / 768 / 390: clientWidth == scrollWidth at the document
+level at all five (no page-level horizontal scroll), while .db-table's own scrollWidth
+exceeds its clientWidth at 1280 / 1024 / 768, confirming the scroll is happening inside
+the table, not being avoided by accident.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catalogus &middot; Layout Stress</title>
+<style>
+/* ---------- tokens ---------- */
+:root {
+  --color-bg:             #f4f1ea;
+  --color-surface:        #fbf9f4;
+  --color-surface-sunken: #ece8de;
+  --color-header-fill:    #e9e4d8;
+  --color-text:           #24211c;
+  --color-text-muted:     #5e5a50;
+  --color-text-faint:     #7e7a6e;
+  --color-signal:         #d40010;
+  --color-hairline:       #d5cebe;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, "Liberation Mono", monospace;
+
+  --radius-transient: 6px;
+  --shadow-transient: 0 10px 30px -8px rgba(36,33,28,0.28), 0 2px 8px rgba(36,33,28,0.10);
+
+  --rail-width: 240px;
+
+  --col-service: minmax(220px, 2.1fr);
+  --col-id: 128px;
+  --col-role: 168px;
+  --col-kind: 96px;
+  --col-version: 60px;
+  --col-status: 220px;
+  --col-in: 52px;
+  --col-out: 52px;
+}
+
+/* ---------- reset ---------- */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p { margin: 0; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: default; padding: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+:focus-visible { outline: 2px solid var(--color-text); outline-offset: 2px; }
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--color-text-muted); }
+.faint { color: var(--color-text-faint); }
+.em { color: var(--color-text-faint); }
+
+/* ---------- shell ---------- */
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- topbar ---------- */
+.topbar {
+  height: 60px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: var(--color-header-fill);
+  border-bottom: 1px solid var(--color-hairline);
+  position: relative;
+  z-index: 30;
+}
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.wordmark {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+.topbar-sep {
+  color: var(--color-text-faint);
+  font-size: 15px;
+}
+.topbar-project {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.visibility-tag {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-hairline);
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ---------- icon buttons + dropdowns ---------- */
+.icon-btn-wrap { position: relative; }
+.icon-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 10px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.icon-btn svg { flex: 0 0 auto; }
+.icon-btn:hover { color: var(--color-text); }
+.icon-btn-label { font-size: 13.5px; }
+.profile-btn { padding: 0 2px 0 8px; }
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-text);
+  color: var(--color-surface);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.avatar-lg { width: 36px; height: 36px; font-size: 13px; }
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 272px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-transient);
+  box-shadow: var(--shadow-transient);
+  padding: 14px;
+  z-index: 50;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s;
+}
+.icon-btn-wrap:hover .dropdown,
+.icon-btn-wrap:focus-within .dropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.dropdown-profile.profile-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.dropdown-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin-bottom: 10px;
+}
+.dropdown-item {
+  display: block;
+  font-size: 14px;
+  color: var(--color-text);
+  padding: 8px 6px;
+  margin: 0 -6px;
+}
+.dropdown-item:hover { background: var(--color-surface-sunken); }
+.dropdown-divider { height: 1px; background: var(--color-hairline); margin: 10px 0; }
+
+.dropdown-cli { padding: 2px 0 10px; }
+.dropdown-cli-label { font-size: 12.5px; font-weight: 600; color: var(--color-text-muted); display: block; margin-bottom: 4px; }
+.dropdown-cli-cmds { font-size: 11.5px; color: var(--color-text-faint); line-height: 1.6; display: block; }
+.dropdown-version { font-size: 11.5px; color: var(--color-text-faint); }
+
+/* settings */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+}
+.setting-label { font-size: 13.5px; color: var(--color-text-muted); }
+.setting-row-static .setting-value { font-size: 12px; color: var(--color-text-faint); text-align: right; }
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--color-hairline);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.segment {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  padding: 5px 9px;
+  border-right: 1px solid var(--color-hairline);
+}
+.segment:last-child { border-right: none; }
+.segment-active { background: var(--color-text); color: var(--color-surface); font-weight: 600; }
+
+/* profile */
+.profile-head { display: flex; align-items: center; gap: 10px; }
+.profile-name { font-size: 14px; font-weight: 600; }
+.profile-email { font-size: 12.5px; color: var(--color-text-muted); }
+.profile-plan { font-size: 12px; color: var(--color-text-faint); margin: 10px 0 2px; }
+
+/* ---------- body: rail + content ---------- */
+.body {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-start;
+  min-height: 0;
+}
+
+.rail {
+  flex: 0 0 var(--rail-width);
+  width: var(--rail-width);
+  padding: 28px 20px;
+  border-right: 1px solid var(--color-hairline);
+  position: sticky;
+  top: 0;
+  align-self: stretch;
+}
+.rail-project-name { font-size: 16px; font-weight: 700; }
+.rail-project-slug { font-size: 12px; color: var(--color-text-faint); margin-top: 3px; }
+.rail-project-manifest {
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-top: 10px;
+  word-break: break-all;
+  line-height: 1.5;
+}
+.rail-bands {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+}
+.rail-band-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 8px;
+  margin: 0 -8px;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+  border-left: 2px solid transparent;
+}
+.rail-band-link:hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+}
+.rail-band-count { font-size: 12px; color: var(--color-text-faint); }
+
+.content {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 28px 40px 64px;
+}
+
+/* view tabs */
+.view-tabs {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  border-bottom: 1px solid var(--color-hairline);
+  margin-bottom: 28px;
+}
+.view-tab {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+  padding: 0 0 12px;
+  border-bottom: 2px solid transparent;
+}
+.view-tab-active { color: var(--color-text); border-bottom-color: var(--color-text); }
+.view-tab-disabled { cursor: default; }
+
+/* page head */
+.page-head { margin-bottom: 36px; max-width: 760px; }
+.page-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+.page-desc { font-size: 14.5px; color: var(--color-text-muted); margin-top: 8px; }
+.page-totals { font-size: 12.5px; color: var(--color-text-faint); margin-top: 14px; }
+
+/* ---------- bands ---------- */
+.band { margin-bottom: 44px; }
+.band-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.band-head h2 { font-size: 14px; font-weight: 700; letter-spacing: 0.01em; }
+.band-count { font-size: 12.5px; color: var(--color-text-faint); }
+.band-note { font-size: 12.5px; color: var(--color-text-faint); margin-top: 6px; max-width: 640px; }
+.band-hr { height: 1px; background: var(--color-hairline); margin-top: 12px; }
+
+/* ---------- db table ---------- */
+/* The grid below has a real minimum width (eight columns, generous cell padding,
+   the "breathing room wins" widths chosen for 1440px). Below that minimum the row
+   itself does not shrink or drop a column here — it scrolls sideways inside this
+   box alone, so the shell, rail and footer never move. Columns are only dropped at
+   the <=640px phone breakpoint below, where a sideways-scrolling data table is a
+   worse read than a shorter one. */
+.db-table { width: 100%; overflow-x: auto; padding-bottom: 2px; }
+.db-table::-webkit-scrollbar { height: 8px; }
+.db-table::-webkit-scrollbar-track { background: transparent; }
+.db-table::-webkit-scrollbar-thumb { background: var(--color-hairline); }
+.db-table::-webkit-scrollbar-thumb:hover { background: var(--color-text-faint); }
+.db-header, .db-row {
+  display: grid;
+  grid-template-columns: var(--col-service) var(--col-id) var(--col-role) var(--col-kind) var(--col-version) var(--col-status) var(--col-in) var(--col-out);
+  align-items: center;
+  column-gap: 16px;
+}
+.db-header {
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.db-header .db-cell {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.db-body { display: flex; flex-direction: column; }
+.db-row {
+  padding: 12px 10px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--color-hairline);
+  position: relative;
+}
+.db-row:last-child { border-bottom: none; }
+.db-row:hover, .db-row:focus-within, .db-row:focus {
+  background: var(--color-surface-sunken);
+}
+.db-row-demo { background: var(--color-surface-sunken); }
+
+.db-cell { min-width: 0; font-size: 14px; }
+.cell-in, .cell-out { text-align: right; padding-right: 4px; color: var(--color-text-muted); }
+.db-header .cell-in, .db-header .cell-out { text-align: right; padding-right: 4px; }
+.cell-role { color: var(--color-text-muted); font-size: 13.5px; }
+.cell-id .mono { color: var(--color-text-faint); font-size: 12.5px; }
+
+/* service cell */
+.cell-service { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.svc-icon {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.brand-svg { display: block; }
+.brand-fallback {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-hairline);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.svc-text { min-width: 0; }
+.svc-name { font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.svc-name-raw { font-weight: 500; color: var(--color-text-muted); font-size: 13.5px; }
+.svc-note { font-size: 12px; color: var(--color-text-faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* kind */
+.kind-common { color: var(--color-text-faint); font-size: 13px; }
+.kind-rare { color: var(--color-text-muted); font-size: 13.5px; font-weight: 600; }
+
+/* version */
+.muted-num { color: var(--color-text-muted); font-size: 13px; }
+
+/* status */
+.cell-status { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 13px; }
+.status-flag { font-weight: 600; }
+.status-flag.status-phasing_out, .status-flag.status-deprecated, .status-flag.status-removed { color: var(--color-signal); }
+.status-arrow { color: var(--color-text-faint); font-size: 12.5px; }
+
+/* counts */
+.num { color: var(--color-text); font-size: 13.5px; }
+
+/* ---------- popover ---------- */
+.svc-popover {
+  position: absolute;
+  top: calc(100% - 1px);
+  left: 44px;
+  width: 300px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-transient);
+  box-shadow: var(--shadow-transient);
+  padding: 16px;
+  z-index: 40;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.14s ease, visibility 0.14s;
+}
+.db-row:hover .svc-popover,
+.db-row:focus-within .svc-popover,
+.db-row:focus .svc-popover {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.svc-popover.always-open {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto;
+}
+.pop-head { display: flex; align-items: center; gap: 10px; }
+.pop-icon { flex: 0 0 auto; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.pop-name { font-size: 14.5px; font-weight: 700; }
+.pop-id { font-size: 11.5px; color: var(--color-text-faint); margin-top: 1px; }
+.pop-body { margin-top: 12px; display: flex; flex-direction: column; gap: 7px; }
+.pop-row { display: flex; align-items: baseline; justify-content: space-between; font-size: 13px; gap: 10px; }
+.pop-label { color: var(--color-text-faint); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; flex: 0 0 auto; }
+.pop-status { justify-content: flex-start; gap: 6px; font-weight: 600; }
+.pop-status.status-phasing_out, .pop-status.status-deprecated, .pop-status.status-removed { color: var(--color-signal); }
+.pop-replaces { color: var(--color-text-faint); font-weight: 400; font-size: 12.5px; }
+.pop-note { color: var(--color-text-muted); font-style: normal; font-size: 12.5px; line-height: 1.5; border-top: 1px solid var(--color-hairline); padding-top: 9px; }
+
+/* ---------- footer ---------- */
+.site-footer {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 56px;
+  padding: 22px 40px;
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-header-fill);
+}
+.footer-col { display: flex; flex-direction: column; gap: 4px; }
+.footer-col-links { margin-left: auto; text-align: right; }
+.footer-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-text-faint); margin-bottom: 2px; }
+.footer-mono { font-size: 12.5px; color: var(--color-text-muted); }
+.footer-sub { font-size: 12px; color: var(--color-text-faint); }
+.footer-link { font-size: 12.5px; color: var(--color-text-muted); }
+.footer-link:hover { color: var(--color-text); }
+
+/* ---------- responsive ----------
+   Two states only, chosen deliberately rather than picked to stop an overflow:
+   - Above 640px (laptop/tablet through desktop): all eight columns always render,
+     at their full "breathing room" width. If the viewport is narrower than the
+     table needs, .db-table above scrolls horizontally on its own — the page body
+     never does, and the shell/rail/footer hold still while a band's rows pan.
+   - At 640px and below (phone): the table has to actually get narrower, not just
+     scroll, since panning a data table sideways with a thumb reads worse than a
+     shorter one. Four secondary columns (id, role, kind, version) are dropped
+     there, keeping service, status and the two dependency counts. */
+@media (max-width: 640px) {
+  :root {
+    --col-service: minmax(0, 1fr);
+    --col-status: minmax(64px, 0.85fr);
+    --col-in: 24px;
+    --col-out: 24px;
+  }
+  .body { flex-direction: column; }
+  .rail {
+    width: 100%;
+    position: static;
+    border-right: none;
+    border-bottom: 1px solid var(--color-hairline);
+    padding: 20px 24px;
+  }
+  .content { padding: 24px 16px 48px; }
+  .topbar { padding: 0 12px; }
+  .topbar-project { max-width: 90px; }
+  .icon-btn-label { display: none; }
+  .icon-btn { padding: 0 6px; gap: 0; }
+  .profile-btn { padding: 0; }
+  .dropdown { min-width: 0; width: calc(100vw - 24px); right: -12px; }
+  .site-footer { flex-direction: column; gap: 16px; padding: 20px 16px; }
+  .footer-col-links { margin-left: 0; text-align: left; }
+  .svc-popover { display: none; }
+  .cell-id, .cell-role, .cell-kind, .cell-version { display: none; }
+  .db-header .cell-id, .db-header .cell-role, .db-header .cell-kind, .db-header .cell-version { display: none; }
+  .db-header, .db-row {
+    grid-template-columns: var(--col-service) var(--col-status) var(--col-in) var(--col-out);
+    column-gap: 8px;
+  }
+  .db-row { padding: 12px 6px; }
+  .db-header { padding: 8px 6px; }
+  .svc-icon { flex-basis: 20px; width: 20px; height: 20px; }
+  .cell-in, .cell-out { padding-right: 0; }
+}
+
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="wordmark">Catalogus</span>
+      <span class="topbar-sep" aria-hidden="true">/</span>
+      <span class="topbar-project">Layout Stress</span>
+      <span class="visibility-tag">private</span>
+    </div>
+    <div class="topbar-right">
+
+      <div class="icon-btn-wrap">
+        <button class="icon-btn" type="button" aria-haspopup="true" aria-label="Help">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9.25"/>
+            <path d="M9.15 9.5a2.85 2.85 0 1 1 4.2 2.5c-.85.55-1.35 1.05-1.35 2.15"/>
+            <circle cx="12" cy="17.35" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+          <span class="icon-btn-label">Help</span>
+        </button>
+        <div class="dropdown dropdown-help" role="menu">
+          <div class="dropdown-title">Help</div>
+          <a class="dropdown-item" href="#" role="menuitem">Documentation</a>
+          <a class="dropdown-item" href="#" role="menuitem">Manifest format reference</a>
+          <a class="dropdown-item" href="#" role="menuitem">Keyboard shortcuts</a>
+          <a class="dropdown-item" href="#" role="menuitem">CLI reference</a>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-cli">
+            <span class="dropdown-cli-label">catalogus</span>
+            <span class="mono dropdown-cli-cmds">init &middot; detect &middot; diff &middot; add &middot; set &middot; link &middot; unlink &middot; deprecate &middot; remove &middot; rename &middot; validate &middot; graph &middot; view</span>
+          </div>
+          <div class="dropdown-version">Catalogus CLI v0.0.1</div>
+        </div>
+      </div>
+
+      <div class="icon-btn-wrap">
+        <button class="icon-btn" type="button" aria-haspopup="true" aria-label="Settings">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.1"/>
+            <path d="M12 3.6v2.35M12 18.05v2.35M20.4 12h-2.35M5.95 12H3.6M17.63 6.37l-1.66 1.66M8.03 15.97l-1.66 1.66M17.63 17.63l-1.66-1.66M8.03 8.03l-1.66-1.66"/>
+          </svg>
+          <span class="icon-btn-label">Settings</span>
+        </button>
+        <div class="dropdown dropdown-settings" role="menu">
+          <div class="dropdown-title">Settings</div>
+
+          <div class="setting-row">
+            <span class="setting-label">Appearance</span>
+            <div class="segmented" role="radiogroup" aria-label="Appearance">
+              <span class="segment segment-active">Light</span><span class="segment">Dark</span><span class="segment">System</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">Density</span>
+            <div class="segmented" role="radiogroup" aria-label="Density">
+              <span class="segment segment-active">Comfortable</span><span class="segment">Compact</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">Brand icons</span>
+            <div class="segmented" role="radiogroup" aria-label="Brand icons">
+              <span class="segment segment-active">Color</span><span class="segment">Monochrome</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">Default view</span>
+            <div class="segmented" role="radiogroup" aria-label="Default view">
+              <span class="segment segment-active">List</span><span class="segment">Graph</span><span class="segment">Migrations</span>
+            </div>
+          </div>
+
+          <div class="dropdown-divider"></div>
+          <div class="setting-row setting-row-static">
+            <span class="setting-label">Manifest path</span>
+            <span class="mono setting-value">examples/layout-stress&#8203;.catalogus.yaml</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="icon-btn-wrap profile-wrap">
+        <button class="icon-btn profile-btn" type="button" aria-haspopup="true" aria-expanded="true" aria-label="Account menu">
+          <span class="avatar" aria-hidden="true">LC</span>
+        </button>
+        <div class="dropdown dropdown-profile profile-open" role="menu">
+          <div class="profile-head">
+            <span class="avatar avatar-lg" aria-hidden="true">LC</span>
+            <div class="profile-id">
+              <div class="profile-name">Leandro Carvalho</div>
+              <div class="profile-email">dsnktec@gmail.com</div>
+            </div>
+          </div>
+          <div class="profile-plan">Personal account</div>
+          <div class="dropdown-divider"></div>
+          <a class="dropdown-item" href="#" role="menuitem">Account</a>
+          <a class="dropdown-item" href="#" role="menuitem">Preferences</a>
+          <a class="dropdown-item" href="#" role="menuitem">Keyboard shortcuts</a>
+          <a class="dropdown-item" href="#" role="menuitem">Documentation</a>
+          <div class="dropdown-divider"></div>
+          <a class="dropdown-item" href="#" role="menuitem">Sign out</a>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <div class="body">
+    <aside class="rail">
+      <div class="rail-project">
+        <div class="rail-project-name">Layout Stress</div>
+        <div class="rail-project-slug mono">layout-stress</div>
+        <div class="rail-project-manifest mono">examples/layout-stress.catalogus.yaml</div>
+      </div>
+      <nav class="rail-bands" aria-label="Bands">
+<a class="rail-band-link" href="#runs-in-production"><span class="rail-band-label">Runs in production</span><span class="rail-band-count mono">7</span></a>
+<a class="rail-band-link" href="#holds-data"><span class="rail-band-label">Holds data</span><span class="rail-band-count mono">7</span></a>
+<a class="rail-band-link" href="#calls-out-to"><span class="rail-band-label">Calls out to</span><span class="rail-band-count mono">6</span></a>
+<a class="rail-band-link" href="#runs-on"><span class="rail-band-label">Runs on</span><span class="rail-band-count mono">4</span></a>
+<a class="rail-band-link" href="#watched-by"><span class="rail-band-label">Watched by</span><span class="rail-band-count mono">4</span></a>
+<a class="rail-band-link" href="#built-and-shipped-by"><span class="rail-band-label">Built and shipped by</span><span class="rail-band-count mono">5</span></a>
+<a class="rail-band-link" href="#registered-at"><span class="rail-band-label">Registered at</span><span class="rail-band-count mono">1</span></a>
+<a class="rail-band-link" href="#unplaced"><span class="rail-band-label">Unplaced</span><span class="rail-band-count mono">1</span></a>
+      </nav>
+    </aside>
+
+    <main class="content">
+
+      <div class="view-tabs" role="tablist" aria-label="Views">
+        <span class="view-tab view-tab-active" role="tab" aria-selected="true">List</span>
+        <span class="view-tab view-tab-disabled" role="tab" aria-selected="false" aria-disabled="true">Graph</span>
+        <span class="view-tab view-tab-disabled" role="tab" aria-selected="false" aria-disabled="true">Migrations</span>
+      </div>
+
+      <div class="page-head">
+        <h1>Services</h1>
+        <p class="page-desc">Deliberately overgrown: an API hub with eighteen outgoing dependencies, two lifecycle migrations in flight, and one entry nothing depends on.</p>
+        <p class="page-totals mono">35 services &middot; 48 dependencies &middot; 21 rollups &middot; 7 bands</p>
+      </div>
+
+<section class="band" id="runs-in-production" aria-labelledby="runs-in-production-h">
+          <div class="band-head">
+            <h2 id="runs-in-production-h">Runs in production</h2>
+            <span class="band-count mono">7</span>
+          </div>
+          
+          <div class="band-hr"></div>
+          <div class="db-table" role="table" aria-label="Runs in production services">
+            <div class="db-header" role="row">
+              <div class="db-cell cell-service">Service</div>
+              <div class="db-cell cell-id">ID</div>
+              <div class="db-cell cell-role">Role</div>
+              <div class="db-cell cell-kind">Kind</div>
+              <div class="db-cell cell-version">Ver.</div>
+              <div class="db-cell cell-status">Status</div>
+              <div class="db-cell cell-in">In</div>
+              <div class="db-cell cell-out">Out</div>
+            </div>
+            <div class="db-body">
+            <div class="db-row" tabindex="0" data-id="auth-legacy">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#EB5424" d="M21.98 7.448L19.62 0H4.347L2.02 7.448c-1.352 4.312.03 9.206 3.815 12.015L12.007 24l6.157-4.552c3.755-2.81 5.182-7.688 3.815-12.015l-6.16 4.58 2.343 7.45-6.157-4.597-6.158 4.58 2.358-7.433-6.188-4.55 7.63-.045L12.008 0l2.356 7.404 7.615.044z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Auth0</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">auth-legacy</span></div>
+              <div class="db-cell cell-role">auth-legacy</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"><span class="status-flag status-phasing_out">Phasing out</span><span class="status-arrow">→ <span class="mono">auth-users</span></span></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Auth0 details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#EB5424" d="M21.98 7.448L19.62 0H4.347L2.02 7.448c-1.352 4.312.03 9.206 3.815 12.015L12.007 24l6.157-4.552c3.755-2.81 5.182-7.688 3.815-12.015l-6.16 4.58 2.343 7.45-6.157-4.597-6.158 4.58 2.358-7.433-6.188-4.55 7.63-.045L12.008 0l2.356 7.404 7.615.044z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Auth0</div>
+                  <div class="pop-id mono">auth-legacy</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>auth-legacy</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">0</span> out</span></div>
+                <div class="pop-row pop-status status-phasing_out">Phasing out <span class="pop-replaces">→ <span class="mono">auth-users</span></span></div>
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="auth-users">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#6C47FF" d="m21.47 20.829-2.881-2.881a.572.572 0 0 0-.7-.084 6.854 6.854 0 0 1-7.081 0 .576.576 0 0 0-.7.084l-2.881 2.881a.576.576 0 0 0-.103.69.57.57 0 0 0 .166.186 12 12 0 0 0 14.113 0 .58.58 0 0 0 .239-.423.576.576 0 0 0-.172-.453Zm.002-17.668-2.88 2.88a.569.569 0 0 1-.701.084A6.857 6.857 0 0 0 8.724 8.08a6.862 6.862 0 0 0-1.222 3.692 6.86 6.86 0 0 0 .978 3.764.573.573 0 0 1-.083.699l-2.881 2.88a.567.567 0 0 1-.864-.063A11.993 11.993 0 0 1 6.771 2.7a11.99 11.99 0 0 1 14.637-.405.566.566 0 0 1 .232.418.57.57 0 0 1-.168.448Zm-7.118 12.261a3.427 3.427 0 1 0 0-6.854 3.427 3.427 0 0 0 0 6.854Z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Clerk</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">auth-users</span></div>
+              <div class="db-cell cell-role">auth-users</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">1</span></div>
+              <div class="svc-popover" role="note" aria-label="Clerk details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#6C47FF" d="m21.47 20.829-2.881-2.881a.572.572 0 0 0-.7-.084 6.854 6.854 0 0 1-7.081 0 .576.576 0 0 0-.7.084l-2.881 2.881a.576.576 0 0 0-.103.69.57.57 0 0 0 .166.186 12 12 0 0 0 14.113 0 .58.58 0 0 0 .239-.423.576.576 0 0 0-.172-.453Zm.002-17.668-2.88 2.88a.569.569 0 0 1-.701.084A6.857 6.857 0 0 0 8.724 8.08a6.862 6.862 0 0 0-1.222 3.692 6.86 6.86 0 0 0 .978 3.764.573.573 0 0 1-.083.699l-2.881 2.88a.567.567 0 0 1-.864-.063A11.993 11.993 0 0 1 6.771 2.7a11.99 11.99 0 0 1 14.637-.405.566.566 0 0 1 .232.418.57.57 0 0 1-.168.448Zm-7.118 12.261a3.427 3.427 0 1 0 0-6.854 3.427 3.427 0 0 0 0 6.854Z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Clerk</div>
+                  <div class="pop-id mono">auth-users</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>auth-users</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">1</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="host-api">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#24175B" d="M11.987 0c-2.45-.01-5.002.925-6.541 2.897-1.17 1.502-1.664 3.474-1.49 5.356.29 2.112 1.476 3.96 2.676 5.672a41.5 41.5 0 0 0 4.216 4.831c-1.063.832-1.943 2.286-1.357 3.644.821 2.32 4.665 2.05 5.122-.372.39-1.288-.694-2.533-1.428-3.309 2.388-2.431 4.706-5.036 6.17-8.145.595-1.32.902-2.802.614-4.24-.28-2.341-1.823-4.473-3.967-5.46C14.76.266 13.364.016 11.987 0m-.236 1.577v15.534C9.881 13.483 7.724 9.266 8.73 5.069c.35-1.539 1.253-3.309 3.02-3.492m1.996.04c1.534.357 3.031 1.096 3.906 2.48 1.3 1.93 1.318 4.55.1 6.521-1.268 2.395-3.06 4.463-4.916 6.415 1.472-2.974 3.074-6.106 3.182-9.5-.043-2.08-.438-4.612-2.272-5.916M11.97 20.103c.848.342 1.597 1.983.153 2.173-.664.15-1.367-.599-.995-1.222.213-.355.488-.73.842-.95"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Fly.io</div>
+                  <div class="svc-note">the fan-out hub: 18 outgoing edges</div>
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">host-api</span></div>
+              <div class="db-cell cell-role">hosting-api</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">3</span></div>
+              <div class="db-cell cell-out"><span class="mono num">18</span></div>
+              <div class="svc-popover" role="note" aria-label="Fly.io details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#24175B" d="M11.987 0c-2.45-.01-5.002.925-6.541 2.897-1.17 1.502-1.664 3.474-1.49 5.356.29 2.112 1.476 3.96 2.676 5.672a41.5 41.5 0 0 0 4.216 4.831c-1.063.832-1.943 2.286-1.357 3.644.821 2.32 4.665 2.05 5.122-.372.39-1.288-.694-2.533-1.428-3.309 2.388-2.431 4.706-5.036 6.17-8.145.595-1.32.902-2.802.614-4.24-.28-2.341-1.823-4.473-3.967-5.46C14.76.266 13.364.016 11.987 0m-.236 1.577v15.534C9.881 13.483 7.724 9.266 8.73 5.069c.35-1.539 1.253-3.309 3.02-3.492m1.996.04c1.534.357 3.031 1.096 3.906 2.48 1.3 1.93 1.318 4.55.1 6.521-1.268 2.395-3.06 4.463-4.916 6.415 1.472-2.974 3.074-6.106 3.182-9.5-.043-2.08-.438-4.612-2.272-5.916M11.97 20.103c.848.342 1.597 1.983.153 2.173-.664.15-1.367-.599-.995-1.222.213-.355.488-.73.842-.95"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Fly.io</div>
+                  <div class="pop-id mono">host-api</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>hosting-api</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">3</span> in &middot; <span class="mono">18</span> out</span></div>
+                
+                <div class="pop-row pop-note">the fan-out hub: 18 outgoing edges</div>
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="host-edge">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#F38020" d="m8.213.063 8.879 12.136-8.67 11.739h2.476l8.665-11.735-8.89-12.14Zm4.728 0 9.02 11.992-9.018 11.883h2.496L24 12.656v-1.199L15.434.063ZM7.178 2.02.01 11.398l-.01 1.2 7.203 9.644 1.238-1.676-6.396-8.556 6.361-8.313Z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Cloudflare Workers</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">host-edge</span></div>
+              <div class="db-cell cell-role">hosting-edge</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">2</span></div>
+              <div class="db-cell cell-out"><span class="mono num">3</span></div>
+              <div class="svc-popover" role="note" aria-label="Cloudflare Workers details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#F38020" d="m8.213.063 8.879 12.136-8.67 11.739h2.476l8.665-11.735-8.89-12.14Zm4.728 0 9.02 11.992-9.018 11.883h2.496L24 12.656v-1.199L15.434.063ZM7.178 2.02.01 11.398l-.01 1.2 7.203 9.644 1.238-1.676-6.396-8.556 6.361-8.313Z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Cloudflare Workers</div>
+                  <div class="pop-id mono">host-edge</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>hosting-edge</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">2</span> in &middot; <span class="mono">3</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="host-web">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#24175B" d="M11.987 0c-2.45-.01-5.002.925-6.541 2.897-1.17 1.502-1.664 3.474-1.49 5.356.29 2.112 1.476 3.96 2.676 5.672a41.5 41.5 0 0 0 4.216 4.831c-1.063.832-1.943 2.286-1.357 3.644.821 2.32 4.665 2.05 5.122-.372.39-1.288-.694-2.533-1.428-3.309 2.388-2.431 4.706-5.036 6.17-8.145.595-1.32.902-2.802.614-4.24-.28-2.341-1.823-4.473-3.967-5.46C14.76.266 13.364.016 11.987 0m-.236 1.577v15.534C9.881 13.483 7.724 9.266 8.73 5.069c.35-1.539 1.253-3.309 3.02-3.492m1.996.04c1.534.357 3.031 1.096 3.906 2.48 1.3 1.93 1.318 4.55.1 6.521-1.268 2.395-3.06 4.463-4.916 6.415 1.472-2.974 3.074-6.106 3.182-9.5-.043-2.08-.438-4.612-2.272-5.916M11.97 20.103c.848.342 1.597 1.983.153 2.173-.664.15-1.367-.599-.995-1.222.213-.355.488-.73.842-.95"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Fly.io</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">host-web</span></div>
+              <div class="db-cell cell-role">hosting-web</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">2</span></div>
+              <div class="db-cell cell-out"><span class="mono num">5</span></div>
+              <div class="svc-popover" role="note" aria-label="Fly.io details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#24175B" d="M11.987 0c-2.45-.01-5.002.925-6.541 2.897-1.17 1.502-1.664 3.474-1.49 5.356.29 2.112 1.476 3.96 2.676 5.672a41.5 41.5 0 0 0 4.216 4.831c-1.063.832-1.943 2.286-1.357 3.644.821 2.32 4.665 2.05 5.122-.372.39-1.288-.694-2.533-1.428-3.309 2.388-2.431 4.706-5.036 6.17-8.145.595-1.32.902-2.802.614-4.24-.28-2.341-1.823-4.473-3.967-5.46C14.76.266 13.364.016 11.987 0m-.236 1.577v15.534C9.881 13.483 7.724 9.266 8.73 5.069c.35-1.539 1.253-3.309 3.02-3.492m1.996.04c1.534.357 3.031 1.096 3.906 2.48 1.3 1.93 1.318 4.55.1 6.521-1.268 2.395-3.06 4.463-4.916 6.415 1.472-2.974 3.074-6.106 3.182-9.5-.043-2.08-.438-4.612-2.272-5.916M11.97 20.103c.848.342 1.597 1.983.153 2.173-.664.15-1.367-.599-.995-1.222.213-.355.488-.73.842-.95"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Fly.io</div>
+                  <div class="pop-id mono">host-web</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>hosting-web</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">2</span> in &middot; <span class="mono">5</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="host-worker">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#24175B" d="M11.987 0c-2.45-.01-5.002.925-6.541 2.897-1.17 1.502-1.664 3.474-1.49 5.356.29 2.112 1.476 3.96 2.676 5.672a41.5 41.5 0 0 0 4.216 4.831c-1.063.832-1.943 2.286-1.357 3.644.821 2.32 4.665 2.05 5.122-.372.39-1.288-.694-2.533-1.428-3.309 2.388-2.431 4.706-5.036 6.17-8.145.595-1.32.902-2.802.614-4.24-.28-2.341-1.823-4.473-3.967-5.46C14.76.266 13.364.016 11.987 0m-.236 1.577v15.534C9.881 13.483 7.724 9.266 8.73 5.069c.35-1.539 1.253-3.309 3.02-3.492m1.996.04c1.534.357 3.031 1.096 3.906 2.48 1.3 1.93 1.318 4.55.1 6.521-1.268 2.395-3.06 4.463-4.916 6.415 1.472-2.974 3.074-6.106 3.182-9.5-.043-2.08-.438-4.612-2.272-5.916M11.97 20.103c.848.342 1.597 1.983.153 2.173-.664.15-1.367-.599-.995-1.222.213-.355.488-.73.842-.95"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Fly.io</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">host-worker</span></div>
+              <div class="db-cell cell-role">hosting-worker</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">5</span></div>
+              <div class="svc-popover" role="note" aria-label="Fly.io details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#24175B" d="M11.987 0c-2.45-.01-5.002.925-6.541 2.897-1.17 1.502-1.664 3.474-1.49 5.356.29 2.112 1.476 3.96 2.676 5.672a41.5 41.5 0 0 0 4.216 4.831c-1.063.832-1.943 2.286-1.357 3.644.821 2.32 4.665 2.05 5.122-.372.39-1.288-.694-2.533-1.428-3.309 2.388-2.431 4.706-5.036 6.17-8.145.595-1.32.902-2.802.614-4.24-.28-2.341-1.823-4.473-3.967-5.46C14.76.266 13.364.016 11.987 0m-.236 1.577v15.534C9.881 13.483 7.724 9.266 8.73 5.069c.35-1.539 1.253-3.309 3.02-3.492m1.996.04c1.534.357 3.031 1.096 3.906 2.48 1.3 1.93 1.318 4.55.1 6.521-1.268 2.395-3.06 4.463-4.916 6.415 1.472-2.974 3.074-6.106 3.182-9.5-.043-2.08-.438-4.612-2.272-5.916M11.97 20.103c.848.342 1.597 1.983.153 2.173-.664.15-1.367-.599-.995-1.222.213-.355.488-.73.842-.95"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Fly.io</div>
+                  <div class="pop-id mono">host-worker</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>hosting-worker</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">5</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="ingress-edge">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#009639" d="M12 0L1.605 6v12L12 24l10.395-6V6L12 0zm6 16.59c0 .705-.646 1.29-1.529 1.29-.631 0-1.351-.255-1.801-.81l-6-7.141v6.66c0 .721-.57 1.29-1.274 1.29H7.32c-.721 0-1.29-.6-1.29-1.29V7.41c0-.705.63-1.29 1.5-1.29.646 0 1.38.255 1.83.81l5.97 7.141V7.41c0-.721.6-1.29 1.29-1.29h.075c.72 0 1.29.6 1.29 1.29v9.18H18z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">NGINX</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">ingress-edge</span></div>
+              <div class="db-cell cell-role">ingress-proxy</div>
+              <div class="db-cell cell-kind"><span class="kind-rare">component</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">0</span></div>
+              <div class="db-cell cell-out"><span class="mono num">1</span></div>
+              <div class="svc-popover" role="note" aria-label="NGINX details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#009639" d="M12 0L1.605 6v12L12 24l10.395-6V6L12 0zm6 16.59c0 .705-.646 1.29-1.529 1.29-.631 0-1.351-.255-1.801-.81l-6-7.141v6.66c0 .721-.57 1.29-1.274 1.29H7.32c-.721 0-1.29-.6-1.29-1.29V7.41c0-.705.63-1.29 1.5-1.29.646 0 1.38.255 1.83.81l5.97 7.141V7.41c0-.721.6-1.29 1.29-1.29h.075c.72 0 1.29.6 1.29 1.29v9.18H18z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">NGINX</div>
+                  <div class="pop-id mono">ingress-edge</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>ingress-proxy</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>component</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">0</span> in &middot; <span class="mono">1</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+            </div>
+          </div>
+        </section>
+<section class="band" id="holds-data" aria-labelledby="holds-data-h">
+          <div class="band-head">
+            <h2 id="holds-data-h">Holds data</h2>
+            <span class="band-count mono">7</span>
+          </div>
+          
+          <div class="band-hr"></div>
+          <div class="db-table" role="table" aria-label="Holds data services">
+            <div class="db-header" role="row">
+              <div class="db-cell cell-service">Service</div>
+              <div class="db-cell cell-id">ID</div>
+              <div class="db-cell cell-role">Role</div>
+              <div class="db-cell cell-kind">Kind</div>
+              <div class="db-cell cell-version">Ver.</div>
+              <div class="db-cell cell-status">Status</div>
+              <div class="db-cell cell-in">In</div>
+              <div class="db-cell cell-out">Out</div>
+            </div>
+            <div class="db-body">
+            <div class="db-row" tabindex="0" data-id="blob-store">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#AECBFA" d="M24 2.4v8.4h-2.4V2.4H24zM0 10.8h2.4V2.4H0v8.4zm3-8.4h18v8.4H3V2.4zm12.6 4.2a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 0 0-3.6 0zm-10.8.6H12V6H4.8v1.2zm16.8 14.4H24v-8.4h-2.4v8.4zM0 21.6h2.4v-8.4H0v8.4zm3-8.4h18v8.4H3v-8.4zm12.6 4.2a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 0 0-3.6 0zM4.8 18H12v-1.2H4.8V18z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Google Cloud Storage</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">blob-store</span></div>
+              <div class="db-cell cell-role">storage-blob</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">3</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Google Cloud Storage details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#AECBFA" d="M24 2.4v8.4h-2.4V2.4H24zM0 10.8h2.4V2.4H0v8.4zm3-8.4h18v8.4H3V2.4zm12.6 4.2a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 0 0-3.6 0zm-10.8.6H12V6H4.8v1.2zm16.8 14.4H24v-8.4h-2.4v8.4zM0 21.6h2.4v-8.4H0v8.4zm3-8.4h18v8.4H3v-8.4zm12.6 4.2a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 0 0-3.6 0zM4.8 18H12v-1.2H4.8V18z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Google Cloud Storage</div>
+                  <div class="pop-id mono">blob-store</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>storage-blob</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">3</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="db-cache">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#FF4438" d="M22.71 13.145c-1.66 2.092-3.452 4.483-7.038 4.483-3.203 0-4.397-2.825-4.48-5.12.701 1.484 2.073 2.685 4.214 2.63 4.117-.133 6.94-3.852 6.94-7.239 0-4.05-3.022-6.972-8.268-6.972-3.752 0-8.4 1.428-11.455 3.685C2.59 6.937 3.885 9.958 4.35 9.626c2.648-1.904 4.748-3.13 6.784-3.744C8.12 9.244.886 17.05 0 18.425c.1 1.261 1.66 4.648 2.424 4.648.232 0 .431-.133.664-.365a100.49 100.49 0 0 0 5.54-6.765c.222 3.104 1.748 6.898 6.014 6.898 3.819 0 7.604-2.756 9.33-8.965.2-.764-.73-1.361-1.261-.73zm-4.349-5.013c0 1.959-1.926 2.922-3.685 2.922-.941 0-1.664-.247-2.235-.568 1.051-1.592 2.092-3.225 3.21-4.973 1.972.334 2.71 1.43 2.71 2.619z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Redis</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">db-cache</span></div>
+              <div class="db-cell cell-role">database-cache</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">2</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Redis details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#FF4438" d="M22.71 13.145c-1.66 2.092-3.452 4.483-7.038 4.483-3.203 0-4.397-2.825-4.48-5.12.701 1.484 2.073 2.685 4.214 2.63 4.117-.133 6.94-3.852 6.94-7.239 0-4.05-3.022-6.972-8.268-6.972-3.752 0-8.4 1.428-11.455 3.685C2.59 6.937 3.885 9.958 4.35 9.626c2.648-1.904 4.748-3.13 6.784-3.744C8.12 9.244.886 17.05 0 18.425c.1 1.261 1.66 4.648 2.424 4.648.232 0 .431-.133.664-.365a100.49 100.49 0 0 0 5.54-6.765c.222 3.104 1.748 6.898 6.014 6.898 3.819 0 7.604-2.756 9.33-8.965.2-.764-.73-1.361-1.261-.73zm-4.349-5.013c0 1.959-1.926 2.922-3.685 2.922-.941 0-1.664-.247-2.235-.568 1.051-1.592 2.092-3.225 3.21-4.973 1.972.334 2.71 1.43 2.71 2.619z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Redis</div>
+                  <div class="pop-id mono">db-cache</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>database-cache</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">2</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="db-legacy">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#47A248" d="M17.193 9.555c-1.264-5.58-4.252-7.414-4.573-8.115-.28-.394-.53-.954-.735-1.44-.036.495-.055.685-.523 1.184-.723.566-4.438 3.682-4.74 10.02-.282 5.912 4.27 9.435 4.888 9.884l.07.05A73.49 73.49 0 0111.91 24h.481c.114-1.032.284-2.056.51-3.07.417-.296.604-.463.85-.693a11.342 11.342 0 003.639-8.464c.01-.814-.103-1.662-.197-2.218zm-5.336 8.195s0-8.291.275-8.29c.213 0 .49 10.695.49 10.695-.381-.045-.765-1.76-.765-2.405z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">MongoDB</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">db-legacy</span></div>
+              <div class="db-cell cell-role">database-document</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"><span class="status-flag status-deprecated">Deprecated</span><span class="status-arrow">→ <span class="mono">db-primary</span></span></div>
+              <div class="db-cell cell-in"><span class="mono num">2</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="MongoDB details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#47A248" d="M17.193 9.555c-1.264-5.58-4.252-7.414-4.573-8.115-.28-.394-.53-.954-.735-1.44-.036.495-.055.685-.523 1.184-.723.566-4.438 3.682-4.74 10.02-.282 5.912 4.27 9.435 4.888 9.884l.07.05A73.49 73.49 0 0111.91 24h.481c.114-1.032.284-2.056.51-3.07.417-.296.604-.463.85-.693a11.342 11.342 0 003.639-8.464c.01-.814-.103-1.662-.197-2.218zm-5.336 8.195s0-8.291.275-8.29c.213 0 .49 10.695.49 10.695-.381-.045-.765-1.76-.765-2.405z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">MongoDB</div>
+                  <div class="pop-id mono">db-legacy</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>database-document</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">2</span> in &middot; <span class="mono">0</span> out</span></div>
+                <div class="pop-row pop-status status-deprecated">Deprecated <span class="pop-replaces">→ <span class="mono">db-primary</span></span></div>
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row db-row-demo" tabindex="0" data-id="db-primary">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#4169E1" d="M23.5594 14.7228a.5269.5269 0 0 0-.0563-.1191c-.139-.2632-.4768-.3418-1.0074-.2321-1.6533.3411-2.2935.1312-2.5256-.0191 1.342-2.0482 2.445-4.522 3.0411-6.8297.2714-1.0507.7982-3.5237.1222-4.7316a1.5641 1.5641 0 0 0-.1509-.235C21.6931.9086 19.8007.0248 17.5099.0005c-1.4947-.0158-2.7705.3461-3.1161.4794a9.449 9.449 0 0 0-.5159-.0816 8.044 8.044 0 0 0-1.3114-.1278c-1.1822-.0184-2.2038.2642-3.0498.8406-.8573-.3211-4.7888-1.645-7.2219.0788C.9359 2.1526.3086 3.8733.4302 6.3043c.0409.818.5069 3.334 1.2423 5.7436.4598 1.5065.9387 2.7019 1.4334 3.582.553.9942 1.1259 1.5933 1.7143 1.7895.4474.1491 1.1327.1441 1.8581-.7279.8012-.9635 1.5903-1.8258 1.9446-2.2069.4351.2355.9064.3625 1.39.3772a.0569.0569 0 0 0 .0004.0041 11.0312 11.0312 0 0 0-.2472.3054c-.3389.4302-.4094.5197-1.5002.7443-.3102.064-1.1344.2339-1.1464.8115-.0025.1224.0329.2309.0919.3268.2269.4231.9216.6097 1.015.6331 1.3345.3335 2.5044.092 3.3714-.6787-.017 2.231.0775 4.4174.3454 5.0874.2212.5529.7618 1.9045 2.4692 1.9043.2505 0 .5263-.0291.8296-.0941 1.7819-.3821 2.5557-1.1696 2.855-2.9059.1503-.8707.4016-2.8753.5388-4.1012.0169-.0703.0357-.1207.057-.1362.0007-.0005.0697-.0471.4272.0307a.3673.3673 0 0 0 .0443.0068l.2539.0223.0149.001c.8468.0384 1.9114-.1426 2.5312-.4308.6438-.2988 1.8057-1.0323 1.5951-1.6698zM2.371 11.8765c-.7435-2.4358-1.1779-4.8851-1.2123-5.5719-.1086-2.1714.4171-3.6829 1.5623-4.4927 1.8367-1.2986 4.8398-.5408 6.108-.13-.0032.0032-.0066.0061-.0098.0094-2.0238 2.044-1.9758 5.536-1.9708 5.7495-.0002.0823.0066.1989.0162.3593.0348.5873.0996 1.6804-.0735 2.9184-.1609 1.1504.1937 2.2764.9728 3.0892.0806.0841.1648.1631.2518.2374-.3468.3714-1.1004 1.1926-1.9025 2.1576-.5677.6825-.9597.5517-1.0886.5087-.3919-.1307-.813-.5871-1.2381-1.3223-.4796-.839-.9635-2.0317-1.4155-3.5126zm6.0072 5.0871c-.1711-.0428-.3271-.1132-.4322-.1772.0889-.0394.2374-.0902.4833-.1409 1.2833-.2641 1.4815-.4506 1.9143-1.0002.0992-.126.2116-.2687.3673-.4426a.3549.3549 0 0 0 .0737-.1298c.1708-.1513.2724-.1099.4369-.0417.156.0646.3078.26.3695.4752.0291.1016.0619.2945-.0452.4444-.9043 1.2658-2.2216 1.2494-3.1676 1.0128zm2.094-3.988-.0525.141c-.133.3566-.2567.6881-.3334 1.003-.6674-.0021-1.3168-.2872-1.8105-.8024-.6279-.6551-.9131-1.5664-.7825-2.5004.1828-1.3079.1153-2.4468.079-3.0586-.005-.0857-.0095-.1607-.0122-.2199.2957-.2621 1.6659-.9962 2.6429-.7724.4459.1022.7176.4057.8305.928.5846 2.7038.0774 3.8307-.3302 4.7363-.084.1866-.1633.3629-.2311.5454zm7.3637 4.5725c-.0169.1768-.0358.376-.0618.5959l-.146.4383a.3547.3547 0 0 0-.0182.1077c-.0059.4747-.054.6489-.115.8693-.0634.2292-.1353.4891-.1794 1.0575-.11 1.4143-.8782 2.2267-2.4172 2.5565-1.5155.3251-1.7843-.4968-2.0212-1.2217a6.5824 6.5824 0 0 0-.0769-.2266c-.2154-.5858-.1911-1.4119-.1574-2.5551.0165-.5612-.0249-1.9013-.3302-2.6462.0044-.2932.0106-.5909.019-.8918a.3529.3529 0 0 0-.0153-.1126 1.4927 1.4927 0 0 0-.0439-.208c-.1226-.4283-.4213-.7866-.7797-.9351-.1424-.059-.4038-.1672-.7178-.0869.067-.276.1831-.5875.309-.9249l.0529-.142c.0595-.16.134-.3257.213-.5012.4265-.9476 1.0106-2.2453.3766-5.1772-.2374-1.0981-1.0304-1.6343-2.2324-1.5098-.7207.0746-1.3799.3654-1.7088.5321a5.6716 5.6716 0 0 0-.1958.1041c.0918-1.1064.4386-3.1741 1.7357-4.4823a4.0306 4.0306 0 0 1 .3033-.276.3532.3532 0 0 0 .1447-.0644c.7524-.5706 1.6945-.8506 2.802-.8325.4091.0067.8017.0339 1.1742.081 1.939.3544 3.2439 1.4468 4.0359 2.3827.8143.9623 1.2552 1.9315 1.4312 2.4543-1.3232-.1346-2.2234.1268-2.6797.779-.9926 1.4189.543 4.1729 1.2811 5.4964.1353.2426.2522.4522.2889.5413.2403.5825.5515.9713.7787 1.2552.0696.087.1372.1714.1885.245-.4008.1155-1.1208.3825-1.0552 1.717-.0123.1563-.0423.4469-.0834.8148-.0461.2077-.0702.4603-.0994.7662zm.8905-1.6211c-.0405-.8316.2691-.9185.5967-1.0105a2.8566 2.8566 0 0 0 .135-.0406 1.202 1.202 0 0 0 .1342.103c.5703.3765 1.5823.4213 3.0068.1344-.2016.1769-.5189.3994-.9533.6011-.4098.1903-1.0957.333-1.7473.3636-.7197.0336-1.0859-.0807-1.1721-.151zm.5695-9.2712c-.0059.3508-.0542.6692-.1054 1.0017-.055.3576-.112.7274-.1264 1.1762-.0142.4368.0404.8909.0932 1.3301.1066.887.216 1.8003-.2075 2.7014a3.5272 3.5272 0 0 1-.1876-.3856c-.0527-.1276-.1669-.3326-.3251-.6162-.6156-1.1041-2.0574-3.6896-1.3193-4.7446.3795-.5427 1.3408-.5661 2.1781-.463zm.2284 7.0137a12.3762 12.3762 0 0 0-.0853-.1074l-.0355-.0444c.7262-1.1995.5842-2.3862.4578-3.4385-.0519-.4318-.1009-.8396-.0885-1.2226.0129-.4061.0666-.7543.1185-1.0911.0639-.415.1288-.8443.1109-1.3505.0134-.0531.0188-.1158.0118-.1902-.0457-.4855-.5999-1.938-1.7294-3.253-.6076-.7073-1.4896-1.4972-2.6889-2.0395.5251-.1066 1.2328-.2035 2.0244-.1859 2.0515.0456 3.6746.8135 4.8242 2.2824a.908.908 0 0 1 .0667.1002c.7231 1.3556-.2762 6.2751-2.9867 10.5405zm-8.8166-6.1162c-.025.1794-.3089.4225-.6211.4225a.5821.5821 0 0 1-.0809-.0056c-.1873-.026-.3765-.144-.5059-.3156-.0458-.0605-.1203-.178-.1055-.2844.0055-.0401.0261-.0985.0925-.1488.1182-.0894.3518-.1226.6096-.0867.3163.0441.6426.1938.6113.4186zm7.9305-.4114c.0111.0792-.049.201-.1531.3102-.0683.0717-.212.1961-.4079.2232a.5456.5456 0 0 1-.075.0052c-.2935 0-.5414-.2344-.5607-.3717-.024-.1765.2641-.3106.5611-.352.297-.0414.6111.0088.6356.1851z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">PostgreSQL</div>
+                  <div class="svc-note">the fan-in hub: six dependents across five rollups</div>
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">db-primary</span></div>
+              <div class="db-cell cell-role">database-primary</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">6</span></div>
+              <div class="db-cell cell-out"><span class="mono num">1</span></div>
+              <div class="svc-popover always-open" role="note" aria-label="PostgreSQL details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#4169E1" d="M23.5594 14.7228a.5269.5269 0 0 0-.0563-.1191c-.139-.2632-.4768-.3418-1.0074-.2321-1.6533.3411-2.2935.1312-2.5256-.0191 1.342-2.0482 2.445-4.522 3.0411-6.8297.2714-1.0507.7982-3.5237.1222-4.7316a1.5641 1.5641 0 0 0-.1509-.235C21.6931.9086 19.8007.0248 17.5099.0005c-1.4947-.0158-2.7705.3461-3.1161.4794a9.449 9.449 0 0 0-.5159-.0816 8.044 8.044 0 0 0-1.3114-.1278c-1.1822-.0184-2.2038.2642-3.0498.8406-.8573-.3211-4.7888-1.645-7.2219.0788C.9359 2.1526.3086 3.8733.4302 6.3043c.0409.818.5069 3.334 1.2423 5.7436.4598 1.5065.9387 2.7019 1.4334 3.582.553.9942 1.1259 1.5933 1.7143 1.7895.4474.1491 1.1327.1441 1.8581-.7279.8012-.9635 1.5903-1.8258 1.9446-2.2069.4351.2355.9064.3625 1.39.3772a.0569.0569 0 0 0 .0004.0041 11.0312 11.0312 0 0 0-.2472.3054c-.3389.4302-.4094.5197-1.5002.7443-.3102.064-1.1344.2339-1.1464.8115-.0025.1224.0329.2309.0919.3268.2269.4231.9216.6097 1.015.6331 1.3345.3335 2.5044.092 3.3714-.6787-.017 2.231.0775 4.4174.3454 5.0874.2212.5529.7618 1.9045 2.4692 1.9043.2505 0 .5263-.0291.8296-.0941 1.7819-.3821 2.5557-1.1696 2.855-2.9059.1503-.8707.4016-2.8753.5388-4.1012.0169-.0703.0357-.1207.057-.1362.0007-.0005.0697-.0471.4272.0307a.3673.3673 0 0 0 .0443.0068l.2539.0223.0149.001c.8468.0384 1.9114-.1426 2.5312-.4308.6438-.2988 1.8057-1.0323 1.5951-1.6698zM2.371 11.8765c-.7435-2.4358-1.1779-4.8851-1.2123-5.5719-.1086-2.1714.4171-3.6829 1.5623-4.4927 1.8367-1.2986 4.8398-.5408 6.108-.13-.0032.0032-.0066.0061-.0098.0094-2.0238 2.044-1.9758 5.536-1.9708 5.7495-.0002.0823.0066.1989.0162.3593.0348.5873.0996 1.6804-.0735 2.9184-.1609 1.1504.1937 2.2764.9728 3.0892.0806.0841.1648.1631.2518.2374-.3468.3714-1.1004 1.1926-1.9025 2.1576-.5677.6825-.9597.5517-1.0886.5087-.3919-.1307-.813-.5871-1.2381-1.3223-.4796-.839-.9635-2.0317-1.4155-3.5126zm6.0072 5.0871c-.1711-.0428-.3271-.1132-.4322-.1772.0889-.0394.2374-.0902.4833-.1409 1.2833-.2641 1.4815-.4506 1.9143-1.0002.0992-.126.2116-.2687.3673-.4426a.3549.3549 0 0 0 .0737-.1298c.1708-.1513.2724-.1099.4369-.0417.156.0646.3078.26.3695.4752.0291.1016.0619.2945-.0452.4444-.9043 1.2658-2.2216 1.2494-3.1676 1.0128zm2.094-3.988-.0525.141c-.133.3566-.2567.6881-.3334 1.003-.6674-.0021-1.3168-.2872-1.8105-.8024-.6279-.6551-.9131-1.5664-.7825-2.5004.1828-1.3079.1153-2.4468.079-3.0586-.005-.0857-.0095-.1607-.0122-.2199.2957-.2621 1.6659-.9962 2.6429-.7724.4459.1022.7176.4057.8305.928.5846 2.7038.0774 3.8307-.3302 4.7363-.084.1866-.1633.3629-.2311.5454zm7.3637 4.5725c-.0169.1768-.0358.376-.0618.5959l-.146.4383a.3547.3547 0 0 0-.0182.1077c-.0059.4747-.054.6489-.115.8693-.0634.2292-.1353.4891-.1794 1.0575-.11 1.4143-.8782 2.2267-2.4172 2.5565-1.5155.3251-1.7843-.4968-2.0212-1.2217a6.5824 6.5824 0 0 0-.0769-.2266c-.2154-.5858-.1911-1.4119-.1574-2.5551.0165-.5612-.0249-1.9013-.3302-2.6462.0044-.2932.0106-.5909.019-.8918a.3529.3529 0 0 0-.0153-.1126 1.4927 1.4927 0 0 0-.0439-.208c-.1226-.4283-.4213-.7866-.7797-.9351-.1424-.059-.4038-.1672-.7178-.0869.067-.276.1831-.5875.309-.9249l.0529-.142c.0595-.16.134-.3257.213-.5012.4265-.9476 1.0106-2.2453.3766-5.1772-.2374-1.0981-1.0304-1.6343-2.2324-1.5098-.7207.0746-1.3799.3654-1.7088.5321a5.6716 5.6716 0 0 0-.1958.1041c.0918-1.1064.4386-3.1741 1.7357-4.4823a4.0306 4.0306 0 0 1 .3033-.276.3532.3532 0 0 0 .1447-.0644c.7524-.5706 1.6945-.8506 2.802-.8325.4091.0067.8017.0339 1.1742.081 1.939.3544 3.2439 1.4468 4.0359 2.3827.8143.9623 1.2552 1.9315 1.4312 2.4543-1.3232-.1346-2.2234.1268-2.6797.779-.9926 1.4189.543 4.1729 1.2811 5.4964.1353.2426.2522.4522.2889.5413.2403.5825.5515.9713.7787 1.2552.0696.087.1372.1714.1885.245-.4008.1155-1.1208.3825-1.0552 1.717-.0123.1563-.0423.4469-.0834.8148-.0461.2077-.0702.4603-.0994.7662zm.8905-1.6211c-.0405-.8316.2691-.9185.5967-1.0105a2.8566 2.8566 0 0 0 .135-.0406 1.202 1.202 0 0 0 .1342.103c.5703.3765 1.5823.4213 3.0068.1344-.2016.1769-.5189.3994-.9533.6011-.4098.1903-1.0957.333-1.7473.3636-.7197.0336-1.0859-.0807-1.1721-.151zm.5695-9.2712c-.0059.3508-.0542.6692-.1054 1.0017-.055.3576-.112.7274-.1264 1.1762-.0142.4368.0404.8909.0932 1.3301.1066.887.216 1.8003-.2075 2.7014a3.5272 3.5272 0 0 1-.1876-.3856c-.0527-.1276-.1669-.3326-.3251-.6162-.6156-1.1041-2.0574-3.6896-1.3193-4.7446.3795-.5427 1.3408-.5661 2.1781-.463zm.2284 7.0137a12.3762 12.3762 0 0 0-.0853-.1074l-.0355-.0444c.7262-1.1995.5842-2.3862.4578-3.4385-.0519-.4318-.1009-.8396-.0885-1.2226.0129-.4061.0666-.7543.1185-1.0911.0639-.415.1288-.8443.1109-1.3505.0134-.0531.0188-.1158.0118-.1902-.0457-.4855-.5999-1.938-1.7294-3.253-.6076-.7073-1.4896-1.4972-2.6889-2.0395.5251-.1066 1.2328-.2035 2.0244-.1859 2.0515.0456 3.6746.8135 4.8242 2.2824a.908.908 0 0 1 .0667.1002c.7231 1.3556-.2762 6.2751-2.9867 10.5405zm-8.8166-6.1162c-.025.1794-.3089.4225-.6211.4225a.5821.5821 0 0 1-.0809-.0056c-.1873-.026-.3765-.144-.5059-.3156-.0458-.0605-.1203-.178-.1055-.2844.0055-.0401.0261-.0985.0925-.1488.1182-.0894.3518-.1226.6096-.0867.3163.0441.6426.1938.6113.4186zm7.9305-.4114c.0111.0792-.049.201-.1531.3102-.0683.0717-.212.1961-.4079.2232a.5456.5456 0 0 1-.075.0052c-.2935 0-.5414-.2344-.5607-.3717-.024-.1765.2641-.3106.5611-.352.297-.0414.6111.0088.6356.1851z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">PostgreSQL</div>
+                  <div class="pop-id mono">db-primary</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>database-primary</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">6</span> in &middot; <span class="mono">1</span> out</span></div>
+                
+                <div class="pop-row pop-note">the fan-in hub: six dependents across five rollups</div>
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="db-replica">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#4169E1" d="M23.5594 14.7228a.5269.5269 0 0 0-.0563-.1191c-.139-.2632-.4768-.3418-1.0074-.2321-1.6533.3411-2.2935.1312-2.5256-.0191 1.342-2.0482 2.445-4.522 3.0411-6.8297.2714-1.0507.7982-3.5237.1222-4.7316a1.5641 1.5641 0 0 0-.1509-.235C21.6931.9086 19.8007.0248 17.5099.0005c-1.4947-.0158-2.7705.3461-3.1161.4794a9.449 9.449 0 0 0-.5159-.0816 8.044 8.044 0 0 0-1.3114-.1278c-1.1822-.0184-2.2038.2642-3.0498.8406-.8573-.3211-4.7888-1.645-7.2219.0788C.9359 2.1526.3086 3.8733.4302 6.3043c.0409.818.5069 3.334 1.2423 5.7436.4598 1.5065.9387 2.7019 1.4334 3.582.553.9942 1.1259 1.5933 1.7143 1.7895.4474.1491 1.1327.1441 1.8581-.7279.8012-.9635 1.5903-1.8258 1.9446-2.2069.4351.2355.9064.3625 1.39.3772a.0569.0569 0 0 0 .0004.0041 11.0312 11.0312 0 0 0-.2472.3054c-.3389.4302-.4094.5197-1.5002.7443-.3102.064-1.1344.2339-1.1464.8115-.0025.1224.0329.2309.0919.3268.2269.4231.9216.6097 1.015.6331 1.3345.3335 2.5044.092 3.3714-.6787-.017 2.231.0775 4.4174.3454 5.0874.2212.5529.7618 1.9045 2.4692 1.9043.2505 0 .5263-.0291.8296-.0941 1.7819-.3821 2.5557-1.1696 2.855-2.9059.1503-.8707.4016-2.8753.5388-4.1012.0169-.0703.0357-.1207.057-.1362.0007-.0005.0697-.0471.4272.0307a.3673.3673 0 0 0 .0443.0068l.2539.0223.0149.001c.8468.0384 1.9114-.1426 2.5312-.4308.6438-.2988 1.8057-1.0323 1.5951-1.6698zM2.371 11.8765c-.7435-2.4358-1.1779-4.8851-1.2123-5.5719-.1086-2.1714.4171-3.6829 1.5623-4.4927 1.8367-1.2986 4.8398-.5408 6.108-.13-.0032.0032-.0066.0061-.0098.0094-2.0238 2.044-1.9758 5.536-1.9708 5.7495-.0002.0823.0066.1989.0162.3593.0348.5873.0996 1.6804-.0735 2.9184-.1609 1.1504.1937 2.2764.9728 3.0892.0806.0841.1648.1631.2518.2374-.3468.3714-1.1004 1.1926-1.9025 2.1576-.5677.6825-.9597.5517-1.0886.5087-.3919-.1307-.813-.5871-1.2381-1.3223-.4796-.839-.9635-2.0317-1.4155-3.5126zm6.0072 5.0871c-.1711-.0428-.3271-.1132-.4322-.1772.0889-.0394.2374-.0902.4833-.1409 1.2833-.2641 1.4815-.4506 1.9143-1.0002.0992-.126.2116-.2687.3673-.4426a.3549.3549 0 0 0 .0737-.1298c.1708-.1513.2724-.1099.4369-.0417.156.0646.3078.26.3695.4752.0291.1016.0619.2945-.0452.4444-.9043 1.2658-2.2216 1.2494-3.1676 1.0128zm2.094-3.988-.0525.141c-.133.3566-.2567.6881-.3334 1.003-.6674-.0021-1.3168-.2872-1.8105-.8024-.6279-.6551-.9131-1.5664-.7825-2.5004.1828-1.3079.1153-2.4468.079-3.0586-.005-.0857-.0095-.1607-.0122-.2199.2957-.2621 1.6659-.9962 2.6429-.7724.4459.1022.7176.4057.8305.928.5846 2.7038.0774 3.8307-.3302 4.7363-.084.1866-.1633.3629-.2311.5454zm7.3637 4.5725c-.0169.1768-.0358.376-.0618.5959l-.146.4383a.3547.3547 0 0 0-.0182.1077c-.0059.4747-.054.6489-.115.8693-.0634.2292-.1353.4891-.1794 1.0575-.11 1.4143-.8782 2.2267-2.4172 2.5565-1.5155.3251-1.7843-.4968-2.0212-1.2217a6.5824 6.5824 0 0 0-.0769-.2266c-.2154-.5858-.1911-1.4119-.1574-2.5551.0165-.5612-.0249-1.9013-.3302-2.6462.0044-.2932.0106-.5909.019-.8918a.3529.3529 0 0 0-.0153-.1126 1.4927 1.4927 0 0 0-.0439-.208c-.1226-.4283-.4213-.7866-.7797-.9351-.1424-.059-.4038-.1672-.7178-.0869.067-.276.1831-.5875.309-.9249l.0529-.142c.0595-.16.134-.3257.213-.5012.4265-.9476 1.0106-2.2453.3766-5.1772-.2374-1.0981-1.0304-1.6343-2.2324-1.5098-.7207.0746-1.3799.3654-1.7088.5321a5.6716 5.6716 0 0 0-.1958.1041c.0918-1.1064.4386-3.1741 1.7357-4.4823a4.0306 4.0306 0 0 1 .3033-.276.3532.3532 0 0 0 .1447-.0644c.7524-.5706 1.6945-.8506 2.802-.8325.4091.0067.8017.0339 1.1742.081 1.939.3544 3.2439 1.4468 4.0359 2.3827.8143.9623 1.2552 1.9315 1.4312 2.4543-1.3232-.1346-2.2234.1268-2.6797.779-.9926 1.4189.543 4.1729 1.2811 5.4964.1353.2426.2522.4522.2889.5413.2403.5825.5515.9713.7787 1.2552.0696.087.1372.1714.1885.245-.4008.1155-1.1208.3825-1.0552 1.717-.0123.1563-.0423.4469-.0834.8148-.0461.2077-.0702.4603-.0994.7662zm.8905-1.6211c-.0405-.8316.2691-.9185.5967-1.0105a2.8566 2.8566 0 0 0 .135-.0406 1.202 1.202 0 0 0 .1342.103c.5703.3765 1.5823.4213 3.0068.1344-.2016.1769-.5189.3994-.9533.6011-.4098.1903-1.0957.333-1.7473.3636-.7197.0336-1.0859-.0807-1.1721-.151zm.5695-9.2712c-.0059.3508-.0542.6692-.1054 1.0017-.055.3576-.112.7274-.1264 1.1762-.0142.4368.0404.8909.0932 1.3301.1066.887.216 1.8003-.2075 2.7014a3.5272 3.5272 0 0 1-.1876-.3856c-.0527-.1276-.1669-.3326-.3251-.6162-.6156-1.1041-2.0574-3.6896-1.3193-4.7446.3795-.5427 1.3408-.5661 2.1781-.463zm.2284 7.0137a12.3762 12.3762 0 0 0-.0853-.1074l-.0355-.0444c.7262-1.1995.5842-2.3862.4578-3.4385-.0519-.4318-.1009-.8396-.0885-1.2226.0129-.4061.0666-.7543.1185-1.0911.0639-.415.1288-.8443.1109-1.3505.0134-.0531.0188-.1158.0118-.1902-.0457-.4855-.5999-1.938-1.7294-3.253-.6076-.7073-1.4896-1.4972-2.6889-2.0395.5251-.1066 1.2328-.2035 2.0244-.1859 2.0515.0456 3.6746.8135 4.8242 2.2824a.908.908 0 0 1 .0667.1002c.7231 1.3556-.2762 6.2751-2.9867 10.5405zm-8.8166-6.1162c-.025.1794-.3089.4225-.6211.4225a.5821.5821 0 0 1-.0809-.0056c-.1873-.026-.3765-.144-.5059-.3156-.0458-.0605-.1203-.178-.1055-.2844.0055-.0401.0261-.0985.0925-.1488.1182-.0894.3518-.1226.6096-.0867.3163.0441.6426.1938.6113.4186zm7.9305-.4114c.0111.0792-.049.201-.1531.3102-.0683.0717-.212.1961-.4079.2232a.5456.5456 0 0 1-.075.0052c-.2935 0-.5414-.2344-.5607-.3717-.024-.1765.2641-.3106.5611-.352.297-.0414.6111.0088.6356.1851z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">PostgreSQL</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">db-replica</span></div>
+              <div class="db-cell cell-role">database-replica</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="PostgreSQL details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#4169E1" d="M23.5594 14.7228a.5269.5269 0 0 0-.0563-.1191c-.139-.2632-.4768-.3418-1.0074-.2321-1.6533.3411-2.2935.1312-2.5256-.0191 1.342-2.0482 2.445-4.522 3.0411-6.8297.2714-1.0507.7982-3.5237.1222-4.7316a1.5641 1.5641 0 0 0-.1509-.235C21.6931.9086 19.8007.0248 17.5099.0005c-1.4947-.0158-2.7705.3461-3.1161.4794a9.449 9.449 0 0 0-.5159-.0816 8.044 8.044 0 0 0-1.3114-.1278c-1.1822-.0184-2.2038.2642-3.0498.8406-.8573-.3211-4.7888-1.645-7.2219.0788C.9359 2.1526.3086 3.8733.4302 6.3043c.0409.818.5069 3.334 1.2423 5.7436.4598 1.5065.9387 2.7019 1.4334 3.582.553.9942 1.1259 1.5933 1.7143 1.7895.4474.1491 1.1327.1441 1.8581-.7279.8012-.9635 1.5903-1.8258 1.9446-2.2069.4351.2355.9064.3625 1.39.3772a.0569.0569 0 0 0 .0004.0041 11.0312 11.0312 0 0 0-.2472.3054c-.3389.4302-.4094.5197-1.5002.7443-.3102.064-1.1344.2339-1.1464.8115-.0025.1224.0329.2309.0919.3268.2269.4231.9216.6097 1.015.6331 1.3345.3335 2.5044.092 3.3714-.6787-.017 2.231.0775 4.4174.3454 5.0874.2212.5529.7618 1.9045 2.4692 1.9043.2505 0 .5263-.0291.8296-.0941 1.7819-.3821 2.5557-1.1696 2.855-2.9059.1503-.8707.4016-2.8753.5388-4.1012.0169-.0703.0357-.1207.057-.1362.0007-.0005.0697-.0471.4272.0307a.3673.3673 0 0 0 .0443.0068l.2539.0223.0149.001c.8468.0384 1.9114-.1426 2.5312-.4308.6438-.2988 1.8057-1.0323 1.5951-1.6698zM2.371 11.8765c-.7435-2.4358-1.1779-4.8851-1.2123-5.5719-.1086-2.1714.4171-3.6829 1.5623-4.4927 1.8367-1.2986 4.8398-.5408 6.108-.13-.0032.0032-.0066.0061-.0098.0094-2.0238 2.044-1.9758 5.536-1.9708 5.7495-.0002.0823.0066.1989.0162.3593.0348.5873.0996 1.6804-.0735 2.9184-.1609 1.1504.1937 2.2764.9728 3.0892.0806.0841.1648.1631.2518.2374-.3468.3714-1.1004 1.1926-1.9025 2.1576-.5677.6825-.9597.5517-1.0886.5087-.3919-.1307-.813-.5871-1.2381-1.3223-.4796-.839-.9635-2.0317-1.4155-3.5126zm6.0072 5.0871c-.1711-.0428-.3271-.1132-.4322-.1772.0889-.0394.2374-.0902.4833-.1409 1.2833-.2641 1.4815-.4506 1.9143-1.0002.0992-.126.2116-.2687.3673-.4426a.3549.3549 0 0 0 .0737-.1298c.1708-.1513.2724-.1099.4369-.0417.156.0646.3078.26.3695.4752.0291.1016.0619.2945-.0452.4444-.9043 1.2658-2.2216 1.2494-3.1676 1.0128zm2.094-3.988-.0525.141c-.133.3566-.2567.6881-.3334 1.003-.6674-.0021-1.3168-.2872-1.8105-.8024-.6279-.6551-.9131-1.5664-.7825-2.5004.1828-1.3079.1153-2.4468.079-3.0586-.005-.0857-.0095-.1607-.0122-.2199.2957-.2621 1.6659-.9962 2.6429-.7724.4459.1022.7176.4057.8305.928.5846 2.7038.0774 3.8307-.3302 4.7363-.084.1866-.1633.3629-.2311.5454zm7.3637 4.5725c-.0169.1768-.0358.376-.0618.5959l-.146.4383a.3547.3547 0 0 0-.0182.1077c-.0059.4747-.054.6489-.115.8693-.0634.2292-.1353.4891-.1794 1.0575-.11 1.4143-.8782 2.2267-2.4172 2.5565-1.5155.3251-1.7843-.4968-2.0212-1.2217a6.5824 6.5824 0 0 0-.0769-.2266c-.2154-.5858-.1911-1.4119-.1574-2.5551.0165-.5612-.0249-1.9013-.3302-2.6462.0044-.2932.0106-.5909.019-.8918a.3529.3529 0 0 0-.0153-.1126 1.4927 1.4927 0 0 0-.0439-.208c-.1226-.4283-.4213-.7866-.7797-.9351-.1424-.059-.4038-.1672-.7178-.0869.067-.276.1831-.5875.309-.9249l.0529-.142c.0595-.16.134-.3257.213-.5012.4265-.9476 1.0106-2.2453.3766-5.1772-.2374-1.0981-1.0304-1.6343-2.2324-1.5098-.7207.0746-1.3799.3654-1.7088.5321a5.6716 5.6716 0 0 0-.1958.1041c.0918-1.1064.4386-3.1741 1.7357-4.4823a4.0306 4.0306 0 0 1 .3033-.276.3532.3532 0 0 0 .1447-.0644c.7524-.5706 1.6945-.8506 2.802-.8325.4091.0067.8017.0339 1.1742.081 1.939.3544 3.2439 1.4468 4.0359 2.3827.8143.9623 1.2552 1.9315 1.4312 2.4543-1.3232-.1346-2.2234.1268-2.6797.779-.9926 1.4189.543 4.1729 1.2811 5.4964.1353.2426.2522.4522.2889.5413.2403.5825.5515.9713.7787 1.2552.0696.087.1372.1714.1885.245-.4008.1155-1.1208.3825-1.0552 1.717-.0123.1563-.0423.4469-.0834.8148-.0461.2077-.0702.4603-.0994.7662zm.8905-1.6211c-.0405-.8316.2691-.9185.5967-1.0105a2.8566 2.8566 0 0 0 .135-.0406 1.202 1.202 0 0 0 .1342.103c.5703.3765 1.5823.4213 3.0068.1344-.2016.1769-.5189.3994-.9533.6011-.4098.1903-1.0957.333-1.7473.3636-.7197.0336-1.0859-.0807-1.1721-.151zm.5695-9.2712c-.0059.3508-.0542.6692-.1054 1.0017-.055.3576-.112.7274-.1264 1.1762-.0142.4368.0404.8909.0932 1.3301.1066.887.216 1.8003-.2075 2.7014a3.5272 3.5272 0 0 1-.1876-.3856c-.0527-.1276-.1669-.3326-.3251-.6162-.6156-1.1041-2.0574-3.6896-1.3193-4.7446.3795-.5427 1.3408-.5661 2.1781-.463zm.2284 7.0137a12.3762 12.3762 0 0 0-.0853-.1074l-.0355-.0444c.7262-1.1995.5842-2.3862.4578-3.4385-.0519-.4318-.1009-.8396-.0885-1.2226.0129-.4061.0666-.7543.1185-1.0911.0639-.415.1288-.8443.1109-1.3505.0134-.0531.0188-.1158.0118-.1902-.0457-.4855-.5999-1.938-1.7294-3.253-.6076-.7073-1.4896-1.4972-2.6889-2.0395.5251-.1066 1.2328-.2035 2.0244-.1859 2.0515.0456 3.6746.8135 4.8242 2.2824a.908.908 0 0 1 .0667.1002c.7231 1.3556-.2762 6.2751-2.9867 10.5405zm-8.8166-6.1162c-.025.1794-.3089.4225-.6211.4225a.5821.5821 0 0 1-.0809-.0056c-.1873-.026-.3765-.144-.5059-.3156-.0458-.0605-.1203-.178-.1055-.2844.0055-.0401.0261-.0985.0925-.1488.1182-.0894.3518-.1226.6096-.0867.3163.0441.6426.1938.6113.4186zm7.9305-.4114c.0111.0792-.049.201-.1531.3102-.0683.0717-.212.1961-.4079.2232a.5456.5456 0 0 1-.075.0052c-.2935 0-.5414-.2344-.5607-.3717-.024-.1765.2641-.3106.5611-.352.297-.0414.6111.0088.6356.1851z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">PostgreSQL</div>
+                  <div class="pop-id mono">db-replica</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>database-replica</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="db-search">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#005571" d="M13.394 0C8.683 0 4.609 2.716 2.644 6.667h15.641a4.77 4.77 0 0 0 3.073-1.11c.446-.375.864-.785 1.247-1.243l.001-.002A11.974 11.974 0 0 0 13.394 0zM1.804 8.889a12.009 12.009 0 0 0 0 6.222h14.7a3.111 3.111 0 1 0 0-6.222zm.84 8.444C4.61 21.283 8.684 24 13.395 24c3.701 0 7.011-1.677 9.212-4.312l-.001-.002a9.958 9.958 0 0 0-1.247-1.243 4.77 4.77 0 0 0-3.073-1.11z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Elasticsearch</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">db-search</span></div>
+              <div class="db-cell cell-role">database-search</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Elasticsearch details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#005571" d="M13.394 0C8.683 0 4.609 2.716 2.644 6.667h15.641a4.77 4.77 0 0 0 3.073-1.11c.446-.375.864-.785 1.247-1.243l.001-.002A11.974 11.974 0 0 0 13.394 0zM1.804 8.889a12.009 12.009 0 0 0 0 6.222h14.7a3.111 3.111 0 1 0 0-6.222zm.84 8.444C4.61 21.283 8.684 24 13.395 24c3.701 0 7.011-1.677 9.212-4.312l-.001-.002a9.958 9.958 0 0 0-1.247-1.243 4.77 4.77 0 0 0-3.073-1.11z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Elasticsearch</div>
+                  <div class="pop-id mono">db-search</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>database-search</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="queue-jobs">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#FF6600" d="M23.035 9.601h-7.677a.956.956 0 01-.962-.962V.962a.956.956 0 00-.962-.956H10.56a.956.956 0 00-.962.956V8.64a.956.956 0 01-.962.962H5.762a.956.956 0 01-.961-.962V.962A.956.956 0 003.839 0H.959a.956.956 0 00-.956.962v22.076A.956.956 0 00.965 24h22.07a.956.956 0 00.962-.962V10.58a.956.956 0 00-.962-.98zm-3.86 8.152a1.437 1.437 0 01-1.437 1.443h-1.924a1.437 1.437 0 01-1.436-1.443v-1.917a1.437 1.437 0 011.436-1.443h1.924a1.437 1.437 0 011.437 1.443z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">RabbitMQ</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">queue-jobs</span></div>
+              <div class="db-cell cell-role">queue-jobs</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">2</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="RabbitMQ details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#FF6600" d="M23.035 9.601h-7.677a.956.956 0 01-.962-.962V.962a.956.956 0 00-.962-.956H10.56a.956.956 0 00-.962.956V8.64a.956.956 0 01-.962.962H5.762a.956.956 0 01-.961-.962V.962A.956.956 0 003.839 0H.959a.956.956 0 00-.956.962v22.076A.956.956 0 00.965 24h22.07a.956.956 0 00.962-.962V10.58a.956.956 0 00-.962-.98zm-3.86 8.152a1.437 1.437 0 01-1.437 1.443h-1.924a1.437 1.437 0 01-1.436-1.443v-1.917a1.437 1.437 0 011.436-1.443h1.924a1.437 1.437 0 011.437 1.443z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">RabbitMQ</div>
+                  <div class="pop-id mono">queue-jobs</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>queue-jobs</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">2</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+            </div>
+          </div>
+        </section>
+<section class="band" id="calls-out-to" aria-labelledby="calls-out-to-h">
+          <div class="band-head">
+            <h2 id="calls-out-to-h">Calls out to</h2>
+            <span class="band-count mono">6</span>
+          </div>
+          <p class="band-note">Third-party capabilities this project invokes.</p>
+          <div class="band-hr"></div>
+          <div class="db-table" role="table" aria-label="Calls out to services">
+            <div class="db-header" role="row">
+              <div class="db-cell cell-service">Service</div>
+              <div class="db-cell cell-id">ID</div>
+              <div class="db-cell cell-role">Role</div>
+              <div class="db-cell cell-kind">Kind</div>
+              <div class="db-cell cell-version">Ver.</div>
+              <div class="db-cell cell-status">Status</div>
+              <div class="db-cell cell-in">In</div>
+              <div class="db-cell cell-out">Out</div>
+            </div>
+            <div class="db-body">
+            <div class="db-row" tabindex="0" data-id="ai-chat">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#191919" d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Anthropic</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">ai-chat</span></div>
+              <div class="db-cell cell-role">ai-inference</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">1</span></div>
+              <div class="svc-popover" role="note" aria-label="Anthropic details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#191919" d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Anthropic</div>
+                  <div class="pop-id mono">ai-chat</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>ai-inference</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">1</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="ai-embed">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#FFD21E" d="M12.025 1.13c-5.77 0-10.449 4.647-10.449 10.378 0 1.112.178 2.181.503 3.185.064-.222.203-.444.416-.577a.96.96 0 0 1 .524-.15c.293 0 .584.124.84.284.278.173.48.408.71.694.226.282.458.611.684.951v-.014c.017-.324.106-.622.264-.874s.403-.487.762-.543c.3-.047.596.06.787.203s.31.313.4.467c.15.257.212.468.233.542.01.026.653 1.552 1.657 2.54.616.605 1.01 1.223 1.082 1.912.055.537-.096 1.059-.38 1.572.637.121 1.294.187 1.967.187.657 0 1.298-.063 1.921-.178-.287-.517-.44-1.041-.384-1.581.07-.69.465-1.307 1.081-1.913 1.004-.987 1.647-2.513 1.657-2.539.021-.074.083-.285.233-.542.09-.154.208-.323.4-.467a1.08 1.08 0 0 1 .787-.203c.359.056.604.29.762.543s.247.55.265.874v.015c.225-.34.457-.67.683-.952.23-.286.432-.52.71-.694.257-.16.547-.284.84-.285a.97.97 0 0 1 .524.151c.228.143.373.388.43.625l.006.04a10.3 10.3 0 0 0 .534-3.273c0-5.731-4.678-10.378-10.449-10.378M8.327 6.583a1.5 1.5 0 0 1 .713.174 1.487 1.487 0 0 1 .617 2.013c-.183.343-.762-.214-1.102-.094-.38.134-.532.914-.917.71a1.487 1.487 0 0 1 .69-2.803m7.486 0a1.487 1.487 0 0 1 .689 2.803c-.385.204-.536-.576-.916-.71-.34-.12-.92.437-1.103.094a1.487 1.487 0 0 1 .617-2.013 1.5 1.5 0 0 1 .713-.174m-10.68 1.55a.96.96 0 1 1 0 1.921.96.96 0 0 1 0-1.92m13.838 0a.96.96 0 1 1 0 1.92.96.96 0 0 1 0-1.92M8.489 11.458c.588.01 1.965 1.157 3.572 1.164 1.607-.007 2.984-1.155 3.572-1.164.196-.003.305.12.305.454 0 .886-.424 2.328-1.563 3.202-.22-.756-1.396-1.366-1.63-1.32q-.011.001-.02.006l-.044.026-.01.008-.03.024q-.018.017-.035.036l-.032.04a1 1 0 0 0-.058.09l-.014.025q-.049.088-.11.19a1 1 0 0 1-.083.116 1.2 1.2 0 0 1-.173.18q-.035.029-.075.058a1.3 1.3 0 0 1-.251-.243 1 1 0 0 1-.076-.107c-.124-.193-.177-.363-.337-.444-.034-.016-.104-.008-.2.022q-.094.03-.216.087-.06.028-.125.063l-.13.074q-.067.04-.136.086a3 3 0 0 0-.135.096 3 3 0 0 0-.26.219 2 2 0 0 0-.12.121 2 2 0 0 0-.106.128l-.002.002a2 2 0 0 0-.09.132l-.001.001a1.2 1.2 0 0 0-.105.212q-.013.036-.024.073c-1.139-.875-1.563-2.317-1.563-3.203 0-.334.109-.457.305-.454m.836 10.354c.824-1.19.766-2.082-.365-3.194-1.13-1.112-1.789-2.738-1.789-2.738s-.246-.945-.806-.858-.97 1.499.202 2.362c1.173.864-.233 1.45-.685.64-.45-.812-1.683-2.896-2.322-3.295s-1.089-.175-.938.647 2.822 2.813 2.562 3.244-1.176-.506-1.176-.506-2.866-2.567-3.49-1.898.473 1.23 2.037 2.16c1.564.932 1.686 1.178 1.464 1.53s-3.675-2.511-4-1.297c-.323 1.214 3.524 1.567 3.287 2.405-.238.839-2.71-1.587-3.216-.642-.506.946 3.49 2.056 3.522 2.064 1.29.33 4.568 1.028 5.713-.624m5.349 0c-.824-1.19-.766-2.082.365-3.194 1.13-1.112 1.789-2.738 1.789-2.738s.246-.945.806-.858.97 1.499-.202 2.362c-1.173.864.233 1.45.685.64.451-.812 1.683-2.896 2.322-3.295s1.089-.175.938.647-2.822 2.813-2.562 3.244 1.176-.506 1.176-.506 2.866-2.567 3.49-1.898-.473 1.23-2.037 2.16c-1.564.932-1.686 1.178-1.464 1.53s3.675-2.511 4-1.297c.323 1.214-3.524 1.567-3.287 2.405.238.839 2.71-1.587 3.216-.642.506.946-3.49 2.056-3.522 2.064-1.29.33-4.568 1.028-5.713-.624"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Hugging Face</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">ai-embed</span></div>
+              <div class="db-cell cell-role">ai-embeddings</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">0</span></div>
+              <div class="db-cell cell-out"><span class="mono num">2</span></div>
+              <div class="svc-popover" role="note" aria-label="Hugging Face details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#FFD21E" d="M12.025 1.13c-5.77 0-10.449 4.647-10.449 10.378 0 1.112.178 2.181.503 3.185.064-.222.203-.444.416-.577a.96.96 0 0 1 .524-.15c.293 0 .584.124.84.284.278.173.48.408.71.694.226.282.458.611.684.951v-.014c.017-.324.106-.622.264-.874s.403-.487.762-.543c.3-.047.596.06.787.203s.31.313.4.467c.15.257.212.468.233.542.01.026.653 1.552 1.657 2.54.616.605 1.01 1.223 1.082 1.912.055.537-.096 1.059-.38 1.572.637.121 1.294.187 1.967.187.657 0 1.298-.063 1.921-.178-.287-.517-.44-1.041-.384-1.581.07-.69.465-1.307 1.081-1.913 1.004-.987 1.647-2.513 1.657-2.539.021-.074.083-.285.233-.542.09-.154.208-.323.4-.467a1.08 1.08 0 0 1 .787-.203c.359.056.604.29.762.543s.247.55.265.874v.015c.225-.34.457-.67.683-.952.23-.286.432-.52.71-.694.257-.16.547-.284.84-.285a.97.97 0 0 1 .524.151c.228.143.373.388.43.625l.006.04a10.3 10.3 0 0 0 .534-3.273c0-5.731-4.678-10.378-10.449-10.378M8.327 6.583a1.5 1.5 0 0 1 .713.174 1.487 1.487 0 0 1 .617 2.013c-.183.343-.762-.214-1.102-.094-.38.134-.532.914-.917.71a1.487 1.487 0 0 1 .69-2.803m7.486 0a1.487 1.487 0 0 1 .689 2.803c-.385.204-.536-.576-.916-.71-.34-.12-.92.437-1.103.094a1.487 1.487 0 0 1 .617-2.013 1.5 1.5 0 0 1 .713-.174m-10.68 1.55a.96.96 0 1 1 0 1.921.96.96 0 0 1 0-1.92m13.838 0a.96.96 0 1 1 0 1.92.96.96 0 0 1 0-1.92M8.489 11.458c.588.01 1.965 1.157 3.572 1.164 1.607-.007 2.984-1.155 3.572-1.164.196-.003.305.12.305.454 0 .886-.424 2.328-1.563 3.202-.22-.756-1.396-1.366-1.63-1.32q-.011.001-.02.006l-.044.026-.01.008-.03.024q-.018.017-.035.036l-.032.04a1 1 0 0 0-.058.09l-.014.025q-.049.088-.11.19a1 1 0 0 1-.083.116 1.2 1.2 0 0 1-.173.18q-.035.029-.075.058a1.3 1.3 0 0 1-.251-.243 1 1 0 0 1-.076-.107c-.124-.193-.177-.363-.337-.444-.034-.016-.104-.008-.2.022q-.094.03-.216.087-.06.028-.125.063l-.13.074q-.067.04-.136.086a3 3 0 0 0-.135.096 3 3 0 0 0-.26.219 2 2 0 0 0-.12.121 2 2 0 0 0-.106.128l-.002.002a2 2 0 0 0-.09.132l-.001.001a1.2 1.2 0 0 0-.105.212q-.013.036-.024.073c-1.139-.875-1.563-2.317-1.563-3.203 0-.334.109-.457.305-.454m.836 10.354c.824-1.19.766-2.082-.365-3.194-1.13-1.112-1.789-2.738-1.789-2.738s-.246-.945-.806-.858-.97 1.499.202 2.362c1.173.864-.233 1.45-.685.64-.45-.812-1.683-2.896-2.322-3.295s-1.089-.175-.938.647 2.822 2.813 2.562 3.244-1.176-.506-1.176-.506-2.866-2.567-3.49-1.898.473 1.23 2.037 2.16c1.564.932 1.686 1.178 1.464 1.53s-3.675-2.511-4-1.297c-.323 1.214 3.524 1.567 3.287 2.405-.238.839-2.71-1.587-3.216-.642-.506.946 3.49 2.056 3.522 2.064 1.29.33 4.568 1.028 5.713-.624m5.349 0c-.824-1.19-.766-2.082.365-3.194 1.13-1.112 1.789-2.738 1.789-2.738s.246-.945.806-.858.97 1.499-.202 2.362c-1.173.864.233 1.45.685.64.451-.812 1.683-2.896 2.322-3.295s1.089-.175.938.647-2.822 2.813-2.562 3.244 1.176-.506 1.176-.506 2.866-2.567 3.49-1.898-.473 1.23-2.037 2.16c-1.564.932-1.686 1.178-1.464 1.53s3.675-2.511 4-1.297c.323 1.214-3.524 1.567-3.287 2.405.238.839 2.71-1.587 3.216-.642.506.946-3.49 2.056-3.522 2.064-1.29.33-4.568 1.028-5.713-.624"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Hugging Face</div>
+                  <div class="pop-id mono">ai-embed</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>ai-embeddings</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">0</span> in &middot; <span class="mono">2</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="mail-legacy">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#F06B66" d="M11.837 0c6.602 0 11.984 5.381 11.984 11.994-.017 2.99-3.264 4.84-5.844 3.331a3.805 3.805 0 0 1-.06-.035l-.055-.033-.022.055c-2.554 4.63-9.162 4.758-11.894.232-2.732-4.527.46-10.313 5.746-10.416a6.868 6.868 0 0 1 7.002 6.866 1.265 1.265 0 0 0 2.52 0c0-5.18-4.197-9.38-9.377-9.387C4.611 2.594.081 10.41 3.683 16.673c3.238 5.632 11.08 6.351 15.289 1.402l1.997 1.686A11.95 11.95 0 0 1 11.837 24C2.6 23.72-2.87 13.543 1.992 5.684A12.006 12.006 0 0 1 11.837 0Zm0 7.745c-3.276-.163-5.5 3.281-4.003 6.2a4.26 4.26 0 0 0 4.014 2.31c3.276-.171 5.137-3.824 3.35-6.575a4.26 4.26 0 0 0-3.36-1.935Zm0 2.53c1.324 0 2.152 1.433 1.49 2.58a1.72 1.72 0 0 1-1.49.86 1.72 1.72 0 1 1 0-3.44Z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Mailgun</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">mail-legacy</span></div>
+              <div class="db-cell cell-role">email-legacy</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"><span class="status-flag status-removed">Removed</span><span class="status-arrow">→ <span class="mono">mail-tx</span></span></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Mailgun details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#F06B66" d="M11.837 0c6.602 0 11.984 5.381 11.984 11.994-.017 2.99-3.264 4.84-5.844 3.331a3.805 3.805 0 0 1-.06-.035l-.055-.033-.022.055c-2.554 4.63-9.162 4.758-11.894.232-2.732-4.527.46-10.313 5.746-10.416a6.868 6.868 0 0 1 7.002 6.866 1.265 1.265 0 0 0 2.52 0c0-5.18-4.197-9.38-9.377-9.387C4.611 2.594.081 10.41 3.683 16.673c3.238 5.632 11.08 6.351 15.289 1.402l1.997 1.686A11.95 11.95 0 0 1 11.837 24C2.6 23.72-2.87 13.543 1.992 5.684A12.006 12.006 0 0 1 11.837 0Zm0 7.745c-3.276-.163-5.5 3.281-4.003 6.2a4.26 4.26 0 0 0 4.014 2.31c3.276-.171 5.137-3.824 3.35-6.575a4.26 4.26 0 0 0-3.36-1.935Zm0 2.53c1.324 0 2.152 1.433 1.49 2.58a1.72 1.72 0 0 1-1.49.86 1.72 1.72 0 1 1 0-3.44Z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Mailgun</div>
+                  <div class="pop-id mono">mail-legacy</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>email-legacy</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">0</span> out</span></div>
+                <div class="pop-row pop-status status-removed">Removed <span class="pop-replaces">→ <span class="mono">mail-tx</span></span></div>
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="mail-tx">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#000000" d="M14.679 0c4.648 0 7.413 2.765 7.413 6.434s-2.765 6.434-7.413 6.434H12.33L24 24h-8.245l-8.88-8.44c-.636-.588-.93-1.273-.93-1.86 0-.831.587-1.565 1.713-1.883l4.574-1.224c1.737-.465 2.936-1.81 2.936-3.572 0-2.153-1.761-3.4-3.939-3.4H0V0z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Resend</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">mail-tx</span></div>
+              <div class="db-cell cell-role">email-transactional</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">2</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Resend details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#000000" d="M14.679 0c4.648 0 7.413 2.765 7.413 6.434s-2.765 6.434-7.413 6.434H12.33L24 24h-8.245l-8.88-8.44c-.636-.588-.93-1.273-.93-1.86 0-.831.587-1.565 1.713-1.883l4.574-1.224c1.737-.465 2.936-1.81 2.936-3.572 0-2.153-1.761-3.4-3.939-3.4H0V0z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Resend</div>
+                  <div class="pop-id mono">mail-tx</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>email-transactional</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">2</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="pay-cards">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#635BFF" d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Stripe</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">pay-cards</span></div>
+              <div class="db-cell cell-role">payments-cards</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Stripe details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#635BFF" d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Stripe</div>
+                  <div class="pop-id mono">pay-cards</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>payments-cards</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="pay-legacy">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#002991" d="M15.607 4.653H8.941L6.645 19.251H1.82L4.862 0h7.995c3.754 0 6.375 2.294 6.473 5.513-.648-.478-2.105-.86-3.722-.86m6.57 5.546c0 3.41-3.01 6.853-6.958 6.853h-2.493L11.595 24H6.74l1.845-11.538h3.592c4.208 0 7.346-3.634 7.153-6.949a5.24 5.24 0 0 1 2.848 4.686M9.653 5.546h6.408c.907 0 1.942.222 2.363.541-.195 2.741-2.655 5.483-6.441 5.483H8.714Z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">PayPal</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">pay-legacy</span></div>
+              <div class="db-cell cell-role">payments-legacy</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"><span class="status-flag status-phasing_out">Phasing out</span><span class="status-arrow">→ <span class="mono">pay-cards</span></span></div>
+              <div class="db-cell cell-in"><span class="mono num">2</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="PayPal details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#002991" d="M15.607 4.653H8.941L6.645 19.251H1.82L4.862 0h7.995c3.754 0 6.375 2.294 6.473 5.513-.648-.478-2.105-.86-3.722-.86m6.57 5.546c0 3.41-3.01 6.853-6.958 6.853h-2.493L11.595 24H6.74l1.845-11.538h3.592c4.208 0 7.346-3.634 7.153-6.949a5.24 5.24 0 0 1 2.848 4.686M9.653 5.546h6.408c.907 0 1.942.222 2.363.541-.195 2.741-2.655 5.483-6.441 5.483H8.714Z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">PayPal</div>
+                  <div class="pop-id mono">pay-legacy</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>payments-legacy</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">2</span> in &middot; <span class="mono">0</span> out</span></div>
+                <div class="pop-row pop-status status-phasing_out">Phasing out <span class="pop-replaces">→ <span class="mono">pay-cards</span></span></div>
+                
+              </div>
+            </div>
+            </div>
+            </div>
+          </div>
+        </section>
+<section class="band" id="runs-on" aria-labelledby="runs-on-h">
+          <div class="band-head">
+            <h2 id="runs-on-h">Runs on</h2>
+            <span class="band-count mono">4</span>
+          </div>
+          
+          <div class="band-hr"></div>
+          <div class="db-table" role="table" aria-label="Runs on services">
+            <div class="db-header" role="row">
+              <div class="db-cell cell-service">Service</div>
+              <div class="db-cell cell-id">ID</div>
+              <div class="db-cell cell-role">Role</div>
+              <div class="db-cell cell-kind">Kind</div>
+              <div class="db-cell cell-version">Ver.</div>
+              <div class="db-cell cell-status">Status</div>
+              <div class="db-cell cell-in">In</div>
+              <div class="db-cell cell-out">Out</div>
+            </div>
+            <div class="db-body">
+            <div class="db-row" tabindex="0" data-id="stack-lang">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#3178C6" d="M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">TypeScript</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">stack-lang</span></div>
+              <div class="db-cell cell-role">language-shared</div>
+              <div class="db-cell cell-kind"><span class="kind-rare">stack</span></div>
+              <div class="db-cell cell-version"><span class="mono muted-num">5</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">4</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="TypeScript details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#3178C6" d="M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">TypeScript</div>
+                  <div class="pop-id mono">stack-lang</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>language-shared</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>stack</span></div>
+                <div class="pop-row"><span class="pop-label">Version</span><span class="mono">5</span></div>
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">4</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="stack-mobile">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#1C2024" d="M0 20.084c.043.53.23 1.063.718 1.778.58.849 1.576 1.315 2.303.567.49-.505 5.794-9.776 8.35-13.29a.761.761 0 011.248 0c2.556 3.514 7.86 12.785 8.35 13.29.727.748 1.723.282 2.303-.567.57-.835.728-1.42.728-2.046 0-.426-8.26-15.798-9.092-17.078-.8-1.23-1.044-1.498-2.397-1.542h-1.032c-1.353.044-1.597.311-2.398 1.542C8.267 3.991.33 18.758 0 19.77Z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Expo</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">stack-mobile</span></div>
+              <div class="db-cell cell-role">ui-mobile</div>
+              <div class="db-cell cell-kind"><span class="kind-rare">stack</span></div>
+              <div class="db-cell cell-version"><span class="mono muted-num">52</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">0</span></div>
+              <div class="db-cell cell-out"><span class="mono num">2</span></div>
+              <div class="svc-popover" role="note" aria-label="Expo details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#1C2024" d="M0 20.084c.043.53.23 1.063.718 1.778.58.849 1.576 1.315 2.303.567.49-.505 5.794-9.776 8.35-13.29a.761.761 0 011.248 0c2.556 3.514 7.86 12.785 8.35 13.29.727.748 1.723.282 2.303-.567.57-.835.728-1.42.728-2.046 0-.426-8.26-15.798-9.092-17.078-.8-1.23-1.044-1.498-2.397-1.542h-1.032c-1.353.044-1.597.311-2.398 1.542C8.267 3.991.33 18.758 0 19.77Z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Expo</div>
+                  <div class="pop-id mono">stack-mobile</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>ui-mobile</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>stack</span></div>
+                <div class="pop-row"><span class="pop-label">Version</span><span class="mono">52</span></div>
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">0</span> in &middot; <span class="mono">2</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="stack-runtime">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#512BD4" d="M24 8.77h-2.468v7.565h-1.425V8.77h-2.462V7.53H24zm-6.852 7.565h-4.821V7.53h4.63v1.24h-3.205v2.494h2.953v1.234h-2.953v2.604h3.396zm-6.708 0H8.882L4.78 9.863a2.896 2.896 0 0 1-.258-.51h-.036c.032.189.048.592.048 1.21v5.772H3.157V7.53h1.659l3.965 6.32c.167.261.275.442.323.54h.024c-.04-.233-.06-.629-.06-1.185V7.529h1.372zm-8.703-.693a.868.829 0 0 1-.869.829.868.829 0 0 1-.868-.83.868.829 0 0 1 .868-.828.868.829 0 0 1 .869.829Z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">.NET</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">stack-runtime</span></div>
+              <div class="db-cell cell-role">runtime-backend</div>
+              <div class="db-cell cell-kind"><span class="kind-rare">stack</span></div>
+              <div class="db-cell cell-version"><span class="mono muted-num">10</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">2</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label=".NET details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#512BD4" d="M24 8.77h-2.468v7.565h-1.425V8.77h-2.462V7.53H24zm-6.852 7.565h-4.821V7.53h4.63v1.24h-3.205v2.494h2.953v1.234h-2.953v2.604h3.396zm-6.708 0H8.882L4.78 9.863a2.896 2.896 0 0 1-.258-.51h-.036c.032.189.048.592.048 1.21v5.772H3.157V7.53h1.659l3.965 6.32c.167.261.275.442.323.54h.024c-.04-.233-.06-.629-.06-1.185V7.529h1.372zm-8.703-.693a.868.829 0 0 1-.869.829.868.829 0 0 1-.868-.83.868.829 0 0 1 .868-.828.868.829 0 0 1 .869.829Z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">.NET</div>
+                  <div class="pop-id mono">stack-runtime</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>runtime-backend</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>stack</span></div>
+                <div class="pop-row"><span class="pop-label">Version</span><span class="mono">10</span></div>
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">2</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="stack-ui">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#61DAFB" d="M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">React</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">stack-ui</span></div>
+              <div class="db-cell cell-role">ui-framework</div>
+              <div class="db-cell cell-kind"><span class="kind-rare">stack</span></div>
+              <div class="db-cell cell-version"><span class="mono muted-num">19</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="React details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#61DAFB" d="M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">React</div>
+                  <div class="pop-id mono">stack-ui</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>ui-framework</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>stack</span></div>
+                <div class="pop-row"><span class="pop-label">Version</span><span class="mono">19</span></div>
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+            </div>
+          </div>
+        </section>
+<section class="band" id="watched-by" aria-labelledby="watched-by-h">
+          <div class="band-head">
+            <h2 id="watched-by-h">Watched by</h2>
+            <span class="band-count mono">4</span>
+          </div>
+          
+          <div class="band-hr"></div>
+          <div class="db-table" role="table" aria-label="Watched by services">
+            <div class="db-header" role="row">
+              <div class="db-cell cell-service">Service</div>
+              <div class="db-cell cell-id">ID</div>
+              <div class="db-cell cell-role">Role</div>
+              <div class="db-cell cell-kind">Kind</div>
+              <div class="db-cell cell-version">Ver.</div>
+              <div class="db-cell cell-status">Status</div>
+              <div class="db-cell cell-in">In</div>
+              <div class="db-cell cell-out">Out</div>
+            </div>
+            <div class="db-body">
+            <div class="db-row" tabindex="0" data-id="analytics-product">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#000000" d="M9.854 14.5 5 9.647.854 5.5A.5.5 0 0 0 0 5.854V8.44a.5.5 0 0 0 .146.353L5 13.647l.147.146L9.854 18.5l.146.147v-.049c.065.03.134.049.207.049h2.586a.5.5 0 0 0 .353-.854L9.854 14.5zm0-5-4-4a.487.487 0 0 0-.409-.144.515.515 0 0 0-.356.21.493.493 0 0 0-.089.288V8.44a.5.5 0 0 0 .147.353l9 9a.5.5 0 0 0 .853-.354v-2.585a.5.5 0 0 0-.146-.354l-5-5zm1-4a.5.5 0 0 0-.854.354V8.44a.5.5 0 0 0 .147.353l4 4a.5.5 0 0 0 .853-.354V9.854a.5.5 0 0 0-.146-.354l-4-4zm12.647 11.515a3.863 3.863 0 0 1-2.232-1.1l-4.708-4.707a.5.5 0 0 0-.854.354v6.585a.5.5 0 0 0 .5.5H23.5a.5.5 0 0 0 .5-.5v-.6c0-.276-.225-.497-.499-.532zm-5.394.032a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6zM.854 15.5a.5.5 0 0 0-.854.354v2.293a.5.5 0 0 0 .5.5h2.293c.222 0 .39-.135.462-.309a.493.493 0 0 0-.109-.545L.854 15.501zM5 14.647.854 10.5a.5.5 0 0 0-.854.353v2.586a.5.5 0 0 0 .146.353L4.854 18.5l.146.147h2.793a.5.5 0 0 0 .353-.854L5 14.647z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">PostHog</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">analytics-product</span></div>
+              <div class="db-cell cell-role">analytics-product</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">0</span></div>
+              <div class="db-cell cell-out"><span class="mono num">2</span></div>
+              <div class="svc-popover" role="note" aria-label="PostHog details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#000000" d="M9.854 14.5 5 9.647.854 5.5A.5.5 0 0 0 0 5.854V8.44a.5.5 0 0 0 .146.353L5 13.647l.147.146L9.854 18.5l.146.147v-.049c.065.03.134.049.207.049h2.586a.5.5 0 0 0 .353-.854L9.854 14.5zm0-5-4-4a.487.487 0 0 0-.409-.144.515.515 0 0 0-.356.21.493.493 0 0 0-.089.288V8.44a.5.5 0 0 0 .147.353l9 9a.5.5 0 0 0 .853-.354v-2.585a.5.5 0 0 0-.146-.354l-5-5zm1-4a.5.5 0 0 0-.854.354V8.44a.5.5 0 0 0 .147.353l4 4a.5.5 0 0 0 .853-.354V9.854a.5.5 0 0 0-.146-.354l-4-4zm12.647 11.515a3.863 3.863 0 0 1-2.232-1.1l-4.708-4.707a.5.5 0 0 0-.854.354v6.585a.5.5 0 0 0 .5.5H23.5a.5.5 0 0 0 .5-.5v-.6c0-.276-.225-.497-.499-.532zm-5.394.032a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6zM.854 15.5a.5.5 0 0 0-.854.354v2.293a.5.5 0 0 0 .5.5h2.293c.222 0 .39-.135.462-.309a.493.493 0 0 0-.109-.545L.854 15.501zM5 14.647.854 10.5a.5.5 0 0 0-.854.353v2.586a.5.5 0 0 0 .146.353L4.854 18.5l.146.147h2.793a.5.5 0 0 0 .353-.854L5 14.647z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">PostHog</div>
+                  <div class="pop-id mono">analytics-product</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>analytics-product</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">0</span> in &middot; <span class="mono">2</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="obs-errors">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#362D59" d="M13.91 2.505c-.873-1.448-2.972-1.448-3.844 0L6.904 7.92a15.478 15.478 0 0 1 8.53 12.811h-2.221A13.301 13.301 0 0 0 5.784 9.814l-2.926 5.06a7.65 7.65 0 0 1 4.435 5.848H2.194a.365.365 0 0 1-.298-.534l1.413-2.402a5.16 5.16 0 0 0-1.614-.913L.296 19.275a2.182 2.182 0 0 0 .812 2.999 2.24 2.24 0 0 0 1.086.288h6.983a9.322 9.322 0 0 0-3.845-8.318l1.11-1.922a11.47 11.47 0 0 1 4.95 10.24h5.915a17.242 17.242 0 0 0-7.885-15.28l2.244-3.845a.37.37 0 0 1 .504-.13c.255.14 9.75 16.708 9.928 16.9a.365.365 0 0 1-.327.543h-2.287c.029.612.029 1.223 0 1.831h2.297a2.206 2.206 0 0 0 1.922-3.31z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Sentry</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">obs-errors</span></div>
+              <div class="db-cell cell-role">monitoring-errors</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Sentry details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#362D59" d="M13.91 2.505c-.873-1.448-2.972-1.448-3.844 0L6.904 7.92a15.478 15.478 0 0 1 8.53 12.811h-2.221A13.301 13.301 0 0 0 5.784 9.814l-2.926 5.06a7.65 7.65 0 0 1 4.435 5.848H2.194a.365.365 0 0 1-.298-.534l1.413-2.402a5.16 5.16 0 0 0-1.614-.913L.296 19.275a2.182 2.182 0 0 0 .812 2.999 2.24 2.24 0 0 0 1.086.288h6.983a9.322 9.322 0 0 0-3.845-8.318l1.11-1.922a11.47 11.47 0 0 1 4.95 10.24h5.915a17.242 17.242 0 0 0-7.885-15.28l2.244-3.845a.37.37 0 0 1 .504-.13c.255.14 9.75 16.708 9.928 16.9a.365.365 0 0 1-.327.543h-2.287c.029.612.029 1.223 0 1.831h2.297a2.206 2.206 0 0 0 1.922-3.31z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Sentry</div>
+                  <div class="pop-id mono">obs-errors</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>monitoring-errors</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="obs-metrics">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#632CA6" d="M19.57 17.04l-1.997-1.316-1.665 2.782-1.937-.567-1.706 2.604.087.82 9.274-1.71-.538-5.794zm-8.649-2.498l1.488-.204c.241.108.409.15.697.223.45.117.97.23 1.741-.16.18-.088.553-.43.704-.625l6.096-1.106.622 7.527-10.444 1.882zm11.325-2.712l-.602.115L20.488 0 .789 2.285l2.427 19.693 2.306-.334c-.184-.263-.471-.581-.96-.989-.68-.564-.44-1.522-.039-2.127.53-1.022 3.26-2.322 3.106-3.956-.056-.594-.15-1.368-.702-1.898-.02.22.017.432.017.432s-.227-.289-.34-.683c-.112-.15-.2-.199-.319-.4-.085.233-.073.503-.073.503s-.186-.437-.216-.807c-.11.166-.137.48-.137.48s-.241-.69-.186-1.062c-.11-.323-.436-.965-.343-2.424.6.421 1.924.321 2.44-.439.171-.251.288-.939-.086-2.293-.24-.868-.835-2.16-1.066-2.651l-.028.02c.122.395.374 1.223.47 1.625.293 1.218.372 1.642.234 2.204-.116.488-.397.808-1.107 1.165-.71.358-1.653-.514-1.713-.562-.69-.55-1.224-1.447-1.284-1.883-.062-.477.275-.763.445-1.153-.243.07-.514.192-.514.192s.323-.334.722-.624c.165-.109.262-.178.436-.323a9.762 9.762 0 0 0-.456.003s.42-.227.855-.392c-.318-.014-.623-.003-.623-.003s.937-.419 1.678-.727c.509-.208 1.006-.147 1.286.257.367.53.752.817 1.569.996.501-.223.653-.337 1.284-.509.554-.61.99-.688.99-.688s-.216.198-.274.51c.314-.249.66-.455.66-.455s-.134.164-.259.426l.03.043c.366-.22.797-.394.797-.394s-.123.156-.268.358c.277-.002.838.012 1.056.037 1.285.028 1.552-1.374 2.045-1.55.618-.22.894-.353 1.947.68.903.888 1.609 2.477 1.259 2.833-.294.295-.874-.115-1.516-.916a3.466 3.466 0 0 1-.716-1.562 1.533 1.533 0 0 0-.497-.85s.23.51.23.96c0 .246.03 1.165.424 1.68-.039.076-.057.374-.1.43-.458-.554-1.443-.95-1.604-1.067.544.445 1.793 1.468 2.273 2.449.453.927.186 1.777.416 1.997.065.063.976 1.197 1.15 1.767.306.994.019 2.038-.381 2.685l-1.117.174c-.163-.045-.273-.068-.42-.153.08-.143.241-.5.243-.572l-.063-.111c-.348.492-.93.97-1.414 1.245-.633.359-1.363.304-1.838.156-1.348-.415-2.623-1.327-2.93-1.566 0 0-.01.191.048.234.34.383 1.119 1.077 1.872 1.56l-1.605.177.759 5.908c-.337.048-.39.071-.757.124-.325-1.147-.946-1.895-1.624-2.332-.599-.384-1.424-.47-2.214-.314l-.05.059a2.851 2.851 0 0 1 1.863.444c.654.413 1.181 1.481 1.375 2.124.248.822.42 1.7-.248 2.632-.476.662-1.864 1.028-2.986.237.3.481.705.876 1.25.95.809.11 1.577-.03 2.106-.574.452-.464.69-1.434.628-2.456l.714-.104.258 1.834 11.827-1.424zM15.05 6.848c-.034.075-.085.125-.007.37l.004.014.013.032.032.073c.14.287.295.558.552.696.067-.011.136-.019.207-.023.242-.01.395.028.492.08.009-.048.01-.119.005-.222-.018-.364.072-.982-.626-1.308-.264-.122-.634-.084-.757.068a.302.302 0 0 1 .058.013c.186.066.06.13.027.207m1.958 3.392c-.092-.05-.52-.03-.821.005-.574.068-1.193.267-1.328.372-.247.191-.135.523.047.66.511.382.96.638 1.432.575.29-.038.546-.497.728-.914.124-.288.124-.598-.058-.698m-5.077-2.942c.162-.154-.805-.355-1.556.156-.554.378-.571 1.187-.041 1.646.053.046.096.078.137.104a4.77 4.77 0 0 1 1.396-.412c.113-.125.243-.345.21-.745-.044-.542-.455-.456-.146-.749"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Datadog</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">obs-metrics</span></div>
+              <div class="db-cell cell-role">monitoring-metrics</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Datadog details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#632CA6" d="M19.57 17.04l-1.997-1.316-1.665 2.782-1.937-.567-1.706 2.604.087.82 9.274-1.71-.538-5.794zm-8.649-2.498l1.488-.204c.241.108.409.15.697.223.45.117.97.23 1.741-.16.18-.088.553-.43.704-.625l6.096-1.106.622 7.527-10.444 1.882zm11.325-2.712l-.602.115L20.488 0 .789 2.285l2.427 19.693 2.306-.334c-.184-.263-.471-.581-.96-.989-.68-.564-.44-1.522-.039-2.127.53-1.022 3.26-2.322 3.106-3.956-.056-.594-.15-1.368-.702-1.898-.02.22.017.432.017.432s-.227-.289-.34-.683c-.112-.15-.2-.199-.319-.4-.085.233-.073.503-.073.503s-.186-.437-.216-.807c-.11.166-.137.48-.137.48s-.241-.69-.186-1.062c-.11-.323-.436-.965-.343-2.424.6.421 1.924.321 2.44-.439.171-.251.288-.939-.086-2.293-.24-.868-.835-2.16-1.066-2.651l-.028.02c.122.395.374 1.223.47 1.625.293 1.218.372 1.642.234 2.204-.116.488-.397.808-1.107 1.165-.71.358-1.653-.514-1.713-.562-.69-.55-1.224-1.447-1.284-1.883-.062-.477.275-.763.445-1.153-.243.07-.514.192-.514.192s.323-.334.722-.624c.165-.109.262-.178.436-.323a9.762 9.762 0 0 0-.456.003s.42-.227.855-.392c-.318-.014-.623-.003-.623-.003s.937-.419 1.678-.727c.509-.208 1.006-.147 1.286.257.367.53.752.817 1.569.996.501-.223.653-.337 1.284-.509.554-.61.99-.688.99-.688s-.216.198-.274.51c.314-.249.66-.455.66-.455s-.134.164-.259.426l.03.043c.366-.22.797-.394.797-.394s-.123.156-.268.358c.277-.002.838.012 1.056.037 1.285.028 1.552-1.374 2.045-1.55.618-.22.894-.353 1.947.68.903.888 1.609 2.477 1.259 2.833-.294.295-.874-.115-1.516-.916a3.466 3.466 0 0 1-.716-1.562 1.533 1.533 0 0 0-.497-.85s.23.51.23.96c0 .246.03 1.165.424 1.68-.039.076-.057.374-.1.43-.458-.554-1.443-.95-1.604-1.067.544.445 1.793 1.468 2.273 2.449.453.927.186 1.777.416 1.997.065.063.976 1.197 1.15 1.767.306.994.019 2.038-.381 2.685l-1.117.174c-.163-.045-.273-.068-.42-.153.08-.143.241-.5.243-.572l-.063-.111c-.348.492-.93.97-1.414 1.245-.633.359-1.363.304-1.838.156-1.348-.415-2.623-1.327-2.93-1.566 0 0-.01.191.048.234.34.383 1.119 1.077 1.872 1.56l-1.605.177.759 5.908c-.337.048-.39.071-.757.124-.325-1.147-.946-1.895-1.624-2.332-.599-.384-1.424-.47-2.214-.314l-.05.059a2.851 2.851 0 0 1 1.863.444c.654.413 1.181 1.481 1.375 2.124.248.822.42 1.7-.248 2.632-.476.662-1.864 1.028-2.986.237.3.481.705.876 1.25.95.809.11 1.577-.03 2.106-.574.452-.464.69-1.434.628-2.456l.714-.104.258 1.834 11.827-1.424zM15.05 6.848c-.034.075-.085.125-.007.37l.004.014.013.032.032.073c.14.287.295.558.552.696.067-.011.136-.019.207-.023.242-.01.395.028.492.08.009-.048.01-.119.005-.222-.018-.364.072-.982-.626-1.308-.264-.122-.634-.084-.757.068a.302.302 0 0 1 .058.013c.186.066.06.13.027.207m1.958 3.392c-.092-.05-.52-.03-.821.005-.574.068-1.193.267-1.328.372-.247.191-.135.523.047.66.511.382.96.638 1.432.575.29-.038.546-.497.728-.914.124-.288.124-.598-.058-.698m-5.077-2.942c.162-.154-.805-.355-1.556.156-.554.378-.571 1.187-.041 1.646.053.046.096.078.137.104a4.77 4.77 0 0 1 1.396-.412c.113-.125.243-.345.21-.745-.044-.542-.455-.456-.146-.749"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Datadog</div>
+                  <div class="pop-id mono">obs-metrics</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>monitoring-metrics</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="obs-trace">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#000000" d="M12.6974 13.1173c-1.0224 1.0224-1.0224 2.68 0 3.7024 1.0224 1.0224 2.68 1.0224 3.7024 0 1.0224-1.0223 1.0224-2.68 0-3.7024-1.0223-1.0223-2.68-1.0223-3.7024 0zm2.7677 2.7701c-.5063.5063-1.3267.5063-1.833 0s-.5063-1.3266 0-1.833c.5063-.5062 1.3267-.5062 1.833 0 .5063.504.5063 1.3267 0 1.833zM16.356.2355l-1.6041 1.6042c-.314.314-.314.83 0 1.144L21.015 9.247c.314.314.83.314 1.144 0l1.6042-1.6041c.314-.314.314-.83 0-1.144L17.4976.2354c-.314-.314-.8276-.314-1.1416 0zM5.1173 20.734c.2848-.2848.2848-.7497 0-1.0345l-.8155-.8155c-.2848-.2848-.7497-.2848-1.0345 0l-1.6845 1.6845-.0024.0024-.4625-.4625c-.2556-.2556-.6718-.2556-.925 0-.2556.2556-.2556.6718 0 .925l2.775 2.775c.2556.2556.6718.2556.925 0 .2532-.2556.2556-.6718 0-.925l-.4625-.4625.0024-.0024zm8.4856-15.893-3.5637 3.5637c-.3164.3164-.3164.8374 0 1.1538l2.2006 2.2005c1.5554-1.1197 3.7365-.981 5.1361.4187l1.7819-1.7818c.3164-.3165.3164-.8374 0-1.1538l-4.401-4.401c-.3165-.319-.8374-.319-1.1539 0zm-2.2881 7.8455-1.2999-1.2999c-.3043-.3043-.8033-.3043-1.1076 0l-4.5836 4.586c-.3042.3043-.3042.8033 0 1.1076l2.5973 2.5973c.3043.3043.8033.3043 1.1076 0l2.9478-2.9527c-.6231-1.2877-.5112-2.8431.3384-4.0383z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">OpenTelemetry</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">obs-trace</span></div>
+              <div class="db-cell cell-role">telemetry-transport</div>
+              <div class="db-cell cell-kind"><span class="kind-rare">component</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">3</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="OpenTelemetry details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#000000" d="M12.6974 13.1173c-1.0224 1.0224-1.0224 2.68 0 3.7024 1.0224 1.0224 2.68 1.0224 3.7024 0 1.0224-1.0223 1.0224-2.68 0-3.7024-1.0223-1.0223-2.68-1.0223-3.7024 0zm2.7677 2.7701c-.5063.5063-1.3267.5063-1.833 0s-.5063-1.3266 0-1.833c.5063-.5062 1.3267-.5062 1.833 0 .5063.504.5063 1.3267 0 1.833zM16.356.2355l-1.6041 1.6042c-.314.314-.314.83 0 1.144L21.015 9.247c.314.314.83.314 1.144 0l1.6042-1.6041c.314-.314.314-.83 0-1.144L17.4976.2354c-.314-.314-.8276-.314-1.1416 0zM5.1173 20.734c.2848-.2848.2848-.7497 0-1.0345l-.8155-.8155c-.2848-.2848-.7497-.2848-1.0345 0l-1.6845 1.6845-.0024.0024-.4625-.4625c-.2556-.2556-.6718-.2556-.925 0-.2556.2556-.2556.6718 0 .925l2.775 2.775c.2556.2556.6718.2556.925 0 .2532-.2556.2556-.6718 0-.925l-.4625-.4625.0024-.0024zm8.4856-15.893-3.5637 3.5637c-.3164.3164-.3164.8374 0 1.1538l2.2006 2.2005c1.5554-1.1197 3.7365-.981 5.1361.4187l1.7819-1.7818c.3164-.3165.3164-.8374 0-1.1538l-4.401-4.401c-.3165-.319-.8374-.319-1.1539 0zm-2.2881 7.8455-1.2999-1.2999c-.3043-.3043-.8033-.3043-1.1076 0l-4.5836 4.586c-.3042.3043-.3042.8033 0 1.1076l2.5973 2.5973c.3043.3043.8033.3043 1.1076 0l2.9478-2.9527c-.6231-1.2877-.5112-2.8431.3384-4.0383z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">OpenTelemetry</div>
+                  <div class="pop-id mono">obs-trace</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>telemetry-transport</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>component</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">3</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+            </div>
+          </div>
+        </section>
+<section class="band" id="built-and-shipped-by" aria-labelledby="built-and-shipped-by-h">
+          <div class="band-head">
+            <h2 id="built-and-shipped-by-h">Built and shipped by</h2>
+            <span class="band-count mono">5</span>
+          </div>
+          
+          <div class="band-hr"></div>
+          <div class="db-table" role="table" aria-label="Built and shipped by services">
+            <div class="db-header" role="row">
+              <div class="db-cell cell-service">Service</div>
+              <div class="db-cell cell-id">ID</div>
+              <div class="db-cell cell-role">Role</div>
+              <div class="db-cell cell-kind">Kind</div>
+              <div class="db-cell cell-version">Ver.</div>
+              <div class="db-cell cell-status">Status</div>
+              <div class="db-cell cell-in">In</div>
+              <div class="db-cell cell-out">Out</div>
+            </div>
+            <div class="db-body">
+            <div class="db-row" tabindex="0" data-id="agent-claude">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#D97757" d="M21 10.5h3v3h-3v3h-1.5v3H18v-3h-1.5v3H15v-3H9v3H7.5v-3H6v3H4.5v-3H3v-3H0v-3h3v-6h18Zm-15 0h1.5v-3H6Zm10.5 0H18v-3h-1.5z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Claude Code</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">agent-claude</span></div>
+              <div class="db-cell cell-role">coding-agent</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">0</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Claude Code details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#D97757" d="M21 10.5h3v3h-3v3h-1.5v3H18v-3h-1.5v3H15v-3H9v3H7.5v-3H6v3H4.5v-3H3v-3H0v-3h3v-6h18Zm-15 0h1.5v-3H6Zm10.5 0H18v-3h-1.5z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Claude Code</div>
+                  <div class="pop-id mono">agent-claude</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>coding-agent</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">0</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="agent-cursor">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#000000" d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Cursor</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">agent-cursor</span></div>
+              <div class="db-cell cell-role">coding-review</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">0</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Cursor details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#000000" d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Cursor</div>
+                  <div class="pop-id mono">agent-cursor</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>coding-review</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">0</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="board">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#0052CC" d="M21.147 0H2.853A2.86 2.86 0 000 2.853v18.294A2.86 2.86 0 002.853 24h18.294A2.86 2.86 0 0024 21.147V2.853A2.86 2.86 0 0021.147 0zM10.34 17.287a.953.953 0 01-.953.953h-4a.954.954 0 01-.954-.953V5.38a.953.953 0 01.954-.953h4a.954.954 0 01.953.953zm9.233-5.467a.944.944 0 01-.953.947h-4a.947.947 0 01-.953-.947V5.38a.953.953 0 01.953-.953h4a.954.954 0 01.953.953z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Trello</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">board</span></div>
+              <div class="db-cell cell-role">pm</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">0</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Trello details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#0052CC" d="M21.147 0H2.853A2.86 2.86 0 000 2.853v18.294A2.86 2.86 0 002.853 24h18.294A2.86 2.86 0 0024 21.147V2.853A2.86 2.86 0 0021.147 0zM10.34 17.287a.953.953 0 01-.953.953h-4a.954.954 0 01-.954-.953V5.38a.953.953 0 01.954-.953h4a.954.954 0 01.953.953zm9.233-5.467a.944.944 0 01-.953.947h-4a.947.947 0 01-.953-.947V5.38a.953.953 0 01.953-.953h4a.954.954 0 01.953.953z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Trello</div>
+                  <div class="pop-id mono">board</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>pm</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">0</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="ci">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#2088FF" d="M10.984 13.836a.5.5 0 0 1-.353-.146l-.745-.743a.5.5 0 1 1 .706-.708l.392.391 1.181-1.18a.5.5 0 0 1 .708.707l-1.535 1.533a.504.504 0 0 1-.354.146zm9.353-.147l1.534-1.532a.5.5 0 0 0-.707-.707l-1.181 1.18-.392-.391a.5.5 0 1 0-.706.708l.746.743a.497.497 0 0 0 .706-.001zM4.527 7.452l2.557-1.585A1 1 0 0 0 7.09 4.17L4.533 2.56A1 1 0 0 0 3 3.406v3.196a1.001 1.001 0 0 0 1.527.85zm2.03-2.436L4 6.602V3.406l2.557 1.61zM24 12.5c0 1.93-1.57 3.5-3.5 3.5a3.503 3.503 0 0 1-3.46-3h-2.08a3.503 3.503 0 0 1-3.46 3 3.502 3.502 0 0 1-3.46-3h-.558c-.972 0-1.85-.399-2.482-1.042V17c0 1.654 1.346 3 3 3h.04c.244-1.693 1.7-3 3.46-3 1.93 0 3.5 1.57 3.5 3.5S13.43 24 11.5 24a3.502 3.502 0 0 1-3.46-3H8c-2.206 0-4-1.794-4-4V9.899A5.008 5.008 0 0 1 0 5c0-2.757 2.243-5 5-5s5 2.243 5 5a5.005 5.005 0 0 1-4.952 4.998A2.482 2.482 0 0 0 7.482 12h.558c.244-1.693 1.7-3 3.46-3a3.502 3.502 0 0 1 3.46 3h2.08a3.503 3.503 0 0 1 3.46-3c1.93 0 3.5 1.57 3.5 3.5zm-15 8c0 1.378 1.122 2.5 2.5 2.5s2.5-1.122 2.5-2.5-1.122-2.5-2.5-2.5S9 19.122 9 20.5zM5 9c2.206 0 4-1.794 4-4S7.206 1 5 1 1 2.794 1 5s1.794 4 4 4zm9 3.5c0-1.378-1.122-2.5-2.5-2.5S9 11.122 9 12.5s1.122 2.5 2.5 2.5 2.5-1.122 2.5-2.5zm9 0c0-1.378-1.122-2.5-2.5-2.5S18 11.122 18 12.5s1.122 2.5 2.5 2.5 2.5-1.122 2.5-2.5zm-13 8a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0zm2 0a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0zm12 0c0 1.93-1.57 3.5-3.5 3.5a3.503 3.503 0 0 1-3.46-3.002c-.007.001-.013.005-.021.005l-.506.017h-.017a.5.5 0 0 1-.016-.999l.506-.017c.018-.002.035.006.052.007A3.503 3.503 0 0 1 20.5 17c1.93 0 3.5 1.57 3.5 3.5zm-1 0c0-1.378-1.122-2.5-2.5-2.5S18 19.122 18 20.5s1.122 2.5 2.5 2.5 2.5-1.122 2.5-2.5z"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">GitHub Actions</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">ci</span></div>
+              <div class="db-cell cell-role">ci</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">0</span></div>
+              <div class="db-cell cell-out"><span class="mono num">5</span></div>
+              <div class="svc-popover" role="note" aria-label="GitHub Actions details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#2088FF" d="M10.984 13.836a.5.5 0 0 1-.353-.146l-.745-.743a.5.5 0 1 1 .706-.708l.392.391 1.181-1.18a.5.5 0 0 1 .708.707l-1.535 1.533a.504.504 0 0 1-.354.146zm9.353-.147l1.534-1.532a.5.5 0 0 0-.707-.707l-1.181 1.18-.392-.391a.5.5 0 1 0-.706.708l.746.743a.497.497 0 0 0 .706-.001zM4.527 7.452l2.557-1.585A1 1 0 0 0 7.09 4.17L4.533 2.56A1 1 0 0 0 3 3.406v3.196a1.001 1.001 0 0 0 1.527.85zm2.03-2.436L4 6.602V3.406l2.557 1.61zM24 12.5c0 1.93-1.57 3.5-3.5 3.5a3.503 3.503 0 0 1-3.46-3h-2.08a3.503 3.503 0 0 1-3.46 3 3.502 3.502 0 0 1-3.46-3h-.558c-.972 0-1.85-.399-2.482-1.042V17c0 1.654 1.346 3 3 3h.04c.244-1.693 1.7-3 3.46-3 1.93 0 3.5 1.57 3.5 3.5S13.43 24 11.5 24a3.502 3.502 0 0 1-3.46-3H8c-2.206 0-4-1.794-4-4V9.899A5.008 5.008 0 0 1 0 5c0-2.757 2.243-5 5-5s5 2.243 5 5a5.005 5.005 0 0 1-4.952 4.998A2.482 2.482 0 0 0 7.482 12h.558c.244-1.693 1.7-3 3.46-3a3.502 3.502 0 0 1 3.46 3h2.08a3.503 3.503 0 0 1 3.46-3c1.93 0 3.5 1.57 3.5 3.5zm-15 8c0 1.378 1.122 2.5 2.5 2.5s2.5-1.122 2.5-2.5-1.122-2.5-2.5-2.5S9 19.122 9 20.5zM5 9c2.206 0 4-1.794 4-4S7.206 1 5 1 1 2.794 1 5s1.794 4 4 4zm9 3.5c0-1.378-1.122-2.5-2.5-2.5S9 11.122 9 12.5s1.122 2.5 2.5 2.5 2.5-1.122 2.5-2.5zm9 0c0-1.378-1.122-2.5-2.5-2.5S18 11.122 18 12.5s1.122 2.5 2.5 2.5 2.5-1.122 2.5-2.5zm-13 8a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0zm2 0a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0zm12 0c0 1.93-1.57 3.5-3.5 3.5a3.503 3.503 0 0 1-3.46-3.002c-.007.001-.013.005-.021.005l-.506.017h-.017a.5.5 0 0 1-.016-.999l.506-.017c.018-.002.035.006.052.007A3.503 3.503 0 0 1 20.5 17c1.93 0 3.5 1.57 3.5 3.5zm-1 0c0-1.378-1.122-2.5-2.5-2.5S18 19.122 18 20.5s1.122 2.5 2.5 2.5 2.5-1.122 2.5-2.5z"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">GitHub Actions</div>
+                  <div class="pop-id mono">ci</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>ci</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">0</span> in &middot; <span class="mono">5</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+<div class="db-row" tabindex="0" data-id="vcs">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#181717" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">GitHub</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">vcs</span></div>
+              <div class="db-cell cell-role">vcs</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="GitHub details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#181717" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">GitHub</div>
+                  <div class="pop-id mono">vcs</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>vcs</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+            </div>
+          </div>
+        </section>
+<section class="band" id="registered-at" aria-labelledby="registered-at-h">
+          <div class="band-head">
+            <h2 id="registered-at-h">Registered at</h2>
+            <span class="band-count mono">1</span>
+          </div>
+          
+          <div class="band-hr"></div>
+          <div class="db-table" role="table" aria-label="Registered at services">
+            <div class="db-header" role="row">
+              <div class="db-cell cell-service">Service</div>
+              <div class="db-cell cell-id">ID</div>
+              <div class="db-cell cell-role">Role</div>
+              <div class="db-cell cell-kind">Kind</div>
+              <div class="db-cell cell-version">Ver.</div>
+              <div class="db-cell cell-status">Status</div>
+              <div class="db-cell cell-in">In</div>
+              <div class="db-cell cell-out">Out</div>
+            </div>
+            <div class="db-body">
+            <div class="db-row" tabindex="0" data-id="dns">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><svg class="brand-svg" width="20" height="20" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#F38020" d="M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727"/></svg></span>
+                <div class="svc-text">
+                  <div class="svc-name">Cloudflare</div>
+                  
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">dns</span></div>
+              <div class="db-cell cell-role">dns</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"></div>
+              <div class="db-cell cell-in"><span class="mono num">1</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="Cloudflare details">
+              <div class="pop-head">
+                <span class="pop-icon"><svg class="brand-svg" width="22" height="22" viewBox="0 0 24 24" role="img" aria-hidden="true"><path fill="#F38020" d="M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727"/></svg></span>
+                <div class="pop-title">
+                  <div class="pop-name">Cloudflare</div>
+                  <div class="pop-id mono">dns</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>dns</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">1</span> in &middot; <span class="mono">0</span> out</span></div>
+                
+                
+              </div>
+            </div>
+            </div>
+            </div>
+          </div>
+        </section>
+<section class="band" id="unplaced" aria-labelledby="unplaced-h">
+          <div class="band-head">
+            <h2 id="unplaced-h">Unplaced</h2>
+            <span class="band-count mono">1</span>
+          </div>
+          <p class="band-note">These roles are not in SKILL.md&#x27;s base-word list, so this view has no band for them.</p>
+          <div class="band-hr"></div>
+          <div class="db-table" role="table" aria-label="Unplaced services">
+            <div class="db-header" role="row">
+              <div class="db-cell cell-service">Service</div>
+              <div class="db-cell cell-id">ID</div>
+              <div class="db-cell cell-role">Role</div>
+              <div class="db-cell cell-kind">Kind</div>
+              <div class="db-cell cell-version">Ver.</div>
+              <div class="db-cell cell-status">Status</div>
+              <div class="db-cell cell-in">In</div>
+              <div class="db-cell cell-out">Out</div>
+            </div>
+            <div class="db-body">
+            <div class="db-row" tabindex="0" data-id="legacy-ledger">
+              <div class="db-cell cell-service">
+                <span class="svc-icon"><span class="brand-fallback" aria-hidden="true">A</span></span>
+                <div class="svc-text">
+                  <div class="svc-name svc-name-raw mono">acme-ledger</div>
+                  <div class="svc-note">an in-house ledger service nobody has a catalog row for</div>
+                </div>
+              </div>
+              <div class="db-cell cell-id"><span class="mono muted">legacy-ledger</span></div>
+              <div class="db-cell cell-role">finance-ledger</div>
+              <div class="db-cell cell-kind"><span class="kind-common">service</span></div>
+              <div class="db-cell cell-version"><span class="em">—</span></div>
+              <div class="db-cell cell-status"><span class="status-flag status-deprecated">Deprecated</span></div>
+              <div class="db-cell cell-in"><span class="mono num">2</span></div>
+              <div class="db-cell cell-out"><span class="mono num">0</span></div>
+              <div class="svc-popover" role="note" aria-label="acme-ledger details">
+              <div class="pop-head">
+                <span class="pop-icon"><span class="brand-fallback" aria-hidden="true">A</span></span>
+                <div class="pop-title">
+                  <div class="pop-name">acme-ledger</div>
+                  <div class="pop-id mono">legacy-ledger</div>
+                </div>
+              </div>
+              <div class="pop-body">
+                <div class="pop-row"><span class="pop-label">Role</span><span>finance-ledger</span></div>
+                <div class="pop-row"><span class="pop-label">Kind</span><span>service</span></div>
+                
+                <div class="pop-row"><span class="pop-label">Dependencies</span><span><span class="mono">2</span> in &middot; <span class="mono">0</span> out</span></div>
+                <div class="pop-row pop-status status-deprecated">Deprecated</div>
+                <div class="pop-row pop-note">an in-house ledger service nobody has a catalog row for</div>
+              </div>
+            </div>
+            </div>
+            </div>
+          </div>
+        </section>
+
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-col">
+      <div class="footer-label">Manifest</div>
+      <div class="mono footer-mono">examples/layout-stress.catalogus.yaml</div>
+      <div class="footer-sub">Read 2026-08-26 at 14:32</div>
+    </div>
+    <div class="footer-col">
+      <div class="footer-label">Totals</div>
+      <div class="footer-sub">35 services &middot; 48 dependencies &middot; 21 rollups &middot; 7 bands</div>
+      <div class="footer-sub">Catalogus CLI v0.0.1</div>
+    </div>
+    <div class="footer-col footer-col-links">
+      <a class="footer-link" href="#">Documentation</a>
+      <a class="footer-link mono" href="https://catalogus.dev/schema/v1.json">catalogus.dev/schema/v1.json</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -66,7 +66,7 @@ const SEED_KEY = "ac1ba604";
 const DEPARTURES_HEADING = "DEPARTURES: where the text above differs from DIRECTION.md's contract";
 const DISCLOSURE_HEADING = "WHAT THIS CONTRACT DOES NOT YET DESCRIBE";
 const FINISH_LINE = "FINISH: unreviewed and undocumented is unfinished.";
-const NUMBER_WORDS = { Three: 3, Four: 4, Five: 5, Six: 6, Seven: 7, Eight: 8 } as const;
+const NUMBER_WORDS = { Zero: 0, Three: 3, Four: 4, Five: 5, Six: 6, Seven: 7, Eight: 8 } as const;
 
 const sourceHtmlPath = join(webDir, "index.html");
 const builtHtmlPath = join(webDir, "dist", "index.html");
@@ -170,34 +170,16 @@ const DIRECTION_BOUNDARIES = [...SECTIONS.slice(1).map((section) => section.dire
  * The `why` is not read by the test. It is here so that the reason lives beside
  * the exception rather than three documents away.
  */
-const DECLARED_DEPARTURES: readonly { section: string; from: string; to: string; why: string }[] = [
-  {
-    section: "THESIS",
-    from: "this app currently ships",
-    to: "this app once shipped",
-    why: "The dark dashboard of evenly-weighted cards is gone. Present tense when written, past tense now.",
-  },
-  {
-    section: "OWN-WORLD",
-    from: "Bright white ground (#FFFFFF)",
-    to: "Warm cream ground (#f4f1ea)",
-    why: "The 2026-08-25 warming, an owner decision recorded in DIRECTION.md's own revision.",
-  },
-  { section: "OWN-WORLD", from: "ink (#111111)", to: "ink (#24211c)", why: "Same warming." },
-  { section: "OWN-WORLD", from: "Hairline grey (#E0E0E0)", to: "Hairline grey (#d5cebe)", why: "Same warming; the rule keeps its 1.4:1 against the ground." },
-  { section: "OWN-WORLD", from: "light grey (#F2F2F2)", to: "light grey (#e9e4d8)", why: "Same warming." },
-  {
-    section: "OWN-WORLD",
-    from: "one utility red (#E60012)",
-    to: "one utility red (#d40010)",
-    why:
-      "NOT the warming, and the one departure here that nobody decided. `--color-signal` has been #d40010 " +
-      "since the commit that introduced the token (e92761d) -- before the warming commit, while the ground " +
-      "was still #ffffff -- and #E60012 has never appeared in a stylesheet in this repo's history. The embedded copy " +
-      "carries the shipped value because a contract in the page must describe the page; the divergence is " +
-      "the owner's to rule on, and the comment says so rather than inventing a reason for it.",
-  },
-];
+// Empty as of the 2026-08-26 world change to candidate E. DIRECTION.md's
+// contract and the embedded copy were authored together against the same
+// approved mockup, so there is nothing to declare this round: OWN-WORLD states
+// its own colours directly rather than departing from a frozen older version
+// of itself. The five entries that lived here for the 2026-08-25 warming (four
+// warmed values plus the tense change in THESIS) are gone with the world they
+// described. The mechanism stays -- an empty array is still data, and the next
+// change that actually diverges the two copies declares itself here the same
+// way the warming did.
+const DECLARED_DEPARTURES: readonly { section: string; from: string; to: string; why: string }[] = [];
 
 const directionMd = readFileSync(directionPath, "utf8");
 
@@ -226,7 +208,7 @@ describe("the direction contract is present in apps/web/index.html", () => {
     expect(preamble).toContain("Every contract section below is verbatim from that file");
     // The counts stay out. Restating one here is how the stale "five" survived
     // three passes in the copy a reader of the shipped page actually sees.
-    expect(preamble).not.toMatch(/(two|three|four|five|six|seven|eight|nine) (contract sections|differences|departures)/i);
+    expect(preamble).not.toMatch(/\b(two|three|four|five|six|seven|eight|nine)\b (contract sections|differences|departures)/i);
   });
 
   // `Mode: **Read**` is a product constraint, not a formality: it is why the
@@ -241,17 +223,27 @@ describe("the direction contract is present in apps/web/index.html", () => {
   // contract are written down. Deleting it leaves a contract that reads as a
   // description of the shipped app -- which it is not, and which is exactly the
   // impression this whole comment exists to avoid giving.
-  // Scoped to the disclosure section itself, not to the whole comment. Three of
-  // these five strings also occur in FIRST VIEWPORT or in the DEPARTURES prose
-  // that discusses them, and a whole-comment `toContain` was satisfied by those
-  // other occurrences: a validator deleted the "routed chain" and "MOST DEPENDED
-  // ON" bullets outright and the suite stayed green, because the words were
-  // still in the file somewhere else. A pin shadowed by a second occurrence is
-  // not a pin.
+  //
+  // Rewritten for the 2026-08-26 world change: the old five known gaps (left
+  // rail, routed chain, MOST DEPENDED ON, band names, red header tabs) were
+  // each about a mismatch inside the *old* world's own contract text, and most
+  // of them are moot now that OWN-WORLD and FIRST VIEWPORT no longer make those
+  // specific claims -- there is no "routed chain" ask left to disagree with.
+  // What replaces them is one larger, verified fact: none of candidate E has
+  // been rebuilt into `apps/web/src` yet (confirmed by reading `AppShell.tsx`,
+  // `ServiceTile.tsx` and `BandModule.tsx`, and by `git status` showing only
+  // `tokens.css` and `docs/PLAN.md` touched before this pass), plus the one
+  // real limitation the approved mockup itself carries (the edge-column
+  // popover) and the mark, which was never about the world and survives it.
+  //
+  // Scoped to the disclosure section itself, not to the whole comment, for the
+  // same reason as before: a pin that reads the whole comment can be satisfied
+  // by prose *about* the gap rather than by the gap being named where a reader
+  // of the disclosure section would look for it.
   it("carries its disclosure section, naming what the build does not do", () => {
     const disclosure = flat(regionBetween(sourceContract ?? "", DISCLOSURE_HEADING, FINISH_LINE));
     expect(disclosure.length, "the disclosure section is empty or its FINISH boundary moved").toBeGreaterThan(500);
-    for (const known of ["left rail is unbuilt", "routed chain", "MOST DEPENDED ON", "band names", "mark is deferred"]) {
+    for (const known of ["the retired dense-module world", "consumes them yet", "between 768px and 1280px", "mark is still deferred"]) {
       expect(disclosure).toContain(known);
     }
   });
@@ -313,14 +305,23 @@ describe("the DEPARTURES section keeps saying what it is for", () => {
 
   // Pinned as literals rather than paraphrased, because the failure mode is a
   // rewrite that still reads plausibly. Each of these is a claim that was
-  // verified by execution against this repo's history (`git log --all -S`), and
-  // together they are the difference between recording an open question and
-  // narrating an answer to it.
+  // verified by execution against this repo's history (`git log --all -S`) or
+  // by measurement (the contrast figures), and together they are the
+  // difference between recording that the owner ruled and narrating that the
+  // ruling explains more than it does.
+  //
+  // Rewritten on 2026-08-26 when the owner ruled: the fourth claim used to be
+  // "it is the owner's to rule on", which is now false on its face -- they
+  // ruled the same day. It is replaced by the ruling itself and by the
+  // distinction the ruling does not erase: which value ships is settled; why
+  // it diverged from the contract on day one is not, and cannot be by any
+  // measurement. The first two claims about the divergence's history are
+  // unchanged, because the ruling does not touch them either.
   it.each([
-    "**not** the warming",
     "has never appeared in any stylesheet in this repo's history",
-    "nothing in the repo records a decision to do that",
-    "it is the owner's to rule on",
+    "nothing in the repo records a decision to implement it differently",
+    "The owner ruled on 2026-08-26: accept #d40010",
+    "The ruling closes the question, it does not answer it",
   ])("still says: %s", (claim) => {
     expect(departures).toContain(claim);
   });
@@ -351,21 +352,36 @@ describe("the DEPARTURES section keeps saying what it is for", () => {
     expect(departures).toContain("review of the diff is the control, not the test");
   });
 
-  // A tripwire, and worth being precise about what it is not. No test can tell
-  // whether prose is truthful: a validator left all four pinned claims above
-  // intact and appended one sentence saying the question had since been
-  // resolved, and every assertion here still passed. What *is* machine-checkable
-  // is the fact underneath -- while `tokens.css` ships a red the contract does
-  // not name, a claim that the divergence is settled is false. So this fires on
-  // the phrasing that claim takes, which catches the sentence a careless or
-  // hurried writer produces and not the class. The real control is review, and
+  // A tripwire, and worth being precise about what it is not -- and about how
+  // it changed on 2026-08-26.
+  //
+  // Before that day this fired conditionally: it only checked while
+  // `--color-signal` still diverged from the contract's stated #E60012,
+  // because the risk was a false claim that the ship question had been
+  // settled when nobody had ruled. The owner ruled that question on
+  // 2026-08-26 (accept #d40010), so the old condition can no longer be true --
+  // OWN-WORLD now states #d40010 directly, matching the token -- and the old
+  // check would simply never run again. Deleting it here would have been the
+  // easy move and the wrong one: CLAUDE.md's whole point is that a settled
+  // question stops being checked, which is exactly how a *different* false
+  // claim gets through unnoticed.
+  //
+  // The risk that survives is narrower and permanent: conflating "the owner
+  // ruled which value ships" with "the repo now knows why it diverged on day
+  // one." The second is not true and cannot become true by measurement --
+  // `git log --all -S E60012` returns one commit on any branch, and it is the
+  // one that rescued this document, not one that explains the token. So this
+  // check is unconditional now rather than gated on the token, and it fires on
+  // the phrasing a future writer would use to claim the origin is understood
+  // rather than merely ruled on. No test can tell whether prose is truthful --
+  // a validator demonstrated exactly that against the old wording, leaving all
+  // four pinned claims intact and appending one sentence claiming resolution,
+  // and every assertion still passed. This fires on the phrasing a careless or
+  // hurried writer produces, not on the class; the real control is review, and
   // the page says so in the paragraph above.
-  it("does not claim the red question is settled while the token still diverges", () => {
-    const tokensCss = readFileSync(join(srcDir, "tokens.css"), "utf8");
-    const shipsTheContractsRed = /--color-signal:\s*#E60012/i.test(tokensCss);
-    if (shipsTheContractsRed) return;
-    for (const settled of ["Since resolved", "no decision is outstanding", "the owner confirmed", "no longer open"]) {
-      expect(departures, `the page claims the red divergence is settled while --color-signal is not #E60012`).not.toContain(settled);
+  it("does not claim the red's day-one divergence has been explained, only ruled on", () => {
+    for (const explained of ["the original reason was", "this explains why", "now known why", "no longer unexplained", "explains the divergence"]) {
+      expect(departures, "the page claims the red's origin is explained, which no evidence in this repo supports").not.toContain(explained);
     }
   });
 
@@ -399,10 +415,17 @@ describe("the owner's hardest named constraints survive in the page", () => {
     expect(sections.length, "the DEPARTURES heading moved or the sections are empty").toBeGreaterThan(2000);
   });
 
+  // Rewritten for the 2026-08-26 world change. "First screen = the shape of
+  // the system" is gone rather than replaced: it asserted the whole shape
+  // fits without scrolling, which is what "breathing room wins" retires, and
+  // the two cannot both be pinned as true. "No search" survives, but its old
+  // justification ("It should fit.") does not, because that is the same
+  // retired claim; the new CONSTRAINTS bullet gives the reason that replaced
+  // it instead.
   it.each([
-    'No search. "It should fit." (owner)',
+    "Breathing room wins",
+    "No search. Bands and the left rail carry finding. (owner)",
     "Organize by architecture, not alphabet. (owner)",
-    "First screen = the shape of the system. (owner)",
     "no search field",
     "Read-only: no editing affordance anywhere.",
   ])("still carries: %s", (constraint) => {

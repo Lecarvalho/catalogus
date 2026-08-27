@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Catalogus — direction candidates</title>
+<style>
+  :root {
+    --color-bg: #f4f1ea; --color-surface: #fbf9f4; --color-header-fill: #e9e4d8;
+    --color-text: #24211c; --color-text-muted: #5e5a50; --color-text-faint: #7e7a6e;
+    --color-signal: #d40010; --color-hairline: #d5cebe;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--color-bg); color: var(--color-text);
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: stretch; gap: 0;
+    border-bottom: 1px solid var(--color-hairline);
+    background: var(--color-header-fill); flex: none;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 20px; border-right: 1px solid var(--color-hairline);
+  }
+  .brand b { font-size: 14px; letter-spacing: .01em; }
+  .brand span { color: var(--color-text-faint); font-size: 11px;
+    text-transform: uppercase; letter-spacing: .08em; }
+  nav { display: flex; }
+  nav a {
+    display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 10px 22px; text-decoration: none; color: var(--color-text);
+    border-right: 1px solid var(--color-hairline);
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  nav a:hover { background: var(--color-surface); }
+  nav a.on { border-bottom-color: var(--color-signal); background: var(--color-bg); }
+  nav a i { font-style: normal; font-size: 11px; color: var(--color-text-faint);
+    text-transform: uppercase; letter-spacing: .08em; }
+  nav a em { font-style: normal; font-weight: 600; }
+  nav a.pending em { color: var(--color-text-faint); font-weight: 400; }
+  .note { margin-left: auto; display: flex; align-items: center; padding: 0 20px;
+    font-size: 11px; color: var(--color-text-faint); }
+  iframe { flex: 1 1 auto; width: 100%; border: 0; background: var(--color-bg); }
+  .empty { flex: 1; display: grid; place-items: center; color: var(--color-text-muted); }
+  .empty p { max-width: 42ch; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>Catalogus</b><span>Direction candidates</span></div>
+  <nav>
+    <a href="#a" class="on" data-src="candidate-a-document.html"><i>A</i><em>Document</em></a>
+    <a href="#b" data-src="candidate-b-database.html"><i>B</i><em>Database</em></a>
+    <a href="#c" data-src="candidate-c-gallery.html"><i>C</i><em>Gallery</em></a>
+    <a href="#d" data-src="candidate-d-iconwall.html"><i>D</i><em>Icon wall</em></a>
+    <a href="#e" data-src="candidate-e-homescreen.html"><i>E</i><em>Home screen</em></a>
+    <a href="#f" data-src="candidate-f-applist.html"><i>F</i><em>App list</em></a>
+  </nav>
+  <div class="note">Notion register · cream + one red · breathing room · no search</div>
+</header>
+<iframe id="frame" src="candidate-a-document.html" title="candidate"></iframe>
+<script>
+  var links = document.querySelectorAll('nav a');
+  var frame = document.getElementById('frame');
+  function pick(a) {
+    links.forEach(function (l) { l.classList.toggle('on', l === a); });
+    frame.src = a.dataset.src;
+  }
+  links.forEach(function (a) {
+    a.addEventListener('click', function (e) { e.preventDefault(); pick(a); });
+  });
+  // Deep-link so a reload keeps the candidate you were looking at.
+  var hash = location.hash.replace('#', '');
+  if (hash) {
+    links.forEach(function (a) { if (a.getAttribute('href') === '#' + hash) pick(a); });
+  }
+</script>
+</body>
+</html>

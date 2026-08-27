@@ -2,8 +2,12 @@
 <html lang="en">
   <!--
     IMPECCABLE DIRECTION CONTRACT
-    Seed key: ac1ba604 · direction: challenger `japanese-high-density-web`
-    (user-chosen; a user pick beats the roll). Mode: **Read**.
+    Seed key: ac1ba604 · direction: candidate E, the home screen — owner-named,
+    chosen directly in an interview on 2026-08-26, with no roll behind it. This
+    run's original direction, challenger `japanese-high-density-web`
+    (user-chosen; a user pick beats the roll), is retired by owner decision the
+    same day. The seed key is unchanged: it names the run, which is still open,
+    not the direction, which changed. Mode: **Read**.
 
     Embedded here, in the markup the app actually emits, because a contract that
     lives only in a docs file and in component headers is a contract nobody
@@ -23,66 +27,87 @@
     less than no contract, because the gap it should have exposed is the thing
     the edit removes.
 
-    Deliberately no counts in this paragraph. It said "the five contract
-    sections" and "the six differences" until 2026-08-26, when a validator
-    pointed out that the first had *already* gone stale — the guard compares
-    seven — and that nothing tied either number to anything. Both are stated
-    once, further down, where the guard checks them. A count restated in a
-    second place is a count that will disagree with itself.
+    Deliberately no counts in this paragraph. A stale draft said the section
+    total was five and the difference total was six, until 2026-08-26, when a
+    validator pointed out that the section figure had *already* gone stale —
+    the guard compares seven — and that nothing tied either number to
+    anything. Both are stated once, further down, where the guard checks them.
+    A count restated in a second place is a count that will disagree with
+    itself.
 
     THESIS
 
-    A project's whole operational reality on one screen, dense enough that you never search for anything.
-    It refuses the category default this app once shipped — the dark dashboard of evenly-weighted
-    cards under alphabetical headings — and refuses its predictable opposite, the airy white docs page
-    with thin grey rules and a blue link. Density is the argument: 35 services, 41 edges, five
-    architecture bands, no scrolling to find a thing.
+    A project's whole operational reality on one screen you scroll rather than one you must fit into,
+    calm enough to read without hunting for anything in it. It refuses the category default this app
+    once shipped — the dark dashboard of evenly-weighted cards under alphabetical headings — and refuses
+    Notion's own literal form too: a cream ground and one red keep it from becoming the airy white docs
+    page with thin grey rules and a blue link. Breathing room wins over density now: 35 services, 48
+    edges, eight architecture bands, given real space rather than packed to fit one viewport.
 
     OWN-WORLD
 
-    Warm cream ground (#f4f1ea), ink (#24211c), one utility red (#d40010) and nothing else chromatic.
-    Hairline grey (#d5cebe) rules every module; light grey (#e9e4d8) fills header tabs. Boxed modules
-    tile edge to edge in an uneven grid — a wide spine module beside narrow stacked ones — each with a
-    small header bar carrying a title left and a count right. Sharp corners throughout, no radius above
-    2px, no shadow, no gradient. Compact sans at 11–13px with tight leading; a heavier face for numerals.
-    Tags are small sharp rectangles in four weights: red solid, red outline, black solid, grey solid.
-    Icons are 1.5px line work. Recognizable with all content removed by: hairline module mosaic, red
-    header tabs, tabular numerals, zero rounding.
+    Warm cream ground (#f4f1ea), warm charcoal ink (#24211c), one utility red (#d40010) and nothing else
+    chromatic. Services carry no card, border or panel: each is a bare brand-mark icon on the ground, a
+    two-line label beneath it — vendor name, then the manifest `id`, because the vendor name alone
+    renders three Fly.io tiles and two PostgreSQL tiles identically. Hairline grey (#d5cebe) and light
+    grey (#e9e4d8) move off the services entirely and onto the shell — the topbar, the footer, a rail
+    divider, a popover's own rule — which is where this world's Notion-calm surfaces actually live now.
+    Sharp structure, soft transients: no radius or shadow anywhere except the popovers and menus that are
+    this world's only transient surfaces, plus one declared, contained exception the owner approved — a
+    phone-like corner radius on the icon tile alone. It does not license a radius on anything else.
+    Compact sans, airier than the world it replaces: no heavier face for numerals, no webfont —
+    `catalogus view` has no network to fetch one from. Status carries no hue requirement: a corner badge
+    with a distinct pictogram per state, the mark itself desaturated, and the state spelled out in words
+    under the label, so the signal colour is never the only way to read it — verified under a full-page
+    greyscale filter. Signal red is spent in exactly two places, the status badge and the status word,
+    and nowhere else: not a view, not a count. Recognizable with all content removed by: the bare icon
+    grid, the phone-like tile radius, the three-way greyscale-safe status mark.
 
     STORY
 
     The reader opens a project they have not touched in six months, or hands it to someone who has never
-    seen it. In one viewport they understand the shape — what serves requests, what it runs on, what
-    holds the data, what watches it, what builds it — and they can see which few services everything
-    else hangs off. They click one and land on its page.
+    seen it. Reading down through the bands, they understand the shape — what serves requests, what it
+    runs on, what holds the data, what watches it, what builds it. They click one and land on its page.
 
     FIRST VIEWPORT
 
-    Left rail (240px): project identity, then the band index with counts, no search field. Main field: a
-    two-row header (project name + architecture sentence, then the List/Graph/Migrations rail with a red
-    underline on the active one). Below it the module mosaic — ON THE REQUEST PATH spans the full width
-    as the spine, drawn as a routed chain rather than a list; beneath it RUNS ON, HOLDS DATA, WATCHED BY,
-    BUILT AND SHIPPED BY tile in an uneven grid sized to their contents; MOST DEPENDED ON sits right as a
-    numbered rank module. No primary action — this is Read mode; the action is clicking a service.
+    A top bar: product identity left, a help / settings / profile cluster right, each opening its own
+    menu — help lists the docs and the CLI's own command surface, settings covers appearance, density,
+    brand-icon colour and the default view and nothing that writes, profile covers the account. Left
+    rail (240px, collapses below 900px): project identity and its architecture sentence, the manifest
+    path, then the band index with counts, no search field. Main field: a view rail — List, Graph,
+    Migrations — then the icon grid, grouped under band headings: Runs in production, Holds data, Calls
+    out to, Runs on, Watched by, Built and shipped by, Registered at, and Unplaced for anything the
+    mapping cannot place. A footer: the manifest path and read time, the service/dependency/rollup
+    counts, the CLI version, a documentation link, the schema URL. No primary action — this is Read
+    mode; the action is hovering a tile for its popover or clicking it for its page.
 
     FORM
 
-    Dense module mosaic, candidate 2 of the challenger hand, chosen by the user over the assigned
-    grounded direction (the manifest/bill-of-lading world). Seed key ac1ba604.
+    A smartphone home screen: bare brand-mark icons on the ground, a two-line label beneath each one, no
+    card, border or panel around any service. Candidate E of six built to compare against the same
+    35-service fixture — a Notion document, a grouped database table, a gallery, a bordered icon wall,
+    this home screen, and an app-drawer list — chosen by the owner outright, in the interview that
+    produced all six, over the other five. No roll behind this direction: the owner named it, rather
+    than drawing it from a hand.
 
     MAPPED FROM THE WORLD'S OWN GRAMMAR, NOT INVENTED
 
-    - struck old price + red new price -> `phasing_out` with its `replaced_by`
-    - numbered ranking module -> most depended on, by inbound edge count
-    - red outline "NEW" tag -> recently added (answers HANDOFF §4.2 query 5)
-    - `active` carries **no tag**: tagging the norm is what produced 35 identical pills
-    - `deprecated` -> black solid tag; `removed` -> grey solid; `phasing_out` -> red outline
+    - a phone's own home-screen icon, its background square, and its caption -> the bare brand mark, the
+      icon tile's own fill, and the two-line label beneath it
+    - a phone icon's status dot -> a corner badge, glyph-shaped per status: an hourglass for
+      `phasing_out`, an archive box for `deprecated`, a cross for `removed`
+    - a phone icon with no artwork on file -> a dashed, sunken tile and an ink monogram (`AL`, from the
+      raw slug `acme-ledger`) in place of a missing-image icon
+    - `active` carries no badge and no status word: tagging the norm is what produced thirty-five
+      identical marks before
+    - the owner's own reference, an icon wall with the name below and a hover popover for the rest
+      ("Like StackShare") -> the grid itself, and this world's popover
 
     CONSTRAINTS CARRIED IN FROM PRODUCT.md
 
-    - No search. "It should fit." (owner)
+    - No search. Bands and the left rail carry finding. (owner)
     - Organize by architecture, not alphabet. (owner)
-    - First screen = the shape of the system. (owner)
     - Hover -> popover near the item; click -> the service page. (owner, supersedes
       viewer-foundations decision 4)
     - Read-only: no editing affordance anywhere. Editing arrives with Phase 4.
@@ -91,12 +116,13 @@
 
     DEPARTURES: where the text above differs from DIRECTION.md's contract
 
-    Six differences, each declared in the guard so that a seventh cannot appear
-    unnoticed, and each quoted below in the contract's own words so the guard can
-    check the page and the table say the same thing. Every hex here is checked
-    against `apps/web/src/tokens.css`'s own light `:root` declarations rather
-    than against a list typed into a test, so the contract and the token layer
-    cannot drift apart silently.
+    Zero differences below this round. DIRECTION.md's contract and this
+    embedded copy were written together against the same approved mockup, so
+    there is nothing here to reconcile between them — an entry belongs in this
+    section only when the two genuinely diverge, the way five values did across
+    the 2026-08-25 warming. `DECLARED_DEPARTURES` in the guard stays empty
+    rather than removed, because the next revision that actually diverges the
+    two copies is exactly what it exists to declare.
 
     **What the guard cannot do, so that nobody trusts it further than it goes.**
     It proves the two copies agree; it cannot prove either one is what the owner
@@ -111,35 +137,33 @@
     those a three-way agreement rather than a two-way one — but five lines are
     not the contract.
 
-      - THESIS: "this app currently ships" -> "this app once shipped". The dark
-        dashboard of evenly-weighted cards is gone; the sentence described the
-        present when it was written and describes the past now.
-      - OWN-WORLD, four warmed values: "Bright white ground (#FFFFFF)" -> "Warm
-        cream ground (#f4f1ea)", "ink (#111111)" -> "ink (#24211c)", "Hairline
-        grey (#E0E0E0)" -> "Hairline grey (#d5cebe)", "light grey (#F2F2F2)" ->
-        "light grey (#e9e4d8)".
-        This is the 2026-08-25 warming, an owner decision recorded in
-        DIRECTION.md's own revision: their brand references were uniformly warm
-        cream with soft charcoal line work, and asked directly whether the brand
-        should follow the app's world or the app the brand, they chose the app
-        follows the brand. A temperature change inside the same direction — the
-        seed key and the direction are untouched. tokens.css's header carries
-        every recomputed contrast pair, including the one that does not reach AA
-        and why it was left.
-      - OWN-WORLD, the fifth: "one utility red (#E60012)" -> "one utility red
-        (#d40010)", and this one is **not** the warming. `--color-signal` has been #d40010 since the commit that
-        introduced the token (`e92761d`) — before the warming commit, while the
-        ground was still #ffffff — and the palette before that one had no signal
-        token at all, only a blue accent. `#E60012` has never appeared in any
-        stylesheet in this repo's history, on any branch, in any commit: only in
-        the contract itself. So the red did not move with the
-        ramp: it was implemented differently from the contract on day one, and
-        nothing in the repo records a decision to do that. **The value here is
-        the shipped one because a contract embedded in the page must describe
-        the page — but the divergence is unexplained, and it is the owner's to
-        rule on**, either by accepting #d40010 into the contract or by moving
-        the token to #E60012. Recorded as an open question rather than narrated
-        into a reason, which is what a first draft of this comment did.
+      **The signal red is settled; why it first diverged is not, and this is
+      the paragraph that says so plainly rather than leaving a reader to
+      wonder.** `--color-signal` has been #d40010 since the token was
+      introduced (`e92761d`), before either the 2026-08-25 warming or this
+      world change, while the ground was still #ffffff — so the warming did
+      not cause it, and neither did this world change. #E60012, the value the
+      very first version of this contract named, has never appeared in any
+      stylesheet in this repo's history, on any branch, in any commit, and
+      nothing in the repo records a decision to implement it differently.
+      **The owner ruled on 2026-08-26: accept #d40010.** Measured against the
+      cream ground #f4f1ea, #d40010 gives 4.89:1 (AA) and #E60012 gives 4.26:1
+      (below AA) — the old contract's own value no longer clears AA on the
+      ground the owner chose the day before, which is why #d40010 is the value
+      kept. **The ruling closes the question, it does not answer it**: it
+      settles which value ships, not why it diverged from the contract on day
+      one, and the repo has no record of that to produce. OWN-WORLD above
+      states #d40010 directly now, so this is no longer a departure between
+      the two copies — it is history the DEPARTURES table has no other place
+      to hold.
+
+      Ground and ink carry the 2026-08-25 warming forward unchanged: cream
+      #f4f1ea and warm charcoal #24211c, in place of the bright white #ffffff
+      and near-black #111111 this run started with; the hairline moved from
+      #e0e0e0 to #d5cebe and the header fill from #f2f2f2 to #e9e4d8 in the
+      same pass. None of the four moved again for this world change — see
+      DIRECTION.md's 2026-08-25 revision for the computed contrast of every
+      pair.
 
     WHAT THIS CONTRACT DOES NOT YET DESCRIBE
 
@@ -147,44 +171,36 @@
     each of these is a place where the built world and the contract disagree and
     the contract has not been amended.
 
-      - **The left rail is unbuilt.** FIRST VIEWPORT specifies 240px of project
-        identity and a band index; `AppShell` renders a sticky identity bar the
-        contract did not specify, and the rail is not there.
-      - **The spine is a list, not a routed chain.** FIRST VIEWPORT asks for the
-        request-path band to be drawn as a routed chain; it renders as an
-        ordinary `BandModule` like every other band.
-      - **MOST DEPENDED ON is not on screen at all.** The owner removed the
-        ranking on 2026-08-25. `RankModule.tsx` and `bands.ts`'s
-        `mostDependedOn` are kept rather than deleted, with no caller, so the
-        component and its stylesheet are tree-shaken out of the bundle.
-      - **The band names are not the contract's.** It names ON THE REQUEST PATH,
-        RUNS ON, HOLDS DATA, WATCHED BY, BUILT AND SHIPPED BY — five. `bands.ts`
-        ships seven plus `Unplaced`: the request-path band was renamed "Runs in
-        production" by the owner on 2026-08-25, and "Calls out to" and
-        "Registered at" have no counterpart in the contract at all.
-      - **There is no heavier face for numerals.** OWN-WORLD asks for one;
-        `catalogus view` serves from 127.0.0.1 and has to work with no network,
-        so there is no webfont and numerals are the system face's tabular
-        figures. That trade is recorded in tokens.css's header.
-      - **The mark is deferred** by the owner after three directions were
-        explored and none chosen. `BrandMark` sets the wordmark and draws no
-        glyph, marked `data-mark="placeholder"`. What survived as settled: ink
-        only — the utility red stays a signal colour and is never spent on the
-        brand — a primary mark plus a derived reduced variant, and the drawing
-        register of the owner's references (uniform stroke weight, rounded caps,
-        no fill).
-      - **"Red header tabs" is not what the build does**, and the recognizability
-        claim survives anyway. Header bars are grey-filled, per OWN-WORLD's own
-        preceding sentence. Where the red lands on the rail is the *underline*
-        under the active List/Graph/Migrations tab, drawn on the hairline it sits
-        on. Across the whole board the signal colour is spent in three places:
-        that underline, the module header counts, and red-outline tag marks.
+      - **None of candidate E has reached the shipped app yet.**
+        `ServiceTile.tsx`, `BandModule.tsx`, `AppShell.tsx` and
+        `ServicePopover.module.css` still render the retired dense-module world
+        in full — bordered tiles, a shell with no rail, no footer, no help /
+        settings / profile cluster. `tokens.css` carries this world's geometry
+        and spacing as additive tokens (`--icon-tile-radius`, the icon-grid and
+        band-spacing values), lifted from the approved mockup rather than
+        invented, but nothing in `apps/web/src` consumes them yet: this
+        contract describes the approved target, not what a reader of
+        `catalogus view` sees today. Rebuilding the components against it is
+        separate, tracked work.
+      - **One real limitation carries over from the mockup itself, not from
+        the gap above.** A hover popover on an icon in the grid's outermost
+        columns can extend past the viewport edge between 768px and 1280px —
+        the mockup centres it with CSS alone and cannot flip it to stay on
+        screen. The React build can, with real edge detection, and should
+        solve it rather than inherit it.
+      - **The mark is still deferred** by the owner after three directions
+        were explored and none chosen. `BrandMark` sets the wordmark and draws
+        no glyph, marked `data-mark="placeholder"`. What survived as settled:
+        ink only — the utility red stays a signal colour and is never spent on
+        the brand — a primary mark plus a derived reduced variant, and the
+        drawing register of the owner's references (uniform stroke weight,
+        rounded caps, no fill). That gap survives this world change unchanged.
 
     FINISH: unreviewed and undocumented is unfinished. The finish review and
-    DESIGN.md are deliberately still open, and waiting on the mark by the owner's
-    standing condition. This comment and the mechanical detector run are the two
-    steps of the flow the owner released on 2026-08-26; the other two were not
-    run, and `docs/PLAN.md` records why.
+    DESIGN.md are deliberately still open, and waiting on the mark by the
+    owner's standing condition — unchanged by this world change. This comment
+    and DIRECTION.md were both rewritten for candidate E on 2026-08-26;
+    `docs/PLAN.md` records why the direction changed and what is still open.
   -->
   <head>
     <meta charset="UTF-8" />

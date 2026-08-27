@@ -67,6 +67,18 @@
  * 12px body at 1.5 is the reference register, not an accessibility
  * oversight -- nothing here is below 11px, and the 11px sizes carry labels
  * in caps with positive tracking, which is where they stay legible.
+ *
+ * ---------------------------------------------------------------------
+ * Extended 2026-08-26 for candidate E, the home screen (docs/PLAN.md, "The
+ * form is settled: candidate E, the home screen"): a Notion-register,
+ * breathing-room layout on this same cream ground, where services render as
+ * bare brand-icon marks with labels beneath instead of the bordered tile
+ * below -- no card, no border, no panel around any service. Its geometry,
+ * spacing and type tokens are added near the end of :root, lifted from the
+ * approved mockup rather than invented, and are additive only: every
+ * component still renders the dense-module world above until it is rebuilt
+ * against them. The `--color-signal` divergence flagged below was also
+ * ruled on this day; see that declaration for the decision.
  */
 :root {
   /* Ground and ink. */
@@ -83,22 +95,31 @@
   --color-line-strong: #24211c;
 
   /*
-   * The one signal colour -- and the one value in this file that diverges
-   * from the direction contract with nothing recording why. OWN-WORLD names
-   * `#E60012`; this token has been `#d40010` since it was first written,
-   * before the 2026-08-25 warming and while the ground was still `#ffffff`,
-   * and `#E60012` has never appeared in a stylesheet in this repo's history.
-   * So it is not the warming: the ground and the ink moved by an owner
-   * decision that is written down, and the red was simply implemented as
-   * something else on day one.
+   * The one signal colour -- and, until 2026-08-26, the one value in this
+   * file that diverged from the direction contract with nothing recording
+   * why. OWN-WORLD names `#E60012`; this token has been `#d40010` since it
+   * was first written, before the 2026-08-25 warming and while the ground
+   * was still `#ffffff`, and `#E60012` has never appeared in a stylesheet in
+   * this repo's history. So it was not the warming: the ground and the ink
+   * moved by an owner decision that is written down, and the red was simply
+   * implemented as something else on day one. That history stays true no
+   * matter how the question below is settled -- the ruling closes it, it
+   * does not explain it.
    *
    * Found 2026-08-26, while embedding the contract into the page, where the
-   * first draft of that comment narrated a plausible reason for it -- which
-   * is the defect class CLAUDE.md names. Left at the shipped value and
-   * flagged instead: **the owner rules on it**, by accepting `#d40010` into
-   * the contract or by moving this token to `#E60012` (which would need its
-   * contrast recomputed against the cream ground, the pair above having been
-   * computed for this value).
+   * first draft of that comment narrated a plausible reason for the
+   * divergence -- which is the defect class CLAUDE.md names. Left at the
+   * shipped value and flagged for the owner instead of guessed at.
+   *
+   * **The owner ruled on 2026-08-26: accept `#d40010`.** Measured against
+   * the cream ground `#f4f1ea` (relative luminance 0.881, the same figure
+   * the header above uses), `#d40010` gives 4.89:1 -- AA -- and `#E60012`
+   * gives 4.26:1 -- below AA. The ground and ink moved to cream by owner
+   * decision on 2026-08-25; the contract's `#E60012` never moved with them,
+   * and on the cream ground it no longer clears AA. `#d40010` does, which is
+   * why it is the value kept: this is a contrast finding, not a preference,
+   * and it is the direction contract that now needs to catch up to this
+   * token, not the other way around.
    */
   --color-signal: #d40010;
   --color-signal-ink: #fdf8f4;
@@ -176,6 +197,78 @@
    * rank module reads as a rank rather than as a list.
    */
   --numeric-features: "tnum" 1, "lnum" 1;
+
+  /*
+   * Candidate E, the home screen -- approved 2026-08-26 (docs/PLAN.md, "The
+   * form is settled: candidate E, the home screen"). Services render as bare
+   * brand-icon marks on the ground, label beneath, no card or border around
+   * any service, grouped under band headings -- Notion register, breathing
+   * room, on the same cream ground and the same one signal colour as above.
+   * The app shell (top bar, rail, footer and their menus) is separately
+   * approved and frozen, unchanged from before, so none of its geometry is
+   * added here.
+   *
+   * Every value below is lifted from the approved mockup itself
+   * (candidate-e-homescreen.html's `.icon-mark`, `.icon-grid`, `.band` and
+   * `.popover` rules) rather than picked fresh -- a number taken from the
+   * artifact the owner approved is a record, one chosen independently would
+   * be a guess (CLAUDE.md, "ask, never guess").
+   *
+   * This pass only adds the vocabulary: ServiceTile.tsx, BandModule.tsx and
+   * ServicePopover.module.css still render the bordered-tile world above,
+   * nothing here is consumed by a component yet, and nothing above this
+   * group was changed to make room for it.
+   */
+
+  /*
+   * Icon tile: the bare brand-mark square, no border, that replaces the
+   * bordered tile above. `--icon-tile-radius` is a declared, contained
+   * exception to "sharp structure, soft transients" -- a phone-like corner
+   * radius on the icon tile alone, chosen explicitly by the owner. It is not
+   * the rule eroding: nothing else in this world takes a radius except the
+   * transient surfaces below.
+   */
+  --icon-tile-size: 76px;
+  --icon-tile-radius: 20px;
+  --icon-mark-size: 46px;
+
+  /* Icon grid: auto-fill columns no narrower than --icon-grid-col-min, and
+     gaps wide enough to read as air -- "breathing room wins" applied to the
+     board itself. --icon-grid-top is the space between a band's heading and
+     its grid. */
+  --icon-grid-col-min: 118px;
+  --icon-grid-row-gap: 44px;
+  --icon-grid-column-gap: 20px;
+  --icon-grid-top: 30px;
+
+  /* Section spacing: the air above each band, and around the board's own
+     head (the List/Graph view rail) -- both above the icon grid, neither
+     part of the frozen app shell. */
+  --band-spacing-top: 40px;
+  --board-head-padding-top: 26px;
+  --board-head-padding-bottom: 18px;
+
+  /*
+   * Type: this world's own scale for the board body, the band headings and
+   * the icon labels -- larger and looser than the --text-* scale above,
+   * which the dense-module world keeps using until it is rebuilt.
+   */
+  --text-board-body: 15px;
+  --leading-board-body: 1.55;
+  --text-band-title: 19px;
+  --text-band-count: 13px;
+  --text-icon-name: 13.5px;
+  --leading-icon-name: 1.3;
+  --text-icon-id: 11px;
+  --text-icon-status: 10.5px;
+  --leading-icon-status: 1.35;
+
+  /* Transient surfaces: this world's popover carries the radius and shadow
+     "soft transients" allows, in place of the old world's hard offset block
+     (ServicePopover.module.css) wherever this world's popover ships. */
+  --radius-popover: 6px;
+  --shadow-popover:
+    0 12px 30px -8px rgba(36, 33, 28, 0.3), 0 2px 8px -2px rgba(36, 33, 28, 0.14);
 
   color-scheme: light;
 }
