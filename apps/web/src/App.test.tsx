@@ -307,27 +307,27 @@ describe("App -- focus when the page closes", () => {
     expect(document.activeElement).not.toBe(document.body);
   });
 
-  // The defect the coordinator named directly: App.tsx's deep-link fallback
-  // still calls `serviceNodeDomId(closedId)` (entry id, "service-node-..."),
-  // and imports `serviceTileDomId` without ever calling it. On the list view
-  // a tile's real DOM id is `serviceTileDomId(group.service)` -- the catalog
-  // slug, "service-tile-..." -- so the lookup finds nothing and focus falls
-  // through to <body>, which is the exact regression this fallback exists to
-  // prevent (see App.tsx's own comment on the line above the lookup).
+  // A deep link opens a page with nothing on screen having opened it, so
+  // there is no opener to hand focus back to and the fallback has to find the
+  // tile by id. Was `it.fails` once: the fallback looked the closed service up
+  // with `serviceNodeDomId` alone, which names the graph's nodes, so on the
+  // board it found nothing and focus fell to `<body>` -- the exact regression
+  // the fallback exists to prevent. App.tsx now tries the tile id and the node
+  // id in turn, covering the board, the graph and the migration board without
+  // knowing which is mounted.
   //
-  // Was `it.fails`: the fallback looked the closed service up with
-  // `serviceNodeDomId`, keyed by entry id, while the board's tiles are keyed
-  // by catalog slug -- so it found nothing and focus fell to `<body>`. App.tsx
-  // now tries the slug-keyed tile id first and the entry-keyed node id second,
-  // which covers the board, the graph and the migration board without knowing
-  // which is mounted.
+  // The two ids used to key differently as well as prefix differently -- tiles
+  // by catalog slug, because a tile stood for every entry of one vendor, and
+  // nodes by entry id. Candidate E renders one tile per entry, so both key on
+  // the entry id now and this asserts on `supabase-db` where it once asserted
+  // on `supabase`.
   it("hands focus to the tile the page was addressed to when nothing opened it -- the deep-link case", async () => {
     window.history.replaceState(null, "", "/#/service/supabase-db");
     await renderLoaded();
     await waitFor(() => expect(servicePage()).not.toBeNull());
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(servicePage()).toBeNull());
-    expect(document.activeElement).toBe(document.getElementById(serviceTileDomId("supabase")));
+    expect(document.activeElement).toBe(document.getElementById(serviceTileDomId("supabase-db")));
     expect(document.activeElement).not.toBe(document.body);
   });
 
@@ -402,8 +402,21 @@ describe("App -- focus when the page closes", () => {
   });
 });
 
-describe("App -- clicking a tile: single entry navigates, several do not", () => {
-  const multiPayload = () =>
+// This describe used to assert the opposite of what it asserts now, and the
+// reversal is the point rather than a detail. The board collapsed every entry
+// of one vendor into a single tile, so a two-entry Fly.io tile had no page to
+// open -- "Fly.io" is not a document, two Fly.io deployments are -- and the
+// click deliberately did nothing, leaving the popover's rows as the only
+// destinations. The owner approved candidate E on 2026-08-26, which renders
+// one tile per manifest entry, so every tile now has exactly one page and the
+// refusal has nothing left to refuse (docs/PLAN.md, "The form is settled").
+//
+// The second test is the one that earns its place: two entries of one vendor
+// must reach two *different* pages. It is the App-level guard against the
+// collapse being restored, and it fails loudly rather than subtly if it is --
+// a restored collapse renders one tile where this looks for two.
+describe("App -- clicking a tile: every tile is one entry, and opens its own page", () => {
+  const twoOfOneVendor = () =>
     payload({
       services: [
         makeViewService({ id: "fly-api", role: "hosting-api", rollup: "hosting", name: "Fly.io", service: "flyio" }),
@@ -411,24 +424,19 @@ describe("App -- clicking a tile: single entry navigates, several do not", () =>
       ],
     });
 
-  it("navigates on click for a single-entry tile", async () => {
+  it("navigates on click", async () => {
     await renderLoaded();
     fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
     await waitFor(() => expect(window.location.hash).toBe("#/service/fly-api"));
   });
 
-  // Named directly by the coordinator: there is no vendor page to open for a
-  // multi-entry tile -- "Fly.io" is not a document, two Fly.io deployments
-  // are -- so the click must not change the hash or open a page at all.
-  it("does not navigate, and opens no page, on click for a multi-entry tile", async () => {
-    await renderLoaded(multiPayload());
-    const tile = await screen.findByRole("button", { name: /Fly\.io, 2 entries/ });
-    fireEvent.click(tile);
-    // Give any (incorrect) navigation a chance to happen before asserting
-    // its absence.
-    await Promise.resolve();
-    expect(window.location.hash).toBe("");
-    expect(servicePage()).toBeNull();
+  it("gives two entries of one vendor two tiles, each opening its own page", async () => {
+    await renderLoaded(twoOfOneVendor());
+    const tiles = await screen.findAllByRole("button", { name: /Fly\.io/ });
+    expect(tiles).toHaveLength(2);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Fly\.io, fly-web/ }));
+    await waitFor(() => expect(window.location.hash).toBe("#/service/fly-web"));
   });
 });
 

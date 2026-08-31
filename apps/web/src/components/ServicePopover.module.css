@@ -7,39 +7,76 @@
  * which is already viewport-relative, so `fixed` is also the coordinate
  * space the numbers arrive in.
  *
- * This is the one element in the app that floats above the page, so it is
- * the one place a shadow is allowed -- and it is a hard-edged offset block
- * rather than a soft blur, which is what the committed world does when it
- * needs to lift something.
+ * No `transform` here, deliberately. Candidate E's own static mockup centres
+ * its popover with `left: 50%; transform: translateX(-50%)`, which is
+ * exactly the mechanism docs/candidates/README.md's "Known limitation in E"
+ * blames for the popover running past the viewport in the grid's edge
+ * columns between 768 and 1280px -- CSS centring cannot flip itself at an
+ * edge. The fix is a `left` App.tsx computes and corrects from the anchor's
+ * own position, so this stylesheet does not bake in a transform (or
+ * anything else) that would fight whatever `left` the caller decides on.
+ *
+ * `--radius-popover` and `--shadow-popover` are this world's "soft
+ * transient" vocabulary (tokens.css, "Candidate E, the home screen") -- the
+ * one departure "sharp structure, soft transients" allows -- in place of the
+ * old world's hard offset block this rule used to draw. The single padding
+ * here (rather than per-section padding) matches the mockup's own
+ * `.popover` rule, since this file now owns its whole body directly instead
+ * of composing another component's separately-padded sections.
  */
 .popover {
   position: fixed;
   z-index: 20;
-  width: 300px;
+  width: 268px;
+  max-width: calc(100vw - 24px);
   max-height: 60vh;
   overflow-y: auto;
-  border: 1px solid var(--color-line-strong);
+  padding: var(--pop-padding);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-popover);
   background: var(--color-surface);
-  box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-popover);
   /*
    * The popover accepts the pointer. An earlier version set
    * `pointer-events: none` here to keep it from intercepting hovers meant
-   * for the board, and that made its rows unreachable: the pointer left the
-   * tile, the peek cleared, and the popover was gone before it could be
-   * entered. It now hosts the hover bridge instead -- entering cancels the
-   * scheduled close (see App.tsx) -- which is both reachable and correct,
-   * because a popover under the pointer is a popover the reader is using.
+   * for the board, and that made it unreachable: the pointer left the tile,
+   * the peek cleared, and the popover was gone before it could be entered.
+   * It now hosts the hover bridge instead -- entering cancels the scheduled
+   * close (see App.tsx) -- which is both reachable and correct, because a
+   * popover under the pointer is a popover the reader is using.
    */
   pointer-events: auto;
 }
 
+@media (max-width: 480px) {
+  /*
+   * Below 480px a popover anchored to its own trigger can run past the edge
+   * of a narrow viewport -- lifted from candidate E's own
+   * `@media (max-width: 480px)` rule for `.popover`. Rather than let it clip
+   * off-screen, it becomes a viewport-anchored sheet pinned to the bottom.
+   * This is a separate mechanism from the edge-column flip above: it always
+   * applies below this width, regardless of which column the tile sits in.
+   *
+   * `top`/`left` here override the inline `style` App.tsx sets on this
+   * element for its normal, above-480px placement. An inline `style`
+   * attribute wins over an external stylesheet rule for the same property
+   * regardless of selector specificity, so overriding it from a stylesheet
+   * needs `!important` -- the one place in this file that reaches for it.
+   */
+  .popover {
+    top: auto !important;
+    left: 10px !important;
+    bottom: 10px;
+    right: 10px;
+    width: auto;
+    max-width: none;
+  }
+}
+
 .header {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-header-fill);
-  border-bottom: 1px solid var(--color-line);
+  align-items: center;
+  gap: var(--pop-head-gap);
 }
 
 .glyph {
@@ -47,38 +84,47 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
 }
 
 .glyph svg {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
 }
 
 .identity {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: var(--pop-id-gap);
   flex: 1 1 auto;
   min-width: 0;
 }
 
+/*
+ * `--text-pop-name` and the bare `-0.01em` tracking are both candidate E's
+ * own values (`.pop-name`), not this app's dense-world name scale -- reusing
+ * a neighbouring component's token here would couple two things that only
+ * share a number today, and the tracking is a value the approved mockup
+ * states rather than a guess this file gets to round to a nearby token.
+ */
 .name {
-  font-size: var(--text-module);
+  font-size: var(--text-pop-name);
   font-weight: var(--weight-bold);
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
 
 /*
- * The local id, or the entry count for a collapsed vendor. Mono for the id
- * because it is a literal from the manifest that the reader may need to type
- * into a `catalogus set services.<id>...` command.
+ * The entry id, mono because it is a literal from the manifest the reader
+ * may need to type into a `catalogus set services.<id>...` command. There is
+ * no multi-entry "N entries" form to fall back to anymore -- one popover, one
+ * entry, one id, always. `--text-pop-id` is this popover's own id scale, not
+ * the icon grid's `--text-icon-id` -- see the `.name` note above.
  */
 .slug {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-pop-id);
   color: var(--color-text-faint);
   overflow-wrap: anywhere;
 }
@@ -89,88 +135,114 @@
  * so the name is the raw slug and there is no verified brand mark.
  */
 .uncatalogued {
-  font-size: 10px;
+  font-size: var(--text-pop-label);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
   color: var(--color-signal);
 }
 
-.entries {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.entry {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-3) var(--space-4);
-  border: 0;
-  border-top: 1px solid var(--color-line);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.entries li:first-child .entry {
-  border-top: 0;
-}
-
-.entry:hover {
-  background: var(--color-surface-sunken);
-}
-
-.entryHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.role {
-  font-size: var(--text-row);
-  font-weight: var(--weight-bold);
-}
-
-.id {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--color-text-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
+/*
+ * The tag row is not in candidate E's mockup at all -- it is the
+ * status vocabulary from service-tags.ts/Tag.tsx, kept from before this
+ * component's redesign. `--space-2` here is a general-purpose spacing
+ * unit for content the approved artifact does not show, not a rounding
+ * of any measurement the mockup states, so it stays.
+ */
 .tags {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
 
-.fact {
-  font-size: var(--text-label);
-  line-height: var(--leading-body);
+/*
+ * The six facts, one `<div>` per fact so each stacks its own label above its
+ * own value -- the shape `docs/candidates/candidate-e-homescreen.html`'s
+ * `.pop-facts` markup uses, translated to this app's tokens rather than its
+ * own bare pixels. Two columns of three, not one column of six: with the
+ * facts this short ("service", "3", "Active"), one column would waste half
+ * the box's width on empty space beside every value.
+ */
+.facts {
+  margin: var(--pop-facts-gap) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--pop-facts-row-gap) var(--pop-facts-column-gap);
+}
+
+.facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pop-fact-gap);
+}
+
+.facts dt {
+  margin: 0;
+  font-size: var(--text-pop-label);
+  letter-spacing: var(--track-pop-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.facts dd {
+  margin: 0;
+  font-size: var(--text-pop-fact);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+/*
+ * "Not tracked" reads as a state, not as a hole -- dimmed rather than
+ * omitted, so the Version fact is always present and a reader never has to
+ * infer that a missing row means the manifest has no version rather than
+ * that this popover forgot to ask.
+ */
+.dim {
+  font-weight: var(--weight-normal);
+  color: var(--color-text-faint);
+}
+
+/*
+ * `replaced_by`, folded into the Status fact rather than a row of its own --
+ * mono because, like the entry id, it is a literal the reader may need to
+ * type into a `catalogus` command.
+ */
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-pop-mono);
+}
+
+/*
+ * The manifest's own `notes`, quoted the way the mockup quotes it. Top-ruled
+ * and appears only when the entry has one -- an entry with no note has
+ * nothing here, not an empty ruled block.
+ */
+.note {
+  margin: var(--pop-note-gap) 0 0;
+  padding-top: var(--pop-note-rule-gap);
+  border-top: 1px solid var(--color-line);
+  font-size: var(--text-pop-note);
+  line-height: var(--leading-pop-note);
+  font-style: italic;
   color: var(--color-text-muted);
 }
 
 /*
- * The one instruction, said once. A single-entry tile opens on click, which
- * the reader discovers for free the first time; a multi-entry tile
- * deliberately does not navigate, because there is no vendor page to
- * navigate to, so the rows being the destinations has to be stated.
+ * The one instruction, said once: a tile always opens its own page on click
+ * now that there is no chooser branch to say something different for. This
+ * line is not in candidate E's mockup either -- it is this component's own
+ * addition (decision 1). `--space-3` for its rule gap is a general spacing
+ * choice for content candidate E never measured, not a rounding of a
+ * mockup value, so it stays rather than being forced onto a `--pop-*`
+ * token defined for something else.
  */
 .hint {
-  margin: 0;
-  padding: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--color-line);
-  background: var(--color-surface-sunken);
-  font-size: 10px;
-  letter-spacing: var(--track-caps);
+  font-size: var(--text-pop-label);
+  letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
   color: var(--color-text-faint);
 }

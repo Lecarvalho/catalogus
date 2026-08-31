@@ -1,98 +1,99 @@
 /*
- * The module: a 1px hairline box, no radius, no shadow, no gradient. Every
- * boundary in this layout is a hairline, and depth is expressed by fill
- * alone. That is what lets modules tile edge to edge without the whitespace
- * inflation a card grid needs to separate its cards.
+ * The band section, plain -- no hairline box, no filled header bar. The
+ * mosaic world's `.module` (see this file's own git history) argued for a
+ * bordered card at length, and the argument does not survive the shape
+ * change: a card exists to separate a module from its neighbours when
+ * several of them tile edge to edge in a multi-column layout, and a single
+ * vertical stack of full-width bands has no side-by-side neighbour for a
+ * border to separate it from. A `border-bottom` is the whole rule between
+ * one band and the next; the last band drops even that so the stack does
+ * not end on a stray line.
  */
-.module {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border: 1px solid var(--color-line);
-  background: var(--color-surface);
-  /* Modules never grow taller than their contents; the grid places them. */
-  align-self: start;
+.band {
+  padding: var(--band-spacing-top) 0 var(--band-spacing-bottom);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.band:last-of-type {
+  border-bottom: none;
 }
 
 /*
- * The header bar. Filled, with a heavier bottom rule than the row hairlines
- * so the band's name reads as a lid rather than as the first row.
+ * Heading and count on one row, baseline-aligned rather than centre-aligned
+ * so the count's smaller text sits on the heading's own text line instead
+ * of being centred against its full line-height.
  */
-.header {
+.head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 24px;
-  padding: 0 var(--space-3);
-  background: var(--color-header-fill);
-  border-bottom: 1px solid var(--color-line);
+  align-items: baseline;
+  gap: var(--band-head-gap);
 }
 
 .title {
   margin: 0;
-  font-size: var(--text-label);
+  font-size: var(--text-band-title);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-band-title);
   color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /*
- * The count, in the signal colour. This is one of the two places red is
- * spent on the project page (the other is a departure from normal), and it
- * earns it: the counts are how a reader takes in the shape of the project
- * before reading a single service name.
+ * The count. `aria-hidden` in the markup carries the reasoning the mosaic
+ * world already had right: the heading beside it names the band, so a
+ * screen reader stating the count as part of the heading would be reading
+ * a decoration as content.
  *
- * aria-hidden on the element itself -- the heading it sits beside already
- * names the band, and a screen reader announcing "Runs in production 7" as a
- * heading would be reading a decoration as content. The rows carry the
- * real information.
+ * Not the signal colour any more. The mosaic header spent red here, and
+ * earned it there because a collapsed tile's `xN` made the header's entry
+ * count and the tile count genuinely different numbers -- red singled out
+ * the one that reconciled with the manifest. Candidate E collapses nothing,
+ * so those two counts are now the same number and there is nothing left for
+ * red to distinguish. Spending it on every band heading anyway would be the
+ * same failure service-tags.ts's header describes for status pills on every
+ * entry: tagging the norm spends the reader's attention on the norm, and a
+ * band heading is exactly the board's norm. Red stays reserved for
+ * lifecycle status.
  */
 .count {
   flex: 0 0 auto;
-  font-size: var(--text-label);
-  font-weight: var(--weight-bold);
-  color: var(--color-signal);
+  font-size: var(--text-band-count);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-faint);
   font-variant-numeric: tabular-nums;
   font-feature-settings: var(--numeric-features);
 }
 
 .note {
-  margin: 0;
-  padding: var(--space-3) var(--space-3) var(--space-2);
-  border-bottom: 1px solid var(--color-line);
-  font-size: var(--text-label);
-  line-height: var(--leading-body);
+  margin: var(--band-note-gap) 0 0;
+  max-width: var(--band-note-measure);
+  font-size: var(--text-band-note);
+  font-style: italic;
   color: var(--color-text-muted);
 }
 
 /*
- * The tile grid: separated cards, not table cells.
- *
- * Two earlier attempts ruled this grid with hairlines -- first by filling the
- * container with the line colour and letting 1px gaps show through, then by
- * moving the rule onto each tile as an outward box-shadow. The first left
- * dark holes wherever a band's count was not a multiple of the column count,
- * because an empty track had no tile covering the container's fill. The
- * second fixed that and was still the wrong shape: the owner's reference is
- * StackShare's integration grid, where each entry is a separate bordered card
- * and the set reads as a collection of marks rather than as a ruled table.
- *
- * The cost is real and was taken deliberately: gaps between every tile spend
- * space, and this layout's whole argument is that a project fits one screen
- * without a search field. It is paid for by keeping the gaps small (8px), the
- * borders hairline, and the tiles at 74px -- and by refusing the drop shadow
- * the reference has, which is the single detail that would tip a disciplined
- * collection into a generic card wall.
+ * The icon grid: bare marks on the ground, no card, no border, no hairline
+ * rule between them. auto-fill columns no narrower than
+ * `--icon-grid-col-min`, and gaps wide enough to read as air -- "breathing
+ * room wins" (docs/candidates/README.md) over the mosaic world's dense,
+ * gap-minimised card wall.
  */
 .grid {
+  margin-top: var(--icon-grid-top);
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-3);
-  background: var(--color-surface);
+  grid-template-columns: repeat(auto-fill, minmax(var(--icon-grid-col-min), 1fr));
+  row-gap: var(--icon-grid-row-gap);
+  column-gap: var(--icon-grid-column-gap);
+}
+
+/*
+ * The grid tightens below 480px rather than reflowing to fewer, wider
+ * columns -- the mockup's own breakpoint and values.
+ */
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(var(--icon-grid-col-min-narrow), 1fr));
+    row-gap: var(--icon-grid-row-gap-narrow);
+    column-gap: var(--icon-grid-column-gap-narrow);
+  }
 }

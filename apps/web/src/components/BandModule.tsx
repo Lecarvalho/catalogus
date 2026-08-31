@@ -1,23 +1,32 @@
-// One band, as a boxed module in the mosaic. Pure.
+// One band, as a full-width section of bare icons.
 //
-// The module is the unit of the layout: a hairline box with a filled header
-// bar carrying the band's name on the left and its entry count on the right,
-// then a grid of vendor tiles. Modules tile in an uneven grid rather than a
-// uniform card wall -- a band with nine services occupies more of the field
-// than one with two, which is the point. A uniform grid would restate the
-// problem the old list had, where every group got equal weight regardless of
-// what was in it.
+// Candidate E (docs/candidates/candidate-e-homescreen.html,
+// docs/candidates/README.md; owner-approved 2026-08-26) replaced the boxed
+// module in a mosaic with a plain heading, an optional note, and a grid of
+// bare icons -- no hairline box, no filled header bar, no uneven masonry
+// packing. Read BandModule.module.css's git history for the mosaic's own
+// reasoning; it was sound for the dense world being retired and does not
+// carry over to a single vertical stack.
 //
-// The header counts **entries**, not tiles, and those differ wherever a
-// vendor is collapsed: Clapline's "Runs in production" holds seven entries
-// rendered as four tiles. The entry count is the manifest's own number and
-// the one that reconciles with the graph and the CLI, so it is what the
-// header states; each collapsed tile carries its own `xN` so the arithmetic
-// is visible rather than something a reader has to take on trust.
+// **One tile per manifest entry, not per vendor.** ServiceTile no longer
+// collapses by catalog slug -- a bare-icon board tells `host-api`,
+// `host-web` and `host-worker` apart by the tile's own two-line
+// vendor-name-then-id label, so three Fly.io entries are three tiles rather
+// than one tile carrying an `x3` a bare icon has no card left to hold. This
+// component now maps over `services` directly, in the order
+// `groupIntoBands` already put them in, and `collapseByService` has no
+// caller left here (bands.ts keeps it; the main session owns its fate).
+//
+// That also retires the header-count argument the previous version of this
+// file made at length: the header used to count *entries* rather than
+// tiles because a collapsed tile's `xN` made the two numbers genuinely
+// different, and the entry count was the one that reconciled with the
+// manifest and the CLI. There is no collapsing left, so the header count
+// and the number of tiles on screen are now the same number, and the header
+// simply states it.
 import type { ViewService } from "@catalogus/cli";
 
-import type { BandDefinition, VendorGroup } from "../bands.js";
-import { collapseByService } from "../bands.js";
+import type { BandDefinition } from "../bands.js";
 import { ServiceTile } from "./ServiceTile.js";
 import styles from "./BandModule.module.css";
 
@@ -26,8 +35,8 @@ export interface BandModuleProps {
   services: ViewService[];
   readAt: string;
   selectedId: string | null;
-  onActivate: (group: VendorGroup) => void;
-  onPeek: (group: VendorGroup, anchor: HTMLElement) => void;
+  onActivate: (service: ViewService) => void;
+  onPeek: (service: ViewService, anchor: HTMLElement) => void;
   onPeekEnd: () => void;
 }
 
@@ -40,38 +49,46 @@ export function BandModule({
   onPeek,
   onPeekEnd,
 }: BandModuleProps) {
-  // Collapsed within this band only. Supabase is `auth` here and `database`
-  // in "Holds data"; collapsing across bands would force one Supabase tile
-  // into one band and state that it does one job, when the manifest says it
-  // does two. bands.ts carries the full reasoning.
-  const groups = collapseByService(services);
+  // The section carries the anchor id -- the mockup's left rail links to
+  // `#band-production`, and that shell work is the next brief, so the
+  // target has to exist now and has to be the section, not the heading. The
+  // heading needs an id of its own that does not collide with it, for
+  // `aria-labelledby` to point at.
+  const sectionId = `band-${band.id}`;
+  const headingId = `${sectionId}-title`;
 
   return (
-    <section className={styles.module} aria-labelledby={`band-${band.id}`}>
-      <header className={styles.header}>
-        <h2 className={styles.title} id={`band-${band.id}`}>
+    <section id={sectionId} className={styles.band} aria-labelledby={headingId}>
+      <div className={styles.head}>
+        <h2 className={styles.title} id={headingId}>
           {band.label}
         </h2>
+        {/*
+          aria-hidden on the element itself -- the heading it sits beside
+          already names the band, and a screen reader announcing "Runs in
+          production 7" as a heading would be reading a decoration as
+          content. The rows carry the real information.
+        */}
         <span className={styles.count} aria-hidden="true">
           {services.length}
         </span>
-      </header>
+      </div>
 
       {/*
         A note only where the band's membership is not self-evident, and
         never as decoration. `unplaced` is the case this exists for: a
-        reader seeing that heading needs to know it is a vocabulary miss
-        they can fix, not a defect in the viewer.
+        reader seeing that heading needs to know it is a vocabulary gap they
+        can fix, not a defect in the viewer.
       */}
       {band.note && <p className={styles.note}>{band.note}</p>}
 
       <div className={styles.grid}>
-        {groups.map((group) => (
+        {services.map((service) => (
           <ServiceTile
-            key={group.service}
-            group={group}
+            key={service.id}
+            service={service}
             readAt={readAt}
-            selected={group.entries.some((entry) => entry.id === selectedId)}
+            selected={service.id === selectedId}
             onActivate={onActivate}
             onPeek={onPeek}
             onPeekEnd={onPeekEnd}

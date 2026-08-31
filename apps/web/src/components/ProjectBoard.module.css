@@ -1,51 +1,40 @@
 /*
- * The mosaic. A masonry-ish multi-column grid rather than a row grid,
+ * The board: a single vertical stack of full-width bands, replacing the
+ * mosaic's CSS multi-column packing (see this file's own git history for
+ * that version's reasoning, which argued at length for masonry packing
  * because bands are wildly uneven -- Clapline's "Runs in production" holds
- * seven services and "Registered at" holds two -- and a row grid would
- * stretch every module in a row to the tallest one, reintroducing exactly
- * the equal-weight problem this layout exists to fix.
+ * seven services and "Registered at" holds two, and a row grid would
+ * stretch every module to the tallest one).
  *
- * CSS multi-column does the packing with no JavaScript, no measurement pass,
- * and no layout thrash on resize. The cost is that reading order runs down
- * each column before moving right; that is acceptable here because the bands
- * are independent of one another -- there is no sentence running across
- * them -- and because the DOM order, which is what a screen reader and the
- * keyboard follow, stays the deliberate one bands.ts fixes.
+ * Candidate E (docs/candidates/candidate-e-homescreen.html,
+ * docs/candidates/README.md; owner-approved 2026-08-26) does not solve that
+ * unevenness -- it declines to treat it as a layout problem at all. A short
+ * band and a long one each get the full width and only the vertical space
+ * their own content needs: no column balancing, no `break-inside: avoid`,
+ * no reading order that runs down one column before crossing to the next.
+ * Scrolling is allowed and expected in this world ("Breathing room over
+ * density"); the old world's "a project should fit one screen" is retired
+ * along with the layout built to satisfy it. Sections are block-level and
+ * stack in DOM order with no rule needed here to make that happen.
+ *
+ * `flex: 1 1 auto` and `min-width: 0` carry over unchanged, but the failure
+ * they prevent is a different one now. The board is a flex item beside the
+ * detail panel (App.module.css's `.body`, shared with the graph and
+ * migration views, so it is not going away), and a flex item's default
+ * `min-width: auto` is not zero -- it is the item's own automatic minimum
+ * size, which for a descendant `display: grid` container is derived from
+ * its tracks' minimums. Each band's `.icon-grid` (BandModule.module.css)
+ * declares `auto-fill` columns no narrower than `--icon-grid-col-min`; left
+ * to its default, `.board` would refuse to shrink below whatever width that
+ * computes to, so the grid sizes its columns against its own intrinsic
+ * minimum instead of the space `.body` actually gives it -- overflow, not
+ * the old mosaic's failure of collapsing to one column. `min-width: 0`
+ * removes that floor so the icon grid's `auto-fill` responds to the flex
+ * row's real width instead.
  */
 .board {
-  /* The board is a flex item beside the detail panel (App.module.css's
-     `.body`). Without `min-width: 0` a flex item refuses to shrink below its
-     content's intrinsic width, which for a multi-column container is one
-     full column -- so the board sized itself to ~230px and tiled nothing.
-     `flex: 1` claims the rest of the row; `min-width: 0` lets it. */
   flex: 1 1 auto;
   min-width: 0;
-  column-width: 300px;
-  column-gap: var(--space-5);
-  /*
-   * The hairline between columns is the source world's own device: it turns
-   * a set of floating boxes into a ruled field, which is what stops a dense
-   * layout reading as clutter.
-   */
-  column-rule: 1px solid var(--color-line);
-}
-
-/*
- * `break-inside: avoid` is what keeps a module from being sliced across a
- * column boundary. Without it a band's header can land at the bottom of one
- * column and its rows at the top of the next, which reads as two broken
- * modules rather than one whole one.
- */
-.board > * {
-  break-inside: avoid;
-  /*
-   * Multi-column ignores margin-collapsing rules in a way that leaves the
-   * first module in each column with a phantom top gap unless it is stated
-   * explicitly. Bottom-only margin, so every column starts flush.
-   */
-  margin: 0 0 var(--space-5);
-  /* Belt on braces for engines that honour the older keyword only. */
-  page-break-inside: avoid;
 }
 
 .empty {
@@ -54,17 +43,4 @@
   border: 1px solid var(--color-line);
   color: var(--color-text-muted);
   font-size: var(--text-body);
-}
-
-/*
- * One column below 640px. The mosaic is a desktop argument -- it exists so a
- * project fits one screen -- and on a phone the honest answer is a single
- * ordered column in the reading order bands.ts fixes, not a squeezed grid.
- */
-@media (max-width: 640px) {
-  .board {
-    column-width: auto;
-    column-count: 1;
-    column-rule: none;
-  }
 }

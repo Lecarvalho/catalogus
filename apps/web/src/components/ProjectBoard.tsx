@@ -31,7 +31,6 @@
 // remains in use; the popover states per-entry dependents.
 import type { ViewService } from "@catalogus/cli";
 
-import type { VendorGroup } from "../bands.js";
 import { groupIntoBands } from "../bands.js";
 import { BandModule } from "./BandModule.js";
 import styles from "./ProjectBoard.module.css";
@@ -41,8 +40,8 @@ export interface ProjectBoardProps {
   /** Server-stamped moment the manifest was read; every recency mark measures from it. */
   readAt: string;
   selectedId: string | null;
-  onActivate: (group: VendorGroup) => void;
-  onPeek: (group: VendorGroup, anchor: HTMLElement) => void;
+  onActivate: (service: ViewService) => void;
+  onPeek: (service: ViewService, anchor: HTMLElement) => void;
   onPeekEnd: () => void;
 }
 

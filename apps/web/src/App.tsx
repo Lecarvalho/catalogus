@@ -18,8 +18,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewPayload, ViewService } from "@catalogus/cli";
 
-import type { VendorGroup } from "./bands.js";
-
 import styles from "./App.module.css";
 import { AppShell } from "./components/AppShell.js";
 import { ErrorState } from "./components/ErrorState.js";
@@ -101,7 +99,7 @@ export function App() {
   // plain DOM refs, not React state, because moving focus is an imperative
   // side effect, never something a render should read back.
   const panelRef = useRef<HTMLElement | null>(null);
-  const previousSelectedRef = useRef<{ id: string; service: string } | null>(null);
+  const previousSelectedRef = useRef<{ id: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -197,16 +195,17 @@ export function App() {
   // The hover model has one hazard that is easy to ship broken: the popover
   // has to survive the pointer travelling *into* it. Clearing the peek
   // straight from the tile's pointerleave closes it in the gap between tile
-  // and popover, so its rows -- which are the destinations for a vendor with
-  // several entries -- can never be clicked. Hence the close is scheduled
-  // rather than immediate, and the popover cancels it on enter.
+  // and popover, so anything inside it is unreachable. Hence the close is
+  // scheduled rather than immediate, and the popover cancels it on enter.
+  // (Until candidate E the popover also carried the *only* route to a page
+  // for a multi-entry vendor, which made this load-bearing rather than a
+  // nicety; one tile per entry retires that, and the bridge is kept because
+  // a peek the pointer cannot enter is still a broken peek.)
   //
-  // Position is measured here rather than in the popover because the tiles
-  // live inside a CSS multi-column container: a column fragment is not a
-  // containing block an absolutely-positioned child can be trusted against,
-  // so the popover is `position: fixed` and wants viewport coordinates,
-  // which is what getBoundingClientRect() already returns.
-  const [peek, setPeek] = useState<{ group: VendorGroup; position: { top: number; left: number } } | null>(null);
+  // Position is measured here rather than in the popover because the popover
+  // is `position: fixed` and wants viewport coordinates, which is what
+  // getBoundingClientRect() already returns.
+  const [peek, setPeek] = useState<{ service: ViewService; position: { top: number; left: number } } | null>(null);
   const closeTimerRef = useRef<number | null>(null);
 
   const cancelClose = useCallback(() => {
@@ -218,25 +217,50 @@ export function App() {
 
   const positionFor = useCallback((anchor: HTMLElement) => {
     const rect = anchor.getBoundingClientRect();
+    // Both mirror ServicePopover.module.css. The coupling is real and
+    // unavoidable -- the flip below has to know how wide the thing it is
+    // flipping is, and reading it back would mean measuring after a paint the
+    // reader has already seen in the wrong place -- so it is stated here
+    // rather than left implicit.
     const width = 268;
-    const gap = 6;
-    // Prefer the right of the tile; flip to the left when that would run off
-    // the viewport, and clamp rather than allow a negative left, so a tile in
-    // the first column of a narrow window still produces a reachable popover.
-    const rightRoom = window.innerWidth - rect.right - gap;
-    const left = rightRoom >= width ? rect.right + gap : Math.max(gap, rect.left - width - gap);
-    // Top-aligned to the tile, then pulled up only as far as needed to stay
-    // on screen. Popover height is unknown before paint, so this uses the
-    // max-height the stylesheet caps it at.
-    const maxHeight = window.innerHeight * 0.6;
-    const top = Math.max(gap, Math.min(rect.top, window.innerHeight - maxHeight - gap));
+    const gap = 12;
+
+    // Centred under the tile, which is what candidate E specifies. The
+    // mockup does this with `left: 50%; transform: translateX(-50%)` and
+    // that is precisely the defect its own author reported: CSS centring
+    // cannot notice a viewport edge, so a tile in the first or last grid
+    // column pushed half a popover off screen between 768 and 1280px
+    // (apps/web/docs/candidates/README.md, "Known limitation in E"). Clamping
+    // the centred position into the viewport is the whole fix, and it is why
+    // the stylesheet must carry no transform of its own.
+    const centred = rect.left + rect.width / 2 - width / 2;
+    const left = Math.max(gap, Math.min(centred, window.innerWidth - width - gap));
+
+    // Below the tile by preference, above it when below does not fit.
+    //
+    // `ESTIMATED_HEIGHT` is an estimate and is named one. The popover's real
+    // height is not knowable before it paints, and the six-fact body makes it
+    // nearly fixed -- a head, three rows of two facts, and sometimes a note --
+    // so a constant is honest here in a way it would not be for arbitrary
+    // content. Being wrong costs a popover that hangs a little off the bottom
+    // on a short window, not one that is unreachable.
+    const ESTIMATED_HEIGHT = 250;
+    const below = rect.bottom + gap;
+    const fitsBelow = below + ESTIMATED_HEIGHT <= window.innerHeight - gap;
+    const top = fitsBelow ? below : Math.max(gap, rect.top - ESTIMATED_HEIGHT - gap);
+
+    // Below 480px none of this applies: the stylesheet turns the popover into
+    // a viewport-anchored bottom sheet and overrides both coordinates, because
+    // at that width there is no placement relative to a tile that does not
+    // clip. These numbers are still computed and still handed over; they are
+    // simply not what positions it there.
     return { top, left };
   }, []);
 
   const handlePeek = useCallback(
-    (group: VendorGroup, anchor: HTMLElement) => {
+    (service: ViewService, anchor: HTMLElement) => {
       cancelClose();
-      setPeek({ group, position: positionFor(anchor) });
+      setPeek({ service, position: positionFor(anchor) });
     },
     [cancelClose, positionFor]
   );
@@ -254,17 +278,15 @@ export function App() {
   useEffect(() => cancelClose, [cancelClose]);
 
   const handleActivate = useCallback(
-    (group: VendorGroup) => {
-      // One entry: the tile *is* the page, so open it.
-      //
-      // Several entries: there is no page to open -- "Fly.io" is not a
-      // document, five Fly.io deployments are -- so the tile does not
-      // navigate and the popover's rows stay the destinations. The popover is
-      // already open, because hover opened it.
-      if (group.entries.length === 1) {
-        setPeek(null);
-        handleSelect(group.entries[0].id);
-      }
+    (service: ViewService) => {
+      // Every tile is one manifest entry now, so every tile has a page and
+      // clicking always opens it. This used to branch: a tile standing for
+      // several entries of one vendor had no page to open -- "Fly.io" is not
+      // a document, five Fly.io deployments are -- so it refused to navigate
+      // and left the popover's rows as the only destinations. Candidate E
+      // renders one tile per entry, so the branch and the rows went together.
+      setPeek(null);
+      handleSelect(service.id);
     },
     [handleSelect]
   );
@@ -304,11 +326,16 @@ export function App() {
   // focus fell to `<body>` for clicks as well as deep links. A stashed element
   // is a reference to a render that no longer exists.
   //
-  // Two ids are tried because two surfaces render a service and they key
-  // differently. The board's tiles are keyed by **catalog slug**, because one
-  // tile can stand for several entries and no single entry id names it. The
-  // graph and the migration board key by entry id. Trying slug first and id
-  // second covers all three without this file knowing which view is mounted.
+  // Two ids are tried because two surfaces render a service, and each names
+  // its DOM node with its own prefix -- `service-tile-` on the board,
+  // `service-node-` in the graph and the migration board. Trying both covers
+  // all three without this file knowing which view is mounted.
+  //
+  // Both now key on the **entry id**. The board's tiles used to key on the
+  // catalog slug instead, because a tile stood for every entry of one vendor
+  // and no single entry id named it; candidate E renders one tile per entry
+  // (docs/PLAN.md, "The form is settled"), so the slug branch went with the
+  // collapse and the two schemes converged.
   //
   // A focus restore that silently finds nothing is invisible in a passing test
   // suite -- this repo has shipped that exact defect twice now, once on the
@@ -320,7 +347,7 @@ export function App() {
     if (matched?.id === closed?.id) {
       return;
     }
-    previousSelectedRef.current = matched ? { id: matched.id, service: matched.service } : null;
+    previousSelectedRef.current = matched ? { id: matched.id } : null;
 
     if (matched) {
       panelRef.current?.focus();
@@ -329,7 +356,7 @@ export function App() {
 
     if (closed) {
       const target =
-        document.getElementById(serviceTileDomId(closed.service)) ?? document.getElementById(serviceNodeDomId(closed.id));
+        document.getElementById(serviceTileDomId(closed.id)) ?? document.getElementById(serviceNodeDomId(closed.id));
       target?.focus();
     }
   }, [selectedService]);
@@ -410,13 +437,12 @@ export function App() {
                 </div>
                 {peek && mode === "list" && (
                   <ServicePopover
-                    group={peek.group}
+                    service={peek.service}
                     readAt={state.payload.readAt}
                     position={peek.position}
-                    dependsOn={(id) => edgeMaps.dependsOn.get(id) ?? []}
-                    dependedOnBy={(id) => edgeMaps.dependedOnBy.get(id) ?? []}
+                    dependsOn={edgeMaps.dependsOn.get(peek.service.id) ?? []}
+                    dependedOnBy={edgeMaps.dependedOnBy.get(peek.service.id) ?? []}
                     labelForId={edgeMaps.labelForId}
-                    onOpen={handleSelect}
                     onPointerEnter={cancelClose}
                     onPointerLeave={handlePeekEnd}
                   />

@@ -11,70 +11,98 @@
 //      because there was no good reason for the same facts to have two
 //      renderings -- a thin one on hover and a rich one on click.
 //
-// The body is `ServiceSummary`, shared with the service page, so the facts
-// have exactly one implementation. This file owns only the header, the
-// multi-entry chooser, and the hover bridge.
+// Decision 2 is superseded, not amended. Candidate E (approved 2026-08-26,
+// docs/candidates/README.md) renders one tile per manifest entry -- `host-api`,
+// `host-web` and `host-worker` are each their own icon now -- so the vendor
+// group this component used to collapse several entries into no longer
+// exists on the board. There is nothing left to choose between, so the
+// chooser branch, its rows, its "N entries" header form and its own hint
+// line are gone along with it. Every popover is now about exactly one
+// manifest entry, the same as every tile is.
 //
-// Two shapes, and they are not variants of each other:
+// Decision 3's *mechanism* -- share one component, `ServiceSummary`, between
+// the popover and the service page -- does not survive candidate E's
+// popover. This was escalated rather than decided here, and the ruling was:
+// build the six-fact grid in this file, and leave `ServiceSummary` untouched
+// as the page's alone. The reasoning that keeps this from being a quiet
+// reversal of decision 3: the popover and the page are not stating *the
+// same fact* about a dependency edge. The page lists the edges themselves,
+// by name, in both directions, because a reader who has landed on the page
+// is deciding something that needs the names. The popover states two
+// counts, because a reader who is hovering is deciding whether to click,
+// and a count answers that in a box 268px wide without asking them to move
+// the pointer to read a list. A count and a list are different facts about
+// the same edge set, chosen for different jobs -- decision 3 ruled against
+// two renderings of *one* fact, not against two facts that happen to share
+// a data source. Where the popover and the page do state literally the same
+// fact -- Role, Kind, Version, Status -- they read them off the same
+// `ViewService`, so they cannot disagree; only the arrangement differs,
+// which decision 3 never governed. Candidate E's own approval is the second
+// reason: the owner approved this popover on sight as part of E, and where
+// an approved mockup conflicts with an earlier decision on mechanism, the
+// mockup wins -- the same reasoning that retired the chooser above.
 //
-//   - **One entry:** the panel. Role, kind, version, added, replaced_by and
-//     this entry's edges. Hovering has already told the reader what clicking
-//     will open, which is what makes the click cheap.
-//   - **Several entries:** a chooser. The vendor is not itself a page --
-//     there is no "Fly.io" document, there are five Fly.io deployments -- so
-//     this lists them and each row is the destination. Five full panels
-//     stacked would be a worse answer than five rows.
+// The six facts, and their values, are candidate E's own
+// (docs/candidates/candidate-e-homescreen.html's `.pop-facts`): Role, Kind
+// (shown even for `kind: "service"`, unlike `ServiceSummary`'s service-page
+// rendering), Version (a dimmed "not tracked" rather than an omitted row
+// when absent), Status (sentence case, with `replaced_by` folded in as
+// "Phasing out -> auth-users" rather than a separate row), Dependents in and
+// Dependencies out (bare counts, including zero). The note, when the entry
+// has one, sits below the facts in a top-ruled block -- this is the
+// manifest's `notes` field, quoted the way the mockup quotes it.
 //
 // It carries no close button and traps no focus, because it is a peek, not a
 // dialog. The page is where a reader lands and stays.
-import type { VendorGroup } from "../bands.js";
+import type { ViewService } from "@catalogus/cli";
+
 import { tagsFor } from "../service-tags.js";
 import { Icon } from "./Icon.js";
-import { ServiceSummary } from "./ServiceSummary.js";
 import { Tag } from "./Tag.js";
 import styles from "./ServicePopover.module.css";
 
 export interface ServicePopoverProps {
-  group: VendorGroup;
+  service: ViewService;
   /** Server-stamped moment the manifest was read; every recency mark measures from it. */
   readAt: string;
   /** Viewport-relative placement, computed by App.tsx from the anchor element. */
   position: { top: number; left: number };
-  /** Per-entry edge slices, resolved by App.tsx from the payload. */
-  dependsOn: (id: string) => string[];
-  dependedOnBy: (id: string) => string[];
+  /** This entry's edges, resolved by App.tsx from the payload. */
+  dependsOn: string[];
+  dependedOnBy: string[];
   /** Resolves an entry id to a readable label, for an edge endpoint or a `replaced_by` target. */
   labelForId: (id: string) => string;
-  onOpen: (id: string) => void;
   /**
    * The hover bridge. The tile schedules this popover's close on pointer
    * leave rather than clearing it outright, and these two cancel and re-arm
-   * that timer -- without them the popover closes in the gap between the tile
-   * and itself, and its rows can never be reached. For a vendor with several
-   * entries those rows are the only route to a page, so this is load-bearing
-   * rather than a nicety.
+   * that timer -- without them the popover closes in the gap between the
+   * tile and itself, and its content (which can run past the tile's own
+   * height once a note is in it -- see the popover's `overflow-y: auto`)
+   * can never be reached by a pointer trying to enter it.
    */
   onPointerEnter: () => void;
   onPointerLeave: () => void;
 }
 
-export function ServicePopover({
-  group,
-  readAt,
-  position,
-  dependsOn,
-  dependedOnBy,
-  labelForId,
-  onOpen,
-  onPointerEnter,
-  onPointerLeave,
-}: ServicePopoverProps) {
-  const multiple = group.entries.length > 1;
-  const single = group.entries[0];
-  // Only read on the single-entry branch; the multi-entry branch tags each
-  // entry separately, because a group's entries can differ in every one of
-  // the three things a tag reports.
-  const singleTags = tagsFor(single, readAt);
+/**
+ * Status, sentence case, exactly as candidate E's mockup states it -- a
+ * `Map` rather than a keyed object literal. See Tag.tsx's header for why: a
+ * manifest-derived key read off a plain object resolves through
+ * `Object.prototype`, and this repo has shipped that exact defect five
+ * times. `service.status` is schema-validated to one of these four, so the
+ * `??` fallback below never fires on real data; it exists so a lookup miss
+ * reads as the raw value rather than as `undefined`.
+ */
+const STATUS_TEXT = new Map<ViewService["status"], string>([
+  ["active", "Active"],
+  ["phasing_out", "Phasing out"],
+  ["deprecated", "Deprecated"],
+  ["removed", "Removed"],
+]);
+
+export function ServicePopover({ service, readAt, position, dependsOn, dependedOnBy, labelForId, onPointerEnter, onPointerLeave }: ServicePopoverProps) {
+  const tags = tagsFor(service, readAt);
+  const statusText = STATUS_TEXT.get(service.status) ?? service.status;
 
   return (
     <div
@@ -89,11 +117,11 @@ export function ServicePopover({
     >
       <header className={styles.header}>
         <span className={styles.glyph} aria-hidden="true">
-          <Icon iconPath={group.icon} iconHex={group.iconHex} rollup={group.rollup} label={group.name} colour />
+          <Icon iconPath={service.icon} iconHex={service.iconHex} rollup={service.rollup} label={service.name} colour />
         </span>
 
         <span className={styles.identity}>
-          <span className={styles.name}>{group.name}</span>
+          <span className={styles.name}>{service.name}</span>
           {/*
             An uncatalogued slug is stated, not hidden. It means the display
             name is the raw slug and there is no verified icon -- a gap in the
@@ -101,80 +129,62 @@ export function ServicePopover({
             Saying so is the difference between "this looks broken" and "this
             is a known missing row".
           */}
-          {!single.known && <span className={styles.uncatalogued}>no catalog entry for this slug</span>}
-          <span className={styles.slug}>{multiple ? `${group.entries.length} entries` : single.id}</span>
+          {!service.known && <span className={styles.uncatalogued}>no catalog entry for this slug</span>}
+          <span className={styles.slug}>{service.id}</span>
         </span>
 
-        {/*
-          The same vocabulary the multi-entry branch below already uses. This
-          was a `StatusPill`, which meant one vendor's popover marked its
-          status one way and a vendor with two entries marked it another --
-          and, because the pill had a rule for `active` too, put a filled
-          "ACTIVE" block on the common case that `service-tags.ts` exists to
-          leave unmarked.
-        */}
-        {!multiple && singleTags.length > 0 && (
+        {tags.length > 0 && (
           <span className={styles.tags}>
-            {singleTags.map((tag) => (
+            {tags.map((tag) => (
               <Tag key={tag.id} tag={tag} />
             ))}
           </span>
         )}
       </header>
 
-      {multiple ? (
-        <>
-          <ul className={styles.entries}>
-            {group.entries.map((entry) => {
-              const tags = tagsFor(entry, readAt);
-              const dependents = dependedOnBy(entry.id).length;
+      <dl className={styles.facts}>
+        <div>
+          <dt>Role</dt>
+          <dd>{service.role}</dd>
+        </div>
 
-              return (
-                <li key={entry.id}>
-                  <button type="button" className={styles.entry} onClick={() => onOpen(entry.id)}>
-                    <span className={styles.entryHead}>
-                      {/*
-                        The role leads, not the id. On a multi-entry tile the
-                        reader's question is "which of these is which", and
-                        the role is the answer -- `hosting-api` against
-                        `hosting-metrics`. The id follows for anyone who needs
-                        to type it into a `catalogus set services.<id>...`.
-                      */}
-                      <span className={styles.role}>{entry.role}</span>
-                      <span className={styles.id}>{entry.id}</span>
-                    </span>
+        <div>
+          <dt>Kind</dt>
+          <dd>{service.kind}</dd>
+        </div>
 
-                    {tags.length > 0 && (
-                      <span className={styles.tags}>
-                        {tags.map((tag) => (
-                          <Tag key={tag.id} tag={tag} />
-                        ))}
-                      </span>
-                    )}
+        <div>
+          <dt>Version</dt>
+          <dd>{service.version ?? <span className={styles.dim}>not tracked</span>}</dd>
+        </div>
 
-                    {dependents > 0 && (
-                      <span className={styles.fact}>
-                        {dependents} {dependents === 1 ? "entry depends" : "entries depend"} on this
-                      </span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <p className={styles.hint}>Choose one to open its page.</p>
-        </>
-      ) : (
-        <>
-          <ServiceSummary
-            service={single}
-            dependsOn={dependsOn(single.id)}
-            dependedOnBy={dependedOnBy(single.id)}
-            labelForId={labelForId}
-          />
-          <p className={styles.hint}>Click the tile to open its page.</p>
-        </>
-      )}
+        <div>
+          <dt>Status</dt>
+          <dd>
+            {statusText}
+            {service.replaced_by && (
+              <>
+                {" → "}
+                <span className={styles.mono}>{labelForId(service.replaced_by)}</span>
+              </>
+            )}
+          </dd>
+        </div>
+
+        <div>
+          <dt>Dependents in</dt>
+          <dd>{dependedOnBy.length}</dd>
+        </div>
+
+        <div>
+          <dt>Dependencies out</dt>
+          <dd>{dependsOn.length}</dd>
+        </div>
+      </dl>
+
+      {service.notes && <p className={styles.note}>&ldquo;{service.notes}&rdquo;</p>}
+
+      <p className={styles.hint}>Click the tile to open its page.</p>
     </div>
   );
 }

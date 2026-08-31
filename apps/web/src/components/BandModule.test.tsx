@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 //
-// BandModule is one boxed section of the board: a header naming the band and
-// stating its entry count, an optional note, and a grid of vendor tiles
-// collapsed from this band's own services.
-import { cleanup, render, screen } from "@testing-library/react";
+// BandModule is one full-width section of the board: a heading naming the
+// band and stating its entry count, an optional note, and a grid of bare
+// icons -- one tile per manifest entry, never collapsed by vendor.
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BandDefinition } from "../bands.js";
@@ -17,18 +17,21 @@ const notedBand: BandDefinition = { id: "unplaced", label: "Unplaced", note: "Th
 
 afterEach(() => cleanup());
 
-describe("BandModule -- the header count", () => {
-  // The header counts entries, not tiles -- they differ once a vendor
-  // collapses, and the header's number is the one that reconciles with the
-  // manifest and the CLI.
-  it("counts entries, which can be more than the number of tiles rendered", () => {
+describe("BandModule -- one tile per entry, never collapsed by vendor", () => {
+  // The regression this exists to catch: candidate E's board has no card
+  // left to carry a collapsed tile's `xN`, so three Fly.io entries must
+  // render as three distinct marks, not one Fly.io tile standing in for
+  // all three. The header count is the same number as the tile count now
+  // that nothing collapses, so this test checks both at once.
+  it("renders three entries of one vendor as three tiles, and the header count matches", () => {
     render(
       <BandModule
         band={band}
         services={[
-          service({ id: "a", role: "hosting-api", service: "flyio" }),
-          service({ id: "b", role: "hosting-web", service: "flyio" }),
-          service({ id: "c", role: "database", service: "supabase" }),
+          service({ id: "host-api", role: "hosting-api", service: "flyio", name: "Fly.io" }),
+          service({ id: "host-web", role: "hosting-web", service: "flyio", name: "Fly.io" }),
+          service({ id: "host-worker", role: "hosting-worker", service: "flyio", name: "Fly.io" }),
+          service({ id: "database", role: "database", service: "supabase", name: "Supabase" }),
         ]}
         readAt={readAt}
         selectedId={null}
@@ -38,14 +41,22 @@ describe("BandModule -- the header count", () => {
       />
     );
     expect(screen.getByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull();
-    expect(screen.getByText("3")).not.toBeNull();
-    // Two vendors -- flyio (2 entries) and supabase (1) -- so two tiles.
-    expect(screen.getAllByRole("button")).toHaveLength(2);
+    // Four tiles, one per manifest entry -- not two (one per vendor slug).
+    expect(screen.getAllByRole("button")).toHaveLength(4);
+    expect(document.getElementById("service-tile-host-api")).not.toBeNull();
+    expect(document.getElementById("service-tile-host-web")).not.toBeNull();
+    expect(document.getElementById("service-tile-host-worker")).not.toBeNull();
+    // The old collapsed id, keyed on the vendor slug rather than the entry
+    // id, must not appear -- its presence would mean collapsing came back.
+    expect(document.getElementById("service-tile-flyio")).toBeNull();
+    // The header states the entry count, which is also the tile count now
+    // that nothing collapses.
+    expect(screen.getByText("4")).not.toBeNull();
   });
 });
 
-describe("BandModule -- the note", () => {
-  it("renders no note when the band defines an empty one", () => {
+describe("BandModule -- the section anchor and its heading", () => {
+  it("carries id=\"band-<id>\" on the section, labelled by a distinct heading id", () => {
     render(
       <BandModule
         band={band}
@@ -57,10 +68,32 @@ describe("BandModule -- the note", () => {
         onPeekEnd={vi.fn()}
       />
     );
-    expect(document.querySelector("p")).toBeNull();
+    const region = screen.getByRole("region", { name: "Runs in production" });
+    expect(region.id).toBe("band-production");
+    const heading = screen.getByRole("heading", { level: 2, name: "Runs in production" });
+    // The heading's own id must not collide with the section's -- it is a
+    // distinct id that aria-labelledby points at.
+    expect(heading.id).not.toBe("band-production");
+    expect(heading.id.length).toBeGreaterThan(0);
   });
+});
 
-  it("renders the band's note when it has one", () => {
+describe("BandModule -- the note", () => {
+  it("renders no note when the band defines an empty one, and renders it when the band has one", () => {
+    const { unmount } = render(
+      <BandModule
+        band={band}
+        services={[service({ id: "a", role: "hosting", service: "flyio" })]}
+        readAt={readAt}
+        selectedId={null}
+        onActivate={vi.fn()}
+        onPeek={vi.fn()}
+        onPeekEnd={vi.fn()}
+      />
+    );
+    expect(document.querySelector("p")).toBeNull();
+    unmount();
+
     render(
       <BandModule
         band={notedBand}
@@ -76,29 +109,8 @@ describe("BandModule -- the note", () => {
   });
 });
 
-describe("BandModule -- collapsing is scoped to the services it is given", () => {
-  it("collapses same-slug entries within its own services into one tile", () => {
-    render(
-      <BandModule
-        band={band}
-        services={[
-          service({ id: "a", role: "hosting-api", service: "flyio" }),
-          service({ id: "b", role: "hosting-web", service: "flyio" }),
-        ]}
-        readAt={readAt}
-        selectedId={null}
-        onActivate={vi.fn()}
-        onPeek={vi.fn()}
-        onPeekEnd={vi.fn()}
-      />
-    );
-    expect(screen.getAllByRole("button")).toHaveLength(1);
-    expect(screen.getByText("×2")).not.toBeNull();
-  });
-});
-
 describe("BandModule -- selection reaches the right tile", () => {
-  it("marks a tile selected when any of its entries matches selectedId", () => {
+  it("marks exactly the tile whose entry id matches selectedId, and no sibling", () => {
     render(
       <BandModule
         band={band}
@@ -114,10 +126,45 @@ describe("BandModule -- selection reaches the right tile", () => {
         onPeekEnd={vi.fn()}
       />
     );
-    const buttons = screen.getAllByRole("button");
-    const flyio = buttons.find((btn) => btn.id === "service-tile-flyio");
-    const supabase = buttons.find((btn) => btn.id === "service-tile-supabase");
-    expect(flyio?.getAttribute("aria-current")).toBe("true");
-    expect(supabase?.hasAttribute("aria-current")).toBe(false);
+    const a = document.getElementById("service-tile-a");
+    const b = document.getElementById("service-tile-b");
+    const c = document.getElementById("service-tile-c");
+    expect(a?.hasAttribute("aria-current")).toBe(false);
+    expect(b?.getAttribute("aria-current")).toBe("true");
+    expect(c?.hasAttribute("aria-current")).toBe(false);
+  });
+});
+
+describe("BandModule -- callbacks reach the right tile with the right service", () => {
+  it("passes the exact ViewService for the tile that was activated and peeked, not another one", () => {
+    const onActivate = vi.fn();
+    const onPeek = vi.fn();
+    const onPeekEnd = vi.fn();
+    const a = service({ id: "a", role: "hosting-api", service: "flyio" });
+    const b = service({ id: "b", role: "hosting-web", service: "flyio" });
+    render(
+      <BandModule
+        band={band}
+        services={[a, b]}
+        readAt={readAt}
+        selectedId={null}
+        onActivate={onActivate}
+        onPeek={onPeek}
+        onPeekEnd={onPeekEnd}
+      />
+    );
+    const tileB = document.getElementById("service-tile-b")!;
+
+    fireEvent.click(tileB);
+    expect(onActivate).toHaveBeenCalledTimes(1);
+    expect(onActivate.mock.calls[0]![0]).toBe(b);
+
+    fireEvent.pointerOver(tileB, { pointerType: "mouse" });
+    expect(onPeek).toHaveBeenCalledTimes(1);
+    expect(onPeek.mock.calls[0]![0]).toBe(b);
+    expect(onPeek.mock.calls[0]![1]).toBe(tileB);
+
+    fireEvent.pointerOut(tileB, { relatedTarget: document.body });
+    expect(onPeekEnd).toHaveBeenCalledTimes(1);
   });
 });

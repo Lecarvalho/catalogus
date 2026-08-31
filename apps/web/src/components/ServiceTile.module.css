@@ -1,127 +1,163 @@
 /*
- * A tile is a separated card, ~74px wide and ~72px tall: a 24px brand mark, a
- * name on one or two lines, and a count when the tile stands for more than
- * one entry. It carries its own hairline border, because the grid that holds
- * these now separates them with gaps rather than ruling them (see
- * BandModule.module.css's grid comment for the two ruled attempts that came
- * before and why the reference is a collection of cards).
+ * Candidate E, the home screen (approved 2026-08-26 -- see
+ * docs/candidates/candidate-e-homescreen.html and docs/candidates/README.md).
+ * A tile is a bare icon on the ground: no card, no border, no panel. Every
+ * value below is either one of tokens.css's Candidate E tokens (the block
+ * above --icon-tile-size) or lifted verbatim from the mockup's own
+ * `.icon-grid` / `.app-icon` / `.icon-mark` / `.status-badge` /
+ * `.icon-label` rules -- a number taken from the artifact the owner approved
+ * is a record, one picked fresh would be a guess (CLAUDE.md).
  *
- * No drop shadow, deliberately, and it is the one place this tile departs
- * from the StackShare reference it is modelled on: the committed world has no
- * shadows anywhere, and a shadow here would be the detail that tips a
- * disciplined collection into a generic card wall.
+ * `--icon-label-gap`, `--icon-id-gap`, `--icon-status-gap`,
+ * `--text-monogram` and `--weight-semibold` were added to tokens.css for
+ * exactly the five values this file needed and the dense world's
+ * `--space-*` / `--text-*` / `--weight-*` ramps did not carry: those ramps
+ * belong to the world this design replaces, and rounding an owner-approved
+ * value onto a scale built for something else is a defect invisible in
+ * review and wrong on screen. Only the badge's 23px / 12px / −6px / 1.5px
+ * and the monogram's 0.02em letter-spacing stay bare -- genuinely local,
+ * single-use numbers with no scale to belong to either way.
  */
+
 .tile {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-2);
-  min-height: 72px;
-  padding: var(--space-4) var(--space-2) var(--space-3);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: inherit;
   text-align: center;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  color: inherit;
   cursor: pointer;
 }
 
-.tile:hover {
-  background: var(--color-surface-sunken);
-}
-
 /*
- * Selection: the sunken fill, plus the border going to full ink. Two cues,
- * and the border weight survives greyscale -- the fix for the defect where a
- * selected node's only two cues were both colour (docs/PLAN.md). Border
- * colour rather than width, so the tile's box never grows and shoves its
- * neighbours when selected.
+ * Selection and keyboard focus both put a shape cue -- not a colour one --
+ * on the squircle itself, exactly as candidate-e-homescreen.html's
+ * `.app-icon.is-open .icon-mark` / `.app-icon:focus-visible .icon-mark`
+ * do. This is on top of, not instead of, the app-wide focus ring every
+ * `button` already gets from tokens.css's `:where(a, button, [tabindex])
+ * :focus-visible` rule -- ServiceNode.module.css states the same "one focus
+ * treatment lives once, globally" principle and stacks its own selection
+ * ring on top of it for the same reason: a second, tile-local cue that
+ * survives greyscale where a single global ring around the whole button
+ * would not point at the mark specifically.
  */
-.selected {
-  background: var(--color-surface-sunken);
-  border-color: var(--color-line-strong);
+.selected .squircle,
+.tile:focus-visible .squircle {
+  outline: 2px solid var(--color-text-faint);
+  outline-offset: 3px;
 }
 
-/*
- * The status mark: a bar across the top edge, full width, 3px. Length and
- * position carry the meaning, so it reads with colour removed entirely.
- */
-.mark {
-  position: absolute;
-  top: -1px;
-  left: -1px;
-  right: -1px;
-  height: 3px;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-}
-
-/* Tones mirror service-tags.ts's vocabulary. `quiet-outline` is the `kind`
-   mark -- component and stack -- and is the faintest thing here on purpose:
-   it is context, not a warning, and a project written mostly in components
-   must not look mostly alarming. */
-.signal-solid,
-.signal-outline {
-  background: var(--color-signal);
-}
-
-.ink-solid {
-  background: var(--color-line-strong);
-}
-
-.grey-solid {
-  background: var(--tag-removed-bg);
-}
-
-.quiet-outline {
-  background: var(--color-line);
-}
-
-.glyph {
+.squircle {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
   flex: 0 0 auto;
+  width: var(--icon-tile-size);
+  height: var(--icon-tile-size);
+  border-radius: var(--icon-tile-radius);
+  background: var(--color-surface);
 }
 
-.glyph svg {
-  width: 24px;
-  height: 24px;
+/* Forces the brand mark to this world's icon size regardless of Icon.tsx's
+   own default sizing -- a plain descendant selector, not a class on the
+   svg itself, since Icon.tsx takes no size prop. ServicePage.module.css's
+   `.glyph svg` rule does the identical thing for the same component. */
+.squircle svg {
+  width: var(--icon-mark-size);
+  height: var(--icon-mark-size);
 }
 
-/*
- * The name wraps to at most two lines and then ellipses. Two rather than one
- * because "Google Cloud Storage" and "GitHub Actions" are real entries and a
- * single clamped line would render both as "Google Cloud…" and
- * "GitHub Actio…", which defeats recognition -- the one job this tile has.
- */
-.name {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: var(--text-label);
+/* The no-brand-icon case: dashed border, sunken fill, in place of the solid
+   surface above. */
+.fallback {
+  background: var(--color-surface-sunken);
+  border: 1.5px dashed var(--color-line);
+}
+
+/* Status signal 2 of 3: the mark itself desaturated and dimmed -- a
+   lightness/saturation change, not a hue, so it reads under a
+   `grayscale(1)` filter exactly as it does in colour. `:not(.fallback)`
+   mirrors the mockup's own guard: a fallback tile is already sunken, and
+   there is no svg under it for the filter rule to touch. */
+.desaturated:not(.fallback) {
+  background: var(--color-surface-sunken);
+}
+
+.desaturated svg {
+  filter: grayscale(0.9) opacity(0.5);
+}
+
+.monogram {
+  font-family: var(--font-mono);
   font-weight: var(--weight-bold);
-  line-height: 1.2;
-  letter-spacing: -0.005em;
+  font-size: var(--text-monogram);
+  letter-spacing: 0.02em;
+  color: var(--color-text-faint);
+}
+
+/* Status signal 1 of 3: a corner badge, glyph-shaped so it reads by outline
+   alone before any colour or word does. Position, size and the 1.5px ring
+   are the mockup's `.status-badge` rule verbatim; none of the four numbers
+   here has a tokens.css equivalent, and all four are local to this
+   component. */
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-signal);
+  color: var(--color-signal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.label {
+  margin-top: var(--icon-label-gap);
+}
+
+.name {
+  font-size: var(--text-icon-name);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-icon-name);
+  color: var(--color-text);
   overflow-wrap: break-word;
 }
 
-/*
- * The entry count, shown only when a tile stands for more than one manifest
- * entry. It exists so the band header's total reconciles with what a reader
- * can count on screen: four Fly.io entries render as one tile, and without
- * `x4` the band would claim seven while showing four.
- */
-.count {
-  font-size: 9px;
-  font-weight: var(--weight-bold);
-  line-height: 1;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: var(--numeric-features);
+.id {
+  margin-top: var(--icon-id-gap);
+  font-size: var(--text-icon-id);
+  font-family: var(--font-mono);
+  color: var(--color-text-faint);
+}
+
+/* Status signal 3 of 3: the status spelled out in words, plain text, so it
+   needs no colour at all to be read -- red here decorates the one thing red
+   is reserved for, it does not carry the meaning (candidate-e-homescreen.html's
+   own comment on `.icon-status`, kept verbatim because it states the reason
+   better than a paraphrase would). */
+.status {
+  margin-top: var(--icon-status-gap);
+  font-size: var(--text-icon-status);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-icon-status);
+  color: var(--color-signal);
+}
+
+.statusTarget {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-medium);
 }
