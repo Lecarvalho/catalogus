@@ -5,6 +5,18 @@
 // with the same `onSelect` contract and the same `#/service/<id>` panel
 // behind it.
 //
+// **This move (candidate E, the home screen -- approved 2026-08-26) changes
+// GraphCanvas.module.css and ServiceNode.tsx/.module.css, not this file's
+// own logic.** Which nodes and edges exist, how the layout state machine
+// works, and the React Flow wiring below are all unchanged; only the mark
+// this canvas draws and the chrome around it moved into the new world.
+// There is no graph mockup -- candidate-e-homescreen.html covers the List
+// view only -- so ServiceNode.tsx takes its mark treatment from
+// ServiceTile.tsx, the world's nearest thing to a graph node, and
+// GraphCanvas.module.css carries the canvas's own chrome (the flow pane,
+// the legend, the vendor `@xyflow/react` overrides) the same way. See both
+// files' own headers for the reasoning; not repeated here.
+//
 // **The layout function arrives as a prop.** elk lives behind a Vite
 // `?worker` import (see elk-layout.ts), which cannot be loaded under jsdom at
 // all, so a canvas that imported it directly would be a canvas with no tests.

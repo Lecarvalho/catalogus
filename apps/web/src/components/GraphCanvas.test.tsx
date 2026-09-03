@@ -11,6 +11,9 @@
 // three layout states render. What is *not* under test is whether React Flow
 // paints them in the right place: that needs a real browser with real
 // dimensions, and the live run recorded in docs/PLAN.md is what covers it.
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewService } from "@catalogus/cli";
@@ -113,10 +116,19 @@ describe("GraphCanvas -- the nodes", () => {
 describe("GraphCanvas -- the status-mark world", () => {
   // The canvas used to paint a coloured ring around every node's icon, one
   // rule per status including `active` -- the world ServiceNode.module.css
-  // moved off of. This is the canvas-level proof that the swap actually
+  // moved off of, first onto a top-edge bar and now (candidate E) onto a
+  // corner badge. This is the canvas-level proof that the swap actually
   // reaches a rendered node here, not only the ServiceNode unit tests: the
   // 31-of-35-active manifest this design is built against would still look
   // wrong if GraphCanvas wired the node up some other way.
+  //
+  // Scoped to `data-testid="status-badge"` rather than a generic
+  // `[aria-hidden="true"]` query, unlike this test before candidate E: the
+  // node's whole mark (icon or monogram) is `aria-hidden` unconditionally
+  // now (ServiceNode.tsx's own header explains why -- the button's
+  // aria-label already states everything inside it), so a generic
+  // aria-hidden query would match the active majority's icon too and prove
+  // nothing.
   it("marks a departure-status node and marks none of the active majority", async () => {
     const services: ViewService[] = [
       ...SERVICES,
@@ -125,10 +137,10 @@ describe("GraphCanvas -- the status-mark world", () => {
     render(<GraphCanvas services={services} edges={EDGES} selectedId={null} onSelect={vi.fn()} layout={stubLayout} />);
 
     const deprecatedButton = await screen.findByRole("button", { name: /Old Thing/ });
-    expect(deprecatedButton.querySelector('[aria-hidden="true"]')).not.toBeNull();
+    expect(deprecatedButton.querySelector('[data-testid="status-badge"]')).not.toBeNull();
 
     const activeButton = screen.getByRole("button", { name: /Trello/ });
-    expect(activeButton.querySelector('[aria-hidden="true"]')).toBeNull();
+    expect(activeButton.querySelector('[data-testid="status-badge"]')).toBeNull();
   });
 });
 
@@ -348,6 +360,37 @@ describe("GraphCanvas -- the incident edge highlight", () => {
     expect(byPair("host-web", "host-api")?.classList.contains(styles.edge ?? "")).toBe(false);
     expect(byPair("host-api", "db-primary")?.classList.contains(styles.edge ?? "")).toBe(true);
     expect(byPair("host-api", "db-primary")?.classList.contains(styles.edgeIncident ?? "")).toBe(false);
+  });
+});
+
+describe("GraphCanvas.module.css's edge colouring", () => {
+  // A source-level guard for the finding in that stylesheet's own header:
+  // `.react-flow__edge-path` (the vendor sheet) declares `stroke` directly
+  // on the <path>, so a rule here that sets the `stroke`/`stroke-width`
+  // *properties* on `.edge`/`.edgeIncident` (which land on the wrapping
+  // <g>, per the "incident edge highlight" block above) never reaches it --
+  // only the vendor's own `--xy-edge-stroke`/`--xy-edge-stroke-width`
+  // *variables* do, because a custom property inherits down to the path
+  // while a directly-set `stroke` on an ancestor is always beaten by the
+  // vendor's own direct declaration on the path itself. jsdom computes
+  // neither form, so this reads the stylesheet as text -- it cannot prove
+  // the line is the right colour, only that the property actually capable
+  // of reaching the path is the one being set, which is what silently
+  // regressed to the property form once already before this move (see the
+  // stylesheet's own header for the full account).
+  const css = readFileSync(fileURLToPath(import.meta.url).replace(/GraphCanvas\.test\.tsx$/, "GraphCanvas.module.css"), "utf8");
+
+  it.each([".edge", ".edgeIncident"])("colours %s through the --xy-edge-stroke variable, not the stroke property directly", (selector) => {
+    const start = css.indexOf(`${selector} {`);
+    const rule = css.slice(start, css.indexOf("}", start));
+    expect(start).toBeGreaterThan(-1);
+    expect(rule).toContain("--xy-edge-stroke:");
+    expect(rule).toContain("--xy-edge-stroke-width:");
+    // Strip the variable declarations out, then confirm nothing sets the
+    // bare `stroke`/`stroke-width` property directly -- the form that looks
+    // identical in the rendered class list and paints nothing.
+    const withoutVariables = rule.replace(/--xy-edge-stroke(-width)?:[^;]*;/g, "");
+    expect(withoutVariables).not.toMatch(/\bstroke(-width)?\s*:/);
   });
 });
 

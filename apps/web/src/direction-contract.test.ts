@@ -229,21 +229,44 @@ describe("the direction contract is present in apps/web/index.html", () => {
   // each about a mismatch inside the *old* world's own contract text, and most
   // of them are moot now that OWN-WORLD and FIRST VIEWPORT no longer make those
   // specific claims -- there is no "routed chain" ask left to disagree with.
-  // What replaces them is one larger, verified fact: none of candidate E has
-  // been rebuilt into `apps/web/src` yet (confirmed by reading `AppShell.tsx`,
-  // `ServiceTile.tsx` and `BandModule.tsx`, and by `git status` showing only
-  // `tokens.css` and `docs/PLAN.md` touched before this pass), plus the one
-  // real limitation the approved mockup itself carries (the edge-column
-  // popover) and the mark, which was never about the world and survives it.
+  // What replaced them for the world change was one larger fact -- that none of
+  // candidate E had been rebuilt into `apps/web/src` yet -- plus the one real
+  // limitation the approved mockup itself carries (the edge-column popover) and
+  // the mark, which was never about the world and survives it.
+  //
+  // Two of those three are now false, and this is the second lesson the file has
+  // learned rather than the first repeated. On 2026-08-31 the board, the
+  // popover, the service page, the migrations board and the graph were all
+  // rebuilt into candidate E and the popover's edge behaviour was solved -- and
+  // this test went on passing, because it pinned the strings that stated the
+  // opposite. A pin that requires a claim keeps that claim true only in the
+  // sense that it keeps it *present*: it cannot tell "still true" from "still
+  // written down", and it ships the stale version to every reader of the built
+  // page. The three strings below were chosen against that: each names a gap
+  // that is open today, and closing one means editing this line, which is the
+  // point. Whoever builds the shell will have to come here, and that is not an
+  // inconvenience -- it is the only moment anyone is guaranteed to reread what
+  // the page claims.
   //
   // Scoped to the disclosure section itself, not to the whole comment, for the
   // same reason as before: a pin that reads the whole comment can be satisfied
   // by prose *about* the gap rather than by the gap being named where a reader
   // of the disclosure section would look for it.
+  //
+  // And the first of the three moved again on 2026-09-02, which is the lesson
+  // arriving a third time rather than a new one. "The shell is the last surface
+  // still in the retired world" was written on 2026-08-31 to replace a claim
+  // that had gone stale, and it was itself untrue the day it was written:
+  // `ViewToggle` sits in the main field, above the board, and is the retired
+  // world's tab rail. So the entry was not stale, it was *wrong*, and pinning it
+  // kept a wrong count present in the page a reader is served. The replacement
+  // names the surface rather than the count -- a claim about one named component
+  // can be checked by looking at that component, where "the last surface" can
+  // only be checked by auditing every surface, which is why nobody did.
   it("carries its disclosure section, naming what the build does not do", () => {
     const disclosure = flat(regionBetween(sourceContract ?? "", DISCLOSURE_HEADING, FINISH_LINE));
     expect(disclosure.length, "the disclosure section is empty or its FINISH boundary moved").toBeGreaterThan(500);
-    for (const known of ["the retired dense-module world", "consumes them yet", "between 768px and 1280px", "mark is still deferred"]) {
+    for (const known of ["the view rail is still the old world's component", "still unbuilt", "mark is still deferred"]) {
       expect(disclosure).toContain(known);
     }
   });

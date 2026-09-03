@@ -13,102 +13,154 @@
 //
 // Grouping, sorting and label resolution are migrations.ts's job, the same
 // division ServiceList keeps with group-services.ts -- this component only
-// renders what buildMigrationDashboard returns.
+// renders what buildMigrationDashboard returns. That derivation is
+// unchanged by everything below: only how a row is drawn moved.
 //
 // ---------------------------------------------------------------------
-// Brought into the dense-module world on 2026-08-26, a day after the board
-// (ProjectBoard/BandModule/ServiceTile) was. Two decisions worth recording
-// because the brief that asked for this left them to judgement rather than
-// spelling them out:
+// Moved into candidate E, the home screen, on 2026-08-31 -- five days after
+// the board (ProjectBoard/BandModule/ServiceTile/ServicePopover) made the
+// same move. docs/PLAN.md records the defect the gap between those two
+// dates produces: a view left behind changes the app underneath the reader
+// the moment they toggle to it. This pass closes that gap for Migrations,
+// the last dense-world holdout.
 //
-// 1. No per-row *visual* status mark. The previous row rendered `StatusPill`
-//    -- solid, on every row -- and `service-tags.ts`'s whole reason for
-//    existing is the same complaint about the old board: "the previous
-//    viewer rendered a status pill on every entry... tagging the norm spends
-//    the reader's attention on the norm." That argument applies here with
-//    force: `migrations.ts` filters `inFlight` to exactly `phasing_out` and
-//    `overdue` to exactly `deprecated`, so *every* row in a section already
-//    has the status its heading names -- there is no row in "In flight" that
-//    could be anything else. A status mark here would not be tagging the
-//    exception, it would be tagging the guaranteed case, which is a stricter
-//    version of the defect `service-tags.ts` was written to fix, not an
-//    exception to it. (See the 2026-08-26 addendum below for the half of
-//    this that was wrong.)
-// 2. No recency ("new") or `kind` (component/stack) tag either, and for a
-//    narrower reason than judgement: both live behind `tagsFor(service,
-//    readAt)`, and `readAt` is not a prop this component receives -- App.tsx,
-//    which owns the only call site, was out of this slice's file list, so
-//    threading it through would mean guessing at a default `readAt` (the
-//    thing CLAUDE.md's "ask, never guess" rule exists to stop) or adding a
-//    required prop the call site cannot supply, which fails the build rather
-//    than the review. A migration decision does not turn on when a service
-//    was added or what kind it is, so the honest scope for this view is
-//    status and replacement only, and that is what it renders.
+// It replaces two things that were never candidate E's, not just a
+// palette:
 //
-// What replaces the pill is the direction contract's own idiom for this
-// exact fact (docs/DIRECTION.md, "Mapped from the world's own grammar, not
-// invented"): "struck old price + red new price -> `phasing_out` with its
-// `replaced_by`". A `phasing_out` row's name renders struck through and its
-// replacement, if one is on record, in the signal colour -- the same visual
-// grammar a price tag uses for "this is going away, that is what to buy
-// instead" -- see MigrationList.module.css's `.superseded` and
-// `.replacementNew`. `deprecated` rows keep their name intact and their
-// replacement in ink rather than red: DIRECTION maps `deprecated` to a solid
-// *black* tag, not the signal colour, and a `deprecated` service is not
-// mid-swap the way a `phasing_out` one is -- "should not be used, still
-// present" is a different claim from "is being replaced right now."
+// 1. **The section chrome.** `.section`/`.header`/`.title`/`.count` used to
+//    duplicate BandModule.module.css's *retired* mosaic chrome verbatim (a
+//    hairline box, a filled header bar) -- a deliberate copy at the time,
+//    because another agent owned BandModule.tsx mid-flight. BandModule has
+//    since been rebuilt for candidate E into a plain heading over an
+//    unboxed stack (no card, no header fill, single-column, full width --
+//    see BandModule.module.css's own header for why the mosaic's box
+//    argument does not survive one column). This file now copies *that*
+//    chrome instead, for the same reason it copied the old one: sharing a
+//    literal import would couple two components whose props do not match,
+//    and another agent owns BandModule.tsx while this slice is built.
 //
-// Neither classed lookup below indexes `styles` (or anything else) by a
-// manifest-derived string -- the `phasing_out` check is a strict-equality
-// branch against a closed schema enum, not a keyed read -- so there is no
-// `Object.prototype` fall-through surface here for CLAUDE.md's standing
-// keyed-lookup rule to guard. `migrations.ts`'s own `buildLabelForId` still
-// keys off manifest ids and still does that through a `Map`.
+// 2. **The row's own vocabulary.** The struck-through name and the red
+//    "new price" replacement were mapped from the *retired* contract's own
+//    "Mapped from the world's own grammar" section: "struck old price + red
+//    new price -> `phasing_out` with its `replaced_by`" (docs/DIRECTION.md,
+//    the retired-contract quote at the file's foot). Candidate E's own
+//    grammar section carries no such mapping -- it maps status to a corner
+//    badge, glyph-shaped per state, plus the word spelled out under the
+//    label, and nothing else. Keeping the price-tag idiom after the board
+//    stopped using it would be exactly the defect this pass exists to
+//    close, just moved from the component layer to the vocabulary layer:
+//    the same view, still speaking a retired world's language.
+//
+//    What replaces it is literally instructed rather than invented (the
+//    brief for this pass, quoting docs/DIRECTION.md): where a row shows the
+//    same three facts a tile shows -- mark, name, status -- take the
+//    treatment from the tile. So the mark, the name/id pair and the status
+//    (badge + word) below are drawn with ServiceTile's own tokens and
+//    wording, not a fresh design. `STATUS_WORDS` and `StatusBadgeGlyph` were
+//    a deliberate, narrowed duplicate of ServiceTile.tsx's own private
+//    versions at the time this file was built, because ServiceTile.tsx kept
+//    them unexported and was off this slice's file list to edit; both now
+//    come from ServiceStatus.tsx, the shared module the three copies were
+//    lifted into once every owning slice had settled (see the
+//    `MigrationStatus` comment below for that move's own account).
+//    `monogramFor` and `serviceNodeDomId` were imported from the start,
+//    because both were already exported for exactly this kind of
+//    cross-component reuse.
+//
+//    The replacement fact has no counterpart on the tile -- a tile never
+//    shows what replaces it, only that it is being replaced -- so it takes
+//    its shape from the other place the brief points at instead: the
+//    popover's `.facts` grid, "the closest thing in the world to a row of
+//    labelled facts". A `<dl>` of one fact, captioned "Replacement", styled
+//    with ServicePopover.module.css's own label/value/mono/dim tokens.
+//
+// **The "exactly two places" discipline, held rather than relaxed.** This
+// view's whole subject is lifecycle, which is exactly why it is tempting to
+// spend red on more of it -- a count of how many need attention, an arrow
+// showing the swap, the replacement itself. Candidate E spends red in
+// exactly two places, the status badge and the status word, and nowhere
+// else (docs/DIRECTION.md, OWN-WORLD). Below: the section count is styled
+// like BandModule's own (`--color-text-faint`, not signal) for the identical
+// reason BandModule's header gives -- tagging the norm spends the reader's
+// attention on the norm, and every row in a migrations section already
+// shares the section's status, so a red count would tag the guaranteed
+// case. The replacement fact is ink, not signal, on every row regardless of
+// status -- dropping the retired mapping's red "new price" along with the
+// strike-through it paired with.
+//
+// **No radius survives the move, including the one the board keeps.**
+// docs/DIRECTION.md declares exactly one exception to "no radius anywhere",
+// the icon tile's own phone-like corner square, and says plainly it "does
+// not license a radius on anything else -- a migration row is not a
+// transient surface". So the mark below is bare -- no squircle, no
+// background tile -- sized and positioned like ServicePopover's own
+// `.glyph` (26px, no radius) rather than ServiceTile's `.squircle`, and the
+// row's button carries no `border-radius` at all (the old version's
+// `var(--radius-md)` is gone, not replaced). The selected-row cue that used
+// to pair a border colour with a background tint now uses `outline` instead
+// -- the exact mechanism ServiceTile.module.css's own `.selected` uses on
+// its squircle, for the same reason: an outline reads as a ring in
+// greyscale and never reads as the "card border" DIRECTION.md rules out for
+// a service.
 //
 // ---------------------------------------------------------------------
-// 2026-08-26 addendum: the status word belongs in the accessible name.
+// 2026-08-26 addendum, carried forward: the status word belongs in the
+// accessible name.
 //
-// Decision 1 above is right for a sighted reader, who keeps the section
-// heading in view while scanning its rows. It is wrong for the common
-// screen-reader mode of tabbing button to button: heard one at a time, a row
-// announced nothing but "Auth0 auth-legacy" and its description nothing but
-// "replaced by auth-users (Clerk)" -- the words "phasing out", "deprecated"
-// and "removed" appeared *nowhere* on this board, not in a row's name, not
-// in its description, not even in the section headings read out of context.
-// Found by a validation agent driving the built app, not by this test suite
-// -- an accessible name is exactly the kind of fact jsdom's assertions never
-// force a browser's accessibility tree to compute.
+// This is the one piece of the pre-candidate-E design that survives
+// unchanged in mechanism, only in wording. A row announced only "Auth0
+// auth-legacy" to a screen reader tabbing button to button, with the status
+// word nowhere in its accessible name or description -- found by a
+// validation agent driving the built app, not by this test suite. The fix
+// was, and remains, `aria-label` built explicitly from name/id/status word
+// rather than left to the button's rendered content, because the button's
+// rendered content is no longer just name+id now that the mark and the
+// status sit inside it too, and `aria-label` overrides all of it for
+// accessible-name purposes regardless. What changed is only the word's
+// casing: it now reads "Phasing out"/"Deprecated" (`STATUS_WORDS` below,
+// ServiceTile.tsx's own Title Case) rather than service-tags.ts's lower-case
+// tag label ("phasing out"), because the word is printed on screen now too
+// (decision 2 above reversed decision 1's old "no visual status mark") and
+// a screen-reader user should hear the exact word a sighted reader sees, not
+// a second vocabulary invented for the same fact. `tagsFor` has no caller
+// left in this file as a result -- the status word comes from this file's
+// own `STATUS_WORDS`, the same source the visible text uses, so the two can
+// never drift apart.
 //
-// The fix is confined to the row's `aria-label`; nothing changes on screen.
-// Putting the word back as visible text would undo decision 1 and rebuild
-// the "thirty-five identical pills" problem service-tags.ts exists to
-// prevent -- the strike-through and signal colour already carry the fact
-// for a sighted reader, and every row in a section still shares its status,
-// so a printed word would repeat what the heading already says, on every
-// row, with no exception. `ServiceTile.tsx` already drew this exact
-// boundary for the board proper: it renders `aria-label="Auth0, auth-legacy,
-// phasing out"` while painting an identical wordless bar, and its comment
-// makes the same argument decision 1 makes here. Two surfaces drawing the
-// same bar should not disagree about whether the fact is announced, so this
-// row's `aria-label` is built the same way, from the same vocabulary.
-//
-// `tagsFor` needs a `readAt` to decide the recency tag, and this component
-// is not given one -- threading it through would mean touching App.tsx's
-// only call site, which is out of this slice's file list, for a component
-// that has no recency mark to show anyway (decision 2 above). The way
-// around that is `ServiceNode.tsx`'s own technique, not a new one: pass
-// `kind: "service"` and `added: undefined` so the kind and recency tags
-// never fire, which makes `readAt` genuinely unused rather than merely
-// unthreaded -- `isRecentlyAdded` returns `false` the moment `added` is
-// `undefined`, before it ever reads its second argument -- so any string
-// satisfies the parameter honestly, and the only tag `tagsFor` can produce
-// is the status one this addendum needs.
+// The replacement stays out of the accessible name, in `aria-describedby`
+// instead, for the reason recorded when this was first built: it is not
+// part of the control, so it does not belong in the control's name. That
+// reasoning does not turn on which world drew the row, so it is kept rather
+// than revisited.
 import type { ViewService } from "@catalogus/cli";
 
 import { buildMigrationDashboard, type MigrationRow } from "../migrations.js";
-import { tagsFor } from "../service-tags.js";
+import { Icon } from "./Icon.js";
 import { serviceNodeDomId } from "./ServiceNode.js";
+import { STATUS_WORDS, StatusBadgeGlyph } from "./ServiceStatus.js";
+import { monogramFor } from "./ServiceTile.js";
 import styles from "./MigrationList.module.css";
+
+/**
+ * The two statuses migrations.ts ever hands this component -- `inFlight` is
+ * always `phasing_out`, `overdue` is always `deprecated`. Narrower than
+ * ServiceStatus.tsx's own `NonActiveStatus` on purpose: a `MigrationSection`
+ * renders one status for every row it holds, so the status is a
+ * section-level fact, not a per-row branch. It is still a subset of
+ * `NonActiveStatus`, so a value typed this way indexes `STATUS_WORDS` and
+ * passes to `StatusBadgeGlyph` without a cast.
+ *
+ * **2026-08-31: `STATUS_WORDS` and the badge glyph moved to
+ * ServiceStatus.tsx.** Both used to be a narrowed duplicate of
+ * ServiceTile.tsx's own private versions, kept as a copy rather than an
+ * import because ServiceTile.tsx was off this slice's file list to edit and
+ * exported neither. That is no longer true -- both are exported from the
+ * shared module now, so this file imports rather than redraws them; the
+ * `removed` case simply never reaches this component (migrations.ts's own
+ * filter), so `MigrationStatus` stays the narrower two-value type it always
+ * was.
+ */
+type MigrationStatus = "phasing_out" | "deprecated";
 
 /** The id of the element naming a row's replacement, referenced by the row's own `aria-describedby` -- see the row markup below for why the replacement has to reach the accessible description. */
 const replacementDomId = (id: string) => `migration-replacement-${id}`;
@@ -124,79 +176,63 @@ interface MigrationSectionProps {
   /** DOM-id suffix and `aria-labelledby` anchor for this section's heading -- mirrors BandModule.tsx's `band-${band.id}` pattern. */
   sectionId: string;
   title: string;
+  /** Every row in this section shares this status -- migrations.ts's own split (`inFlight`/`overdue`), stated once here rather than re-derived per row. */
+  status: MigrationStatus;
   rows: MigrationRow[];
   emptyMessage: string;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }
 
-function MigrationSection({ sectionId, title, rows, emptyMessage, selectedId, onSelect }: MigrationSectionProps) {
+function MigrationSection({ sectionId, title, status, rows, emptyMessage, selectedId, onSelect }: MigrationSectionProps) {
   const headingId = `migration-section-${sectionId}`;
+  const statusWord = STATUS_WORDS[status];
 
   return (
     <section className={styles.section} aria-labelledby={headingId}>
-      <header className={styles.header}>
+      <div className={styles.head}>
         <h2 className={styles.title} id={headingId}>
           {title}
         </h2>
+        {/* aria-hidden for the same reason BandModule.module.css's `.count` is: the heading beside it already names the section, and the rows below carry the real information. Coloured like BandModule's count now, not the signal colour -- see the file header's "exactly two places" note. */}
         <span className={styles.count} aria-hidden="true">
           {rows.length}
         </span>
-      </header>
+      </div>
 
       {rows.length === 0 ? (
         <p className={styles.sectionEmpty}>{emptyMessage}</p>
       ) : (
         <ul className={styles.rows}>
           {rows.map((row) => {
-            // The only branch in this file that reads `service.status`, and
-            // it is a strict-equality check against a closed schema enum,
-            // not a lookup keyed by manifest text -- see the file header.
-            const isPhasingOut = row.service.status === "phasing_out";
-
-            // The status word for the accessible name only -- see the file
-            // header's 2026-08-26 addendum. `[0]` is always the status tag
-            // here (never recency or `kind`, both suppressed above), but
-            // typed as possibly absent regardless: `tagsFor` returns an
-            // array, and reading past a real status would be a silent typo
-            // in the vocabulary rather than a crash, which is worse.
-            // `.filter(Boolean)` is what keeps a hypothetical missing label
-            // from leaving a dangling ", " in the name a screen reader would
-            // read aloud.
-            const [statusTag] = tagsFor({ ...row.service, kind: "service", added: undefined }, "");
-            const accessibleName = [row.service.name, row.service.id, statusTag?.label].filter(Boolean).join(", ");
+            // The status word for the accessible name -- see the file
+            // header's addendum. Built from this file's own STATUS_WORDS,
+            // the same source the visible badge+word below reads, so the
+            // two can never say different things.
+            const accessibleName = [row.service.name, row.service.id, statusWord].filter(Boolean).join(", ");
+            const isFallback = row.service.icon === null;
 
             return (
               <li key={row.service.id} className={styles.row}>
-                {/* A real button, like ServiceNode: keyboard operability and the
+                {/* A real button, like ServiceTile: keyboard operability and the
                     accessible name come from native semantics, not a hand-rolled
                     click handler. Only the row's own service is selectable here --
-                    the replacement is text, not a second selection target, so the
-                    row keeps the single onSelect(id) contract every other view
-                    uses.
+                    the replacement is a fact beside it, not a second selection
+                    target, so the row keeps the single onSelect(id) contract every
+                    other view uses.
 
-                    It carries `serviceNodeDomId` for the same reason ServiceNode
-                    does, and the validation pass is why: App.tsx restores focus on
-                    panel close by looking that id up, so a row without one dropped
-                    focus to `<body>` in this view and only this view -- exactly the
-                    regression App.tsx's own comment says was already found and
-                    fixed once. `serviceNodeDomId`'s doc comment predicted the shape
-                    of it: "a focus restore that silently finds nothing is invisible
-                    in a passing test suite". Only one view renders at a time, so
-                    the id stays unique across the page.
+                    It carries `serviceNodeDomId` for the same reason it always
+                    has: App.tsx restores focus on panel close by looking that id
+                    up, and a row without one drops focus to `<body>` in this view
+                    and only this view -- the regression docs/PLAN.md already
+                    records once. Only one view renders at a time, so the id stays
+                    unique across the page.
 
-                    `aria-describedby` is what puts the replacement into the row's
-                    accessible description. The replacement is the point of the row,
-                    and it sits outside the control so that clicking it cannot
-                    select the wrong service -- which left it out of the button's
-                    name entirely, audible only in a screen reader's browse mode.
-
-                    `aria-label` is the status word's carrier -- see the file header's
-                    2026-08-26 addendum. It overrides the button's text content for
-                    accessible-name purposes, which is why the name is rebuilt in full
-                    (`name, id, status`) here rather than appended to it; the visible
-                    spans below are unchanged and still carry the name and id for a
-                    sighted reader. */}
+                    `aria-label` is the status word's carrier -- see the file
+                    header's addendum. It overrides the button's rendered content
+                    for accessible-name purposes, which is why the mark and the
+                    status glyph inside it are aria-hidden: nothing in the button
+                    needs to announce itself a second time. */}
                 <button
                   type="button"
                   id={serviceNodeDomId(row.service.id)}
@@ -206,33 +242,69 @@ function MigrationSection({ sectionId, title, rows, emptyMessage, selectedId, on
                   aria-describedby={replacementDomId(row.service.id)}
                   onClick={() => onSelect(row.service.id)}
                 >
-                  <span className={`${styles.name} ${isPhasingOut ? styles.superseded : ""}`}>{row.service.name}</span>
-                  <span className={`${styles.id} ${isPhasingOut ? styles.superseded : ""}`}>{row.service.id}</span>
+                  {/* The mark: bare, no squircle -- see the file header's "no
+                      radius survives the move" note. Every row here is
+                      non-active by construction (migrations.ts's own filter),
+                      so the desaturation ServiceTile applies conditionally is
+                      unconditional in this file's stylesheet instead. */}
+                  {/* D6: `styles.markFallback` only when there is no verified icon --
+                      ServiceTile.tsx's own `squircleClassName` combines its `.fallback`
+                      the same conditional way, for the same reason: the dashed/sunken
+                      treatment belongs to the no-icon case alone, not to the mark in
+                      general. */}
+                  <span className={`${styles.mark} ${isFallback ? styles.markFallback : ""}`} aria-hidden="true" data-testid="mark">
+                    {isFallback ? (
+                      <span className={styles.monogram}>{monogramFor(row.service.service)}</span>
+                    ) : (
+                      <Icon iconPath={row.service.icon} iconHex={row.service.iconHex} rollup={row.service.rollup} label={row.service.name} colour />
+                    )}
+                  </span>
+
+                  <span className={styles.identity}>
+                    <span className={styles.name}>{row.service.name}</span>
+                    <span className={styles.id}>{row.service.id}</span>
+                  </span>
+
+                  {/* Status signal, both halves: the badge glyph and the word,
+                      the same two places DIRECTION.md licenses red for. */}
+                  <span className={styles.status} aria-hidden="true" data-testid="status">
+                    <StatusBadgeGlyph status={status} />
+                    <span className={styles.statusWord}>{statusWord}</span>
+                  </span>
                 </button>
-                <span className={styles.arrow} aria-hidden="true">
-                  →
-                </span>
-                {row.replacementLabel ? (
-                  <span
-                    id={replacementDomId(row.service.id)}
-                    className={`${styles.replacement} ${isPhasingOut ? styles.replacementNew : ""}`}
-                  >
-                    {/* The arrow carries "replaced by" for a sighted reader and is
-                        aria-hidden, so the description this element provides would
-                        otherwise be a bare name with no relationship attached to
-                        it. Same srOnly device ServiceNode uses for the uncatalogued
-                        marker, and for the same reason. */}
-                    <span className={styles.srOnly}>replaced by </span>
-                    {row.replacementLabel}
-                  </span>
-                ) : (
-                  // Explicit and plain, not blank -- an absent replaced_by is an
-                  // unanswered question, not an error (CLAUDE.md's "ask, never
-                  // guess"; migrations.ts's own comment on `replacementLabel`).
-                  <span id={replacementDomId(row.service.id)} className={styles.noReplacement}>
-                    no replacement recorded
-                  </span>
-                )}
+
+                {/* The replacement, as its own labelled fact -- geometry from
+                    ServicePopover.module.css's `.facts` (dt caption, dd value),
+                    the shape the brief points at for "a row of labelled
+                    facts". Ink, never the signal colour, on every row
+                    regardless of status -- the retired price-tag mapping's red
+                    "new price" is gone along with the strike-through it paired
+                    with (file header). */}
+                <dl className={styles.fact}>
+                  <dt className={styles.factLabel}>Replacement</dt>
+                  <dd id={replacementDomId(row.service.id)} className={styles.factValue}>
+                    {row.replacementLabel ? (
+                      <>
+                        {/* srOnly prefix so the description reads as a full
+                            sentence on its own -- the caption beside it is
+                            visible-only context, not part of what
+                            aria-describedby exposes. Same device the previous
+                            version of this file used, kept because the reasoning
+                            for it (a bare name in the description has no
+                            relationship attached) does not depend on which world
+                            drew the row. */}
+                        <span className={styles.srOnly}>replaced by </span>
+                        <span className={styles.mono}>{row.replacementLabel}</span>
+                      </>
+                    ) : (
+                      // Explicit and plain, not blank -- an absent replaced_by is
+                      // an unanswered question, not an error (CLAUDE.md's "ask,
+                      // never guess"; migrations.ts's own comment on
+                      // `replacementLabel`).
+                      <span className={styles.dim}>no replacement recorded</span>
+                    )}
+                  </dd>
+                </dl>
               </li>
             );
           })}
@@ -256,6 +328,7 @@ export function MigrationList({ services, selectedId, onSelect }: MigrationListP
       <MigrationSection
         sectionId="in-flight"
         title="In flight"
+        status="phasing_out"
         rows={inFlight}
         emptyMessage="Nothing is phasing out right now."
         selectedId={selectedId}
@@ -264,6 +337,7 @@ export function MigrationList({ services, selectedId, onSelect }: MigrationListP
       <MigrationSection
         sectionId="overdue"
         title="Overdue"
+        status="deprecated"
         rows={overdue}
         emptyMessage="Nothing is deprecated right now."
         selectedId={selectedId}

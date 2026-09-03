@@ -42,9 +42,17 @@
 //      border, sunken fill, a monogram from the raw slug -- rather than the
 //      generic rollup glyph the old board used for it. `monogramFor` is
 //      exported so the popover can render the same glyph.
+//
+// Owner ruling, 2026-08-31 (docs/DIRECTION.md, "Signal red: the rule
+// stands..."): an `active` service that also carries `replaced_by` -- the
+// schema permits the combination -- now shows the replacement in the status
+// row here, matching ServicePopover.tsx, which already rendered it. See the
+// local `statusPhrase` below for the exact rule and what it deliberately
+// does not extend to (the badge, the desaturation).
 import type { ViewService } from "@catalogus/cli";
 
 import { Icon } from "./Icon.js";
+import { STATUS_WORDS, statusPhrase as sharedStatusPhrase, StatusBadgeGlyph } from "./ServiceStatus.js";
 import styles from "./ServiceTile.module.css";
 
 export interface ServiceTileProps {
@@ -65,67 +73,69 @@ export interface ServiceTileProps {
   onPeekEnd: () => void;
 }
 
-type NonActiveStatus = Exclude<ViewService["status"], "active">;
-
 /**
- * The status word spelled out under the label -- one of the three
- * independent, non-colour signals candidate E requires (README.md). Wording
- * matches candidate-e-homescreen.html's own `.icon-status` text exactly
- * ("Phasing out", "Deprecated", "Removed"); `active` never reaches this map
- * because the tile renders no status row at all for it.
- */
-const STATUS_WORDS: Record<NonActiveStatus, string> = {
-  phasing_out: "Phasing out",
-  deprecated: "Deprecated",
-  removed: "Removed",
-};
-
-/**
- * The corner badge's pictogram, one distinct shape per status so it reads
- * before any word does and survives a full-page `grayscale(1)` filter on
- * shape alone -- the check candidate-e-homescreen.html was verified against.
- * Markup (viewBox, stroke attributes, path data) is taken verbatim from the
- * mockup's `.status-badge--phasing_out` / `--deprecated` / `--removed`
- * elements, not redrawn, so this is a record rather than a fresh guess at
- * what those shapes should be (CLAUDE.md, "ask, never guess").
- */
-function StatusBadgeGlyph({ status }: { status: NonActiveStatus }) {
-  switch (status) {
-    case "phasing_out":
-      // An hourglass.
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M7 2.5h10M7 21.5h10M8 2.5c0 4.2 3.1 5.9 4 6.4.9-.5 4-2.2 4-6.4M8 21.5c0-4.2 3.1-5.9 4-6.4.9.5 4 2.2 4 6.4" />
-        </svg>
-      );
-    case "deprecated":
-      // An archive box.
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <rect x="3" y="4.5" width="18" height="4.2" rx="1.1" />
-          <path d="M5 8.7v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9" />
-          <path d="M10.2 13.4h3.6" />
-        </svg>
-      );
-    case "removed":
-      // An X.
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true">
-          <path d="M6 6l12 12M18 6L6 18" />
-        </svg>
-      );
-  }
-}
-
-/**
- * The status phrase for the accessible label and the worded status line:
- * the status word alone, or `${word} → ${replaced_by}` where the manifest
- * names a replacement. `undefined` for `active`, which earns neither.
+ * The status word and pictogram (`STATUS_WORDS`, `StatusBadgeGlyph`) used to
+ * be private to this file -- ServiceNode.tsx and MigrationList.tsx each kept
+ * their own flagged copy because neither could reach into this file while it
+ * was mid-flight. Both are settled now, so all three import the single
+ * shared version from ServiceStatus.tsx; see that file's own header for why
+ * the duplication mattered enough to lift.
+ *
+ * `statusPhrase` below is *not* the shared one, imported as
+ * `sharedStatusPhrase` instead and used only for the non-active branch. The
+ * owner's 2026-08-31 ruling on `active` + `replaced_by` (docs/DIRECTION.md,
+ * "Signal red: the rule stands, and the build was wrong rather than the
+ * rule") was put to this component specifically -- "Both surfaces show it"
+ * pairs this tile with ServicePopover.tsx, which already renders the
+ * combination -- and not to ServiceNode.tsx or MigrationList.tsx, so the
+ * exception is layered on here rather than folded into the shared function
+ * every caller already agreed on.
+ *
+ * The rule this protects (docs/DIRECTION.md, OWN-WORLD): "`active` carries
+ * no badge and no status word: tagging the norm is what produced thirty-five
+ * identical marks before." That is a rule about the *norm* -- an `active`
+ * service that already carries `replaced_by` is not the norm, it is "the
+ * exception that rule exists to make visible" (the ruling's own words), so
+ * it still earns nothing when `replaced_by` is unset, and only then.
+ *
+ * Two things this exception does *not* extend to, on the evidence available
+ * rather than a fresh guess (CLAUDE.md):
+ *
+ *   - **No corner badge.** The badge is a pictogram keyed to one of three
+ *     shapes candidate-e-homescreen.html actually draws -- an hourglass, an
+ *     archive box, a cross -- and none of them is captioned `active`. There
+ *     is no fourth shape in the mockup to draw here, and inventing one is
+ *     exactly what "ask, never guess" forbids. So the badge condition below
+ *     stays `service.status !== "active"`, unchanged: this case renders the
+ *     word and nothing else. If the owner wants a fourth pictogram, that is
+ *     a new mockup decision, not something this file can infer from the
+ *     other three.
+ *   - **No desaturation.** `isActive` (below) still governs
+ *     `styles.desaturated`, unchanged, so this case's mark stays at full
+ *     tone. Desaturation is documented as status signal 2 of 3 alongside the
+ *     badge and the word (this file's own comments, and DIRECTION.md's
+ *     "corner badge ... the mark itself desaturated ... spelled out in
+ *     words"), all three keyed to the same three non-active statuses -- there
+ *     is no source describing a fourth, partial application of it to an
+ *     `active` mark, so none is added.
+ *
+ * The word itself is "Active", transcribed from ServicePopover.tsx's own
+ * `STATUS_TEXT.get("active")` (the surface this tile is being made to
+ * agree with renders exactly this word for exactly this status) rather than
+ * picked fresh. The target after the arrow is `service.replaced_by` itself
+ * -- the raw manifest id, not a `labelForId`-resolved "id (Name)" label the
+ * way ServicePopover's does: this component is never handed a resolver
+ * (BandModule.tsx, its only call site, passes none), and the tile's own
+ * existing convention for every other status already prints the bare id
+ * here (see the status row below), so the active case matches its own
+ * sibling rows rather than reaching for a format nothing else on this tile
+ * uses.
  */
 function statusPhrase(service: ViewService): string | undefined {
-  if (service.status === "active") return undefined;
-  const word = STATUS_WORDS[service.status];
-  return service.replaced_by ? `${word} → ${service.replaced_by}` : word;
+  if (service.status === "active") {
+    return service.replaced_by ? `Active → ${service.replaced_by}` : undefined;
+  }
+  return sharedStatusPhrase(service);
 }
 
 export function ServiceTile({ service, selected, onActivate, onPeek, onPeekEnd }: ServiceTileProps) {
@@ -207,9 +217,19 @@ export function ServiceTile({ service, selected, onActivate, onPeek, onPeekEnd }
         */}
         <span className={styles.id}>{service.id}</span>
 
-        {service.status !== "active" && (
+        {/*
+          Rendered whenever `statusPhrase` above produced something --
+          `service.status !== "active"`, exactly as before, plus the one
+          2026-08-31 exception: `active` with `replaced_by` set. That
+          exception is why this guard reads off `phrase` now rather than
+          re-deriving `service.status !== "active"` a second time here; the
+          two conditions are no longer the same one. `service.status ===
+          "active"` in the ternary just below is narrowed by TypeScript, not
+          re-checked at runtime for a third time.
+        */}
+        {phrase !== undefined && (
           <span className={styles.status} data-testid="status-text">
-            {STATUS_WORDS[service.status]}
+            {service.status === "active" ? "Active" : STATUS_WORDS[service.status]}
             {service.replaced_by && (
               <>
                 {" → "}

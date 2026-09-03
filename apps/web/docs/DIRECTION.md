@@ -590,3 +590,120 @@ the viewer groups on it.)*
 
 **FINISH.** unreviewed and undocumented is unfinished; this build ends with the
 finish review, the verdict, and DESIGN.md.
+
+---
+
+## Revision -- 2026-08-31: candidate E is built, less the shell, and one ruling closes a rule
+
+The section "What is open now" above is a dated record of 2026-08-26 and stays as
+written. This revision supersedes it on two points and adds a third.
+
+### The build caught up with the contract, except for the shell
+
+"None of candidate E has been built into `apps/web/src` yet" was true when it was
+written and is no longer. Built since, each against
+`apps/web/docs/candidates/candidate-e-homescreen.html`: the icon grid and its
+band headings, the bare-icon tile with its two-line label and corner status
+badge, the hover popover's six-fact grid, the service page, the migrations board
+and the graph. The two views without a mockup -- migrations and the graph --
+were moved by matching this world's rules and reusing the tile's and the
+popover's own measured values, not by inventing a second vocabulary for the same
+facts.
+
+**What is left is the shell.** `AppShell.tsx` is a top bar carrying the wordmark
+and the manifest path. FIRST VIEWPORT's left rail with the band index, its
+footer, and its help / settings / profile cluster and their menus are unbuilt, so
+the contract still describes a first viewport nobody has seen.
+
+### The mockup's edge-column popover is solved
+
+Also from that section: the hover popover pushing past the viewport edge between
+768px and 1280px. The React build centres under the tile, clamps into the
+viewport, prefers below, and flips above only where the stylesheet's own 60vh
+ceiling fits there -- so an estimate that is wrong places the popover low or
+high, and cannot place it over the tile it describes. A first attempt got the
+flip wrong in exactly that way and shipped; a validator reproduced it before
+anyone saw it on screen.
+
+### Signal red: the rule stands, and the build was wrong rather than the rule
+
+OWN-WORLD says signal red is spent in exactly two places, the status badge and
+the status word, "and nowhere else: not a view, not a count". The build spent it
+in more than two -- the popover's "no catalog entry" line, the same fact on the
+service page, the view rail's active-tab underline, and some of the tag tones.
+Put to the owner on 2026-08-31 with the option of amending the contract to
+license a third place, **the owner ruled that the rule stands and the build is to
+be corrected.** Nothing in OWN-WORLD changes; the extra sites move onto ink, and
+a guard now fails the suite on a red site outside the two.
+
+The same day the owner also ruled on a case the contract does not cover: a
+service that is `status: active` and carries `replaced_by`, which the schema
+permits. **Both surfaces show it.** It is not the norm the "active carries no
+badge and no status word" rule protects -- it is the exception that rule exists
+to make visible.
+
+### Still open, unchanged
+
+The mark, and with it the finish review and `DESIGN.md`, by the owner's standing
+condition.
+
+### Note -- 2026-09-02: three of the four sites had not moved, and there was no guard
+
+The paragraph above says "the extra sites move onto ink, and a guard now fails
+the suite on a red site outside the two." It is written in the present tense of
+an accomplished fact, and on 2026-09-02 a validator executed the built app and
+found that neither half of it was true yet.
+
+Of the four sites the ruling named, one had moved: the popover's "no catalog
+entry" line, which is ink in `ServicePopover.module.css`. The other three had
+not.
+
+- **The same fact on the service page.** `ServicePage.module.css`'s
+  `.uncatalogued` was still `--color-signal`. This one is worth stating exactly,
+  because the file was not silent about it: the correction pass wrote the
+  owner's ruling into that stylesheet's header at length, said the marker "moves
+  to ink here and in `ServicePopover.module.css` together, in the same pass" --
+  and changed only the popover. For two days the file carried an accurate
+  account of a fix it had not made, which is the most expensive shape this kind
+  of miss can take, since a reader checking whether the site moved finds a
+  paragraph saying it did.
+- **The view rail's active-tab underline.** `ViewToggle.module.css`'s
+  `.current::after` was still `--color-signal`, and that file's own header
+  called it "the only place on this page besides a count where the signal colour
+  is spent" -- a licence OWN-WORLD does not grant and never did. Both halves of
+  that sentence are the clause the contract writes as "not a view, not a count".
+- **The tag tones.** `--tag-phasing-line`, `--tag-phasing-ink`, `--tag-new-line`
+  and `--tag-new-ink` all still aliased `--color-signal`, so a `phasing out` tag
+  and a `new` tag on an active service went on rendering red on the popover and
+  the service page throughout. `Tag.module.css`'s header stated the defect
+  plainly as a decision -- "the tone -> colour mapping is untouched".
+
+And there was no guard of any kind in the tree.
+
+This pass moved all three onto ink and wrote `apps/web/src/signal-red.test.ts`,
+which scans every stylesheet under `apps/web/src` for the signal hex, its `rgb()`
+forms, and any custom property that resolves to it transitively -- the tag tokens
+were one hop, and one more would have hidden them from a scan looking only for
+the token's own name. Its allow-list names selector plus property rather than
+files, so a new red rule in a stylesheet that already draws a badge still fails,
+and every entry must still match a real declaration, so a permission cannot
+outlive the rule it was written for. The mutation it was checked against -- a red
+rule appended to `ProjectBoard.module.css` -- takes the suite red.
+
+**One red site is neither fixed nor licensed, and is the owner's to rule on.**
+`RankModule.module.css` paints a red left border on the selected row and a red
+chip on the top-ranked one; the chip is the "not a count" clause almost word for
+word. It is not corrected here because `RankModule` has no caller -- the owner
+removed the ranking from the board on 2026-08-25 ("the most depend panel is noise
+for now") -- so no reader sees the red, and choosing what replaces it is a design
+decision on a component that is off the board. The contract says *not red*; it
+does not say what instead. The guard carries the two rules in a quarantine list,
+named per selector and dated, which is not a licence: any other red rule in that
+file still fails, and either rule going green makes its own entry stale and fails
+too. It resolves when `RankModule` next has a caller, or when the file goes.
+
+**What the whole entry is evidence for.** Every one of the three sites had a
+comment beside it discussing the red, two of them stating the ruling correctly,
+and one stating that the fix had been applied. Prose next to a rule is not a
+guard on that rule -- it reads as the decision, which is exactly how a reader
+gets past it.

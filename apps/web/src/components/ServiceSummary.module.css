@@ -1,6 +1,8 @@
 /*
- * No chrome: no border, no background, no padding of its own. The popover and
- * the page each supply those, and they want different answers.
+ * No chrome: no border, no background, no padding of its own. The page's
+ * `.facts` aside supplies those (ServicePage.module.css) -- the only
+ * caller left; see ServiceSummary.tsx's header for why `compact` and the
+ * popover it existed for are both gone.
  */
 .summary {
   display: flex;
@@ -13,48 +15,87 @@
  * values without reading the labels twice -- the previous panel used a
  * flowing dl where "Replaced by" pushed its value further right than "Role"
  * did.
+ *
+ * Moved into candidate E on 2026-08-31, corrected the same day. The first
+ * pass here left the row/column gaps and every section's own padding on
+ * --space-2 / --space-3 / --space-4, reasoning that the label-left shape
+ * has no equivalent in candidate-e-homescreen.html to round onto the wrong
+ * ramp. True, and beside the point: landing on --space-* at all still
+ * takes this panel's whole density from the retired world's ramp, whose
+ * own argument was fitting one screen without scrolling -- this world's is
+ * the opposite. Importing the ceiling is the same defect as rounding onto
+ * a step; it just leaves no near-miss value behind to catch later.
+ *
+ * The correction: every gap and every section's padding below is derived
+ * from ServicePopover.module.css's own fact geometry --
+ * --pop-facts-row-gap (9px), --pop-facts-column-gap (14px), --pop-fact-gap
+ * (2px) and --pop-padding (16px 18px 17px) -- because that geometry is
+ * measured, is already in this world, and states the same kind of fact
+ * this grid does (this file already reused the popover's *type* for
+ * exactly that reason). The 300px facts aside (ServicePage.module.css) and
+ * the popover's 268px are close enough in width that the popover's own
+ * padding reads as the right amount of inset here too, not a coincidence
+ * this file is stretching to use. `--pop-facts-row-gap` is the space
+ * between one fact and the next everywhere in this panel a "next fact"
+ * exists (this grid's own rows, the two dependency lines, the state line
+ * before the Layer 3 prose); `--pop-fact-gap` is kept for the one place a
+ * label sits directly on its own value the way a `dt` sits on its `dd` in
+ * the popover, not for space between two different facts.
+ *
+ * The 84px label column itself is restated, not re-derived: nothing in the
+ * popover measures a label-left arrangement (its own fact grid is
+ * label-above-value), so there is genuinely nothing to derive it from, and
+ * 84px already fits every label below ("Replaced by" is the longest).
  */
 .facts {
   display: grid;
   grid-template-columns: 84px 1fr;
-  gap: var(--space-2) var(--space-3);
+  gap: var(--pop-facts-row-gap) var(--pop-facts-column-gap);
   margin: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--pop-padding);
 }
 
 .facts dt {
-  font-size: var(--text-label);
-  letter-spacing: var(--track-caps);
+  font-size: var(--text-pop-label);
+  letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--color-text-faint);
 }
 
 .facts dd {
   margin: 0;
-  font-size: var(--text-row);
+  font-size: var(--text-pop-fact);
   overflow-wrap: anywhere;
 }
 
+/*
+ * The manifest's own `notes` -- the same fact ServicePopover.module.css's
+ * `.note` states about the same entry, so this reuses that rule's own type
+ * (--text-pop-note / --leading-pop-note) rather than the dense world's
+ * --text-body / --leading-body or a fresh size chosen to look about right.
+ * Padding is --pop-padding, the same call as `.facts` above, so every
+ * section's content lines up on one left edge down the panel.
+ */
 .notes {
   margin: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--pop-padding);
   border-top: 1px solid var(--color-line);
-  font-size: var(--text-body);
-  line-height: var(--leading-body);
+  font-size: var(--text-pop-note);
+  line-height: var(--leading-pop-note);
 }
 
 .deps {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--pop-facts-row-gap);
+  padding: var(--pop-padding);
   border-top: 1px solid var(--color-line);
 }
 
 .depLine {
   margin: 0;
-  font-size: var(--text-body);
-  line-height: var(--leading-body);
+  font-size: var(--text-pop-note);
+  line-height: var(--leading-pop-note);
   overflow-wrap: anywhere;
 }
 
@@ -66,31 +107,41 @@
  */
 .depLabel {
   display: block;
-  font-size: var(--text-label);
-  letter-spacing: var(--track-caps);
+  font-size: var(--text-pop-label);
+  letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--color-text-faint);
 }
 
 /*
  * Layer 3. Sunken rather than bordered, because it is a different *kind* of
  * content from the facts above it: everything above is what the manifest
  * says, and this is an explanation of something the manifest deliberately
- * does not hold.
+ * does not hold. Padding is --pop-padding, the same call as every section
+ * above -- this box no longer earns a tighter top inset than the others
+ * (the old --space-3/--space-4/--space-4 asymmetry), because --pop-padding
+ * already carries its own small top/bottom asymmetry (16px / 17px) and a
+ * second, independent one on top of it had no source but a guess.
  */
 .overlay {
-  padding: var(--space-3) var(--space-4) var(--space-4);
+  padding: var(--pop-padding);
   border-top: 1px solid var(--color-line);
   background: var(--color-surface-sunken);
 }
 
+/*
+ * The heading sits directly on "Not connected" the way a `dt` sits on its
+ * `dd` in the popover -- the one place in this file where a label meets its
+ * own value rather than the next fact along, so this is --pop-fact-gap
+ * (2px), not --pop-facts-row-gap.
+ */
 .overlayHeading {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-label);
+  margin: 0 0 var(--pop-fact-gap);
+  font-size: var(--text-pop-label);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--color-text-faint);
 }
 
 /*
@@ -99,15 +150,15 @@
  * takes ink, never the signal colour.
  */
 .overlayState {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-row);
+  margin: 0 0 var(--pop-facts-row-gap);
+  font-size: var(--text-pop-fact);
   font-weight: var(--weight-bold);
 }
 
 .overlayBody {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-body);
-  line-height: var(--leading-body);
+  margin: 0 0 var(--pop-facts-row-gap);
+  font-size: var(--text-pop-note);
+  line-height: var(--leading-pop-note);
   color: var(--color-text-muted);
   max-width: 60ch;
 }
@@ -121,6 +172,6 @@
   border: 1px solid var(--color-line);
   background: var(--color-surface);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-pop-id);
   color: var(--color-text);
 }

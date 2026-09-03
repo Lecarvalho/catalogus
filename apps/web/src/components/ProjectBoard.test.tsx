@@ -68,6 +68,35 @@ describe("ProjectBoard -- bands with no services", () => {
   });
 });
 
+// D12 (docs/PLAN.md): every test above this one passes `selectedId={null}`,
+// so a `ProjectBoard` that silently hardcoded `selectedId={null}` in its own
+// call to `BandModule` -- rather than forwarding the prop it was actually
+// handed -- would pass every one of them. This is the test that reaches
+// through `BandModule` down to a real `ServiceTile` and checks the one
+// thing selection actually does on screen: `aria-current` on the matching
+// tile, and nowhere else (ServiceTile.tsx's own `aria-current={selected ?
+// "true" : undefined}`).
+describe("ProjectBoard -- selection reaches the tiles", () => {
+  it("marks only the tile matching selectedId as aria-current", () => {
+    const services = [
+      service({ id: "fly-api", role: "hosting-api", rollup: "hosting", service: "flyio" }),
+      service({ id: "fly-web", role: "hosting-web", rollup: "hosting", service: "flyio" }),
+    ];
+    render(
+      <ProjectBoard
+        services={services}
+        readAt={readAt}
+        selectedId="fly-web"
+        onActivate={vi.fn()}
+        onPeek={vi.fn()}
+        onPeekEnd={vi.fn()}
+      />
+    );
+    expect(document.getElementById("service-tile-fly-web")?.getAttribute("aria-current")).toBe("true");
+    expect(document.getElementById("service-tile-fly-api")?.hasAttribute("aria-current")).toBe(false);
+  });
+});
+
 describe("ProjectBoard -- the arithmetic", () => {
   it("renders every service handed in exactly once across the whole board", () => {
     const services = [

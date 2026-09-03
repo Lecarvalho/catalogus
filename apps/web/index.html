@@ -171,23 +171,43 @@
     each of these is a place where the built world and the contract disagree and
     the contract has not been amended.
 
-      - **None of candidate E has reached the shipped app yet.**
-        `ServiceTile.tsx`, `BandModule.tsx`, `AppShell.tsx` and
-        `ServicePopover.module.css` still render the retired dense-module world
-        in full — bordered tiles, a shell with no rail, no footer, no help /
-        settings / profile cluster. `tokens.css` carries this world's geometry
-        and spacing as additive tokens (`--icon-tile-radius`, the icon-grid and
-        band-spacing values), lifted from the approved mockup rather than
-        invented, but nothing in `apps/web/src` consumes them yet: this
-        contract describes the approved target, not what a reader of
-        `catalogus view` sees today. Rebuilding the components against it is
-        separate, tracked work.
-      - **One real limitation carries over from the mockup itself, not from
-        the gap above.** A hover popover on an icon in the grid's outermost
-        columns can extend past the viewport edge between 768px and 1280px —
-        the mockup centres it with CSS alone and cannot flip it to stay on
-        screen. The React build can, with real edge detection, and should
-        solve it rather than inherit it.
+      - **The shell is unbuilt, and the view rail is still the old world's
+        component.** Two surfaces, not one. `AppShell.tsx` is a top bar
+        carrying the wordmark and the manifest path, and nothing else: FIRST
+        VIEWPORT's left rail with the band index, its footer, and its help /
+        settings / profile cluster and their menus are all still unbuilt, so
+        the contract describes a first viewport no reader of `catalogus view`
+        has seen. `ViewToggle` is the second, and it is a different kind of
+        gap: it sits in the main field above the board and it works — three
+        views, one tab stop, arrow keys — but it is the dense-module world's
+        tab rail rather than the board-head the mockup draws, so the surface
+        is functional and its world is the retired one. Rewritten 2026-09-02,
+        when this entry claimed the shell was "the last surface still in the
+        retired world" and a validator found that it was not. That is the
+        second time this bullet has had to be corrected for counting the gap
+        wrong rather than for missing it: on 2026-08-31 it still claimed none
+        of candidate E had reached the shipped app, by which time the board,
+        the popover, the service page, the migrations board and the graph had
+        all been rebuilt against it. Both are separate, tracked work.
+      - **The mockup's edge-column popover limitation is solved, and the
+        entry that described it as open is retired with this rewrite.** A
+        hover popover on an icon in the grid's outermost columns extended past
+        the viewport edge between 768px and 1280px, because the mockup centres
+        it with CSS alone and cannot flip at an edge. The React build does the
+        edge detection the mockup could not: it centres under the tile, clamps
+        into the viewport, prefers below and flips above only where the
+        stylesheet's own 60vh ceiling fits there. The clamp is horizontal
+        only, and the vertical half is not solved. The flip tests the 60vh
+        ceiling rather than the box's measured height, so it declines to flip
+        where the real box would have fit above: at 1280×720 every first-band
+        tile's popover runs past the bottom edge, at 1280×600 by about 200px,
+        and the mainstream laptop viewport is inside that range, not an edge
+        case. Where the ceiling does fit above and the flip is taken, the box
+        can land over the tile it describes — measured at 900×400, covering
+        more than half of a first-row tile. Both are one defect, tracked: the
+        placement has to measure the box after paint instead of estimating
+        it. Recorded 2026-09-02, when a validator falsified the earlier
+        wording that said the popover could never cover its tile.
       - **The mark is still deferred** by the owner after three directions
         were explored and none chosen. `BrandMark` sets the wordmark and draws
         no glyph, marked `data-mark="placeholder"`. What survived as settled:

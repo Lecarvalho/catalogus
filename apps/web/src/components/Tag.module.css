@@ -2,11 +2,52 @@
  * Sharp rectangles, caps, 10px, positive tracking. No radius and no icon --
  * a tag in this world is a printed mark, not a chip.
  *
- * Every tone reads in greyscale: the two signal tones differ from each other
- * by fill vs outline, not by hue, and the ink and grey solids differ by
- * lightness. That is the property the old status colours did not have, and
- * it is the reason the selected-node cue in this app is a 3px border rather
- * than a colour (docs/PLAN.md, the five smaller viewer defects).
+ * Every tone reads in greyscale: the tones differ from each other by fill vs
+ * outline and by lightness, never by hue. That is the property the old status
+ * colours did not have, and it is the reason the selected-node cue in this
+ * app is a 3px border rather than a colour (docs/PLAN.md, the five smaller
+ * viewer defects). It is now the *whole* property rather than most of it: no
+ * tone in this file spends a chromatic colour at all.
+ *
+ * Moved into candidate E on 2026-08-31: `Tag` has exactly two callers now
+ * (ServicePage.tsx, ServicePopover.tsx), both candidate E, so its type can
+ * follow that world without a straddling old-world caller left behind to
+ * check. `font-size` and `letter-spacing` now read --text-pop-label and
+ * --track-pop-label -- the value candidate E already uses for a small-caps
+ * label (ServicePopover.module.css's own dt rule) -- in place of the
+ * hardcoded 10px and the dense world's --track-caps (0.06em vs this
+ * world's 0.03em, a real, deliberate difference, not a rounding). Height,
+ * padding and radius stay exactly as they were: --radius-sm is 0px in both
+ * worlds, so "no radius" needed no change, and the tag's own box has no
+ * mockup anywhere to measure against (docs/candidates/candidate-e-
+ * homescreen.html has no standalone tag element at all -- see
+ * ServicePopover.tsx's header for why its own tag row is carried over
+ * rather than redesigned), so there is nothing to round and no reason to
+ * invent a fresh number in its place.
+ *
+ * **The tone -> colour mapping was left untouched by that move, and this is
+ * the correction.** The reasoning recorded here was that service-tags.ts
+ * calls the mapping "borrowed wholesale from the world this viewer is built
+ * in", so it is shared vocabulary the candidate E move did not own -- true
+ * about the *shape* (four weights, no traffic-light ramp) and wrong about the
+ * red, which was never a property of the mapping so much as a spend the
+ * contract does not license. OWN-WORLD gives red to the status badge and the
+ * status word "and nowhere else: not a view, not a count"; a tag is a fourth
+ * thing, and the owner was asked on 2026-08-31 whether to widen the contract
+ * and ruled that the rule stands and the build is corrected. That pass did
+ * not reach here either -- a validator found the tokens still aliasing
+ * `--color-signal` on 2026-09-02 -- so a `phasing out` tag and a `new` tag
+ * had gone on rendering red on the popover and the service page the whole
+ * time. `signal-red.test.ts` fails the suite if red returns to any of them.
+ *
+ * The two solids are the same paint as each other now, and that is worth
+ * naming rather than leaving for someone to notice as a duplicate: nothing in
+ * service-tags.ts emits `signal-solid` -- `deprecated` is `ink-solid`,
+ * `removed` is `grey-solid` -- so no tag on any surface changed appearance
+ * when it lost its red. Whether a closed union still needs a fifth tone that
+ * paints as the third is a real question and it belongs to service-tags.ts,
+ * which owns the union; deleting a name from that union is not a colour fix
+ * and is not made here.
  */
 .tag {
   display: inline-flex;
@@ -16,10 +57,10 @@
   padding: 0 4px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  font-size: 10px;
+  font-size: var(--text-pop-label);
   font-weight: var(--weight-bold);
   line-height: 1;
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
   white-space: nowrap;
   /* Numerals inside a tag (`stack 10`) align with numerals elsewhere. */
@@ -28,9 +69,9 @@
 }
 
 .signal-solid {
-  background: var(--color-signal);
-  border-color: var(--color-signal);
-  color: var(--color-signal-ink);
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--color-bg);
 }
 
 .signal-outline {

@@ -1,158 +1,179 @@
 /*
- * Brought into the dense-module world on 2026-08-26 -- the board (ProjectBoard
- * / BandModule / ServiceTile) was rebuilt the day before and this view was
- * not, so toggling Board -> Migrations used to land in a different app:
- * rounded pill buttons on legacy token aliases (see tokens.css's migration
- * bridge block), and a 0.85rem caps heading invented independently of
- * BandModule's own header bar.
+ * Moved into candidate E, the home screen, on 2026-08-31 -- see
+ * MigrationList.tsx's header for why this was overdue by five days rather
+ * than a routine follow-up. Every value below is one of three things:
  *
- * `.module`/`.header`/`.title`/`.count` below are a deliberate duplicate of
- * BandModule.module.css's chrome, not an import of it -- BandModule takes
- * band-specific props (`BandDefinition`) that do not fit a migration section,
- * and another agent owns that file while this slice is being built. Copying
- * the four rules is cheaper and safer than adding a shared base file mid-flight
- * two agents are editing; if a third rebuild of this chrome is ever needed,
- * *that* is the signal to extract it, not this one.
+ *   1. A candidate E token already declared for a sibling this view is
+ *      explicitly told to match -- BandModule's own section chrome for
+ *      `.section`/`.head`/`.title`/`.count`, ServiceTile's own type scale for
+ *      the mark/name/id/status, ServicePopover's own fact tokens for the
+ *      replacement's dt/dd and (since the correction below) its own row's
+ *      structural rhythm. No new custom property was needed anywhere in
+ *      this file: reusing the tile's and the popover's tokens verbatim is
+ *      what "take the treatment from the tile" and "take geometry from [the
+ *      popover]" (this pass's brief) turn out to mean at the CSS layer too.
+ *   2. A `--space-*` value, for small, incidental gaps no candidate E token
+ *      names -- `.service`'s own inline gap and vertical padding,
+ *      `.status`'s glyph-to-word gap. Left on the ramp deliberately, not
+ *      overlooked: at 8px and 2px they coincide with this world's own
+ *      measured values regardless of which name produced them, and
+ *      rewriting a coincidence buys nothing. This is narrower than it used
+ *      to be -- see the correction below for what moved off it.
+ *   3. A handful of small, local, single-use numbers with no scale to
+ *      belong to either way (the mark's 26px, the status glyph's 14px) --
+ *      ServiceTile.module.css's own badge keeps exactly this kind of number
+ *      bare for the same stated reason, and it is noted at each one below.
  *
- * The row list borrows RankModule.module.css's shape instead of a tile grid --
- * a migration row is a line of text, not a mark to recognise -- and that file
- * says outright that it "shares the module chrome with BandModule; only the
- * row differs," which is exactly the reuse this file is doing by hand.
+ * What is gone: the two-column grid this file used to force its sections
+ * into, and the reasoning that went with it (a fix for the *old* mosaic
+ * world's masonry packing, which candidate E's BandModule does not have --
+ * it stacks bands in one full-width column now, and this file stacks its
+ * two sections the same way, for the same reason). Also gone: `border-radius`
+ * anywhere in this file. DIRECTION.md's one declared radius exception belongs
+ * to the icon tile alone and "does not license a radius on anything else --
+ * a migration row is not a transient surface" (this pass's brief, quoting
+ * it directly). The row's own selected-state cue is `outline` rather than a
+ * border colour as a result -- see `.service[aria-pressed="true"]` below.
+ *
+ * ---------------------------------------------------------------------
+ * 2026-08-31 correction, same day: the row's own structural rhythm moved
+ * off the `--space-*` ramp entirely.
+ *
+ * The first version of this file defended `.row`'s gap and padding,
+ * `.sectionEmpty`'s padding and `.empty`'s padding as general-purpose
+ * spacing for content no mockup states, citing ServicePopover.module.css's
+ * own `--space-2`/`--space-3` uses as precedent. That precedent is real,
+ * but it covers two small, incidental uses on content the mockup does not
+ * show (a tag row's wrap gap, a hint line's rule gap) -- not a row's own
+ * structural density. At the ramp's own steps (2/4/8/12/16/24/32px),
+ * `var(--space-3) var(--space-4)` reads as 8px/12px in a world whose one
+ * measured fact surface, ServicePopover's own `.popover`, pads `16px 18px
+ * 17px`. That is the retired dense world's density arriving through a
+ * token *name* rather than through a number invented fresh, which is
+ * exactly why it is not caught by asking "does this look like a rounded
+ * mockup pixel" -- it never was one.
+ *
+ * `.row`, `.sectionEmpty` and `.empty` now derive from `--pop-padding` and
+ * `--pop-facts-column-gap` -- the measured values ServicePopover.module.css
+ * already lifted from candidate-e-homescreen.html, reused rather than
+ * re-measured. No new custom property was needed for any of the three:
+ * `.row` reuses `--pop-padding` wholesale and zeroes its horizontal
+ * component with a plain `0`, rather than either forcing a shared property
+ * to carry a vertical number it wants and a horizontal one it does not, or
+ * inventing a fresh token to avoid that. See each rule below for its own
+ * reasoning.
  */
-/*
- * 2026-08-26: found by a validation agent driving the built app at 2514px --
- * `.board` measured 358px inside a 1648px row, and its two sections 297px
- * and 358px, ragged and stacked, on a screen wide enough to hold both side
- * by side four times over. Two independent causes, both below.
- *
- * Cause 1 was `.board` claiming no width. Its two sibling view roots both
- * do -- ProjectBoard.module.css's `.board` is `flex: 1 1 auto; min-width: 0`
- * and GraphCanvas.module.css's `.canvas` is `flex: 1; min-width: 0` -- and
- * this one was left at the flex default, so `.body` (App.module.css) gave it
- * the row and it declined to take it, sizing itself to its content instead.
- * Fixed the same way both siblings are: `flex: 1 1 auto; min-width: 0`.
- */
+
 .board {
   flex: 1 1 auto;
   min-width: 0;
-
-  /*
-   * Cause 2 was `.section { align-self: start }`, copied from
-   * BandModule.module.css's `.module`, whose comment says "the grid places
-   * them" -- true there, because that module sits inside a *multi-column*
-   * container where a child's cross-axis size is never in question at all.
-   * Copied into this file's old `flex-direction: column` board, the same
-   * property landed on the live axis instead of an inert one: it is what
-   * stopped each section from stretching to the column's width, which is
-   * what produced the two different, too-narrow numbers above. A rule that
-   * did nothing where it came from and does something where it landed is a
-   * defect, not a grammar choice -- see MigrationList.tsx's file header for
-   * the accessible-name defect found alongside this one.
-   *
-   * The fix is not just to un-shrink them -- two sections is the smallest
-   * possible case of the uneven grid the design contract already describes
-   * for the mosaic proper (docs/DIRECTION.md: modules "sized to their
-   * contents" and "tile edge to edge in an uneven grid"), and a wide screen
-   * stacking two short sections on top of each other wastes exactly the
-   * horizontal room that argument is about. So: side by side, not stacked.
-   *
-   * ProjectBoard.module.css's own mechanism for that -- CSS multi-column,
-   * `column-width` plus `column-gap` -- was tried here first and rejected.
-   * That property is a hint, not a count: the browser picks however many
-   * column tracks the hint and the available width allow (three, at this
-   * board's usual widths), and balances content across all of them. With an
-   * arbitrary number of bands that is the whole point; with exactly two
-   * fixed sections it reintroduces this same defect one level up, as an
-   * empty third column and the row only two-thirds claimed. A grid with a
-   * fixed two-column template has no count to second-guess: there are
-   * always exactly two sections, so there are always exactly two tracks.
-   * `align-items: start` is `.module`'s "never grow taller than their
-   * contents" rule, carried over to a container that actually needs to
-   * state it -- a bare grid stretches every row to its tallest cell by
-   * default, which the mosaic itself never does either.
-   */
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  align-items: start;
-  gap: var(--space-6);
 }
 
-/* Two fixed-purpose columns is a desktop argument, same as the mosaic
-   proper -- ProjectBoard.module.css collapses to one column at the same
-   640px for the same reason. The honest mobile answer is one section above
-   the other, in the reading order migrations.ts already fixes (in flight,
-   then overdue) -- not a squeezed two-up grid on a phone screen. */
-@media (max-width: 640px) {
-  .board {
-    grid-template-columns: 1fr;
-  }
-}
-
+/*
+ * One section, full width, stacked -- BandModule.module.css's own `.band`
+ * verbatim in shape: no box, no filled header bar, a hairline rule between
+ * sections and none after the last. Copied rather than imported for the
+ * same reason it was copied before: BandModule takes band-specific props
+ * this section shape does not need, and BandModule.tsx is off this slice's
+ * file list to edit.
+ */
 .section {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border: 1px solid var(--color-line);
-  background: var(--color-surface);
-  /* No `align-self: start` here -- see `.board`'s comment above for why the
-     property that used to sit on this rule is gone rather than kept as a
-     second inert copy of one it no longer needs: the board is what states
-     the "don't stretch to match the tallest" rule now, because the board is
-     what the mosaic states it on too. */
+  padding: var(--band-spacing-top) 0 var(--band-spacing-bottom);
+  border-bottom: 1px solid var(--color-line);
 }
 
-.header {
+.section:last-of-type {
+  border-bottom: none;
+}
+
+.head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 24px;
-  padding: 0 var(--space-3);
-  background: var(--color-header-fill);
-  border-bottom: 1px solid var(--color-line);
+  align-items: baseline;
+  gap: var(--band-head-gap);
 }
 
 .title {
   margin: 0;
-  font-size: var(--text-label);
+  font-size: var(--text-band-title);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-band-title);
   color: var(--color-text);
 }
 
-/* The row count, in the signal colour -- BandModule's count exists so a
-   reader takes in the shape of a band before reading a row, and the same
-   argument applies here: how many still need a decision is the number worth
-   seeing before the names. aria-hidden for the same reason BandModule hides
-   its count -- the heading already names the section, and the rows below
-   carry the real information. */
+/*
+ * The row count -- BandModule's own `.count`, not the old red one this file
+ * used to draw. That old choice earned red the same way the mosaic header
+ * did (a collapsed count that could diverge from a raw one); nothing here
+ * ever collapsed, and every row in a section already shares the section's
+ * status, so a red count would tag the guaranteed case -- the exact failure
+ * service-tags.ts exists to prevent, and the one this file's own header
+ * names as the temptation this view has to resist. Red stays confined to
+ * the badge and the word, below.
+ */
 .count {
   flex: 0 0 auto;
-  font-size: var(--text-label);
-  font-weight: var(--weight-bold);
-  color: var(--color-signal);
+  font-size: var(--text-band-count);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-faint);
   font-variant-numeric: tabular-nums;
   font-feature-settings: var(--numeric-features);
 }
 
-.rows {
+.sectionEmpty {
   margin: 0;
+  /* --pop-padding, wholesale -- the one measured padding value this world
+     has (ServicePopover.module.css's own fact surface, 16px 18px 17px), not
+     var(--space-3) var(--space-4)'s 8px/12px off the retired ramp (see this
+     file's header, "2026-08-31 correction"). A self-contained message block
+     earns the same breathing room the popover's own content does. */
+  padding: var(--pop-padding);
+  font-size: var(--text-body);
+  color: var(--color-text-muted);
+}
+
+/* Space between the heading and the first row -- BandModule's own gap
+   between a band's heading and its icon grid, reused here for the same
+   role: air under a section head, before its content starts. */
+.rows {
+  margin: var(--icon-grid-top) 0 0;
   padding: 0;
   list-style: none;
 }
 
-/* One hairline between rows, never after the last -- the adjacent-sibling
-   form rather than `:first-child` because `.row` is the `<li>` itself here
-   (RankModule puts its border on the button inside the `<li>` because its
-   whole row is one button; this row is a button plus text beside it, so the
-   divider belongs to the `<li>` that holds both). */
+/*
+ * One row, one hairline below it (never after the last row in a section --
+ * the adjacent-sibling form, not `:first-child`, mirrors this file's own
+ * previous convention and RankModule.module.css's). This is a list-level
+ * divider on the shell, not a border on a service: DIRECTION.md's "no
+ * card/border/panel" rule governs a service's own resting chrome, and this
+ * rule sits on the `<li>` between two rows, not on either service.
+ *
+ * flex-wrap so a long name or a long replacement value can drop the fact
+ * onto its own line on a narrow viewport rather than force horizontal
+ * scroll -- there is no mockup breakpoint to match here (none exists for
+ * this view), so this is the same honest, unforced choice
+ * ServicePopover.module.css's own `max-width: calc(100vw - 24px)` is: a
+ * fallback for content the approved artifact never had to size.
+ */
 .row {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
   flex-wrap: wrap;
-  padding: var(--space-2) var(--space-4);
+  /* --pop-facts-column-gap -- the popover's own gap between two side-by-side
+     facts (14px), reused for the same job here: separating the service
+     identity+status cluster from the replacement fact beside it. Not
+     var(--space-4)'s 12px off the retired ramp. */
+  gap: var(--pop-facts-column-gap);
+  /* --pop-padding's own vertical components (16px top, 17px bottom) -- the
+     one measured padding value this world has, on the one surface that
+     states a real number for it (this file's header, "2026-08-31
+     correction"). The horizontal component is zeroed rather than dropped
+     for a fresh number: rows stay full-bleed, flush with the section's own
+     edges, the same "no card, no inset" choice every other service surface
+     in this world makes. Not var(--space-3)'s 8px off the retired ramp. */
+  padding: var(--pop-padding);
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .row + .row {
@@ -160,25 +181,23 @@
 }
 
 /*
- * The row's own service. A plain control now, not the rounded pill that used
- * to mimic ServiceNode's old graph-node shape -- this list has no icon and no
- * status ring, so a pill here was borrowing another component's silhouette
- * for no reason of its own.
- *
- * `border: 1px solid transparent` reserves the width `aria-pressed="true"`
- * spends below, so pressing a row does not reflow its neighbours by a pixel.
+ * The row's own service. No `border-radius` (the old `var(--radius-md)` is
+ * gone, not replaced -- see this file's header) and no `border: 1px solid
+ * transparent` reservation either: that used to hold the pressed state's
+ * width steady against a border appearing, and `outline` (below) does not
+ * affect layout, so there is nothing left to reserve space for.
  */
 .service {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  flex: 1 1 220px;
+  padding: var(--space-1) 0;
+  border: none;
   background: transparent;
   font: inherit;
-  color: var(--color-text);
+  color: inherit;
   cursor: pointer;
   /* The app-wide focus ring (tokens.css) is left alone deliberately -- "one
      focus treatment for the whole app, defined once" is that file's own
@@ -190,89 +209,211 @@
 }
 
 /*
- * Selected: a fill plus a border stepping from transparent to full ink --
- * the same two-cue shape ServiceTile.module.css's `.selected` uses, and for
- * the same reason. The row this replaces stacked a border colour, a
- * background tint and a 2px inset ring, all three spent on the same hue, so
- * a viewer who cannot read that hue saw one cue where a sighted one saw
- * three. Fill and border-*presence* both survive greyscale; nothing here
+ * Selected: a fill plus an outline -- ServiceTile.module.css's own
+ * `.selected .squircle` mechanism, not this file's old border-colour one.
+ * `outline` never reads as the "card border" DIRECTION.md rules out for a
+ * service (it paints outside the box and never claims layout space), and it
+ * reads as a ring in greyscale the same way the tile's does -- nothing here
  * relies on the signal colour or any other hue to read as "selected".
  */
 .service[aria-pressed="true"] {
   background: var(--color-surface-sunken);
-  border-color: var(--color-line-strong);
-}
-
-.name {
-  font-weight: var(--weight-medium);
-  font-size: var(--text-row);
-}
-
-.id {
-  font-family: var(--font-mono);
-  font-size: var(--text-label);
-  color: var(--color-text-muted);
+  outline: 2px solid var(--color-text-faint);
+  outline-offset: 2px;
 }
 
 /*
- * The world's own idiom for this exact fact (docs/DIRECTION.md, "Mapped from
- * the world's own grammar, not invented"): a struck old price beside a red
- * new one. Applied only to `phasing_out` rows -- the ones actively being
- * swapped for a named replacement right now. A `deprecated` row is a
- * different claim ("should not be used, still present," not "is being
- * replaced this instant"), so it keeps its name intact; see MigrationList.tsx
- * for the rest of that reasoning.
+ * The mark. Bare -- no squircle, no tile background -- sized and shaped
+ * like ServicePopover.module.css's own `.glyph`/`.glyph svg` (26px, no
+ * radius) rather than ServiceTile's `.squircle` (76px, the one declared
+ * radius exception): a migration row is not the icon grid and is not a
+ * transient surface either, so it gets neither the grid's size nor the
+ * tile's exception. 26px is the popover's own local number, reused rather
+ * than picked fresh, for the same "bare icon outside the grid" job.
  */
-.superseded {
-  text-decoration: line-through;
-  color: var(--color-text-muted);
+.mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
 }
 
-.arrow {
-  color: var(--color-text-muted);
+.mark svg {
+  width: 26px;
+  height: 26px;
+  /*
+   * Status signal 2 of 2's silent partner: the mark itself desaturated, the
+   * same lightness/saturation change (not a hue) ServiceTile.module.css's
+   * `.desaturated svg` applies conditionally on `status !== "active"`.
+   * Unconditional here because migrations.ts guarantees every row is
+   * non-active by construction -- there is no `active` branch for this rule
+   * to need.
+   */
+  filter: grayscale(0.9) opacity(0.5);
 }
 
-.replacement {
+/*
+ * D6, 2026-09-02: the no-icon fallback case, on the mark itself -- dashed
+ * hairline, sunken fill, corners rounded to this world's own popover radius.
+ * The comment this replaces claimed "this mark has no tile to be dashed";
+ * that was backwards, and a validator driving the built app caught it: the
+ * mark *is* the tile at this size, exactly as the popover's own `.pop-mark`
+ * is at the same 26px, and DIRECTION.md's grammar names the treatment
+ * directly -- "a phone icon with no artwork on file -> a dashed, sunken tile
+ * and an ink monogram". The mockup's `.pop-mark--fallback`
+ * (candidate-e-homescreen.html; the popover's own 26px mark) states this
+ * exactly: `background: var(--color-surface-sunken)`, `border: 1px dashed`,
+ * `border-radius: 6px`. `--color-line` and `--color-surface-sunken` are the
+ * tokens ServiceTile.module.css's own `.fallback` already carries this same
+ * treatment with, at its own 76px size (`1.5px dashed` there, not 1px -- two
+ * sizes, not one rounded to the other, so the width stays bare rather than
+ * shared); `--radius-popover` is the token ServicePopover.module.css already
+ * defines this world's one 6px radius as, reused rather than a fresh bare
+ * `6px` invented to match it by coincidence.
+ */
+.markFallback {
+  background: var(--color-surface-sunken);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-popover);
+}
+
+/* ServiceTile.module.css's own `.monogram` type, verbatim. */
+.monogram {
   font-family: var(--font-mono);
-  font-size: var(--text-row);
   font-weight: var(--weight-bold);
+  /* Local: ServiceTile's --text-monogram (16px) is sized for its 76px
+     squircle. This mark is a third that size, so its monogram is scaled to
+     match rather than forced onto a token built for a much larger box. */
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* --pop-fact-gap is ServicePopover's own "small gap inside one stacked
+     label/value pair" token (2px) -- reused here for the same shape of gap,
+     a name stacked tight above its id. */
+  gap: var(--pop-fact-gap);
+}
+
+/* ServiceTile.module.css's own `.name` type, verbatim -- the brief's "take
+   the treatment from the tile" applied literally where the tokens already
+   exist for it. */
+.name {
+  font-size: var(--text-icon-name);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-icon-name);
+  color: var(--color-text);
+  overflow-wrap: break-word;
+}
+
+/* ServiceTile.module.css's own `.id` type, verbatim. */
+.id {
+  font-family: var(--font-mono);
+  font-size: var(--text-icon-id);
+  color: var(--color-text-faint);
+}
+
+/*
+ * Status signal 1 of 2: the badge glyph plus the word, together, in the one
+ * colour DIRECTION.md licenses for it. No corner-badge chip (no circle, no
+ * ring, no radius) -- that container is ServiceTile's own "pinned to a
+ * squircle's corner" device, and this mark has no squircle for it to pin
+ * to. What survives the move is the glyph itself and the word beside it,
+ * which is the pairing DIRECTION.md actually names ("the status badge and
+ * the status word"), not the specific chip ServiceTile happens to draw it
+ * in.
+ */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+  color: var(--color-signal);
+}
+
+.status svg {
+  /* Local, like ServiceTile.module.css's own badge svg (12px there, inside
+     a 23px chip this file has no chip for) -- a number sized to read on its
+     own rather than fitted to a container that no longer exists. */
+  width: 14px;
+  height: 14px;
+}
+
+.statusWord {
+  font-size: var(--text-icon-status);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-icon-status);
+}
+
+/*
+ * The replacement fact -- geometry from ServicePopover.module.css's
+ * `.facts > div` (one labelled fact, dt above dd), not invented: this is
+ * the shape the brief points at directly ("the mockup's popover is the
+ * closest thing in the world to a row of labelled facts").
+ */
+.fact {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pop-fact-gap);
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+/* ServicePopover.module.css's own `.facts dt` type, verbatim. */
+.factLabel {
+  margin: 0;
+  font-size: var(--text-pop-label);
+  letter-spacing: var(--track-pop-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+/* ServicePopover.module.css's own `.facts dd` type, verbatim. */
+.factValue {
+  margin: 0;
+  font-size: var(--text-pop-fact);
   color: var(--color-text);
   overflow-wrap: anywhere;
 }
 
-/* The "red new price" half of the same idiom -- `phasing_out` only. A
-   `deprecated` row's replacement (if one is on record) stays ink: DIRECTION's
-   own mapping gives `deprecated` a solid-black tag rather than the signal
-   colour, and spending red there too would make every row on this board red,
-   which is the "35 identical pills" defect wearing new paint. */
-.replacementNew {
-  color: var(--color-signal);
+/* ServicePopover.module.css's own `.mono` -- a resolved replacement label
+   ("id (Name)") is manifest text the reader may need to type into a
+   `catalogus` command, the same reasoning that makes the popover's
+   `replaced_by` mono. */
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-pop-mono);
+  font-weight: var(--weight-medium);
 }
 
-/* An absent `replaced_by` is an unanswered question, not an error (CLAUDE.md;
-   migrations.ts's own comment on `replacementLabel`) -- italic and muted,
-   never the signal colour, on either section. Spending red here would read
-   as a problem, when the honest reading is that nobody has recorded an
-   answer yet. */
-.noReplacement {
+/* An absent `replaced_by` is an unanswered question, not an error
+   (CLAUDE.md; migrations.ts's own comment on `replacementLabel`) -- italic
+   and faint, never the signal colour, on either section. This is the one
+   piece of the pre-candidate-E row this file keeps verbatim in feel: "no
+   replacement recorded" reads as an explicit, plain statement, not a blank
+   cell someone forgot to fill in. */
+.dim {
   font-style: italic;
-  font-size: var(--text-row);
-  color: var(--color-text-muted);
+  color: var(--color-text-faint);
 }
 
-.sectionEmpty {
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--text-body);
-  color: var(--color-text-muted);
-}
-
-/* The all-clear state, boxed the same way ProjectBoard.module.css boxes its
-   own empty state -- a good state for a project, not an error, and not a
-   bare unstyled sentence either. */
+/* The all-clear state, boxed -- a good state for a project, not an error,
+   and not a bare unstyled sentence either. No longer padded to match
+   ProjectBoard.module.css's own empty state verbatim: that file still pads
+   with var(--space-6), the retired ramp's 24px, and off-limits or not, this
+   file does not import that number just to look consistent with it (this
+   file's header, "2026-08-31 correction"). --pop-padding, wholesale -- the
+   one measured padding value this world has -- replaces it, the same
+   derivation .sectionEmpty and .row above now use. */
 .empty {
   margin: 0;
-  padding: var(--space-6);
+  padding: var(--pop-padding);
   border: 1px solid var(--color-line);
   color: var(--color-text-muted);
   font-size: var(--text-body);
@@ -280,8 +421,8 @@
 
 /* Visually hidden, not display:none -- still read by assistive tech, just
    not painted. Copied rather than shared with ServiceNode.module.css or
-   RankModule.module.css: CSS Modules scope class names per file, so there is
-   no cross-file selector to reuse without a global stylesheet this app does
+   Tag.module.css: CSS Modules scope class names per file, so there is no
+   cross-file selector to reuse without a global stylesheet this app does
    not have. */
 .srOnly {
   position: absolute;

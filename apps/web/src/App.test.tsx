@@ -96,6 +96,54 @@ async function renderLoaded(body: ViewPayload = payload()) {
  */
 const servicePage = () => screen.queryByRole("article");
 
+/**
+ * Stubs one element's own `getBoundingClientRect`, the way GraphCanvas.test.tsx
+ * stubs it for React Flow's measurement -- an own-property override, not a
+ * prototype patch, so only the element a positioning test actually cares
+ * about (the hovered tile) reports a real rect; every other element keeps
+ * jsdom's default zero rect, which the rest of this file already renders
+ * against without incident.
+ */
+function stubRect(element: HTMLElement, rect: { top: number; left: number; width: number; height: number }) {
+  element.getBoundingClientRect = () =>
+    ({
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      right: rect.left + rect.width,
+      bottom: rect.top + rect.height,
+      x: rect.left,
+      y: rect.top,
+      toJSON: () => "",
+    }) as DOMRect;
+}
+
+/**
+ * Stubs the viewport dimensions `App.tsx`'s `positionFor` actually reads --
+ * `document.documentElement.clientWidth`/`clientHeight`, not
+ * `window.innerWidth`/`innerHeight` (see that function's own comment on why
+ * it reads the former). jsdom reports 0 for both by default, since it does
+ * no real layout, so every positioning test needs this rather than being
+ * able to lean on a jsdom-provided default the way `window.innerWidth` has
+ * one.
+ */
+function stubViewport(width: number, height: number) {
+  Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: width });
+  Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: height });
+}
+
+/** Undoes stubViewport, falling back to the inherited (jsdom-default) accessor, the same restoration GraphCanvas.test.tsx uses for `getBoundingClientRect`. */
+function restoreViewport() {
+  delete (document.documentElement as { clientWidth?: unknown }).clientWidth;
+  delete (document.documentElement as { clientHeight?: unknown }).clientHeight;
+}
+
+/** Reads a popover fact's value by its label -- the `<dt>`/`<dd>` pair ServicePopover.tsx renders one of per fact. Mirrors ServicePopover.test.tsx's own `factValue`. */
+function factValue(label: string) {
+  return screen.getByText(label).closest("div")?.querySelector("dd")?.textContent;
+}
+
 beforeEach(() => {
   // Every test starts from a hash-free URL on the same history entry --
   // otherwise one test's deep link is the next test's starting state.
@@ -105,6 +153,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  restoreViewport();
   // A test that opts into fake timers for the hover-close delay must not
   // leave them running for the next test's own waitFor() polling.
   vi.useRealTimers();
@@ -504,6 +553,195 @@ describe("App -- the hover popover", () => {
     fireEvent.click(tile);
     await waitFor(() => expect(servicePage()).not.toBeNull());
     expect(screen.queryByRole("presentation")).toBeNull();
+  });
+});
+
+// `positionFor` (App.tsx) had zero coverage before this -- every test above
+// only ever asked *whether* a popover was open, never *where*. These read
+// the inline `style.top`/`style.left` the real component actually renders,
+// through stubbed rects on the real anchor tile, the same way a validator
+// reproduced App.tsx:247-250's defects: no mock of `positionFor` itself,
+// because a mock proves nothing about the function under test.
+//
+// Each test's numbers are chosen to isolate one or two of the six things
+// `positionFor` does -- the clamp, the centring, the gap, the flip, and the
+// two constants (`width`, `ESTIMATED_HEIGHT`) -- rather than exercising the
+// function once and hoping a broad assertion happens to notice whichever
+// piece regresses.
+describe("App -- popover position", () => {
+  it("clamps the centred position into the viewport, rather than letting it run past the right edge", async () => {
+    stubViewport(768, 800);
+    await renderLoaded();
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    // Right column, 768px viewport: centred (730 + 12 - 134 = 608) overruns
+    // the 268px-wide popover's right edge; the clamp is what keeps it on
+    // screen (768 - 268 - 12 = 488). This is also sensitive to `width`: a
+    // narrower popover would either not need clamping at all, or clamp to a
+    // different bound -- either way, not 488.
+    stubRect(tile, { top: 100, left: 730, width: 24, height: 32 });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    const popover = await screen.findByRole("presentation");
+    expect(popover.style.left).toBe("488px");
+  });
+
+  it("centres the popover under the tile when there is room on both sides", async () => {
+    stubViewport(1280, 800);
+    await renderLoaded();
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    // Nowhere near an edge at 1280px, so this is the clamp's *identity*
+    // case: left is whatever centred computes (500 + 20 - 134 = 386), not
+    // rect.left (500) and not some other width's centring.
+    stubRect(tile, { top: 100, left: 500, width: 40, height: 32 });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    const popover = await screen.findByRole("presentation");
+    expect(popover.style.left).toBe("386px");
+  });
+
+  it("leaves a 12px gap below the tile when it fits there", async () => {
+    stubViewport(1280, 800);
+    await renderLoaded();
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    stubRect(tile, { top: 100, left: 100, width: 32, height: 32 });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    const popover = await screen.findByRole("presentation");
+    // rect.bottom (132) + gap (12).
+    expect(popover.style.top).toBe("144px");
+  });
+
+  it("flips above the tile, stopping at a fixed distance from it, when below does not fit", async () => {
+    stubViewport(1280, 800);
+    await renderLoaded();
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    // Low enough on an 800px-tall viewport that below (732 + 12 = 744) has
+    // no room for even the 250px ordinary-case estimate (744 + 250 > 788),
+    // and high enough that the full 60vh ceiling (480px) fits above it
+    // (700 - 24 = 676 >= 480). Both the flip decision and the flip's actual
+    // top depend on distinct numbers here (ESTIMATED_HEIGHT for the first,
+    // the viewport-height-derived ceiling for the second) -- top is
+    // rect.top - gap - ceiling = 700 - 12 - 480 = 208.
+    stubRect(tile, { top: 700, left: 100, width: 32, height: 32 });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    const popover = await screen.findByRole("presentation");
+    expect(popover.style.top).toBe("208px");
+  });
+
+  // D2: the validator's own reproductions, run against the real component
+  // rather than reasoned about. Both assert the fixed property directly --
+  // the popover never starts inside, or above the bottom of, the tile it is
+  // describing -- not just a specific number.
+  describe("D2 -- the flip never covers the tile it describes", () => {
+    it("stays below a tile near the top of a short window, rather than clamping the flip on top of it", async () => {
+      stubViewport(1280, 400);
+      await renderLoaded();
+      const tile = screen.getByRole("button", { name: /Fly\.io/ });
+      // The validator's own numbers: innerHeight 400, tile [100..220]. The
+      // old code clamped the flipped top to 12, which spans [12, 262] and
+      // fully covers [100, 220]. This must land at or below rect.bottom + gap
+      // (232), never inside [100, 220].
+      stubRect(tile, { top: 100, left: 100, width: 32, height: 120 });
+      fireEvent.pointerOver(tile, { pointerType: "mouse" });
+      const popover = await screen.findByRole("presentation");
+      const top = Number(popover.style.top.replace("px", ""));
+      expect(top).toBeGreaterThanOrEqual(232);
+      expect(top).toBeGreaterThan(220); // never starts inside the tile's own span
+    });
+
+    it("stops the flip at the gap above the tile even when the popover renders taller than the ordinary-case estimate", async () => {
+      stubViewport(1280, 900);
+      await renderLoaded();
+      const tile = screen.getByRole("button", { name: /Fly\.io/ });
+      // The validator's own numbers: tile top 700, vh 900. The old code
+      // anchored the flip to ESTIMATED_HEIGHT (250) regardless of how tall
+      // the popover actually rendered, so anything past 250px overlapped the
+      // tile by the overrun -- a 400px popover reached 18px into it. This
+      // anchors against the viewport's own 60vh ceiling (540px here)
+      // instead, so the bottom of *any* rendered height up to that ceiling
+      // stops at rect.top - gap (688), never past it.
+      stubRect(tile, { top: 700, left: 100, width: 32, height: 32 });
+      fireEvent.pointerOver(tile, { pointerType: "mouse" });
+      const popover = await screen.findByRole("presentation");
+      const top = Number(popover.style.top.replace("px", ""));
+      const maxPopoverHeight = 900 * 0.6;
+      expect(top + maxPopoverHeight).toBeLessThanOrEqual(700 - 12);
+    });
+  });
+});
+
+// D10: `position: fixed` freezes the popover at the coordinates it opened
+// with, and nothing in the CSS makes it follow the tile. Reproduced exactly
+// as the validator did it: change what the anchor's own getBoundingClientRect
+// reports (standing in for the tile having scrolled, or the window having
+// resized), fire the event App.tsx should be listening for, and check that
+// `style.top` actually moved -- not that a listener was attached.
+describe("App -- the popover tracks its anchor across scroll and resize", () => {
+  it("recomputes position on a scroll event", async () => {
+    stubViewport(1280, 900);
+    await renderLoaded();
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    stubRect(tile, { top: 300, left: 100, width: 32, height: 32 });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    const popover = await screen.findByRole("presentation");
+    expect(popover.style.top).toBe("344px"); // 300 + 32 + 12
+
+    // The anchor moved from viewport y=300 to y=-100 -- the validator's own
+    // reproduction -- standing in for the page (or a scroll container)
+    // having scrolled underneath the still-open popover.
+    stubRect(tile, { top: -100, left: 100, width: 32, height: 32 });
+    fireEvent.scroll(window);
+    await waitFor(() => expect(popover.style.top).toBe("-56px")); // -100 + 32 + 12
+  });
+
+  it("recomputes position on a resize event", async () => {
+    stubViewport(1280, 900);
+    await renderLoaded();
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    stubRect(tile, { top: 700, left: 100, width: 32, height: 32 });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    const popover = await screen.findByRole("presentation");
+    expect(popover.style.top).toBe("148px"); // flips: 700 - 12 - (900 * 0.6)
+
+    // The window got shorter without the tile moving -- the 60vh ceiling the
+    // flip is anchored to shrinks with it, so the flip's top has to move too.
+    stubViewport(1280, 300);
+    fireEvent.resize(window);
+    await waitFor(() => expect(popover.style.top).toBe("508px")); // 700 - 12 - (300 * 0.6)
+  });
+});
+
+// D4: `dependsOn`/`dependedOnBy` are two props of the same type, wired at
+// App.tsx's own ServicePopover call site from two different maps. Swapping
+// which map feeds which prop at that one call site leaves every other test
+// in this file green -- ServicePopover's own tests catch a transposition
+// *inside* the component, by checking its `<dt>`s, but nothing here reads
+// past "a popover opened" to notice the two counts arrived in the wrong
+// fields. This uses asymmetric in/out edges specifically so a swap cannot
+// coincidentally produce the same numbers.
+describe("App -- the popover's edge counts are wired the right way round", () => {
+  it("shows dependents-in and dependencies-out from the correct edge direction", async () => {
+    await renderLoaded(
+      payload({
+        services: [
+          makeViewService({ id: "svc-a", role: "hosting-api", rollup: "hosting", name: "Alpha", service: "alpha" }),
+          makeViewService({ id: "svc-b", role: "hosting-web", rollup: "hosting", name: "Bravo", service: "bravo" }),
+          makeViewService({ id: "svc-c", role: "database", rollup: "database", name: "Charlie", service: "charlie" }),
+          makeViewService({ id: "svc-d", role: "ai", rollup: "ai", name: "Delta", service: "delta" }),
+        ],
+        edges: [
+          // svc-a depends on two others (dependencies out: 2) and exactly one
+          // other depends on svc-a (dependents in: 1) -- deliberately
+          // different numbers, so a transposed wiring shows up as the wrong
+          // fact rather than as a coincidentally-correct one.
+          { from: "svc-a", to: "svc-b" },
+          { from: "svc-a", to: "svc-c" },
+          { from: "svc-d", to: "svc-a" },
+        ],
+      })
+    );
+    const tile = screen.getByRole("button", { name: /Alpha/ });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    await screen.findByRole("presentation");
+    expect(factValue("Dependents in")).toBe("1");
+    expect(factValue("Dependencies out")).toBe("2");
   });
 });
 

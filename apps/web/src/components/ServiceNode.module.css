@@ -1,142 +1,136 @@
 /*
- * Brought into the dense-module world 2026-08-26, after the board (ProjectBoard
- * / BandModule / ServiceTile / Tag) had already moved and this file had not --
- * the toggle from List to Graph used to change the whole app underneath the
- * reader: rounded tiles, a coloured status ring, and the handful of renamed
- * custom properties tokens.css's migration-bridge alias block lists by name
- * in its own header. None of those old names exist in tokens.css's primary
- * block any more; they only survived there so a component nobody had
- * touched yet still rendered *something* correct rather than nothing. This
- * file is one of the ones that alias block was waiting on -- see this
- * component's test file for the grep that proves it, run each time this
- * file changes. Sharp corners, hairline borders, one signal colour, no
- * shadow -- the same grammar ServiceTile.module.css states at its own head.
+ * The graph node's move into candidate E, the home screen (approved
+ * 2026-08-26 -- docs/candidates/candidate-e-homescreen.html,
+ * docs/candidates/README.md). The mockup covers the List view only; there
+ * is no graph mockup, so this file takes ServiceTile.module.css's own mark
+ * treatment -- the squircle, its fallback and desaturated states, the
+ * status badge -- and fits it inside the fixed 216x64 box graph-layout.ts's
+ * `NODE_SIZE` lays elk out against, which this component cannot resize (see
+ * ServiceNode.tsx's own header for why it did not need to).
+ *
+ * No card, no border, no background on the node itself, same as the tile:
+ * "no radius and no shadow anywhere ... a graph node is not a transient
+ * surface" (apps/web/docs/DIRECTION.md). The old dense-world node drew a
+ * bordered, radiused box (`border: 1px solid var(--color-line)`) exactly
+ * where this world's own contract says a hairline lives on the shell, not
+ * on a service -- that box is gone, not merely restyled.
+ *
+ * No hover state, on purpose, the same absence ServiceTile.module.css has:
+ * cursor: pointer and the native `title` tooltip (ServiceNode.tsx) already
+ * say this is interactive, and this world does not spend a background
+ * shade on a service the way the retired dense node's `.node:hover` did.
+ *
+ * Every size below with no equivalent in tokens.css's candidate-E block is
+ * new -- there is no mockup to lift a graph-node number from, so each is
+ * derived from the tile's own ratios (icon-mark/tile, tile-radius/tile)
+ * scaled down to fit inside NODE_SIZE, and reported rather than guessed at
+ * silently (CLAUDE.md, "ask, never guess"). The badge's own geometry, the
+ * monogram's font size and the node's own horizontal inset stay bare, local
+ * pixel values instead of tokens, for the same reason ServiceTile.module
+ * .css's own badge numbers do: "genuinely local, single-use numbers with no
+ * scale to belong to either way."
  */
 .node {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  /* Bounded, not intrinsic: a compact node is meant to read as a tile of a
-     roughly consistent size, not stretch to however long a raw slug is --
-     a long uncatalogued name ellipsises (see .name) instead. Left at 220px
-     rather than narrowed to the board's 74px: the board tile carries only an
-     icon and a name under it, but this node's name sits beside the icon and
-     sometimes grows an id line under it too (see .id below), and at graph
-     zoom a name has to stay readable without a hover. Same border, fill,
-     radius and status vocabulary as the tile; different footprint because
-     it holds a different amount of content. */
-  max-width: 220px;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  font: inherit;
-  color: var(--color-text);
+  gap: var(--node-content-gap);
+  width: 100%;
+  height: 100%;
+  /* Bare -- a local inset so the badge's negative offset and the label's
+     ellipsis have breathing room from the edge of the box elk laid out,
+     not a value with a scale to belong to. */
+  padding: 0 6px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  color: inherit;
   cursor: pointer;
-  /* Anchors the status mark below, which is positioned against this box the
-     same way ServiceTile.module.css's `.mark` is positioned against `.tile`. */
-  position: relative;
-}
-
-/* Sunken fill on hover, same cue the board's tile uses -- no border-colour
-   change and no focus ring drawn here at all. The single focus treatment for
-   the whole app lives once in tokens.css (`:where(a, button, [tabindex])
-   :focus-visible`) rather than per component; this file used to redeclare
-   its own in the old accent colour, which is exactly the kind of fork that
-   migration bridge in tokens.css exists to catch. */
-.node:hover {
-  background: var(--color-surface-sunken);
-}
-
-/* Selected is conveyed by `aria-pressed` on the button (assistive tech) and,
-   for sighted users, by border colour going from a hairline to full ink plus
-   the sunken fill -- the same two-cue combination ServiceTile.module.css's
-   `.selected` uses for the identical reason stated there: the box must never
-   grow and shove its neighbours, which a wider border would. Kept on top of
-   that is the inset ring below, which is the fix for a real, once-shipped
-   defect and worth keeping even though the tile does not need it: this node
-   sits on a pannable canvas at varying zoom, where a hairline-to-ink border
-   swap alone can lose contrast against the cream canvas background at low
-   zoom in a way a fixed 74px board tile never has to survive. The ring reads
-   as the button's outline going from 1px to 3px in strict greyscale, which
-   does not depend on any colour value being distinguishable from any other --
-   the property the previous cue (two different reads of the same accent hue)
-   did not have. docs/PLAN.md records that defect as one of Phase 3.7's five
-   smaller viewer bugs. */
-.selected {
-  background: var(--color-surface-sunken);
-  border-color: var(--color-line-strong);
-  box-shadow: inset 0 0 0 2px var(--color-line-strong);
 }
 
 /*
- * The status mark: a bar across the top edge, full width, 3px -- the same
- * instrument ServiceTile.module.css's `.mark` is, reused rather than
- * reinvented so the board and the canvas draw a departure from `active` the
- * same way. Length and position carry the meaning, so it reads with colour
- * removed entirely, and it renders at all only for the three statuses that
- * are not `active` (see ServiceNode.tsx's tagsFor call) -- the norm earns no
- * mark, which is the whole point of the tag vocabulary this borrows.
+ * Selection puts the same shape cue on the mark that ServiceTile.module
+ * .css's `.selected .squircle` / `.tile:focus-visible .squircle` do -- an
+ * outline ring around the icon, not a colour change on an outer box this
+ * node no longer has. Stacked on top of, not instead of, the app-wide focus
+ * ring (tokens.css's `:where(a, button, [tabindex]) :focus-visible` rule).
  */
-.mark {
-  position: absolute;
-  top: -1px;
-  left: -1px;
-  right: -1px;
-  height: 3px;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+.selected .squircle,
+.node:focus-visible .squircle {
+  outline: 2px solid var(--color-text-faint);
+  outline-offset: 3px;
 }
 
-/* Tones mirror service-tags.ts's vocabulary and ServiceTile.module.css's own
-   tone rules -- deliberately only the three a status tag can ever produce
-   here (`signal-outline`/`ink-solid`/`grey-solid`, for phasing_out/
-   deprecated/removed). `signal-solid` and `quiet-outline` belong to tags
-   ServiceNode.tsx's tagsFor call has already suppressed (recency and kind),
-   so a rule for either would be a rule nothing ever selects -- the same
-   discipline the default `service` kind is missing a rule for, below. */
-.signal-outline {
-  background: var(--color-signal);
-}
-
-.ink-solid {
-  background: var(--color-line-strong);
-}
-
-.grey-solid {
-  background: var(--tag-removed-bg);
-}
-
-/* The name and, when it is needed, the id stack vertically beside the icon.
-   Was `.ring` -- this wrapper positioned the coloured status ring the icon
-   used to sit inside; now it exists only to anchor the uncatalogued dot,
-   which is still a real absolutely-positioned corner mark on this element. */
-.iconWrap {
+.squircle {
   position: relative;
-  display: inline-flex;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
+  width: var(--icon-node-tile-size);
+  height: var(--icon-node-tile-size);
+  border-radius: var(--icon-node-tile-radius);
+  background: var(--color-surface);
 }
 
-/* A small corner dot, deliberately not another bar: the status mark above
-   already spends the top edge, and a second bar here would read as a second
-   status rather than a different signal. A dot in the opposite corner is a
-   distinct shape in a distinct place, so the two never compete for the same
-   read. Decorative only (aria-hidden) -- the accessible equivalent is
-   .srOnly text in the name, not this dot. */
-.uncataloguedDot {
+.squircle svg {
+  width: var(--icon-node-mark-size);
+  height: var(--icon-node-mark-size);
+}
+
+/* The no-brand-icon case: dashed border, sunken fill, same as the tile. */
+.fallback {
+  background: var(--color-surface-sunken);
+  border: 1.5px dashed var(--color-line);
+}
+
+/* Status signal, half of two: the mark itself desaturated and dimmed -- a
+   lightness/saturation change, not a hue, so it reads under a
+   `grayscale(1)` filter exactly as it does in colour. `:not(.fallback)`
+   mirrors the tile's own guard: a fallback tile is already sunken, and
+   there is no svg under it for the filter rule to touch. */
+.desaturated:not(.fallback) {
+  background: var(--color-surface-sunken);
+}
+
+.desaturated svg {
+  filter: grayscale(0.9) opacity(0.5);
+}
+
+.monogram {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-bold);
+  /* Bare -- single-use, scaled down from --text-monogram (16px at the
+     tile's 76px squircle) to this node's smaller mark the same way the
+     geometry above is derived. */
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  color: var(--color-text-faint);
+}
+
+/* Status signal, the other half: a corner badge, glyph-shaped so it reads
+   by outline alone before any colour or word does. Bare local numbers,
+   scaled down from the tile's own 23px/12px/-6px/1.5px badge -- see this
+   file's header. */
+.badge {
   position: absolute;
-  top: -3px;
-  right: -3px;
+  top: -4px;
+  right: -4px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 1.25px solid var(--color-signal);
+  color: var(--color-signal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badge svg {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background: var(--icon-fallback-fill);
-  border: 2px solid var(--color-surface);
 }
 
-/* The name and, when it is needed, the id stack vertically inside the node's
-   horizontal icon-then-text layout. min-width:0 on the column as well as on
-   .name, or the flex item refuses to shrink below its content and the
-   ellipsis in .name never fires. */
 .label {
   display: flex;
   flex-direction: column;
@@ -144,82 +138,45 @@
 }
 
 .name {
-  font-weight: var(--weight-bold);
+  font-size: var(--text-node-name);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-node-name);
+  color: var(--color-text);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* The uncatalogued case: `service.name` is the raw slug here (view-payload.ts
-   falls back to it when the catalog has no row), and it must never read as
-   a real display name. Monospace plus a muted colour is the same treatment
-   the id line below gets -- reusing it here says "this is a slug" the same
-   way, in less space than the old full-word "uncatalogued" pill this
-   replaces. */
-.uncataloguedName {
-  font-family: var(--font-mono);
-  font-weight: var(--weight-normal);
-  color: var(--color-text-muted);
-}
-
-/* Visually hidden, not display:none -- still read by assistive tech, just
-   not painted. This is the text equivalent for the uncatalogued marker;
-   the dot itself is aria-hidden. */
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* The disambiguating id line, rendered only when another node beside this one
-   shows the same display name (see ServiceNode.tsx's `showId`). Monospace and
-   muted, the same treatment .uncataloguedName gives a raw slug -- an id is a
-   slug too, and reusing that vocabulary says so without a second one. Smaller
-   than the name because it is the tiebreaker, not the label. */
+/* The disambiguating id line -- see ServiceNode.tsx's `showId`. Monospace
+   and muted: manifest text reads as manifest text, the same treatment
+   ServiceTile.module.css's own `.id` gives it. */
 .id {
+  margin-top: var(--node-id-gap);
+  font-size: var(--text-node-meta);
+  line-height: var(--leading-node-meta);
   font-family: var(--font-mono);
-  font-size: 0.8em;
-  color: var(--color-text-muted);
+  color: var(--color-text-faint);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Kind, as a shape. One rule per exact schema `kind` value, named identically
-   to it -- the same convention the status mark above follows, and for the
-   same reason: two vocabularies for one field is how they drift apart.
-
-   These are deliberately *shape* differences rather than colour ones, because
-   colour on this node is already spoken for twice over (the status mark and
-   the selected state), and a third hue competing with those two would make
-   all three harder to read rather than adding a signal. Shape is the axis
-   that is still free.
-
-   `service` keeps the default rounded tile and needs no rule: it is the
-   overwhelming majority (29 of 35 entries in
-   examples/layout-stress.catalogus.yaml), and a rule that restates the
-   default is a rule that can silently disagree with it. */
-
-/* Infrastructure the project runs itself -- no vendor, no account, no
-   invoice. A dashed edge says "not something you are billed for" without
-   needing a word for it, and it is the one border treatment nothing else on
-   this node uses. */
-.kind-component {
-  border-style: dashed;
+/* The status word, plain text, so it needs no colour at all to be read --
+   red here decorates the one thing red is reserved for, it does not carry
+   the meaning (the badge's shape already does). Same reasoning
+   ServiceTile.module.css's own `.status` states at length; not repeated
+   here. */
+.status {
+  margin-top: var(--node-status-gap);
+  font-size: var(--text-node-meta);
+  line-height: var(--leading-node-meta);
+  font-weight: var(--weight-semibold);
+  color: var(--color-signal);
 }
 
-/* What the code is written in. Squared off, because a stack entry is not on
-   the request path at all -- it is a different sort of thing from the two
-   kinds that can take traffic, and the corner radius is the cheapest way to
-   say so at tile size. */
-.kind-stack {
-  border-radius: var(--radius-sm);
+.statusTarget {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-medium);
 }

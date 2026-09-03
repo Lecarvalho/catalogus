@@ -129,18 +129,34 @@
    * Status is expressed as a tag, not as a hue per state -- see Tag.tsx.
    * `active` deliberately has no colour and no tag: it is the norm, and
    * tagging the norm is what produced thirty-five identical green pills.
-   * These three exist because the tag vocabulary needs fills, and they are
-   * ink/grey/red rather than a traffic-light ramp so that meaning survives
-   * greyscale, which colour-coded status never did.
+   * These exist because the tag vocabulary needs fills, and they are ink and
+   * grey rather than a traffic-light ramp so that meaning survives greyscale,
+   * which colour-coded status never did.
+   *
+   * The last four aliased `--color-signal` until 2026-09-02, which meant a
+   * `phasing out` tag and a `new` tag on an active service both painted red
+   * on the popover and the service page. OWN-WORLD spends red on the status
+   * badge and the status word "and nowhere else", and a tag is neither of
+   * those, however much a phase-out is the thing red exists to mark -- the
+   * badge and the word already carry it on the tile, and the tag is a second
+   * telling of the same fact on a different surface. They are the same ink
+   * the rest of the vocabulary is drawn in now: outline against the ground,
+   * which still differs from the two solids by fill rather than by hue, so
+   * nothing in Tag.module.css's greyscale argument changes.
+   *
+   * A border colour and a text colour, named apart even though both resolve
+   * to the same value in both themes: they are two jobs, and the day one of
+   * them wants a hairline rather than the strong rule is the day the name
+   * has to already exist.
    */
   --tag-deprecated-bg: #24211c;
   --tag-deprecated-ink: #f4f1ea;
   --tag-removed-bg: #d9d2c4;
   --tag-removed-ink: #46423a;
-  --tag-phasing-line: var(--color-signal);
-  --tag-phasing-ink: var(--color-signal);
-  --tag-new-line: var(--color-signal);
-  --tag-new-ink: var(--color-signal);
+  --tag-phasing-line: var(--color-line-strong);
+  --tag-phasing-ink: var(--color-text);
+  --tag-new-line: var(--color-line-strong);
+  --tag-new-ink: var(--color-text);
 
   /*
    * Fill for both the brand-icon fallback glyphs and their surrounding
@@ -337,6 +353,62 @@
   --pop-note-gap: 13px;
   --pop-note-rule-gap: 12px;
 
+  /*
+   * The service page's own four values. Added 2026-08-31, and unlike every
+   * other token in this block they are *not* read off a mockup: candidate E
+   * is the List view only, so the service page has no approved geometry and
+   * there is nothing here to transcribe. They are recorded as chosen rather
+   * than measured, because a chosen value filed among measured ones is the
+   * shape of guess CLAUDE.md exists to prevent -- an absent measurement that
+   * reads as an answer.
+   *
+   * What they were chosen against: the title sits a step above the band
+   * heading (19px) and a step above the retired world's --text-title (26px),
+   * which held the same job on the old page. The three gaps are deliberately
+   * past --space-7 (32px), the dense world's largest step: that ramp's
+   * ceiling is the ceiling of a world whose argument was fitting one screen,
+   * and the page's own top-level rhythm is exactly where re-importing it
+   * would show. The owner has not seen these; they are the first thing to
+   * check when the page is looked at.
+   */
+  --text-page-title: 30px;
+  --page-header-gap: 20px;
+  --page-section-gap: 40px;
+  --page-columns-gap: 48px;
+
+  /*
+   * The graph node and the canvas chrome, added 2026-08-31, and chosen rather
+   * than measured for the same reason as the four above: candidate E is the
+   * List view only and there is no approved graph.
+   *
+   * These are not free-hand, though, and the difference is worth stating. The
+   * node has a hard constraint the service page does not: `NODE_SIZE` in
+   * graph-layout.ts is 216x64, the elk layout is computed against it, and a
+   * node that does not fit the box it was laid out for produces a graph that
+   * still renders and is quietly wrong -- the failure mode docs/PLAN.md
+   * already records for this view. So the three icon values are the tile's
+   * own ratios scaled to fit that box (radius 26.3% of the tile, mark 60.5%
+   * of it, both preserved exactly), not new proportions. The type and gaps
+   * are chosen, and the worst case that has to fit -- a three-line label of
+   * name, id and status -- is what sizes them.
+   *
+   * The two canvas values are chrome with no counterpart anywhere in the
+   * approved artifact at all.
+   */
+  --icon-node-tile-size: 42px;
+  --icon-node-tile-radius: 11px;
+  --icon-node-mark-size: 25px;
+  --node-content-gap: 10px;
+  --text-node-name: 12.5px;
+  --leading-node-name: 1.2;
+  --text-node-meta: 10px;
+  --leading-node-meta: 1.25;
+  --node-id-gap: 2px;
+  --node-status-gap: 3px;
+
+  --graph-legend-gap: 16px;
+  --graph-message-padding: 24px;
+
   /* Transient surfaces: this world's popover carries the radius and shadow
      "soft transients" allows, in place of the old world's hard offset block
      (ServicePopover.module.css) wherever this world's popover ships. */
@@ -459,6 +531,20 @@ body {
    * labels enough to read as disabled.
    */
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * The document is the scrolling element, and the three views are not the
+ * same height: at 1280px List and Graph scroll while Migrations does not, so
+ * on a classic-scrollbar platform toggling to Migrations shifted the shell,
+ * the rail and the board 15px sideways. Always showing the track keeps the
+ * layout width the same in every view. `scrollbar-gutter: stable` was tried
+ * first, on `body` and then on `html`, and a validator measured both as
+ * inert in Chrome 152 for the viewport scroller; `overflow-y: scroll` on
+ * `html` measured stable.
+ */
+html {
+  overflow-y: scroll;
 }
 
 /*

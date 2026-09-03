@@ -88,9 +88,20 @@
   height: 26px;
 }
 
+/*
+ * 22px in a 26px box, not 26px in a 26px box. Corrected 2026-08-31 by a
+ * validator that diffed this rule against the mockup rather than trusting the
+ * comment above it: candidate-e-homescreen.html's `.pop-mark` is the 26px flex
+ * box, and every `.pop-mark svg` in it is authored at `width="22" height="22"`
+ * under `max-width: 100%` -- so the mark sits inside its box with 2px of air
+ * on each side. This file had filled the box, rendering every popover mark 18%
+ * larger than the approved artifact. `Icon` emits a bare `viewBox="0 0 24 24"`
+ * svg with no width or height attribute, so the size is entirely this rule's
+ * to state.
+ */
 .glyph svg {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
 }
 
 .identity {
@@ -102,16 +113,23 @@
 }
 
 /*
- * `--text-pop-name` and the bare `-0.01em` tracking are both candidate E's
- * own values (`.pop-name`), not this app's dense-world name scale -- reusing
- * a neighbouring component's token here would couple two things that only
- * share a number today, and the tracking is a value the approved mockup
- * states rather than a guess this file gets to round to a nearby token.
+ * `--text-pop-name` is candidate E's own value (`.pop-name`, 14px), not this
+ * app's dense-world name scale -- reusing a neighbouring component's token
+ * here would couple two things that only share a number today.
+ *
+ * The tracking is gone, and the sentence that defended it was false. It read
+ * "the tracking is a value the approved mockup states rather than a guess";
+ * the mockup's rule is `.pop-name { font-size: 14px; font-weight: 700; }` and
+ * states no tracking at all. The only `-0.01em` in that file is on `.wordmark`
+ * and `.band-head h2`, neither of which is this. A citation to a source that
+ * does not say it is worse than a bare unexplained value: the bare value
+ * invites the next reviewer to check, and the citation tells them not to
+ * bother. Found 2026-08-31 by a validator that opened the mockup instead of
+ * reading the comment.
  */
 .name {
   font-size: var(--text-pop-name);
   font-weight: var(--weight-bold);
-  letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
 
@@ -130,16 +148,30 @@
 }
 
 /*
- * Stated in the signal colour, because unlike everything else in this header
- * it is a defect the reader can act on: the catalog has no row for this slug,
- * so the name is the raw slug and there is no verified brand mark.
+ * Ink, not signal, since 2026-08-31: the owner was asked directly whether
+ * this fact -- the catalog has no row for this slug, so the name is the raw
+ * slug and there is no verified brand mark -- earns the world's one utility
+ * red, and ruled that it does not. DIRECTION.md's OWN-WORLD is explicit and
+ * literal: "Signal red is spent in exactly two places, the status badge and
+ * the status word, and nowhere else: not a view, not a count." An
+ * uncatalogued marker is neither of the two licensed places, so this stays a
+ * third spend regardless of how legitimate the underlying fact is -- the
+ * ruling was about upholding the contract as written, not about whether this
+ * particular fact deserved attention.
+ *
+ * Nothing is lost by dropping the colour: the sentence itself ("no catalog
+ * entry for this slug") already says what it means in words, the same
+ * greyscale-survives argument OWN-WORLD makes for the status badge/word
+ * pair. Bold, caps and tracking already give it more weight than the plain
+ * `.slug` line beneath it -- that typographic weight is the non-colour cue,
+ * not a fresh one invented for this fix.
  */
 .uncatalogued {
   font-size: var(--text-pop-label);
   font-weight: var(--weight-bold);
   letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
-  color: var(--color-signal);
+  color: var(--color-text);
 }
 
 /*

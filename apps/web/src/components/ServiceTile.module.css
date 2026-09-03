@@ -125,7 +125,21 @@
   height: 12px;
 }
 
+/*
+ * `.name`, `.id` and `.status` are `<span>`s (ServiceTile.tsx), which are
+ * inline boxes by default -- and `margin-top` does not apply to a
+ * non-replaced inline box at all (CSS 2.1 SS8.3), so without this rule the
+ * three lines run together with none of the `--icon-id-gap` /
+ * `--icon-status-gap` whitespace below actually rendering. `display: flex;
+ * flex-direction: column` blockifies every direct child (CSS Flexible Box
+ * Layout SS2: "the display value of the flex item is blockified"), which is
+ * the same fix ServiceNode.module.css's own `.label` already uses one file
+ * over -- read there rather than redrawn here since that file is off limits
+ * to edit from this one.
+ */
 .label {
+  display: flex;
+  flex-direction: column;
   margin-top: var(--icon-label-gap);
 }
 
@@ -160,4 +174,26 @@
 .statusTarget {
   font-family: var(--font-mono);
   font-weight: var(--weight-medium);
+}
+
+/*
+ * The tile tightens below 480px alongside the grid it sits in
+ * (BandModule.module.css's own identical breakpoint and comment) -- the
+ * mockup's own values (candidate-e-homescreen.html's
+ * `@media (max-width: 480px)` block), transcribed rather than picked fresh.
+ * `tokens.css` already carries these three as `--icon-tile-size-narrow`,
+ * `--icon-tile-radius-narrow` and `--icon-mark-size-narrow`; this is the
+ * only file that was missing the query that reads them.
+ */
+@media (max-width: 480px) {
+  .squircle {
+    width: var(--icon-tile-size-narrow);
+    height: var(--icon-tile-size-narrow);
+    border-radius: var(--icon-tile-radius-narrow);
+  }
+
+  .squircle svg {
+    width: var(--icon-mark-size-narrow);
+    height: var(--icon-mark-size-narrow);
+  }
 }

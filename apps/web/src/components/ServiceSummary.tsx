@@ -2,15 +2,31 @@
 // own. Pure.
 //
 // This was the body of `ServiceDetailPanel`, lifted out on 2026-08-25 so that
-// two surfaces can render it without one of them reimplementing it: the hover
-// popover, and the service page. The owner's instruction was that the panel
-// *is* the popover -- "instead of showing the actual popover, show this very
-// panel" -- and the way to honour that without ending up with two divergent
-// renderings of the same facts is for there to be one.
+// two surfaces could render it without one of them reimplementing it: the
+// hover popover, and the service page. The owner's instruction was that the
+// panel *is* the popover -- "instead of showing the actual popover, show
+// this very panel" -- and the way to honour that without ending up with two
+// divergent renderings of the same facts was for there to be one.
+//
+// **That sharing did not survive candidate E.** ServicePopover.tsx's header
+// records the ruling: candidate E's own six-fact popover (Role, Kind,
+// Version, Status, Dependents in, Dependencies out) is a different
+// arrangement of a different subset of facts from this component's, built
+// directly in ServicePopover.tsx rather than through this one. ServicePage
+// is this component's only caller now.
+//
+// **`compact` is gone as of 2026-08-31, following this file's own standing
+// instruction below it while it still had the prop:** "if it still has no
+// caller when the page ships, delete it rather than leave a flag nobody
+// exercises." A grep across apps/web/src at the time ServicePage moved into
+// candidate E found exactly one caller passing it -- this file's own test --
+// so the flag was never exercised by production code and is deleted rather
+// than migrated. Notes and the Layer 3 block render unconditionally now,
+// governed only by `service.notes` and `service.kind === "service"`.
 //
 // It renders no heading, no close button and no positioning. The caller owns
-// all three, because a popover and a page want different answers to each and
-// neither answer belongs to the facts.
+// all three, because a page wants its own answer to each and neither answer
+// belongs to the facts.
 import type { ViewService } from "@catalogus/cli";
 
 import styles from "./ServiceSummary.module.css";
@@ -20,22 +36,9 @@ export interface ServiceSummaryProps {
   dependsOn: string[];
   dependedOnBy: string[];
   labelForId: (id: string) => string;
-  /**
-   * `compact` drops the Layer 3 block and the notes paragraph.
-   *
-   * **Nothing passes it today.** I introduced it for the hover popover, on
-   * the reasoning that a Layer 3 explanation identical on every service
-   * buries the four facts a reader actually hovered for -- and the owner's
-   * reference for that popover was a screenshot of the panel *including* that
-   * block, so the brief won. It is kept because the argument for it is still
-   * a real one and the service page may want the inverse of it later; if it
-   * still has no caller when the page ships, delete it rather than leave a
-   * flag nobody exercises.
-   */
-  compact?: boolean;
 }
 
-export function ServiceSummary({ service, dependsOn, dependedOnBy, labelForId, compact = false }: ServiceSummaryProps) {
+export function ServiceSummary({ service, dependsOn, dependedOnBy, labelForId }: ServiceSummaryProps) {
   return (
     <div className={styles.summary}>
       <dl className={styles.facts}>
@@ -71,7 +74,7 @@ export function ServiceSummary({ service, dependsOn, dependedOnBy, labelForId, c
         )}
       </dl>
 
-      {!compact && service.notes && <p className={styles.notes}>{service.notes}</p>}
+      {service.notes && <p className={styles.notes}>{service.notes}</p>}
 
       {(dependsOn.length > 0 || dependedOnBy.length > 0) && (
         <div className={styles.deps}>
@@ -113,7 +116,7 @@ export function ServiceSummary({ service, dependsOn, dependedOnBy, labelForId, c
           test ties the two together -- they are different sentences in
           different packages -- so a rename of `push --private` has to be
           applied in both places by hand. */}
-      {!compact && service.kind === "service" && (
+      {service.kind === "service" && (
         <section className={styles.overlay}>
           <h3 className={styles.overlayHeading}>Cost &amp; account</h3>
           <p className={styles.overlayState}>Not connected</p>

@@ -20,6 +20,16 @@
 // this ships the shell and an empty state that says what is coming and what
 // fills it, and invents nothing. An empty state that guessed at a structure
 // would be the plausible default this project keeps correcting.
+//
+// ---
+//
+// Moved into candidate E (docs/candidates/candidate-e-homescreen.html,
+// approved 2026-08-26) on 2026-08-31 -- see ServicePage.module.css's own
+// header for what changed and why. This file's own JSX did not: the
+// breadcrumb, header and two-column shape are the same structure, because
+// candidate E's approved mockup shows the List view only and there is no
+// service-page artifact to redesign against -- this is a move into an
+// existing world's rules and tokens, not a new information architecture.
 import type { Ref } from "react";
 import type { ViewService } from "@catalogus/cli";
 

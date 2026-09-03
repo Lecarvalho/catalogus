@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 //
-// ServiceSummary is the shared body of the detail panel and the hover
-// popover -- one implementation of the facts, rendered by two chrome-owning
-// callers. `compact` is the only variation this file itself controls.
+// ServiceSummary is the facts body ServicePage renders inside its own
+// `.facts` aside -- its only caller since candidate E gave ServicePopover
+// its own six-fact grid (ServicePopover.tsx's header). `compact` used to be
+// this file's one variation; it is gone as of 2026-08-31 (ServiceSummary.tsx's
+// header records why), so notes and the Layer 3 block are asserted
+// unconditionally below rather than under a compact/not-compact split.
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -69,22 +72,12 @@ describe("ServiceSummary -- edges", () => {
   });
 });
 
-describe("ServiceSummary -- compact mode", () => {
-  it("drops the notes paragraph and the Layer 3 block when compact", () => {
-    render(
-      <ServiceSummary
-        service={service({ id: "a", role: "hosting", kind: "service", notes: "a private note" })}
-        dependsOn={[]}
-        dependedOnBy={[]}
-        labelForId={labelForId}
-        compact
-      />
-    );
-    expect(screen.queryByText("a private note")).toBeNull();
-    expect(screen.queryByText("Cost & account")).toBeNull();
-  });
-
-  it("shows the notes paragraph and the Layer 3 block for kind:service when not compact", () => {
+describe("ServiceSummary -- notes and the Layer 3 block", () => {
+  // Catches a mutation that reintroduces a hidden gate on either block --
+  // e.g. a stray `compact &&` left over from the prop this removed, or the
+  // two guards (`service.notes`, `service.kind === "service"`) merged into
+  // one so that one block's presence silently controls the other's.
+  it("shows the notes paragraph and the Layer 3 block for kind:service", () => {
     render(
       <ServiceSummary
         service={service({ id: "a", role: "hosting", kind: "service", notes: "a private note" })}
@@ -97,7 +90,11 @@ describe("ServiceSummary -- compact mode", () => {
     expect(screen.getByText("Cost & account")).not.toBeNull();
   });
 
-  it("never shows the Layer 3 block for a component or a stack, compact or not -- only a service can carry a cost", () => {
+  // Catches a mutation dropping the `service.kind === "service"` guard --
+  // e.g. rendering Layer 3 for every kind regardless, which would promise a
+  // cost field HANDOFF.md's 2026-08-23 amendment says a component or a
+  // stack can never carry.
+  it("never shows the Layer 3 block for a component or a stack -- only a service can carry a cost", () => {
     render(
       <ServiceSummary service={service({ id: "a", role: "runtime", kind: "stack" })} dependsOn={[]} dependedOnBy={[]} labelForId={labelForId} />
     );

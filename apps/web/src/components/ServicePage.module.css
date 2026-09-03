@@ -3,11 +3,58 @@
  * squeezing into a column beside a list. That is the structural difference
  * between this and the panel it replaced, and it is why the document column
  * can have a real reading measure instead of a 220px gutter.
+ *
+ * Moved into candidate E (docs/candidates/candidate-e-homescreen.html,
+ * approved 2026-08-26) on 2026-08-31. The structure below is untouched --
+ * breadcrumb, header, two columns -- because this move is into a world
+ * whose rules and tokens already exist, not a new information architecture.
+ * What changed is every value. Most of the replacement already existed:
+ * ServiceTile.module.css's --icon-mark-size and --icon-id-gap,
+ * ServicePopover.module.css's --text-pop-id / --text-pop-label /
+ * --track-pop-label, and tokens.css's own --text-board-body /
+ * --leading-board-body -- reused because the value and its meaning both
+ * already matched, not because a near neighbour got rounded onto. Four
+ * values had no match anywhere: --text-page-title, --page-header-gap,
+ * --page-section-gap and --page-columns-gap are new. Candidate E's approved
+ * mockup shows the List view only, so there is no artifact to lift a
+ * service-page number from -- these four are this file's own design
+ * decision rather than a measurement, and are reported as such rather than
+ * invented and left silent.
+ *
+ * One colour use this file used to make no longer does. `.back:hover` spent
+ * --color-signal; DIRECTION.md's own restatement of "signal red is spent in
+ * exactly two places... and nowhere else" names "not a link" directly, so
+ * the hover state below is ink, not red. `.uncatalogued` was left red by the
+ * pass that moved this file into candidate E, deliberately, to match
+ * ServicePopover.module.css's identical marker rather than let the two
+ * surfaces disagree -- and flagged the question up rather than resolving it
+ * silently.
+ *
+ * **Ruled 2026-08-31.** The owner was asked directly whether an uncatalogued
+ * slug earns the one colour OWN-WORLD reserves for the status badge and the
+ * status word, and ruled that it does not: the contract stands as written,
+ * "and nowhere else: not a view, not a count" is not a phrase with room for
+ * a third fact, however legitimate. `.uncatalogued` moves to ink here and in
+ * ServicePopover.module.css together, in the same pass, for the same reason
+ * the two were kept in agreement before -- the two surfaces still say the
+ * same thing about the same fact, just without the colour neither of them
+ * was licensed to spend on it. Nothing is lost: the sentence itself already
+ * states the fact in words, and the bold caps treatment below already
+ * outweighs the plain `.id` line beside it.
+ *
+ * **Applied 2026-09-02, which is not the same day.** The paragraph above was
+ * written on 2026-08-31 and says "in the same pass" -- the pass wrote the
+ * ruling down here and changed the declaration in ServicePopover.module.css
+ * only, so for two days this file carried an accurate account of a fix it had
+ * not made, which is the most expensive shape a comment can take: a reader
+ * checking whether the site moved finds a paragraph saying it did. A
+ * validator found it by reading the declaration instead. The paragraph is
+ * kept as written rather than tidied, because what it got wrong is the point.
  */
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--page-section-gap);
 }
 
 /* Focus lands here on open; the app-wide ring would draw around the whole
@@ -25,38 +72,50 @@
   border: 0;
   background: transparent;
   font: inherit;
-  font-size: var(--text-label);
+  font-size: var(--text-pop-label);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
   color: var(--color-text-muted);
   cursor: pointer;
 }
 
+/* Ink, not signal, on hover -- see the header above: the direction
+   contract's own restatement of the red budget names "not a link"
+   directly, and a back control is exactly that. */
 .back:hover {
-  color: var(--color-signal);
+  color: var(--color-text);
 }
 
 .header {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-4);
-  padding-bottom: var(--space-4);
+  gap: var(--page-header-gap);
+  padding-bottom: var(--page-section-gap);
   border-bottom: 1px solid var(--color-line);
 }
 
+/*
+ * Bare mark, no squircle. The icon-tile radius is candidate E's one
+ * declared exception and it belongs to the grid tile alone
+ * (ServiceTile.module.css's `.squircle`) -- everywhere else a brand mark
+ * renders bare, including ServicePopover's own header glyph, which this
+ * follows. Sized off --icon-mark-size, the value this world already uses
+ * for "a bare mark at its own natural size", rather than a fresh pixel
+ * count chosen to look about right.
+ */
 .glyph {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--icon-mark-size);
+  height: var(--icon-mark-size);
 }
 
 .glyph svg {
-  width: 32px;
-  height: 32px;
+  width: var(--icon-mark-size);
+  height: var(--icon-mark-size);
 }
 
 .identity {
@@ -67,7 +126,11 @@
 /* The status/recency/kind marks, under the id rather than opposite the name.
    `.identity` grows to fill the header, so a mark placed as the header's
    last child lands hard against the right edge of whatever window it is
-   read on -- at 2514px that put the mark half a screen from its service. */
+   read on -- at 2514px that put the mark half a screen from its service.
+   The gap is --space-2, a general-purpose spacing unit for content
+   candidate E's mockup never shows (it has no tag row at all -- see
+   ServicePopover.module.css's own `.tags` comment for the identical call),
+   not a rounding of any measurement the mockup states. */
 .tags {
   display: flex;
   flex-wrap: wrap;
@@ -77,27 +140,27 @@
 
 .name {
   margin: 0;
-  font-size: var(--text-title);
+  font-size: var(--text-page-title);
   font-weight: var(--weight-bold);
-  line-height: 1.05;
-  letter-spacing: var(--track-title);
+  line-height: 1.1;
+  letter-spacing: var(--track-band-title);
   overflow-wrap: anywhere;
 }
 
 .id {
-  margin: var(--space-2) 0 0;
+  margin: var(--icon-id-gap) 0 0;
   font-family: var(--font-mono);
-  font-size: var(--text-label);
+  font-size: var(--text-pop-id);
   color: var(--color-text-faint);
 }
 
 .uncatalogued {
-  margin: var(--space-2) 0 0;
-  font-size: var(--text-label);
+  margin: var(--icon-id-gap) 0 0;
+  font-size: var(--text-pop-label);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
-  color: var(--color-signal);
+  color: var(--color-text);
 }
 
 /*
@@ -109,7 +172,7 @@
 .columns {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-7);
+  gap: var(--page-columns-gap);
 }
 
 .document {
@@ -120,9 +183,9 @@
 
 .documentHeading {
   margin: 0 0 var(--space-3);
-  font-size: var(--text-label);
+  font-size: var(--text-pop-label);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
@@ -134,17 +197,25 @@
  */
 .documentEmpty {
   margin: 0 0 var(--space-4);
-  font-size: var(--text-lead);
+  font-size: var(--text-board-body);
   font-weight: var(--weight-bold);
+  line-height: var(--leading-board-body);
 }
 
 .documentBody {
   margin: 0 0 var(--space-3);
-  font-size: var(--text-body);
-  line-height: var(--leading-body);
+  font-size: var(--text-board-body);
+  line-height: var(--leading-board-body);
   color: var(--color-text-muted);
 }
 
+/*
+ * A bordered, hairline-lined box with no radius -- not a service card
+ * (candidate E's services carry none), but shell chrome the way a rail or a
+ * popover is: this world's Notion-calm surfaces live on the shell now, not
+ * on a service, and a facts sidebar is chrome around the page, not a
+ * service rendering itself.
+ */
 .facts {
   flex: 0 0 300px;
   border: 1px solid var(--color-line);

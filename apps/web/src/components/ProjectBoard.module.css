@@ -37,10 +37,21 @@
   min-width: 0;
 }
 
+/*
+ * The empty board. Survived the candidate E rewrite untouched and was found
+ * on 2026-08-31 by a validator auditing --space-* uses: it is the last panel
+ * left on a board rebuilt around "no card, border or panel", and its 24px
+ * came off the retired dense world's ramp.
+ *
+ * The border is gone because this world does not draw one, and the padding is
+ * --pop-padding -- the one measured padding value candidate E has, taken from
+ * ServicePopover's own fact surface, the same substitution MigrationList's
+ * empty states made the same day. Nothing else changes: an empty board is one
+ * sentence of muted prose on the ground, which is what it should have been.
+ */
 .empty {
   margin: 0;
-  padding: var(--space-6);
-  border: 1px solid var(--color-line);
+  padding: var(--pop-padding);
   color: var(--color-text-muted);
   font-size: var(--text-body);
 }

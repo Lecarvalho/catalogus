@@ -1,7 +1,55 @@
+/*
+ * The DAG canvas's move into candidate E, the home screen (approved
+ * 2026-08-26). There is no graph mockup -- candidate-e-homescreen.html
+ * covers the List view only -- so this file carries the canvas's own
+ * chrome (the loading/error message, the legend, the flow pane) into this
+ * world's tokens and grammar, while ServiceNode.module.css carries the mark
+ * itself. `--graph-legend-gap` and `--graph-message-padding` below have no
+ * mockup to lift a value from either; see this move's own report for where
+ * they came from.
+ *
+ * `@xyflow/react/dist/style.css` (imported in GraphCanvas.tsx) ships its own
+ * colours, node defaults and border radii, and overriding it into the world
+ * is part of this move. Two different mechanisms are needed, not one:
+ *
+ *  - The node's own box needs no override at all. This project's custom
+ *    node type ("service", registered in GraphCanvas.tsx's `NODE_TYPES`) is
+ *    never matched by the vendor sheet's `.react-flow__node-default` /
+ *    `-input` / `-output` / `-group` rules -- those class names belong only
+ *    to React Flow's *built-in* node types -- so ServiceNode.module.css
+ *    owns the node's look outright, with nothing from the vendor sheet
+ *    fighting it.
+ *  - Edges are different, and a plain override does not work here. React
+ *    Flow puts the `className` this file hands an edge on the *wrapping*
+ *    `<g>` (found by rendering it, not by reading the CSS -- see
+ *    GraphCanvas.test.tsx's "the incident edge highlight" describe block),
+ *    while the vendor sheet's own `.react-flow__edge-path` rule declares
+ *    `stroke` *directly on the `<path>`* inside it. A directly-targeted CSS
+ *    declaration always wins over one merely inherited from an ancestor, on
+ *    any element, regardless of source order or specificity -- so a rule
+ *    here that sets the `stroke` *property* on `.edge`/`.edgeIncident`
+ *    would sit on the `<g>` and never reach the `<path>` at all. It would
+ *    look correct in the class list and paint nothing. The vendor rule's
+ *    own theming seam is what actually reaches the path: its `stroke`
+ *    declaration falls back through the custom property named
+ *    "xy-edge-stroke" (two dashes, elided here so this comment's own prose
+ *    does not itself look like a stylesheet reference to
+ *    token-references.test.ts, which scans raw file text and cannot tell a
+ *    comment from a rule), which *does* inherit down to the path from
+ *    whichever ancestor declares it -- unlike the `stroke` property itself.
+ *    ancestor declares it. Setting that *variable* below, not the
+ *    property, is what recolours the line. Not provable by any test in
+ *    this suite -- jsdom computes no cascaded styles at all, which
+ *    GraphCanvas.test.tsx's own "incident edge highlight" block already
+ *    says of itself -- so GraphCanvas.test.tsx's "GraphCanvas.module.css's
+ *    edge colouring" block instead pins that the *variable* form is what
+ *    is declared, as a source-level guard against reverting to the
+ *    property form silently.
+ */
 .canvas {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--graph-legend-gap);
   flex: 1;
   min-width: 0;
 }
@@ -22,10 +70,21 @@
   position: relative;
   height: 70vh;
   min-height: 420px;
+  /* The one hairline border in this file, and it stays: this box is the
+     canvas's own shell chrome, not a service, which is exactly where
+     apps/web/docs/DIRECTION.md says a hairline lives. */
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
+  /* No radius above a hairline's worth anywhere in this world except the
+     icon tile's own declared exception -- a graph node is not a transient
+     surface, and neither is the pane around it. */
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--color-surface);
+
+  /* Vendor theming seam, per this file's header. The background dot
+     texture has no per-element class of its own to target the way an edge
+     does, so it is set once here rather than fought over per element. */
+  --xy-background-pattern-color: var(--color-line);
 }
 
 /* Says out loud which way the arrows are read. Decision 2 in docs/PLAN.md's
@@ -35,22 +94,19 @@
 .legend {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.875rem;
-  line-height: 1.5;
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
 }
 
 .message {
   margin: 0;
-  padding: var(--space-4);
+  padding: var(--graph-message-padding);
   color: var(--color-text-muted);
 }
 
-/* The React Flow node wrapper. The node itself is ServiceNode, unchanged from
-   the list; this only gives it the fixed box elk laid out against, so an edge
-   arrives where the layout expected it to. */
-/* Fills the box React Flow was given (NODE_SIZE, the same constant elk laid
-   out against), rather than restating those numbers here where they could
-   drift from it. */
+/* The React Flow node wrapper. The node itself is ServiceNode, unchanged in
+   shape from before this move; this only gives it the fixed box elk laid
+   out against, so an edge arrives where the layout expected it to. */
 .node {
   width: 100%;
   height: 100%;
@@ -58,27 +114,24 @@
   align-items: center;
 }
 
-/* A direct-child selector, and correctly one now: ServiceNode's root is the
-   button itself (see ServiceNode.tsx), so the chain here is exactly
-   div._node > button._node with nothing between them. It used to run through
-   an `<li>` ServiceNode wrapped itself in for the list -- correct there, dead
-   weight here, since that made the button a *grandchild* and this rule never
-   matched anything in the built stylesheet. The visible tile kept its list
-   `max-width: 220px` and content-driven height inside the box elk laid out
-   for, while the handles edges anchor to stayed positioned against the full
-   box. Moving the `<li>` out to ServiceGroup.tsx, the one caller with a `<ul>`
-   around it, is what makes this selector real; verified against the built
-   CSS, not just read here. */
+/* A direct-child selector: ServiceNode's root is the button itself (see
+   ServiceNode.tsx), so the chain here is div._node > button._node with
+   nothing between them. Nothing left to override here besides sizing --
+   the old dense node's own `max-width: 220px` cap is gone along with the
+   bordered box it was sized for (ServiceNode.module.css's own header), so
+   this rule only hands the button the box elk laid out for. */
 .node > button {
   width: 100%;
-  max-width: none;
   height: 100%;
 }
 
 /* The connection points edges attach to. Invisible on purpose: this canvas
    never lets anyone draw an edge -- an edge is a fact in catalogus.yaml and
    the CLI is the only writer -- so a visible handle would advertise an
-   interaction that does not exist. */
+   interaction that does not exist. Untouched by this move: this class sets
+   `opacity`/`pointer-events`, properties the vendor sheet's own
+   `.react-flow__handle` rule does not also set on the same element, so
+   there is no override contest here the way there is for edges below. */
 .handle {
   opacity: 0;
   pointer-events: none;
@@ -87,20 +140,23 @@
 /* Muted text rather than the hairline rule colour: a border is a 1px line
    against a surface it sits on, and an edge is a line crossing open canvas --
    at --color-line it is nearly invisible at zoom-out, which is the zoom the
-   whole graph is looked at from. */
+   whole graph is looked at from. Set through the vendor's own `--xy-edge-*`
+   variables, not the `stroke`/`stroke-width` properties -- see this file's
+   header for why the property form silently paints nothing. */
 .edge {
-  stroke: var(--color-text-muted);
+  --xy-edge-stroke: var(--color-text-muted);
+  --xy-edge-stroke-width: 1;
 }
 
 /* An edge touching the selected node. Ink, not the signal colour -- this
-   marks the current *focus*, not a departure from normal, and red is spent
-   on the latter only (tokens.css's header; ServiceNode.module.css's
-   `.selected` makes the identical choice for the node itself, for the
-   identical reason). Two changes, only one of them colour: the stroke
-   widens as well as darkens, because a colour change alone is invisible to
-   a viewer who cannot separate two hues -- the same defect the node's own
-   selected state was fixed for. */
+   marks the current *focus*, not a departure from normal, and
+   `--color-signal` is spent in exactly two places in this world, the status
+   badge and the status word (apps/web/docs/DIRECTION.md) -- never an edge.
+   ServiceNode.module.css's `.selected` makes the identical choice for the
+   node itself, for the identical reason. Two changes, only one of them
+   colour: the stroke widens as well as darkens, because a colour change
+   alone is invisible to a viewer who cannot separate two hues. */
 .edgeIncident {
-  stroke: var(--color-line-strong);
-  stroke-width: 2.5;
+  --xy-edge-stroke: var(--color-line-strong);
+  --xy-edge-stroke-width: 2.5;
 }

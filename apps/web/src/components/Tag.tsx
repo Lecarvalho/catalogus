@@ -45,6 +45,16 @@
 // test could have noticed, because none of them asserted one. It uses the
 // same `Map` as `ServiceNode.tsx` now, and `Tag.test.tsx` pins a real tone's
 // class so the map cannot quietly stop resolving.
+//
+// ---
+//
+// Moved into candidate E on 2026-08-31 -- see Tag.module.css's own header
+// for what changed (type only: --text-pop-label / --track-pop-label in
+// place of the hardcoded 10px and the dense world's --track-caps) and what
+// deliberately did not (the tone -> colour mapping, which service-tags.ts
+// states is shared vocabulary older than this move). Nothing in this file
+// changed: the Map lookup and the two defects above are unaffected by which
+// world the class names render as.
 import type { Tag as TagData } from "../service-tags.js";
 import styles from "./Tag.module.css";
 
