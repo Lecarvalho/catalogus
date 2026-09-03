@@ -149,7 +149,7 @@ export function ServiceNode({ service, isSelected, showId, onSelect }: ServiceNo
           // than re-derived -- one fact, one function.
           <span className={styles.monogram}>{monogramFor(service.service)}</span>
         ) : (
-          <Icon iconPath={service.icon} iconHex={service.iconHex} rollup={service.rollup} label={service.name} colour />
+          <Icon icon={service.icon} rollup={service.rollup} label={service.name} colour />
         )}
 
         {/*

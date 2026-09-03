@@ -70,6 +70,8 @@
   height: var(--icon-node-tile-size);
   border-radius: var(--icon-node-tile-radius);
   background: var(--color-surface);
+  /* Knockouts in the mark show this background; see Icon.module.css. */
+  --icon-knockout: var(--color-surface);
 }
 
 .squircle svg {
@@ -90,6 +92,7 @@
    there is no svg under it for the filter rule to touch. */
 .desaturated:not(.fallback) {
   background: var(--color-surface-sunken);
+  --icon-knockout: var(--color-surface-sunken);
 }
 
 .desaturated svg {

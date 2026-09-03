@@ -206,6 +206,8 @@
 
 .service:hover {
   background: var(--color-surface-sunken);
+  /* Knockouts in the mark show the row's ground; see Icon.module.css. */
+  --icon-knockout: var(--color-surface-sunken);
 }
 
 /*
@@ -218,6 +220,7 @@
  */
 .service[aria-pressed="true"] {
   background: var(--color-surface-sunken);
+  --icon-knockout: var(--color-surface-sunken);
   outline: 2px solid var(--color-text-faint);
   outline-offset: 2px;
 }

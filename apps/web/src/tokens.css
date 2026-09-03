@@ -170,6 +170,16 @@
   --icon-fallback-bg: #ece8de;
   --icon-tile-line: #d5cebe;
 
+  /*
+   * What a knockout in a vendored brand mark (a hole cut through it, e.g.
+   * the C# letters -- see @catalogus/core's icons.ts) shows through to.
+   * The page ground by default; every surface that paints its own ground
+   * under a mark re-declares this beside that background (ServiceTile,
+   * ServiceNode, ServicePopover, MigrationList), and Icon.module.css reads
+   * it. Declared here so token-references.test.ts knows it is a real name.
+   */
+  --icon-knockout: var(--color-bg);
+
   /* Sharp. The world has no rounding above a hairline's worth. */
   --radius-sm: 0px;
   --radius-md: 2px;

@@ -1,7 +1,9 @@
+import { access } from "node:fs/promises";
+
 import { getIconsData } from "simple-icons/sdk";
 import { describe, expect, it } from "vitest";
 
-import { CATALOGUS_CATALOG, deriveBaseCatalog, getCatalogEntry, ICON_OVERLAY } from "./catalog.js";
+import { CATALOGUS_CATALOG, deriveBaseCatalog, getCatalogEntry, ICON_OVERLAY, THESVG_ICON_OVERLAY } from "./catalog.js";
 import type { MappingEntry } from "./mapping.js";
 import { SPECFY_TO_CATALOGUS } from "./mapping.js";
 
@@ -125,9 +127,10 @@ describe("CATALOGUS_CATALOG invariants", () => {
 
   // Added 2026-08-24 alongside the amendment that made coding agents service
   // entries: claude-code, cursor and github-copilot have a verified
-  // simple-icons mark; codex does not (see catalog.ts's ICON_OVERLAY comment)
-  // and must fall back to the viewer's generic icon rather than a guessed one.
-  it("gives every coding-agent catalog row a name, and an icon only where simple-icons actually has the mark", () => {
+  // simple-icons mark; codex's comes from thesvg.org (its own
+  // `codex-openai` row, vendored 2026-09-03 -- not the OpenAI logo handed
+  // down; see the row comment in catalog.ts).
+  it("gives every coding-agent catalog row a name and a verified icon -- simple-icons for three, thesvg for codex", () => {
     expect(getCatalogEntry("claude-code")).toEqual({ slug: "claude-code", name: "Claude Code", icon: "claudecode" });
     expect(getCatalogEntry("cursor")).toEqual({ slug: "cursor", name: "Cursor", icon: "cursor" });
     expect(getCatalogEntry("github-copilot")).toEqual({
@@ -135,10 +138,8 @@ describe("CATALOGUS_CATALOG invariants", () => {
       name: "GitHub Copilot",
       icon: "githubcopilot",
     });
-    const codex = getCatalogEntry("codex");
-    expect(codex).toBeDefined();
-    expect(codex?.icon).toBeUndefined();
-    expect(codex && "icon" in codex).toBe(false);
+    expect(getCatalogEntry("codex")).toEqual({ slug: "codex", name: "Codex", icon: "thesvg:codex" });
+    expect(getCatalogEntry("xai")).toEqual({ slug: "xai", name: "xAI", icon: "thesvg:xai" });
   });
 });
 
@@ -166,6 +167,40 @@ describe("closing the Phase 3.7 catalog-gap slice: real slugs a live manifest re
   });
 });
 
+describe("docs/icons-brief.md: brand icons from thesvg.org for the marks simple-icons no longer carries", () => {
+  // AWS, C#, OpenAI, Slack, Loki and Vertex AI rendered as the initials
+  // fallback on a real 36-service inventory (docs/PLAN.md, "The owner's
+  // first run against a real inventory -- 2026-09-03", finding 2). Five of
+  // those six now resolve through THESVG_ICON_OVERLAY; Loki stays a
+  // fallback (see its EXTRA_ROWS comment, catalog.ts).
+
+  it("gives every aws-* row the vendored AWS mark", () => {
+    for (const slug of ["aws-lambda", "aws-ec2", "aws-cognito", "aws-cloudfront", "aws-s3", "aws-sqs"]) {
+      expect(getCatalogEntry(slug)?.icon, `${slug} icon`).toBe("thesvg:aws");
+    }
+  });
+
+  it("gives csharp, slack and google-vertex-ai their own vendored marks", () => {
+    expect(getCatalogEntry("csharp")).toEqual({ slug: "csharp", name: "C#", icon: "thesvg:csharp" });
+    expect(getCatalogEntry("slack")).toEqual({ slug: "slack", name: "Slack", icon: "thesvg:slack" });
+    expect(getCatalogEntry("google-vertex-ai")).toEqual({
+      slug: "google-vertex-ai",
+      name: "Vertex AI",
+      icon: "thesvg:googlevertexai",
+    });
+  });
+
+  it("gives openai its vendored mark", () => {
+    expect(getCatalogEntry("openai")).toEqual({ slug: "openai", name: "OpenAI", icon: "thesvg:openai" });
+  });
+
+  it("still gives loki a name with no icon field at all -- thesvg.org has no entry for it either (checked 2026-09-03)", () => {
+    const loki = getCatalogEntry("loki");
+    expect(loki).toEqual({ slug: "loki", name: "Loki" });
+    expect(loki && "icon" in loki).toBe(false);
+  });
+});
+
 describe("getCatalogEntry", () => {
   it("returns undefined for a slug with no catalog row -- not a synthesised placeholder", () => {
     expect(getCatalogEntry("some-slug-nobody-has-catalogued")).toBeUndefined();
@@ -176,7 +211,11 @@ describe("getCatalogEntry", () => {
   });
 
   it("omits the icon field entirely for a slug with no verified icon, rather than a falsy placeholder", () => {
-    const entry = getCatalogEntry("openai");
+    // openai used to be this suite's example (no simple-icons mark, no
+    // thesvg row either) -- as of 2026-09-03 it has one (THESVG_ICON_OVERLAY,
+    // catalog.ts), so healthchecks-io takes over as the still-genuinely-
+    // iconless case (confirmed absent from both simple-icons and thesvg.org).
+    const entry = getCatalogEntry("healthchecks-io");
     expect(entry).toBeDefined();
     expect(entry?.icon).toBeUndefined();
     expect(entry && "icon" in entry).toBe(false);
@@ -196,22 +235,50 @@ describe("getCatalogEntry", () => {
   });
 });
 
-describe("icon verification against the installed simple-icons package", () => {
-  it("resolves every catalog `icon` to a real slug in the installed simple-icons package", async () => {
+const THESVG_PREFIX = "thesvg:";
+const THESVG_DIR = new URL("../icons/thesvg/", import.meta.url);
+
+describe("icon verification against the installed simple-icons package and the vendored thesvg files", () => {
+  it("resolves every unprefixed catalog `icon` to a real slug in the installed simple-icons package", async () => {
     // This is the tripwire: it re-derives the same real, installed
     // simple-icons data set catalog.ts's ICON_OVERLAY was built against (not
     // a hand-copied list) and fails loudly if any icon slug stops existing
     // -- including the real future event this guards against: simple-icons
     // has removed brand marks under trademark pressure before (this slice's
     // own pass found OpenAI's mark already gone from the installed v16.28.0
-    // package).
+    // package). A `thesvg:`-prefixed icon is a different source entirely
+    // (THESVG_ICON_OVERLAY, checked against the vendored files below, not
+    // against this data set) and is deliberately skipped here rather than
+    // reported as broken.
     const icons = await getIconsData();
     const installedSlugs = new Set(icons.map((icon) => icon.slug));
 
     const brokenEntries: string[] = [];
     for (const [slug, entry] of Object.entries(CATALOGUS_CATALOG)) {
-      if (entry.icon !== undefined && !installedSlugs.has(entry.icon)) {
+      if (entry.icon !== undefined && !entry.icon.startsWith(THESVG_PREFIX) && !installedSlugs.has(entry.icon)) {
         brokenEntries.push(`${slug} -> icon "${entry.icon}" not found in installed simple-icons`);
+      }
+    }
+    expect(brokenEntries).toEqual([]);
+  });
+
+  it("resolves every `thesvg:`-prefixed catalog `icon` to an actually-vendored file on disk", async () => {
+    // The thesvg equivalent of the simple-icons tripwire above: every
+    // `thesvg:<slug>` this catalog names must have a real
+    // ../icons/thesvg/<slug>.svg file backing it -- not a name that reads
+    // as vendored but resolves to nothing (icons.ts's resolveIcon would
+    // degrade that to the fallback glyph silently; this test is what makes
+    // that loud instead).
+    const brokenEntries: string[] = [];
+    for (const [slug, entry] of Object.entries(CATALOGUS_CATALOG)) {
+      if (entry.icon === undefined || !entry.icon.startsWith(THESVG_PREFIX)) {
+        continue;
+      }
+      const thesvgSlug = entry.icon.slice(THESVG_PREFIX.length);
+      try {
+        await access(new URL(`${thesvgSlug}.svg`, THESVG_DIR));
+      } catch {
+        brokenEntries.push(`${slug} -> icon "${entry.icon}" has no vendored file at icons/thesvg/${thesvgSlug}.svg`);
       }
     }
     expect(brokenEntries).toEqual([]);
@@ -241,6 +308,24 @@ describe("icon verification against the installed simple-icons package", () => {
         missing.push(`${slug}: no catalog row exists at all`);
       } else if (entry.icon !== icon) {
         missing.push(`${slug}: catalog row has icon ${JSON.stringify(entry.icon)}, expected ${JSON.stringify(icon)}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it("lands every THESVG_ICON_OVERLAY key as an icon on a real catalog row -- none silently swallowed by a typo'd key matching no slug", () => {
+    // Same gap as the ICON_OVERLAY test above, for the second overlay: a
+    // typo'd key here would be silently skipped by the build loop's
+    // `if (catalog[slug])` guard, and the row it was meant for would lose
+    // its icon with no error anywhere.
+    const missing: string[] = [];
+    for (const [slug, thesvgSlug] of Object.entries(THESVG_ICON_OVERLAY)) {
+      const entry = getCatalogEntry(slug);
+      const expected = `${THESVG_PREFIX}${thesvgSlug}`;
+      if (entry === undefined) {
+        missing.push(`${slug}: no catalog row exists at all`);
+      } else if (entry.icon !== expected) {
+        missing.push(`${slug}: catalog row has icon ${JSON.stringify(entry.icon)}, expected ${JSON.stringify(expected)}`);
       }
     }
     expect(missing).toEqual([]);

@@ -2,15 +2,37 @@
 // resolved server-side, or the rollup's generic fallback glyph when it
 // didn't -- see ../fallback-icons.tsx for why the fallback keys off rollup
 // rather than the catalog.
+//
+// A resolved icon now carries markup, not a bare `d` string: `icon.body` is
+// arbitrary inner-SVG content (`<path>`, `<g>`, more than one element) built
+// server-side by @catalogus/core's icons.ts from either the installed
+// simple-icons package or a vendored thesvg.org file (docs/icons-brief.md).
+// That is why this component reaches for `dangerouslySetInnerHTML` below
+// instead of a `<path d={...}>` the way it used to -- see the render's own
+// comment for why that is safe here specifically.
+import type { ViewService } from "@catalogus/cli";
+
 import { FallbackGlyph } from "../fallback-icons.js";
 import styles from "./Icon.module.css";
 
 export interface IconProps {
-  /** simple-icons path data resolved server-side, or null when there is none. */
-  iconPath: string | null;
-  /** The brand's own colour as `#RRGGBB`, or null. Non-null exactly when `iconPath` is. */
-  iconHex?: string | null;
-  /** Used only when iconPath is null, to pick a generic glyph. */
+  /**
+   * The icon @catalogus/cli's view payload resolved server-side, or null
+   * when there is none -- @catalogus/core's resolveIcon never throws, so a
+   * missing catalog row, an unmapped slug, or a vendored file that fails its
+   * own sanitiser (icons.ts's parseThesvgMarkup) all degrade to null here
+   * rather than reaching this component as an error.
+   *
+   * Typed as `ViewService["icon"]` rather than importing `ResolvedIcon` by
+   * name: `@catalogus/cli`'s index.ts re-exports `ViewPayload`/`ViewService`
+   * but not the `ResolvedIcon` type they carry, and widening that public
+   * surface is outside this file's own scope (docs/icons-brief.md, Part B --
+   * "Do not touch packages/"). Indexing the field off the type every call
+   * site already imports names the exact same type, with nothing added to
+   * @catalogus/cli's exports.
+   */
+  icon: ViewService["icon"];
+  /** Used only when icon is null, to pick a generic glyph. */
   rollup: string;
   /** Display name, used as the accessible label either way. */
   label: string;
@@ -18,21 +40,23 @@ export interface IconProps {
    * Render the mark in the brand's own colour instead of inheriting the
    * surrounding ink.
    *
-   * Off by default, and the board leaves it off, which is the decision worth
-   * recording. Colour is the fastest recognition cue there is, so the
-   * temptation is to use it everywhere -- but 60 of 159 catalog slugs have no
-   * verified icon and fall back to a category glyph. In monochrome a real
-   * mark and a fallback sit at the same visual weight, so the fallback reads
-   * as deliberate; in colour the board splits into brand logos and grey
-   * holes, and two nodes in five look broken on a render that is entirely
-   * correct. The fallback is the majority path, not an edge case
-   * (docs/PLAN.md measured it before any of this was built).
+   * Off by default, and every surface turns it on today -- the board too,
+   * since candidate E (approved 2026-08-26; see ServiceTile.tsx's header).
+   * The case this comment used to make for a monochrome board is worth
+   * keeping because it is still true: 60 of 159 catalog slugs have no
+   * verified icon and fall back to a generic mark, and in colour a board
+   * splits into brand logos and grey holes, so two nodes in five look
+   * broken on a render that is entirely correct. Candidate E's answer was
+   * not to keep the board monochrome but to make the fallback a dashed
+   * monogram tile that reads as deliberate beside a coloured mark. The
+   * monochrome rule in Icon.module.css therefore has no live caller; it
+   * stays because the approved shell's settings panel names a
+   * brand-icon-colour toggle (docs/PLAN.md, the shell's open questions),
+   * and a toggle needs an off state that already works.
    *
-   * So colour is spent where a reader is looking at one thing and
-   * recognition genuinely helps: the hover panel and the service page. The
-   * fallback glyph is never coloured under any circumstances -- it conveys a
-   * shape, never a brand, and tinting it would assert a brand identity the
-   * catalog does not have.
+   * The fallback glyph is never coloured under any circumstances -- it
+   * conveys a shape, never a brand, and tinting it would assert a brand
+   * identity the catalog does not have.
    */
   colour?: boolean;
 }
@@ -46,18 +70,44 @@ export interface IconProps {
 // "— no catalog icon", an implementation detail nobody asked about. The
 // svg keeps aria-label for assistive tech, which is a different channel.
 
-export function Icon({ iconPath, iconHex = null, rollup, label, colour = false }: IconProps) {
-  if (iconPath !== null) {
-    // `currentColor` unless colour is asked for *and* a hex actually
-    // resolved. Falling back to currentColor rather than to a default tint
-    // keeps a missing hex looking like the monochrome mark it already is,
-    // instead of like a wrong brand colour.
-    const fill = colour && iconHex ? iconHex : "currentColor";
+export function Icon({ icon, rollup, label, colour = false }: IconProps) {
+  if (icon !== null) {
     return (
-      <span className={styles.icon}>
-        <svg viewBox="0 0 24 24" role="img" aria-label={label}>
-          <path d={iconPath} fill={fill} />
-        </svg>
+      // `styles.colour` is the entire JS-side half of the colour mechanism:
+      // it flips a CSS rule off (Icon.module.css's own comment on why the
+      // rest of this lives there, not here). It never touches `.fallback`,
+      // whose branch is the early return below and never sees this class.
+      <span className={`${styles.icon}${colour ? ` ${styles.colour}` : ""}`}>
+        <svg
+          viewBox={icon.viewBox}
+          role="img"
+          aria-label={label}
+          // The one JS-side colour *value*. A single-ink mark (`hex !==
+          // null`) is painted its own brand colour by setting the `color`
+          // its `currentColor` fills resolve against -- never by rewriting
+          // a fill, which would mean parsing `body` back apart after just
+          // having trusted it whole. A multi-colour mark (`hex === null`)
+          // has no single colour to hand back here and keeps its own fills
+          // regardless of this attribute, the same "no such thing as one
+          // colour" contract a multi-colour simple-icons mark never had a
+          // way to express either.
+          style={colour && icon.hex ? { color: icon.hex } : undefined}
+          // Safe: `body` is produced server-side by @catalogus/core, from
+          // either the installed simple-icons package (one <path> this
+          // project's own resolver builds, unchanged from before) or a
+          // vendored thesvg.org file whose sha256 is recorded in
+          // packages/core/icons/thesvg/LICENSES.md and checked by a drift
+          // test -- and every vendored file passes icons.ts's own sanitiser
+          // (parseThesvgMarkup / hasForbiddenMarkup: no <script>, no
+          // <foreignObject>, no event-handler attribute, no href, no
+          // <style>) before it ever becomes this string, exercised in
+          // icons.test.ts against a synthetic file carrying each of those.
+          // The view payload this component receives never carries anything
+          // manifest-authored -- it is plain data end to end -- so nothing
+          // reaching this dangerouslySetInnerHTML came from a catalogus.yaml
+          // a project owner wrote.
+          dangerouslySetInnerHTML={{ __html: icon.body }}
+        />
       </span>
     );
   }

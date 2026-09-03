@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { makeViewService } from "../test-support/fixtures.js";
+import { FLYIO_ICON_FIXTURE, makeViewService } from "../test-support/fixtures.js";
 import { ServiceNode, serviceNodeDomId } from "./ServiceNode.js";
 import styles from "./ServiceNode.module.css";
 
@@ -71,7 +71,7 @@ describe("ServiceNode -- the mark", () => {
   it("renders the real brand icon, in colour, when one resolved", () => {
     render(
       <ServiceNode
-        service={makeViewService({ id: "a", role: "hosting-api", service: "flyio", name: "Fly.io", icon: "M0 0h24v24H0z", iconHex: "#24175B" })}
+        service={makeViewService({ id: "a", role: "hosting-api", service: "flyio", name: "Fly.io", icon: FLYIO_ICON_FIXTURE })}
         isSelected={false}
         showId={false}
         onSelect={vi.fn()}
@@ -79,7 +79,12 @@ describe("ServiceNode -- the mark", () => {
     );
     const svg = screen.getByTestId("icon-mark").querySelector("svg");
     expect(svg?.getAttribute("aria-label")).toBe("Fly.io");
-    expect(svg?.querySelector("path")?.getAttribute("fill")).toBe("#24175B");
+    // See ServiceTile.test.tsx's identical assertion for why this is the
+    // normalised rgb() form of FLYIO_ICON_FIXTURE.hex ("#24175B") rather
+    // than the hex string itself, and why the path's own fill stays
+    // "currentColor".
+    expect(svg?.style.color).toBe("rgb(36, 23, 91)");
+    expect(svg?.querySelector("path")?.getAttribute("fill")).toBe("currentColor");
   });
 
   it("hides the whole mark from assistive tech, since the button's own aria-label already states everything in it", () => {

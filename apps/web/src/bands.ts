@@ -208,10 +208,8 @@ export interface VendorGroup {
   service: string;
   /** Catalog display name, taken from the first entry; every entry in a group shares it. */
   name: string;
-  /** simple-icons path data, or null. Shared for the same reason. */
-  icon: string | null;
-  /** The brand's own colour, or null. Non-null exactly when `icon` is. */
-  iconHex: string | null;
+  /** The resolved icon (ResolvedIcon | null, @catalogus/cli's ViewService payload), or null. Shared for the same reason. */
+  icon: ViewService["icon"];
   /** Rollup of the first entry, used only to pick a fallback glyph. */
   rollup: string;
   /**
@@ -291,7 +289,7 @@ export function collapseByService(services: readonly ViewService[]): VendorGroup
     // Every entry sharing a slug resolves the same catalog row, so name, icon
     // and fallback glyph are identical across the group -- the first entry is
     // not a sample, it is any of them.
-    return { service: slug, name: first.name, icon: first.icon, iconHex: first.iconHex, rollup: first.rollup, entries: [first, ...rest] };
+    return { service: slug, name: first.name, icon: first.icon, rollup: first.rollup, entries: [first, ...rest] };
   });
 
   // Sorted on the slug rather than the display name: stable, and it matches

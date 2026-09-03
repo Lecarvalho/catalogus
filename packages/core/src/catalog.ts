@@ -192,11 +192,17 @@ const EXTRA_ROWS: CatalogEntry[] = [
   // adding a fifth here with no matching detector row would be a display
   // entry for something detect() can never actually find.
   { slug: "claude-code", name: "Claude Code" },
-  // No icon: simple-icons@16.28.0 carries neither "codex" nor "openai" (the
-  // latter was removed under trademark pressure -- see ICON_OVERLAY's own
-  // comment). Confirmed against the installed package, not recalled --
-  // falls back to the viewer's generic icon, which is the correct outcome,
-  // not a gap to fill in later.
+  // simple-icons@16.28.0 carries neither "codex" nor "openai" (the latter
+  // was removed under trademark pressure -- see ICON_OVERLAY's own
+  // comment); confirmed against the installed package, not recalled. As of
+  // 2026-09-03 (docs/PLAN.md, "The owner's first run against a real
+  // inventory", finding 2) `openai` gets its mark vendored from thesvg.org
+  // (THESVG_ICON_OVERLAY below), and so does `codex` -- from thesvg's own
+  // `codex-openai` row ("Codex (OpenAI)", url openai.com/codex), Codex's own
+  // mark, not the OpenAI logo handed down. An earlier edit the same day had
+  // done exactly that hand-down ("same company, so same logo") and was
+  // reverted as a brand inference; the mark vendored now was checked to be
+  // Codex's, which is the difference.
   { slug: "codex", name: "Codex" },
   { slug: "cursor", name: "Cursor" },
   { slug: "github-copilot", name: "GitHub Copilot" },
@@ -208,7 +214,11 @@ const EXTRA_ROWS: CatalogEntry[] = [
   // structurally never produce it; a manifest can still legitimately name
   // it by hand, the same shape of gap namecheap and trello fill above. No
   // icon: simple-icons has no "loki" entry at all, bare or near-match,
-  // checked directly including aliases.aka.
+  // checked directly including aliases.aka. Re-checked against thesvg.org's
+  // manifest 2026-09-03 alongside the aws/csharp/openai/slack/vertex-ai
+  // additions below (THESVG_ICON_OVERLAY) -- thesvg has no "loki" entry
+  // either (only "grafana", CC0-1.0) -- so this stays a deliberate fallback,
+  // not an oversight.
   { slug: "loki", name: "Loki" },
 ];
 
@@ -275,7 +285,8 @@ const EXTRA_ROWS: CatalogEntry[] = [
  *     mark spans a multi-product line (Redis/Kafka/QStash/Vector), not a
  *     mark for Redis specifically.
  *   - xai: the only close string match is "X" (slug x, the ex-Twitter
- *     mark) -- an unrelated company, not xAI.
+ *     mark) -- an unrelated company, not xAI. (thesvg.org has the real one;
+ *     THESVG_ICON_OVERLAY, 2026-09-03.)
  *
  * And rows confirmed genuinely absent from the installed package entirely
  * (not even a near-match) rather than merely unmatched by the normaliser:
@@ -288,6 +299,15 @@ const EXTRA_ROWS: CatalogEntry[] = [
  * Phase 3.7 catalog-gap slice, 2026-08-25) -- grafana and prometheus were
  * checked in the same pass and, unlike those three, do have a mark. See
  * this slice's implementation report for the full list checked.
+ *
+ * Every claim above is still true of the *installed simple-icons package*
+ * specifically -- none of those absences changed. As of 2026-09-03, four of
+ * these slugs (the aws-* set, openai, csharp, slack) plus
+ * google-vertex-ai get a mark anyway, sourced from thesvg.org rather than
+ * simple-icons: see THESVG_ICON_OVERLAY below, a separate table rather than
+ * an amendment to this one, because its values point at a vendored file
+ * under ../icons/thesvg/ instead of an installed package's subpath export,
+ * and its own licence record is a per-icon field, not a package-wide one.
  */
 const ICON_OVERLAY: Record<string, string> = {
   ada: "ada",
@@ -422,9 +442,70 @@ const ICON_OVERLAY: Record<string, string> = {
 export { ICON_OVERLAY };
 
 /**
+ * slug -> thesvg.org icon slug, for the six catalog rows across five brands
+ * that simple-icons@16.28.0 cannot mark: four removed under trademark
+ * pressure (AWS, C#, OpenAI, Slack) and one it never had (Vertex AI) --
+ * `docs/PLAN.md`, "The owner's first run against a real inventory
+ * -- 2026-09-03", finding 2. A separate table from ICON_OVERLAY rather than
+ * more rows in it: this table's values are looked up against a file
+ * vendored under ../icons/thesvg/ (icons.ts's resolveIcon), not the
+ * installed simple-icons package, and each one carries its own licence
+ * record in that directory's LICENSES.md rather than the one blanket
+ * "installed package" provenance ICON_OVERLAY's rows share.
+ *
+ * The value here is the bare thesvg slug (`aws`, not `thesvg:aws`) --
+ * CatalogEntry.icon gets the `thesvg:` prefix at build time below, the same
+ * way it's applied at read time in icons.ts, so this table reads the same
+ * shape as ICON_OVERLAY (slug -> slug) rather than repeating the prefix on
+ * every line.
+ *
+ * Every value is chosen to already satisfy icons.ts's SAFE_ICON_REF
+ * (`^[a-z0-9_]+$`) without widening it: `googlevertexai`, not
+ * `google-vertex-ai`, the same squashed-lowercase convention ICON_OVERLAY's
+ * own `googlecloudstorage`/`googleanalytics`/`googlegemini` rows already
+ * use for a multi-word Google product, rather than a hyphen this package's
+ * one safety floor would otherwise have to admit for this table alone.
+ *
+ * `codex` maps to thesvg's `codex-openai` row -- Codex's own mark, not the
+ * OpenAI logo (see its EXTRA_ROWS comment above). `loki` is deliberately
+ * absent: thesvg.org has no entry for it either
+ * (checked directly against its manifest, 2026-09-03) -- it keeps the
+ * viewer's fallback glyph, the same outcome as before this table existed.
+ *
+ * catalog.test.ts's icon-resolution suite covers this table the same way it
+ * covers ICON_OVERLAY: every key must land on a real catalog row, and every
+ * value must resolve -- here, to an actually-vendored file on disk, rather
+ * than an installed package's data export.
+ */
+const THESVG_ICON_OVERLAY: Record<string, string> = {
+  "aws-lambda": "aws",
+  "aws-ec2": "aws",
+  "aws-cognito": "aws",
+  "aws-cloudfront": "aws",
+  "aws-s3": "aws",
+  "aws-sqs": "aws",
+  csharp: "csharp",
+  openai: "openai",
+  slack: "slack",
+  "google-vertex-ai": "googlevertexai",
+  codex: "codex",
+  xai: "xai",
+};
+
+/**
+ * Exported only for catalog.test.ts, for the same reason as ICON_OVERLAY's
+ * own export just above. Not part of this package's public API surface.
+ */
+export { THESVG_ICON_OVERLAY };
+
+/**
  * The full Catalogus service catalog, keyed by catalogus slug: the derived
  * base (deriveBaseCatalog), overlaid with EXTRA_ROWS, overlaid with an
- * `icon` wherever ICON_OVERLAY has one. Built once at module load.
+ * `icon` wherever ICON_OVERLAY or THESVG_ICON_OVERLAY has one -- the two
+ * overlays never target the same slug (catalog.test.ts asserts every
+ * ICON_OVERLAY key lands its own icon unchanged, so a future collision
+ * would surface as one overlay silently overwriting the other's value
+ * rather than as a merge error). Built once at module load.
  *
  * Built on a null-prototype record (Object.create(null)), not a plain `{}`
  * object literal. A plain object's lookups fall through to Object.prototype
@@ -451,6 +532,11 @@ export const CATALOGUS_CATALOG: Record<string, CatalogEntry> = (() => {
   for (const [slug, icon] of Object.entries(ICON_OVERLAY)) {
     if (catalog[slug]) {
       catalog[slug] = { ...catalog[slug], icon };
+    }
+  }
+  for (const [slug, thesvgSlug] of Object.entries(THESVG_ICON_OVERLAY)) {
+    if (catalog[slug]) {
+      catalog[slug] = { ...catalog[slug], icon: `thesvg:${thesvgSlug}` };
     }
   }
   return catalog;

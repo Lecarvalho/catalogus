@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { makeViewService as service } from "../test-support/fixtures.js";
+import { FLYIO_ICON_FIXTURE, makeViewService as service } from "../test-support/fixtures.js";
 import { monogramFor, ServiceTile, serviceTileDomId } from "./ServiceTile.js";
 
 const readAt = "2026-08-24T00:00:00.000Z";
@@ -87,7 +87,7 @@ describe("ServiceTile -- the no-brand-icon case", () => {
   });
 
   it("renders the real brand icon, not a monogram, when one resolved", () => {
-    renderTile({ service: service({ id: "a", role: "hosting-api", service: "flyio", name: "Fly.io", icon: "M0 0h24v24H0z", iconHex: "#24175B" }) });
+    renderTile({ service: service({ id: "a", role: "hosting-api", service: "flyio", name: "Fly.io", icon: FLYIO_ICON_FIXTURE }) });
     expect(screen.queryByText("AL")).toBeNull();
     // The squircle is aria-hidden (the button's own aria-label is the one
     // accessible name), so the icon's own role="img" is deliberately
@@ -96,7 +96,15 @@ describe("ServiceTile -- the no-brand-icon case", () => {
     // this file reach past the a11y tree to the render itself.
     const mark = screen.getByTestId("icon-mark").querySelector("svg");
     expect(mark?.getAttribute("aria-label")).toBe("Fly.io");
-    expect(mark?.querySelector("path")?.getAttribute("fill")).toBe("#24175B");
+    // `colour` is on and FLYIO_ICON_FIXTURE.hex is set, so the mark's own
+    // brand colour reaches it as the svg's inline `color` (Icon.tsx's one
+    // JS-side colour value) -- jsdom's cssstyle normalises the hex to
+    // rgb(...) the moment it is set through the DOM style object, so this is
+    // that normalised form of "#24175B", not a hand-rolled expectation. The
+    // path's own `fill` attribute stays "currentColor" -- see Icon.module.css
+    // for why a fill is never rewritten by hand.
+    expect(mark?.style.color).toBe("rgb(36, 23, 91)");
+    expect(mark?.querySelector("path")?.getAttribute("fill")).toBe("currentColor");
   });
 });
 

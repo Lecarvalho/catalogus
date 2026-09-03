@@ -14,7 +14,7 @@ import {
   groupStatus,
   mostDependedOn,
 } from "./bands.js";
-import { makeViewService as service } from "./test-support/fixtures.js";
+import { FLYIO_ICON_FIXTURE, makeViewService as service, THESVG_ICON_FIXTURE } from "./test-support/fixtures.js";
 
 describe("bandOf", () => {
   it("resolves a rollup from every category in SKILL.md's base-word list", () => {
@@ -129,14 +129,13 @@ describe("collapseByService", () => {
     expect(groups[0]!.entries.map((e) => e.id)).toEqual(["a", "z"]);
   });
 
-  it("takes name, icon, iconHex and rollup from the first entry in id order, not from input order", () => {
+  it("takes name and icon from the first entry in id order, not from input order", () => {
     const groups = collapseByService([
-      service({ id: "z", role: "hosting-api", service: "flyio", name: "Second", icon: "z-icon", iconHex: "#000000" }),
-      service({ id: "a", role: "hosting-web", service: "flyio", name: "First", icon: "a-icon", iconHex: "#ffffff" }),
+      service({ id: "z", role: "hosting-api", service: "flyio", name: "Second", icon: FLYIO_ICON_FIXTURE }),
+      service({ id: "a", role: "hosting-web", service: "flyio", name: "First", icon: THESVG_ICON_FIXTURE }),
     ]);
     expect(groups[0]!.name).toBe("First");
-    expect(groups[0]!.icon).toBe("a-icon");
-    expect(groups[0]!.iconHex).toBe("#ffffff");
+    expect(groups[0]!.icon).toBe(THESVG_ICON_FIXTURE);
   });
 
   it("sorts the groups themselves by slug", () => {

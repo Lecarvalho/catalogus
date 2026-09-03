@@ -15,7 +15,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { makeViewService } from "../test-support/fixtures.js";
+import { FLYIO_ICON_FIXTURE, makeViewService } from "../test-support/fixtures.js";
 import { MigrationList } from "./MigrationList.js";
 import { serviceNodeDomId } from "./ServiceNode.js";
 
@@ -169,7 +169,7 @@ describe("MigrationList -- the mark", () => {
       <MigrationList
         services={[
           makeViewService({ id: "old-ledger", role: "finance-ledger", service: "acme-ledger", status: "deprecated", icon: null }),
-          makeViewService({ id: "host-api", role: "hosting-api", service: "flyio", status: "phasing_out", icon: "M0 0h24v24H0z", iconHex: "#24175B" }),
+          makeViewService({ id: "host-api", role: "hosting-api", service: "flyio", status: "phasing_out", icon: FLYIO_ICON_FIXTURE }),
         ]}
         selectedId={null}
         onSelect={vi.fn()}
@@ -192,14 +192,17 @@ describe("MigrationList -- the mark", () => {
     render(
       <MigrationList
         services={[
-          makeViewService({ id: "host-api", role: "hosting-api", service: "flyio", status: "phasing_out", icon: "M0 0h24v24H0z", iconHex: "#24175B" }),
+          makeViewService({ id: "host-api", role: "hosting-api", service: "flyio", status: "phasing_out", icon: FLYIO_ICON_FIXTURE }),
         ]}
         selectedId={null}
         onSelect={vi.fn()}
       />
     );
     const svg = screen.getByTestId("mark").querySelector("svg");
-    expect(svg?.querySelector("path")?.getAttribute("fill")).toBe("#24175B");
+    // See ServiceTile.test.tsx's identical assertion for why this is the
+    // normalised rgb() form of FLYIO_ICON_FIXTURE.hex ("#24175B") rather
+    // than the hex string itself.
+    expect(svg?.style.color).toBe("rgb(36, 23, 91)");
   });
 });
 

@@ -139,7 +139,7 @@ export function ServicePopover({
     >
       <header className={styles.header}>
         <span className={styles.glyph} aria-hidden="true">
-          <Icon iconPath={service.icon} iconHex={service.iconHex} rollup={service.rollup} label={service.name} colour />
+          <Icon icon={service.icon} rollup={service.rollup} label={service.name} colour />
         </span>
 
         <span className={styles.identity}>

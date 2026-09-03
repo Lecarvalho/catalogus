@@ -77,7 +77,7 @@ design decisions; this file tracks *what has been built* against it and what rem
   `apps/web/docs/candidates/` and are the specification for the component work, **which is built
   and validated as of 2026-09-03 except the three shell menus and the portfolio page**. See the
   newest handoff, directly under "Start here".
-- **Last updated:** 2026-09-03
+- **Last updated:** 2026-09-03 (evening)
 
 ## Start here on a fresh session
 
@@ -86,7 +86,7 @@ trusting anything below. **In that order**: the direction contract guard compare
 `apps/web/index.html` against the build output, so a `pnpm test` run against a `dist` older than your
 last edit to that file fails on a difference you created and already fixed.
 
-**The expected total as of 2026-09-03 is 1375 tests / 77 files** (see the newest handoff). The paragraph that follows is the 2026-08-26 history of why this line once named none.
+**The expected total as of 2026-09-03 (evening) is 1403 tests / 77 files** (see the newest handoff; it was 1375 / 77 the same morning, before the icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
 
 **The expected total moved on 2026-08-26 and this line no longer names one.** It said **1218 tests /
 72 files**, which was correct at the start of that session and is the number to compare against if
@@ -129,6 +129,116 @@ validation pass, which is the more interesting number of the two.)
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
+
+### Handoff — 2026-09-03 (second session), five brand marks come from thesvg.org, and two defects the tests could not see
+
+**Read this first.** One session, one brief: `docs/icons-brief.md` (kept as the record of what was
+asked; run, not to be run again). It is finding 2 of the owner's first real-inventory run, listed
+below the previous handoff. The design is unchanged. What is left of the component work is still
+**the three shell menus** (blocked on the owner) and the portfolio page.
+
+#### What the next session does first
+
+The owner ran the new build on a client repo the same evening: *"Icons look good."* Then:
+
+1. **Finding 3 — centre the board.** Owner said OK; the number (1600 or 1680) is still theirs. Ask
+   once, then a small edit to the rail+board row. Do not pick one.
+2. **Findings 4 + 5 — one tile per brand per band, and the service page.** A design brief, not a
+   fix: the wall (`collapseByService` in `bands.ts` already collapses per band and has no caller
+   since `e1f7dba`), the popover listing the entries, a brand page that lists them with each entry
+   keeping its own page, the graph node, and the counts. One brief per surface. The open design
+   questions to put to the owner before briefing: what the tile's second label line shows when it
+   stands for several entries (the id is gone), and what the brand page is that the entry page is
+   not.
+3. **Owner-supplied icons — a new open item, from the owner's second look (2026-09-03 evening).**
+   Loki and Healthchecks.io are on neither simple-icons nor thesvg.org, so no source this repo can
+   check will ever fill them. The owner asked, without asking for it to be built: let the user set
+   a specific icon when the app cannot find one, or look one up from the app. The shape that fits
+   this repo's rules: an `icon:` field on a service entry accepting a source ref (`thesvg:<slug>`)
+   or a repo-relative path to an SVG (`./.catalogus/icons/loki.svg`), written only through
+   `catalogus set <id> icon ...` so it goes through `manifest-edit` and validation, with local
+   files passing the same sanitiser and fill policy as the vendored ones. **Not a remote URL** — a
+   public manifest naming a URL that the viewer fetches SVG from is the one variant to refuse.
+   Lookup belongs in the CLI (`catalogus icon <id> --search <text>` against thesvg's static
+   registry, showing the per-icon licence, writing the ref on the owner's pick), not in the viewer:
+   FIRST VIEWPORT says nothing writes until Phase 4, and the viewer has no network. Schema change,
+   skill drift test, `set` command, a third source in `resolveIcon` — a brief of its own. Not
+   started.
+4. The three menus, once the owner answers the 2026-09-02 questions.
+
+**Codex and xAI joined the vendored set in the same evening** (`codex.svg` from thesvg's
+`codex-openai` row — Codex's own mark, not the OpenAI logo the morning had reverted; `xai.svg`
+from its `xai` row; both MIT-labelled, both one currentColor path, both with `hex: null` because
+thesvg's manifest hex for each is `fff`, a dark-ground white and not a brand colour). Verified by
+the suite and by serving a scratch manifest through the built CLI: both resolve, Loki stays null.
+`LICENSES.md` has the two records.
+
+**What is built and verified.** `packages/core/icons/thesvg/` holds five SVGs vendored
+byte-for-byte from github.com/glincker/thesvg at commit `9e7c56e6` — aws (every `aws-*` row),
+csharp, openai, slack, googlevertexai (`google-vertex-ai`) — with `LICENSES.md` recording per file
+the source URL at that commit, thesvg's manifest `license` and `hex`, the fetch date and a sha256
+that `icons.test.ts` recomputes (a validator flipped a byte and watched it fail). **The licence
+finding, which is the part the owner asked for:** thesvg's codebase is MIT; every one of the five
+icons carries `license: MIT` in thesvg's own manifest; but that is thesvg's label on a file it
+redistributes, not a licence from Amazon, Microsoft, OpenAI, Slack or Google — thesvg's `LEGAL.md`
+rests the marks on nominative fair use "for identification and development purposes", the same
+basis simple-icons already ships under in this tree. `LICENSES.md` says exactly that, and the
+owner should read it once and decide whether that basis is acceptable to them; nothing here decided
+it for them. **Loki is not on thesvg.org either** (only `grafana`); it keeps the fallback, and its
+row comment now records both checks. **Codex has no icon**: the implementer had given it the
+OpenAI mark ("same company"), and the orchestrator reverted that as a brand inference nobody
+verified — an OpenAI product does not carry the OpenAI logo unless someone checks that it does.
+
+**The mechanism.** A catalog icon ref is either a simple-icons slug or `thesvg:<slug>`;
+`resolveIcon` returns one shape for both, `{ viewBox, body, hex }`, where `body` is sanitised
+inner markup (the sanitiser refuses `<script`, `<foreignObject`, `on*=`, `href`, `<style>`, a
+nested `<svg`, a missing viewBox — all reproduced against the built `dist` by a validator writing
+hostile bytes over a vendored file) and `hex` is non-null only for a single-ink mark. thesvg files
+are multi-path and multi-fill, unlike simple-icons' one path, so each carries a recorded fill
+policy in `icons.ts`: `ink` (openai — every fill becomes currentColor), `brand` (aws, slack,
+vertexai — fills kept), `brand` with a knockout list (csharp — the white letters lose their fill
+and gain `data-knockout`). `ViewService.icon` is that shape or null and `iconHex` is gone.
+`Icon.tsx` renders the body with `dangerouslySetInnerHTML` and says why that is safe; the
+monochrome rule in `Icon.module.css` is CSS overriding presentation attributes.
+
+**Two defects a validator found by measuring the running app, neither visible in 1402 passing
+tests, both fixed by the main session and re-measured:**
+
+1. **Every brand mark on the board and the service page rendered 32×46, not 46×46** — and had
+   since before this slice. `Icon.module.css` gave its span a fixed 2rem box; the surfaces size the
+   svg by descendant rule; a flex item shrinks to its container on the main axis. So the mark was
+   drawn at 32px, 30% under `--icon-mark-size`, visibly smaller than the monogram fallbacks beside
+   it, and nobody had measured it. The span is now 100% of whatever box the surface gives it.
+2. **The knockout painted the wrong ground on four of five surfaces.** The rule said "the ground
+   behind the mark is `--color-bg`" and the comment asserted it; measured, the tile, node and
+   popover paint `--color-surface` and a desaturated tile paints sunken. Now `--icon-knockout` is a
+   token (page ground by default) that each surface re-declares beside the background it paints.
+   `token-references.test.ts` caught the first attempt, which defined it in a component.
+
+**One claim in the brief was stale, and the validator caught it rather than the code.** The brief
+said "the board is monochrome"; it has been in colour since candidate E (2026-08-26,
+`ServiceTile.tsx`'s header), and `Icon.tsx`'s own doc comment still said otherwise. The comment is
+corrected. The monochrome rule has no live caller today and stays for the settings panel's
+brand-icon-colour toggle. **Consequence for the owner:** the contrast re-check they asked for is
+answered in colour, not mono, and the answer is not good — on `--color-surface` the measured
+ratios are openai 20:1, aws wordmark 15:1, slack red 4.4:1, nginx 3.7:1, vertexai `#4285F4` 3.4:1,
+csharp purple 3.2:1, and below 3:1: vertexai `#669DF6` 2.6, slack green 2.5, aws orange 2.0, slack
+blue 1.9, supabase 1.9, slack yellow 1.8, **vertexai `#AECBFA` 1.57:1** — Vertex AI reads as a
+pale-blue smudge at board size. That is the board-in-colour decision meeting real brand palettes,
+and it is the owner's to revisit (a mono board, or a brand-icon-colour toggle defaulting off).
+
+**Smaller things, recorded and not fixed:** with the span now filling its box, the service page's fallback glyph (Loki) fills its tinted 46px tile edge to edge where the popover's keeps a 2px inset — a number for the owner or the mockup to name, not this session; the `ink` policy rewrites `fill="none"` to
+currentColor too, harmless on openai's one path but wrong for a future single-ink mark with a
+hole (`icons.ts` should special-case `none` when that mark arrives); the knockout matcher does not
+match the keyword `white`, only hex; `#/graph` is not a route (view tabs are in-app state, a
+deep link to the graph lands on the list); Chrome's resize tool is still a no-op at 2326px, so the
+popover's right-edge clamp was not re-stressed this session (it was validated at 1280 and 1024
+on 2026-09-03 morning, before any of this).
+
+**State of the tree at this handoff: 1403 tests / 77 files**, green, `pnpm typecheck` clean across
+four packages; 1402 was green on three consecutive runs by the validator and two by the main
+session before the Codex/xAI addition (+1 test). Committed at the close of the session, including
+`packages/core/icons/`.
 
 ### Handoff — 2026-09-03, the shell's structure is built, and one defect the mockup could not show
 
@@ -202,7 +312,7 @@ never been what the owner saw in the app. That one fact explains two of the six 
    for free: Anthropic's brand hex is `#191919`, invisible on near-black and ink-strength on cream.
    Re-check icon contrast on cream *after* this, not before — nobody has seen the icons on cream
    against a real inventory yet.
-2. **Missing icons — AWS, C#, OpenAI, Slack, Loki, Vertex AI.** Not a bug: `simple-icons@16.28`
+2. ✅ (2026-09-03, second session, see the newest handoff; Loki stays a fallback, thesvg.org has no mark for it either) **Missing icons — AWS, C#, OpenAI, Slack, Loki, Vertex AI.** Not a bug: `simple-icons@16.28`
    carries none of the first four (trademark removals) nor Loki, and Vertex AI has no row; the
    initials tile is the designed fallback. **Owner's answer:** the source is https://thesvg.org/
    — check its licence terms per icon before bundling any, record the licence beside each, and

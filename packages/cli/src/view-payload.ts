@@ -15,7 +15,7 @@
 import { createRequire } from "node:module";
 
 import { catalogusSchemaV1, edgeEndpoints, type CatalogusManifestV1, type ServiceEntry } from "@catalogus/schema";
-import { getCatalogEntry, resolveIcon } from "@catalogus/core";
+import { getCatalogEntry, resolveIcon, type ResolvedIcon } from "@catalogus/core";
 
 /**
  * This CLI's own version, read from its package.json rather than repeated
@@ -98,21 +98,21 @@ export interface ViewService {
   name: string;
   /** false when getCatalogEntry() returned undefined */
   known: boolean;
-  /** simple-icons path data (the `d` attribute), resolved server-side; null when there is no verified icon */
-  icon: string | null;
   /**
-   * The brand's own colour, as `#RRGGBB`, resolved server-side alongside the
-   * path; null exactly when `icon` is null.
+   * The resolved icon, from either source @catalogus/core's resolveIcon
+   * knows about (simple-icons or a vendored thesvg.org file), or null when
+   * there is no verified icon for this slug.
    *
-   * Carried so the viewer can render a mark in colour where colour helps
-   * recognition -- a service page, a hover panel -- while keeping the board
-   * monochrome. That split is deliberate and measured rather than aesthetic:
-   * a large fraction of catalog slugs have no verified icon at all, so a
-   * fully coloured board would separate into real logos and grey fallbacks
-   * and make a correct render look half-broken. Every row that has an icon
-   * has a hex, so this never introduces a third state.
+   * Carries `hex` (the brand's own colour, `#RRGGBB`, or null for a
+   * multi-colour mark -- see ResolvedIcon's own doc comment) so the viewer
+   * can render a mark in colour where colour helps recognition -- a service
+   * page, a hover panel -- while keeping the board monochrome. That split
+   * is deliberate and measured rather than aesthetic: a large fraction of
+   * catalog slugs have no verified icon at all, so a fully coloured board
+   * would separate into real logos and grey fallbacks and make a correct
+   * render look half-broken.
    */
-  iconHex: string | null;
+  icon: ResolvedIcon | null;
   role: string;
   /** the segment of role before the first "-" */
   rollup: string;
@@ -147,8 +147,7 @@ async function buildViewService(entry: ServiceEntry): Promise<ViewService> {
     service: entry.service,
     name: catalogEntry?.name ?? entry.service,
     known: catalogEntry !== undefined,
-    icon: resolved?.path ?? null,
-    iconHex: resolved?.hex ?? null,
+    icon: resolved,
     role: entry.role,
     rollup: rollupOf(entry.role),
     kind: entry.kind ?? "service",

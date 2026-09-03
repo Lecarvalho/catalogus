@@ -191,7 +191,7 @@ export function ServiceTile({ service, selected, onActivate, onPeek, onPeekEnd }
           // `colour` doc-comment).
           <span className={styles.monogram}>{monogramFor(service.service)}</span>
         ) : (
-          <Icon iconPath={service.icon} iconHex={service.iconHex} rollup={service.rollup} label={service.name} colour />
+          <Icon icon={service.icon} rollup={service.rollup} label={service.name} colour />
         )}
 
         {/*

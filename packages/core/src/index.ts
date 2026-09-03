@@ -38,7 +38,8 @@ export { mapSpecfySlug, SPECFY_TO_CATALOGUS } from "./mapping.js";
 export type { MappingEntry } from "./mapping.js";
 export { CATALOGUS_CATALOG, getCatalogEntry } from "./catalog.js";
 export type { CatalogEntry } from "./catalog.js";
-export { resolveIcon, resolveIconPath } from "./icons.js";
+export { resolveIcon } from "./icons.js";
+export type { ResolvedIcon } from "./icons.js";
 
 /** Thrown by detect() when repoPath doesn't name a real, absolute directory. */
 export class InvalidRepoPathError extends Error {

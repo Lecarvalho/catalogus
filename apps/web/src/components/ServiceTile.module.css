@@ -61,6 +61,9 @@
   height: var(--icon-tile-size);
   border-radius: var(--icon-tile-radius);
   background: var(--color-surface);
+  /* What a knockout in the mark shows through to -- this background. See
+     Icon.module.css's `[data-knockout]` rule. */
+  --icon-knockout: var(--color-surface);
 }
 
 /* Forces the brand mark to this world's icon size regardless of Icon.tsx's
@@ -86,6 +89,7 @@
    there is no svg under it for the filter rule to touch. */
 .desaturated:not(.fallback) {
   background: var(--color-surface-sunken);
+  --icon-knockout: var(--color-surface-sunken);
 }
 
 .desaturated svg {

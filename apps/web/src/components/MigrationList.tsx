@@ -256,7 +256,7 @@ function MigrationSection({ sectionId, title, status, rows, emptyMessage, select
                     {isFallback ? (
                       <span className={styles.monogram}>{monogramFor(row.service.service)}</span>
                     ) : (
-                      <Icon iconPath={row.service.icon} iconHex={row.service.iconHex} rollup={row.service.rollup} label={row.service.name} colour />
+                      <Icon icon={row.service.icon} rollup={row.service.rollup} label={row.service.name} colour />
                     )}
                   </span>
 

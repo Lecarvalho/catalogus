@@ -46,6 +46,10 @@ services:
     service: openai
     role: ai-completion
     added: 2026-01-01
+  - id: uptime
+    service: healthchecks-io
+    role: monitoring
+    added: 2026-01-01
 dependencies:
   - [host-api, ingress]
   - { from: host-api, to: dotnet, notes: "runs on .NET 10" }
@@ -175,12 +179,15 @@ dependencies: []
     expect(findService(payload, "svc").rollup).toBe("hosting");
   });
 
-  it("marks a catalogued slug known, with its display name and a non-null icon when one is verified", async () => {
+  it("marks a catalogued slug known, with its display name and a resolved simple-icons ResolvedIcon", async () => {
     const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     const ingress = findService(payload, "ingress");
     expect(ingress.known).toBe(true);
     expect(ingress.name).toBe("Nginx");
     expect(ingress.icon).not.toBeNull();
+    expect(ingress.icon!.viewBox).toBe("0 0 24 24");
+    expect(ingress.icon!.body).toMatch(/^<path d="M/);
+    expect(ingress.icon!.hex).toMatch(/^#[0-9A-Fa-f]{6}$/);
   });
 
   it("marks an uncatalogued slug unknown and renders the raw slug rather than a fabricated name", async () => {
@@ -191,22 +198,33 @@ dependencies: []
     expect(mystery.icon).toBeNull();
   });
 
-  // G7, Phase 3.7 hardening pass: docs/PLAN.md measured real catalog-icon
-  // coverage at ~38%, but examples/reference.catalogus.yaml -- deliberately
-  // a showcase of good practice, not a stress fixture -- happens to name
-  // only slugs that all resolve to a verified icon. Nothing committed
-  // exercised the actual majority path (a catalogued slug with no icon)
-  // until this entry: "openai" has a catalog row (packages/core/src/
-  // mapping.ts) but no ICON_OVERLAY entry (packages/core/src/catalog.ts's
-  // own comment explains why -- the installed simple-icons package has no
-  // OpenAI mark, only an unrelated retired "OpenAI Gym" one), so it is
-  // known but iconless by construction, not by omission.
-  it("marks a catalogued slug with no verified icon known, with its display name and a null icon -- the majority real-world path", async () => {
+  // Until 2026-09-03 this entry was "openai": a catalog row with no verified
+  // icon at all (simple-icons has no OpenAI mark, only an unrelated retired
+  // "OpenAI Gym" one), and docs/PLAN.md's measured ~38% real catalog-icon
+  // coverage made that the majority path worth a dedicated test. openai now
+  // resolves through a vendored thesvg.org file instead (see
+  // @catalogus/core's catalog.ts, THESVG_ICON_OVERLAY) -- the two tests below
+  // split what that one test used to cover: this one for the icon llm now
+  // has, the next for the majority-path case a different, still genuinely
+  // iconless slug (healthchecks-io, absent from both simple-icons and
+  // thesvg.org -- catalog.test.ts's own icon-resolution suite verifies
+  // that directly) takes over.
+  it("marks openai known, with its display name and a resolved thesvg ResolvedIcon (ink policy: currentColor, manifest hex)", async () => {
     const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     const llm = findService(payload, "llm");
     expect(llm.known).toBe(true);
     expect(llm.name).toBe("OpenAI");
-    expect(llm.icon).toBeNull();
+    expect(llm.icon).not.toBeNull();
+    expect(llm.icon!.hex).toBe("#000000");
+    expect(llm.icon!.body).toContain('fill="currentColor"');
+  });
+
+  it("marks a catalogued slug with no verified icon known, with its display name and a null icon -- the majority real-world path", async () => {
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
+    const uptime = findService(payload, "uptime");
+    expect(uptime.known).toBe(true);
+    expect(uptime.name).toBe("Healthchecks.io");
+    expect(uptime.icon).toBeNull();
   });
 
   it("normalizes both edge forms (tuple and object) to plain {from, to}", async () => {

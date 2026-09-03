@@ -1,9 +1,23 @@
+/*
+ * Fills whatever box the surface gives it, and states no size of its own.
+ * Every surface that renders a brand mark already sizes the svg through a
+ * descendant rule (ServiceTile's `.squircle svg`, ServicePage's
+ * `.glyph svg`, ServicePopover's, ServiceNode's, MigrationList's), and
+ * until 2026-09-03 this span was a fixed 2rem flex container around them.
+ * A flex item shrinks to its container on the main axis, so a 46px mark in a
+ * 32px span rendered 32 wide and 46 tall, overflowing the span by 7px top
+ * and bottom and drawn at 32px by preserveAspectRatio -- every brand mark on
+ * the board and the service page was 30% under `--icon-mark-size`, and
+ * visibly smaller than the monogram fallbacks beside it. Found by a
+ * validator measuring getComputedStyle on the running app, not by reading
+ * this file, which looked fine.
+ */
 .icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 100%;
+  height: 100%;
   border-radius: var(--radius-md);
   flex-shrink: 0;
 }
@@ -15,6 +29,63 @@
 
 .icon:not(.fallback) {
   color: var(--color-text);
+}
+
+/*
+ * The colour mechanism, in three parts -- monochrome (the default), the
+ * `colour` prop, and the knockout that survives both. Icon.tsx's own
+ * `colour` doc-comment is the *case* for spending colour sparingly; this is
+ * only the *how*.
+ *
+ * Monochrome. A resolved icon's body (@catalogus/core's icons.ts) arrives
+ * with real presentation attributes already on it, whichever of the two
+ * sources it came from: a simple-icons mark's own `fill="currentColor"`, a
+ * thesvg brand mark's own hex fills (aws's orange, slack's four colours,
+ * vertexai's blues, csharp's purples), or an `ink`-policy mark's fills
+ * already rewritten to `currentColor` at read time (openai). A CSS
+ * declaration always outranks a presentation attribute on specificity alone
+ * (CSS 2.1 §6.4.1) regardless of which of those a mark carries, so one
+ * attribute-selector rule paints every source in the same ink: every
+ * `fill`-bearing element inside a resolved, non-colour icon becomes
+ * `currentColor`.
+ *
+ * `:not(.fallback)` is load-bearing, not decorative. FallbackGlyph's own
+ * root <svg> sets `fill="none"` so its shapes default to stroke-only
+ * outlines, and `fill="none"` is itself a value this selector would
+ * otherwise catch -- `[fill]` matches by attribute presence, not by value.
+ * Without the exclusion, this rule would override that `none` with
+ * `currentColor` on the fallback's own root element, and every fallback
+ * shape with no fill of its own (most of them) would inherit that computed
+ * value instead of the file's own default, turning every stroke-only
+ * fallback glyph solid. `:not(.colour)` is the second exclusion, and it is
+ * the entire mechanism by which asking for colour turns this rule off.
+ */
+.icon:not(.fallback):not(.colour) svg [fill] {
+  fill: currentColor;
+}
+
+/*
+ * Knockouts, in both modes. `data-knockout` marks an element whose fill was
+ * stripped at resolve time because its source colour is a hole cut through
+ * the mark, not a painted one -- csharp's two white letters
+ * (@catalogus/core's icons.ts, applyKnockout). It is painted the ground
+ * behind the mark, never literal white: white would sit on this world's
+ * cream as a visible, off-colour patch rather than reading as a hole. Which
+ * ground is the surface's to say, not this file's: the board tile and the
+ * graph node paint `--color-surface` under the mark, a desaturated tile and
+ * a hovered migration row paint `--color-surface-sunken`, the service page
+ * paints nothing and the page ground shows through. Each of those surfaces
+ * sets `--icon-knockout` beside the background it paints, and this rule
+ * reads it; tokens.css declares it as the page ground for a surface that
+ * paints none.
+ * (An earlier version painted `--color-bg` unconditionally with a comment
+ * asserting that was the ground everywhere; a validator measured it wrong
+ * on four of five surfaces.) Unconditional on `.colour`: colour governs the
+ * mark's own ink, not what shows through a hole cut in it, so the C#
+ * letters read as the ground in both modes.
+ */
+.icon svg [data-knockout] {
+  fill: var(--icon-knockout);
 }
 
 /* The fallback tile is visually distinct on purpose -- a tinted background

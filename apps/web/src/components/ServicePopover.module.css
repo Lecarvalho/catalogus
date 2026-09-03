@@ -35,6 +35,8 @@
   border: 1px solid var(--color-line);
   border-radius: var(--radius-popover);
   background: var(--color-surface);
+  /* Knockouts in the header mark show this panel; see Icon.module.css. */
+  --icon-knockout: var(--color-surface);
   box-shadow: var(--shadow-popover);
   /*
    * The popover accepts the pointer. An earlier version set
