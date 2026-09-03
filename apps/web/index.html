@@ -189,25 +189,61 @@
         of candidate E had reached the shipped app, by which time the board,
         the popover, the service page, the migrations board and the graph had
         all been rebuilt against it. Both are separate, tracked work.
-      - **The mockup's edge-column popover limitation is solved, and the
-        entry that described it as open is retired with this rewrite.** A
-        hover popover on an icon in the grid's outermost columns extended past
-        the viewport edge between 768px and 1280px, because the mockup centres
-        it with CSS alone and cannot flip at an edge. The React build does the
-        edge detection the mockup could not: it centres under the tile, clamps
-        into the viewport, prefers below and flips above only where the
-        stylesheet's own 60vh ceiling fits there. The clamp is horizontal
-        only, and the vertical half is not solved. The flip tests the 60vh
-        ceiling rather than the box's measured height, so it declines to flip
-        where the real box would have fit above: at 1280×720 every first-band
-        tile's popover runs past the bottom edge, at 1280×600 by about 200px,
-        and the mainstream laptop viewport is inside that range, not an edge
-        case. Where the ceiling does fit above and the flip is taken, the box
-        can land over the tile it describes — measured at 900×400, covering
-        more than half of a first-row tile. Both are one defect, tracked: the
-        placement has to measure the box after paint instead of estimating
-        it. Recorded 2026-09-02, when a validator falsified the earlier
-        wording that said the popover could never cover its tile.
+      - **The mockup's edge-column popover limitation is solved in both
+        axes now, and the entry that had the vertical half still open is
+        retired with this rewrite.** A hover popover on an icon in the grid's
+        outermost columns extended past the viewport edge between 768px and
+        1280px, because the mockup centres it with CSS alone and cannot flip
+        at an edge. The React build does the edge detection the mockup could
+        not, and since 2026-09-02 it does it from the box's **measured** size
+        rather than from two estimates of it: `popover-placement.ts` centres
+        under the tile and clamps 12px inside both side edges, then puts the
+        box below the tile if the whole of it fits below, above if the whole
+        of it fits above, and otherwise on the side with more room — where it
+        overflows away from the tile rather than over it. The measurement is
+        `App.tsx`'s, taken in a layout effect after the popover mounts and
+        before the browser paints, so the first placement a reader sees is
+        already the corrected one. What that fixed, measured on the built app
+        against `examples/layout-stress.catalogus.yaml`: every first-band tile
+        at 1280×720 put its popover 37–82px past the bottom edge while 329px
+        of unused room sat above it (the old test compared the stylesheet's
+        60vh ceiling, 432px, against that room instead of the 246–291px box),
+        and a flip that was taken anchored the box's top to that same ceiling,
+        floating a 246px popover 306px above the tile it describes at 1280×900
+        instead of 12px.
+
+        What remains is one case, and it is not rare. A popover that fits on
+        neither side overflows on its far edge, and because the box is
+        `position: fixed` that overflow is off screen and cannot be scrolled
+        to. The exact condition, read straight off the arithmetic: neither
+        side fits when the space above the tile *and* the space below it are
+        both smaller than the box plus its two 12px gaps. Those two spaces and
+        the tile's own height are the whole viewport, so it happens whenever
+        the viewport is short relative to the box and the tile together — in
+        a 400px-tall viewport, a fully visible 157.9px tile at y=200 under a
+        240px box fits neither side and is placed 52px off the top, measured
+        on the built app. `max-height: 60vh` plus `overflow-y: auto` keeps the
+        box's *content* reachable by scrolling inside it, but it does not
+        bound this: a box capped at 60% of the viewport still needs 60% plus
+        the tile plus 24px to sit on one side, which is more than the viewport
+        has as soon as the tile passes 40% of it less those gaps. An earlier
+        version of this bullet claimed the 60vh cap confined the case to tiles
+        taller than 40% of the viewport; a validator falsified it with the
+        39.5% tile above, so the arithmetic is stated here and no threshold
+        is.
+
+        The guarantee, and its scope. **Above 480px**, for every viewport and
+        every box height — asserted over a grid rather than at the points that
+        happened to be reproduced — the edge nearest the tile is exactly 12px
+        from it, so the popover and the thing it names are never on top of
+        each other. **Below 480px that guarantee does not apply and is not
+        claimed**: the stylesheet replaces both coordinates with a
+        viewport-anchored bottom sheet, which is the design rather than a gap,
+        and a sheet pinned to the bottom of the viewport routinely sits over
+        the tile that opened it — 115–143px of a first-band tile at 375px
+        wide, measured across three tiles. Whether the phone form should keep
+        the sheet, dismiss the peek, or scroll the tile clear of it is an open
+        design question for the owner, not a placement bug.
       - **The mark is still deferred** by the owner after three directions
         were explored and none chosen. `BrandMark` sets the wordmark and draws
         no glyph, marked `data-mark="placeholder"`. What survived as settled:

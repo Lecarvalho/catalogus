@@ -15,7 +15,7 @@
 // plain `hashchange` plus the one hook below (hash-route.ts carries the
 // pure parsing, kept out of this file and out of `window` the same way
 // group-services.ts is kept out of the render tree).
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ViewPayload, ViewService } from "@catalogus/cli";
 
 import styles from "./App.module.css";
@@ -31,6 +31,7 @@ import { ProjectBoard } from "./components/ProjectBoard.js";
 import { ServicePopover } from "./components/ServicePopover.js";
 import { ViewToggle, type ViewMode } from "./components/ViewToggle.js";
 import { hashForServiceId, serviceIdFromHash } from "./hash-route.js";
+import { POPOVER_ESTIMATE, placePopover, samePlacement, type PopoverSize } from "./popover-placement.js";
 
 // Both halves of the graph view load on demand, and for two different
 // reasons. React Flow is several hundred KB that a viewer who never leaves
@@ -225,15 +226,38 @@ export function App() {
     }
   }, []);
 
+  // The popover's own node, for measuring it. `position: fixed` means the
+  // browser will render it at whatever height its content and the
+  // stylesheet's `max-height: 60vh` settle on, and that number is the one the
+  // vertical placement needs -- see popover-placement.ts's header for the two
+  // defects that came of substituting an estimate for it.
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  // The size the current popover was last *measured* at, which is what the
+  // layout effect below uses to decide whether it has anything new to learn.
+  // A ref rather than state on purpose: it is an input to the next
+  // measurement, never something a render reads.
+  const measuredRef = useRef<PopoverSize | null>(null);
+
   const positionFor = useCallback((anchor: HTMLElement) => {
     const rect = anchor.getBoundingClientRect();
-    // Both mirror ServicePopover.module.css. The coupling is real and
-    // unavoidable -- the flip below has to know how wide the thing it is
-    // flipping is, and reading it back would mean measuring after a paint the
-    // reader has already seen in the wrong place -- so it is stated here
-    // rather than left implicit.
-    const width = 268;
-    const gap = 12;
+
+    // The measured box, when there is one. `popoverRef` is null on the first
+    // frame of a peek (nothing is mounted yet) and, when the pointer moves
+    // from one tile to another, still points at the *previous* popover --
+    // which is a closer estimate than a constant but is not this popover, so
+    // either way the layout effect below re-runs this against the real box
+    // before the browser paints it.
+    //
+    // The zero check is not defensive padding: jsdom has no layout and
+    // reports a zero rect for every element it was not asked about, so
+    // without it every test in App.test.tsx would place against a zero-height
+    // box and prove nothing about a real one.
+    const box = popoverRef.current?.getBoundingClientRect();
+    const size = {
+      width: box && box.width > 0 ? box.width : POPOVER_ESTIMATE.width,
+      height: box && box.height > 0 ? box.height : POPOVER_ESTIMATE.height,
+    };
 
     // `document.documentElement.clientWidth`/`clientHeight`, not
     // `window.innerWidth`/`innerHeight`. The popover is `position: fixed`,
@@ -247,69 +271,21 @@ export function App() {
     // gap the clamp exists to preserve. Overlay-scrollbar platforms (macOS,
     // mobile, most of Linux) have no gap between the two numbers, so this
     // costs nothing there -- it is strictly a correction, never a regression.
-    const viewportWidth = document.documentElement.clientWidth;
-    const viewportHeight = document.documentElement.clientHeight;
+    const viewport = { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight };
 
-    // Centred under the tile, which is what candidate E specifies. The
-    // mockup does this with `left: 50%; transform: translateX(-50%)` and
-    // that is precisely the defect its own author reported: CSS centring
-    // cannot notice a viewport edge, so a tile in the first or last grid
-    // column pushed half a popover off screen between 768 and 1280px
-    // (apps/web/docs/candidates/README.md, "Known limitation in E"). Clamping
-    // the centred position into the viewport is the whole fix, and it is why
-    // the stylesheet must carry no transform of its own.
-    const centred = rect.left + rect.width / 2 - width / 2;
-    const left = Math.max(gap, Math.min(centred, viewportWidth - width - gap));
-
-    // Below the tile by preference, above it when below does not fit.
+    // The rules themselves are popover-placement.ts's -- centred and clamped
+    // horizontally, below-then-above-then-whichever-has-more-room
+    // vertically, and never over the tile. This function is the measuring
+    // half and nothing else, which is what lets the deciding half be tested
+    // over a grid of viewports instead of at whichever three points someone
+    // managed to reproduce.
     //
-    // `ESTIMATED_HEIGHT` decides *whether* to flip, and only that. It is the
-    // ordinary-case height -- a head, three rows of two facts, sometimes a
-    // note -- that "won't fit below" means, and getting that decision wrong
-    // is cheap either way: below gets tried when it was actually a little
-    // short, or a flip gets skipped when it would narrowly have fit, and the
-    // fallback in both cases is a popover that hangs slightly past an edge,
-    // never one that is unreachable.
-    //
-    // *Where the flip's top goes* must not reuse that same ordinary-case
-    // number -- that was the actual defect a validator reproduced against
-    // this function twice over: with a short window, clamping the flipped
-    // top back down toward `gap` put the popover flush on top of the tile it
-    // describes instead of above it; and with a tall note or a wrapped name,
-    // ESTIMATED_HEIGHT is a floor a real popover can exceed, and exceeding it
-    // costs exactly the overrun in anchor coverage, because the top was
-    // placed as if the box stopped there. The real height is never knowable
-    // before paint, but the ceiling is: ServicePopover.module.css caps
-    // `.popover` at `max-height: 60vh` and scrolls its own content past
-    // that, so the browser will never render it taller than 60% of the
-    // viewport regardless of what the six facts and the optional note add up
-    // to. Anchoring the flip against that ceiling instead of the
-    // ordinary-case estimate makes the guarantee unconditional: the box's
-    // bottom edge stops at `rect.top - gap` no matter what actually renders
-    // inside it. A popover shorter than the ceiling then leaves a gap above
-    // the tile rather than sitting flush against it -- the price of the
-    // guarantee is a popover that sometimes floats higher than it strictly
-    // needs to, never one that covers the thing it names.
-    //
-    // Flipping is only taken when the full ceiling fits above the tile.
-    // When it does not -- a short window, a tile near the top -- this stays
-    // below instead of flipping-and-clamping into the tile the way the
-    // previous version did: below can only ever run past the *bottom* edge,
-    // never cover the anchor above it, which makes it the safe fallback
-    // whenever a safe flip is not available either.
-    const ESTIMATED_HEIGHT = 250;
-    const below = rect.bottom + gap;
-    const fitsBelow = below + ESTIMATED_HEIGHT <= viewportHeight - gap;
-    const maxPopoverHeight = viewportHeight * 0.6;
-    const canFlipSafely = rect.top - 2 * gap >= maxPopoverHeight;
-    const top = !fitsBelow && canFlipSafely ? rect.top - gap - maxPopoverHeight : below;
-
     // Below 480px none of this applies: the stylesheet turns the popover into
     // a viewport-anchored bottom sheet and overrides both coordinates, because
     // at that width there is no placement relative to a tile that does not
     // clip. These numbers are still computed and still handed over; they are
     // simply not what positions it there.
-    return { top, left };
+    return placePopover({ top: rect.top, left: rect.left, width: rect.width, height: rect.height }, size, viewport);
   }, []);
 
   const handlePeek = useCallback(
@@ -319,6 +295,63 @@ export function App() {
     },
     [cancelClose, positionFor]
   );
+
+  // The measurement pass, and the reason this is `useLayoutEffect` rather
+  // than `useEffect`: it runs after React has committed the popover to the
+  // DOM but *before* the browser paints, so the corrected position is the
+  // first one a reader sees. A `useEffect` here would paint the estimate
+  // first and the measurement one frame later, which is a visible jump on
+  // exactly the tiles that need correcting most.
+  //
+  // **What it is allowed to react to is the box's own size, and nothing
+  // else.** The first version of this re-placed on every run and depended on
+  // the whole `peek`, so each reposition allocated a peek, which re-ran this,
+  // which measured again -- and the only argument that the chain terminated
+  // was that a second measurement would agree with the first. It does not
+  // during a scroll: this effect re-reads the *anchor's* live rect, a
+  // momentum scroll moves that rect between two synchronous runs, so each run
+  // computed a different position and scheduled another. React counts that
+  // depth and throws `Minified React error #185` at 50, blanking the root --
+  // reproduced twice on the built viewer by a validator, once from a real
+  // wheel gesture, which is what this rewrite is for.
+  //
+  // The `measuredRef` guard makes the termination structural rather than
+  // hopeful. The only new information a second run can carry is a different
+  // rendered size, so an identical size returns before touching state and the
+  // chain stops after exactly one pass. Scroll and resize keep the anchor
+  // tracked; they are that effect's job, not this one's, and they are
+  // throttled to one placement per frame.
+  //
+  // The size does still change on resize -- `max-height: 60vh` moves with the
+  // viewport -- and that is a change this effect must see, which is why the
+  // guard compares sizes rather than skipping every run after the first.
+  //
+  // No `ResizeObserver`: a popover renders one service's facts and its
+  // content cannot change while it is open -- a different service is a
+  // different `peek`, and closing one clears the ref below.
+  useLayoutEffect(() => {
+    if (!peek) {
+      measuredRef.current = null;
+      return;
+    }
+    const box = popoverRef.current?.getBoundingClientRect();
+    if (!box || box.height <= 0) {
+      return;
+    }
+    const previous = measuredRef.current;
+    if (previous && previous.width === box.width && previous.height === box.height) {
+      return;
+    }
+    measuredRef.current = { width: box.width, height: box.height };
+
+    const entryId = peek.service.id;
+    const measured = positionFor(peek.anchor);
+    setPeek((current) =>
+      current && current.service.id === entryId && !samePlacement(current.position, measured)
+        ? { ...current, position: measured }
+        : current
+    );
+  }, [peek, positionFor]);
 
   // `position: fixed` freezes the popover at the pixel coordinates it opened
   // with -- nothing about that CSS makes it follow the tile. The anchor
@@ -344,16 +377,49 @@ export function App() {
   // is a *different popover opening* -- not the position update the effect
   // performs on its own scroll/resize handling, which would otherwise tear
   // down and re-attach the listeners on every scroll tick.
+  //
+  // Two things this does beyond re-reading the rect, both of them the same
+  // defect's other half (see the layout effect's own note on React error
+  // #185). **One placement per animation frame**, because a wheel gesture
+  // fires scroll far faster than the screen updates and every extra tick was
+  // a render nobody could see. And **the same object back when the numbers
+  // have not moved**, through `samePlacement`, because `placePopover`
+  // allocates a fresh result every call: without the comparison, a scroll
+  // that does not move the tile relative to the viewport -- a fixed header,
+  // an already-clamped edge, a scroll container that is not the one the tile
+  // is in -- still produced a new peek, a re-render, and another run of the
+  // measuring effect. Returning `current` makes React bail out instead.
+  //
+  // The frame callback re-checks the entry id because it outlives the event:
+  // a peek that closed, or a different tile that opened, between the tick and
+  // the frame must not have a stale measurement written over it.
   useEffect(() => {
     if (!peek) {
       return;
     }
+    const entryId = peek.service.id;
+    let frame: number | null = null;
     function reposition() {
-      setPeek((current) => (current ? { ...current, position: positionFor(current.anchor) } : current));
+      if (frame !== null) {
+        return;
+      }
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        setPeek((current) => {
+          if (!current || current.service.id !== entryId) {
+            return current;
+          }
+          const next = positionFor(current.anchor);
+          return samePlacement(current.position, next) ? current : { ...current, position: next };
+        });
+      });
     }
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("resize", reposition);
     return () => {
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
       window.removeEventListener("scroll", reposition, true);
       window.removeEventListener("resize", reposition);
     };
@@ -404,6 +470,39 @@ export function App() {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [selectedService, handleClose]);
+
+  // Escape closes the peek too, and this is a separate listener rather than a
+  // branch in the one above because the two never coexist: opening a page
+  // clears the peek, and the page replaces the board that the peek's anchor
+  // lives on. Two effects, each mounted with the thing it dismisses, say that
+  // more plainly than one effect with a precedence rule for a case that
+  // cannot arise.
+  //
+  // Missing since before this popover existed -- the listener above has been
+  // gated on `selectedService` since d9001b1, so a peek opened by hovering or
+  // by keyboard focus had nothing listening for Escape at all, and a keyboard
+  // reader who had focused a tile could only dismiss its popover by moving
+  // focus off the tile. Found 2026-09-02 by a validator driving the built app
+  // from the keyboard.
+  //
+  // Nothing restores focus here, and that is the correct behaviour rather
+  // than an omission: a peek never takes focus. Opened from `onFocus` the
+  // tile still has it and keeps it, so Escape leaves the reader exactly where
+  // they were and the popover stays shut until they leave the tile and come
+  // back; opened by the pointer, focus was never the popover's to move.
+  useEffect(() => {
+    if (!peek) {
+      return;
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        cancelClose();
+        setPeek(null);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [peek?.service.id, cancelClose]);
 
   // Moves focus into the page the moment it opens (click or deep link), and
   // hands it back to the thing that opened it once it closes. Keyed on the
@@ -539,6 +638,7 @@ export function App() {
                     labelForId={edgeMaps.labelForId}
                     onPointerEnter={cancelClose}
                     onPointerLeave={handlePeekEnd}
+                    popoverRef={popoverRef}
                   />
                 )}
               </>

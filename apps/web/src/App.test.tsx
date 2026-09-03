@@ -37,6 +37,29 @@ vi.mock("./elk-layout.js", () => ({
   layoutGraph: async (services: { id: string }[]) => new Map(services.map((service, index) => [service.id, { x: index * 300, y: 0 }])),
 }));
 
+/**
+ * A counter around the real `placePopover`, not a replacement for it -- the
+ * mock spreads the actual module and calls through, so every test in this
+ * file still exercises the real placement arithmetic. What it buys is the one
+ * thing the D4 tests below need and the DOM cannot show: *how often* App.tsx
+ * places the popover. A runaway re-place loop leaves no trace in the rendered
+ * style, because every pass computes the same numbers -- it only shows up as
+ * work, and then as `Minified React error #185` on whichever gesture happens
+ * to move the anchor between passes.
+ */
+const placements = vi.hoisted(() => ({ count: 0 }));
+
+vi.mock("./popover-placement.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./popover-placement.js")>();
+  return {
+    ...actual,
+    placePopover: (...args: Parameters<typeof actual.placePopover>) => {
+      placements.count += 1;
+      return actual.placePopover(...args);
+    },
+  };
+});
+
 beforeAll(() => {
   // React Flow measures its container and jsdom has no ResizeObserver. Same
   // stub, same reasoning as GraphCanvas.test.tsx -- nothing here asserts on
@@ -139,6 +162,44 @@ function restoreViewport() {
   delete (document.documentElement as { clientHeight?: unknown }).clientHeight;
 }
 
+/**
+ * Stubs the box reported by every element that does *not* have its own
+ * `getBoundingClientRect` -- which in a positioning test is the popover and
+ * nothing else, because `stubRect` above installs an own property on the one
+ * tile the test hovers, and an own property shadows this prototype patch.
+ *
+ * A prototype patch rather than an own-property override only because there
+ * is no element to override: the popover does not exist until the peek opens,
+ * and the height has to be readable by the layout effect that runs in the
+ * same commit. Same mechanism, and the same `delete`-rather-than-restore
+ * teardown, as GraphCanvas.test.tsx's React Flow measurement stub -- see its
+ * comment for why deleting is what restores an inherited method.
+ *
+ * Without this the popover measures 0x0 (jsdom does no layout), App.tsx falls
+ * back to POPOVER_ESTIMATE, and a test that means to exercise the measured
+ * path silently exercises the estimated one instead.
+ */
+function stubPopoverBox(size: { width: number; height: number }) {
+  HTMLElement.prototype.getBoundingClientRect = function stubbedRect() {
+    return {
+      width: size.width,
+      height: size.height,
+      top: 0,
+      left: 0,
+      right: size.width,
+      bottom: size.height,
+      x: 0,
+      y: 0,
+      toJSON: () => "",
+    } as DOMRect;
+  };
+}
+
+/** Undoes stubPopoverBox. Unconditional: deleting a property that was never set is a no-op, so this needs no matching flag. */
+function restorePopoverBox() {
+  delete (HTMLElement.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+}
+
 /** Reads a popover fact's value by its label -- the `<dt>`/`<dd>` pair ServicePopover.tsx renders one of per fact. Mirrors ServicePopover.test.tsx's own `factValue`. */
 function factValue(label: string) {
   return screen.getByText(label).closest("div")?.querySelector("dd")?.textContent;
@@ -154,6 +215,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   restoreViewport();
+  restorePopoverBox();
   // A test that opts into fake timers for the hover-close delay must not
   // leave them running for the next test's own waitFor() polling.
   vi.useRealTimers();
@@ -554,6 +616,49 @@ describe("App -- the hover popover", () => {
     await waitFor(() => expect(servicePage()).not.toBeNull());
     expect(screen.queryByRole("presentation")).toBeNull();
   });
+
+  // D1: the Escape listener has been gated on `selectedService` since
+  // d9001b1, so a peek -- which is not a service page -- had nothing
+  // listening. Verified against that commit rather than assumed: this is
+  // older than the popover-placement work, not a regression from it. The
+  // keyboard path is the one that made it a real defect, because a reader who
+  // opened the popover by tabbing to a tile had no way to dismiss it without
+  // leaving the tile.
+  describe("Escape dismisses it", () => {
+    it("closes a popover opened by hovering", async () => {
+      await renderLoaded();
+      const tile = screen.getByRole("button", { name: /Fly\.io/ });
+      fireEvent.pointerOver(tile, { pointerType: "mouse" });
+      await screen.findByRole("presentation");
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("presentation")).toBeNull());
+    });
+
+    it("closes a popover opened by keyboard focus, and leaves focus on the tile", async () => {
+      await renderLoaded();
+      const tile = screen.getByRole("button", { name: /Fly\.io/ });
+      // The focus path, not the pointer one: ServiceTile opens the peek from
+      // `onFocus`, which is how a tab-through reader ever sees a popover.
+      tile.focus();
+      fireEvent.focus(tile);
+      await screen.findByRole("presentation");
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("presentation")).toBeNull());
+      // The peek never took focus, so dismissing it must not move focus
+      // either -- the reader stays on the tile they were on.
+      expect(document.activeElement).toBe(tile);
+    });
+
+    it("ignores keys that are not Escape", async () => {
+      await renderLoaded();
+      const tile = screen.getByRole("button", { name: /Fly\.io/ });
+      fireEvent.pointerOver(tile, { pointerType: "mouse" });
+      await screen.findByRole("presentation");
+      fireEvent.keyDown(document, { key: "Enter" });
+      fireEvent.keyDown(document, { key: "Tab" });
+      expect(screen.queryByRole("presentation")).not.toBeNull();
+    });
+  });
 });
 
 // `positionFor` (App.tsx) had zero coverage before this -- every test above
@@ -563,11 +668,13 @@ describe("App -- the hover popover", () => {
 // reproduced App.tsx:247-250's defects: no mock of `positionFor` itself,
 // because a mock proves nothing about the function under test.
 //
-// Each test's numbers are chosen to isolate one or two of the six things
-// `positionFor` does -- the clamp, the centring, the gap, the flip, and the
-// two constants (`width`, `ESTIMATED_HEIGHT`) -- rather than exercising the
-// function once and hoping a broad assertion happens to notice whichever
-// piece regresses.
+// The *rules* moved to popover-placement.ts and are tested there over a grid
+// of viewports and box heights, which is where a rule belongs. What is left
+// here is the wiring, and it is worth its own tests because it is where the
+// two shipped defects actually lived: which numbers get handed to the rules.
+// So each test below isolates one of those -- the anchor's live rect, the
+// viewport read, the measured box, and the fallback when there is nothing to
+// measure yet.
 describe("App -- popover position", () => {
   it("clamps the centred position into the viewport, rather than letting it run past the right edge", async () => {
     stubViewport(768, 800);
@@ -608,27 +715,82 @@ describe("App -- popover position", () => {
     expect(popover.style.top).toBe("144px");
   });
 
-  it("flips above the tile, stopping at a fixed distance from it, when below does not fit", async () => {
+  it("flips above the tile when below does not fit, using the ordinary-case estimate until there is a box to measure", async () => {
     stubViewport(1280, 800);
     await renderLoaded();
     const tile = screen.getByRole("button", { name: /Fly\.io/ });
-    // Low enough on an 800px-tall viewport that below (732 + 12 = 744) has
-    // no room for even the 250px ordinary-case estimate (744 + 250 > 788),
-    // and high enough that the full 60vh ceiling (480px) fits above it
-    // (700 - 24 = 676 >= 480). Both the flip decision and the flip's actual
-    // top depend on distinct numbers here (ESTIMATED_HEIGHT for the first,
-    // the viewport-height-derived ceiling for the second) -- top is
-    // rect.top - gap - ceiling = 700 - 12 - 480 = 208.
+    // No stubPopoverBox here, so jsdom reports 0x0 and App.tsx falls back to
+    // POPOVER_ESTIMATE -- which is the first-paint path, deliberately
+    // exercised. Below (732 + 12 = 744) has no room for a 250px box
+    // (744 + 250 > 788); above does (700 - 12 - 250 = 438, clear of the
+    // 12px inset), so it flips and its bottom lands exactly one gap over the
+    // tile.
     stubRect(tile, { top: 700, left: 100, width: 32, height: 32 });
     fireEvent.pointerOver(tile, { pointerType: "mouse" });
     const popover = await screen.findByRole("presentation");
-    expect(popover.style.top).toBe("208px");
+    expect(popover.style.top).toBe("438px");
+  });
+
+  // The whole point of the 2026-09-02 rewrite: the placement is made from the
+  // box's *measured* height, corrected in a layout effect before the browser
+  // paints, rather than from a constant or from the stylesheet's 60vh
+  // ceiling. Each of these fails if App.tsx goes back to estimating.
+  describe("the measured box, not an estimate of it", () => {
+    it("places against the popover's own rendered height, which is a different answer from the estimate", async () => {
+      stubViewport(1280, 900);
+      stubPopoverBox({ width: 268, height: 400 });
+      await renderLoaded();
+      const tile = screen.getByRole("button", { name: /Fly\.io/ });
+      // Same tile and viewport as the estimate case above one viewport
+      // taller: a 400px box does not fit below (744 + 400 > 888) and does
+      // fit above, so it flips to 700 - 12 - 400 = 288. The estimate would
+      // have said 438 and left 150px of the box over the tile.
+      stubRect(tile, { top: 700, left: 100, width: 32, height: 32 });
+      fireEvent.pointerOver(tile, { pointerType: "mouse" });
+      const popover = await screen.findByRole("presentation");
+      expect(popover.style.top).toBe("288px");
+      expect(288 + 400).toBe(700 - 12); // the box's bottom, one gap over the tile
+    });
+
+    it("stays below when the measured box fits there and the estimate would have flipped", async () => {
+      stubViewport(1280, 720);
+      stubPopoverBox({ width: 268, height: 150 });
+      await renderLoaded();
+      const tile = screen.getByRole("button", { name: /Fly\.io/ });
+      // Below is 452 + 12 = 464. A 150px box clears the bound (464 + 150 =
+      // 614 <= 708); the 250px estimate would not have (714 > 708) and would
+      // have flipped a box that had room where it was.
+      stubRect(tile, { top: 420, left: 100, width: 32, height: 32 });
+      fireEvent.pointerOver(tile, { pointerType: "mouse" });
+      const popover = await screen.findByRole("presentation");
+      expect(popover.style.top).toBe("464px");
+    });
+
+    it("flips a first-band tile at 1280x720 that the 60vh ceiling used to keep below the fold", async () => {
+      // The reproduction, with the rects measured on the built app against
+      // examples/layout-stress.catalogus.yaml: viewport 1265x720 (1280 less
+      // a classic scrollbar), first-band tile [341, 499], popover 286px
+      // tall. The old code compared the 432px ceiling with the 329px above
+      // the tile, declined to flip, and put the box at 511 -- 89px past the
+      // bottom edge. Measured, the box fits above at 341 - 12 - 286 = 43.
+      stubViewport(1265, 720);
+      stubPopoverBox({ width: 268, height: 286 });
+      await renderLoaded();
+      const tile = screen.getByRole("button", { name: /Fly\.io/ });
+      stubRect(tile, { top: 341, left: 16, width: 119, height: 158 });
+      fireEvent.pointerOver(tile, { pointerType: "mouse" });
+      const popover = await screen.findByRole("presentation");
+      expect(popover.style.top).toBe("43px");
+      expect(43 + 286).toBeLessThanOrEqual(720 - 12); // and it no longer runs past the bottom
+    });
   });
 
   // D2: the validator's own reproductions, run against the real component
-  // rather than reasoned about. Both assert the fixed property directly --
+  // rather than reasoned about. Each asserts the fixed property directly --
   // the popover never starts inside, or above the bottom of, the tile it is
-  // describing -- not just a specific number.
+  // describing -- not just a specific number. popover-placement.test.ts
+  // proves the same property over a grid; these prove that the component is
+  // wired to the function that has it.
   describe("D2 -- the flip never covers the tile it describes", () => {
     it("stays below a tile near the top of a short window, rather than clamping the flip on top of it", async () => {
       stubViewport(1280, 400);
@@ -636,8 +798,9 @@ describe("App -- popover position", () => {
       const tile = screen.getByRole("button", { name: /Fly\.io/ });
       // The validator's own numbers: innerHeight 400, tile [100..220]. The
       // old code clamped the flipped top to 12, which spans [12, 262] and
-      // fully covers [100, 220]. This must land at or below rect.bottom + gap
-      // (232), never inside [100, 220].
+      // fully covers [100, 220]. A 250px box fits on neither side here, and
+      // below has the more room (156 against 76), so it lands at
+      // rect.bottom + gap (232) and overflows past the bottom instead.
       stubRect(tile, { top: 100, left: 100, width: 32, height: 120 });
       fireEvent.pointerOver(tile, { pointerType: "mouse" });
       const popover = await screen.findByRole("presentation");
@@ -646,23 +809,23 @@ describe("App -- popover position", () => {
       expect(top).toBeGreaterThan(220); // never starts inside the tile's own span
     });
 
-    it("stops the flip at the gap above the tile even when the popover renders taller than the ordinary-case estimate", async () => {
-      stubViewport(1280, 900);
+    it("overflows off the top of the viewport, away from the tile, when neither side holds the box", async () => {
+      stubViewport(1280, 400);
+      stubPopoverBox({ width: 268, height: 300 });
       await renderLoaded();
       const tile = screen.getByRole("button", { name: /Fly\.io/ });
-      // The validator's own numbers: tile top 700, vh 900. The old code
-      // anchored the flip to ESTIMATED_HEIGHT (250) regardless of how tall
-      // the popover actually rendered, so anything past 250px overlapped the
-      // tile by the overrun -- a 400px popover reached 18px into it. This
-      // anchors against the viewport's own 60vh ceiling (540px here)
-      // instead, so the bottom of *any* rendered height up to that ceiling
-      // stops at rect.top - gap (688), never past it.
-      stubRect(tile, { top: 700, left: 100, width: 32, height: 32 });
+      // Tile [300, 320] in a 400px viewport: 276px free above, 56px below,
+      // and a 300px box fits in neither. Above wins on room, so the box's
+      // bottom stops one gap over the tile (288) and its top goes to -12 --
+      // off the top edge, which is the direction away from the tile. The
+      // alternative, pinning the top at the 12px inset, is the shape of the
+      // defect this whole rewrite exists to make unreachable.
+      stubRect(tile, { top: 300, left: 100, width: 32, height: 20 });
       fireEvent.pointerOver(tile, { pointerType: "mouse" });
       const popover = await screen.findByRole("presentation");
       const top = Number(popover.style.top.replace("px", ""));
-      const maxPopoverHeight = 900 * 0.6;
-      expect(top + maxPopoverHeight).toBeLessThanOrEqual(700 - 12);
+      expect(top).toBe(-12);
+      expect(top + 300).toBe(300 - 12); // the bottom edge, one gap clear of the tile
     });
   });
 });
@@ -695,16 +858,139 @@ describe("App -- the popover tracks its anchor across scroll and resize", () => 
     stubViewport(1280, 900);
     await renderLoaded();
     const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    stubRect(tile, { top: 400, left: 100, width: 32, height: 32 });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    const popover = await screen.findByRole("presentation");
+    expect(popover.style.top).toBe("444px"); // below: 432 + 12, and 444 + 250 clears 888
+
+    // The window got shorter without the tile moving. The same box no longer
+    // fits below (444 + 250 > 488) and does fit above, so the side it is on
+    // has to change -- which a placement computed once at hover time cannot
+    // notice.
+    stubViewport(1280, 500);
+    fireEvent.resize(window);
+    await waitFor(() => expect(popover.style.top).toBe("138px")); // flips: 400 - 12 - 250
+  });
+});
+
+// D4: the highest-severity defect of the 2026-09-02 validation pass, and the
+// only one whose symptom was a blank page. A validator saw `Minified React
+// error #185` -- maximum update depth -- twice on the built viewer, once from
+// an ordinary wheel scroll with a popover open, and it was not reproducible
+// on demand, which is exactly what a loop that needs the anchor to move
+// between two synchronous measurements looks like from outside.
+//
+// These reproduce it by mechanism rather than by luck. The first drives the
+// gesture (many scroll events, no geometry change) and counts the work; the
+// second makes the anchor move on *every* read, which is the momentum-scroll
+// condition the crash needed, and asserts the chain still terminates.
+//
+// `console.error` is inspected for React's own message rather than for any
+// error at all: a state update arriving from a requestAnimationFrame callback
+// is outside `act()` and React says so, which is noise here and not a defect.
+describe("App -- re-placing the popover is bounded work", () => {
+  /** React's update-depth message, in whichever form this build emits (`#185` minified, the sentence in development). */
+  function updateDepthErrors(spy: ReturnType<typeof vi.spyOn>) {
+    return spy.mock.calls.map((call) => String(call[0])).filter((message) => /Maximum update depth|error #185|Minified React error/.test(message));
+  }
+
+  it("places at most once per animation frame across a burst of 100 scroll events", async () => {
+    stubViewport(1280, 900);
+    await renderLoaded();
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    stubRect(tile, { top: 300, left: 100, width: 32, height: 32 });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    const popover = await screen.findByRole("presentation");
+    const before = popover.style.top;
+
+    // Count only the burst: opening the peek legitimately places it.
+    placements.count = 0;
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      for (let i = 0; i < 100; i += 1) {
+        fireEvent.scroll(window);
+      }
+      // Let every frame the burst could have scheduled actually run.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      });
+
+      // The tile has not moved, so the correct amount of work is one
+      // placement for the frame the burst coalesced into -- and the answer
+      // must not scale with the event count. The bound is 2 rather than 1
+      // only because a burst that straddles a frame boundary is legitimate.
+      expect(placements.count).toBeLessThanOrEqual(2);
+      expect(popover.style.top).toBe(before);
+      expect(updateDepthErrors(errors)).toEqual([]);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it("does not chase an anchor that moves on every read, which is what the crash needed", async () => {
+    stubViewport(1280, 900);
+    // The popover must report a real box or the measuring effect bails on
+    // the zero-height check before reaching the loop this test is about --
+    // which is how the first draft of this test passed against the very
+    // mutation it was written to catch.
+    stubPopoverBox({ width: 268, height: 400 });
+    await renderLoaded();
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+
+    // A momentum scroll, as a synchronous re-measure sees it: every call to
+    // getBoundingClientRect reports a different top. The first version of the
+    // measuring layout effect re-read this on every run and set state
+    // whenever the answer differed, so each run scheduled another -- 50 deep,
+    // then React threw. Nothing here may depend on the anchor settling.
+    let top = 300;
+    tile.getBoundingClientRect = () => {
+      top -= 7;
+      return { top, left: 100, width: 32, height: 32, right: 132, bottom: top + 32, x: 100, y: top, toJSON: () => "" } as DOMRect;
+    };
+
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      fireEvent.pointerOver(tile, { pointerType: "mouse" });
+      await screen.findByRole("presentation");
+      placements.count = 0;
+      fireEvent.scroll(window);
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      });
+
+      // One frame, one placement -- not one per re-render until React gives
+      // up. The popover is still on screen, which is the part the crash took
+      // away: error #185 unmounts the whole root.
+      expect(placements.count).toBeLessThanOrEqual(2);
+      expect(screen.queryByRole("presentation")).not.toBeNull();
+      expect(updateDepthErrors(errors)).toEqual([]);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it("re-places when the box's own size changes, which is the one thing the measuring effect exists for", async () => {
+    // The guard that stops the loop is "an identical measured size teaches
+    // nothing" -- so a *different* size must still get through, or the
+    // termination fix would have silently disabled the measurement it
+    // protects. 60vh moves with the viewport, so a resize is exactly that
+    // case.
+    stubViewport(1280, 900);
+    stubPopoverBox({ width: 268, height: 400 });
+    await renderLoaded();
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
     stubRect(tile, { top: 700, left: 100, width: 32, height: 32 });
     fireEvent.pointerOver(tile, { pointerType: "mouse" });
     const popover = await screen.findByRole("presentation");
-    expect(popover.style.top).toBe("148px"); // flips: 700 - 12 - (900 * 0.6)
+    expect(popover.style.top).toBe("288px"); // flips above: 700 - 12 - 400
 
-    // The window got shorter without the tile moving -- the 60vh ceiling the
-    // flip is anchored to shrinks with it, so the flip's top has to move too.
-    stubViewport(1280, 300);
+    stubPopoverBox({ width: 268, height: 120 });
+    stubViewport(1280, 400);
     fireEvent.resize(window);
-    await waitFor(() => expect(popover.style.top).toBe("508px")); // 700 - 12 - (300 * 0.6)
+    // Now 120 tall in a 400px viewport: below is 744, off screen; above is
+    // 700 - 12 - 120 = 568, also below the fold since the tile is. Room
+    // above wins, so it stays anchored one gap over the tile at 568.
+    await waitFor(() => expect(popover.style.top).toBe("568px"));
   });
 });
 

@@ -85,6 +85,8 @@ trusting anything below. **In that order**: the direction contract guard compare
 `apps/web/index.html` against the build output, so a `pnpm test` run against a `dist` older than your
 last edit to that file fails on a difference you created and already fixed.
 
+**The expected total as of 2026-09-02 is 1317 tests / 75 files** (see the newest handoff). The paragraph that follows is the 2026-08-26 history of why this line once named none.
+
 **The expected total moved on 2026-08-26 and this line no longer names one.** It said **1218 tests /
 72 files**, which was correct at the start of that session and is the number to compare against if
 you are bisecting into it. The design world was then replaced wholesale, and
@@ -126,6 +128,77 @@ validation pass, which is the more interesting number of the two.)
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
+
+### Handoff — 2026-09-02, the three views join the world, and the red rule is finally guarded
+
+**Read this first.** It covers two commits: `e1f7dba` (2026-08-31, the wall, made without a
+handoff here) and `d9001b1` (2026-09-02). The design is settled and unchanged — see the sections
+below. What is left of the component work is **the shell** and **the popover's vertical placement**.
+
+**What is built and verified.** Candidate E's board, tile, popover, service page, graph and
+migrations board are all in `apps/web/src`, measured against the mockup by a validator that did
+not write them: grid, mark, badge, label stack, popover grid and shadow all match the mockup's
+literal values; the graph node and the migration row reuse the tile's and popover's numbers rather
+than a second vocabulary. `active` + `replaced_by` shows on the tile/popover and on the service page
+(owner's ruling, 2026-08-31); the graph node deliberately does not, and `ServiceStatus.tsx` says so.
+
+**The red rule, third time.** OWN-WORLD licenses signal red in two places, the status badge and the
+status word. The 2026-08-31 tree recorded the correction as done in `DIRECTION.md` and in
+`ServicePage.module.css`'s own header, and had made it in one of four named sites. A validator
+driving the built app found the view rail's underline, the tag tones (`--tag-new-*`,
+`--tag-phasing-*`, `.signal-solid`) and the service page's "no catalog entry" line still red, and no
+guard. This session moved all of them onto ink and added `apps/web/src/signal-red.test.ts`: a source
+scan of every stylesheet under `apps/web/src`, comments stripped, `@media`-nested rules attributed
+to their own selector, custom-property aliases resolved transitively, hex / 8-digit hex / `rgb()`
+spellings, licensed by `{file, selector, property}` with a self-cleaning allow-list (a licensed rule
+that stops being red fails too). Eight mutations by a second validator all failed the suite. **The
+lesson is the one this file keeps relearning: a stylesheet header saying a fix was made is not the
+fix, and a file that has been read has not been seen.**
+
+**One red site is quarantined, and it is the owner's call.** `RankModule.module.css` paints
+`.selected` and `.top` red; the component has no caller (removed from the board 2026-08-25, kept on
+disk) and is tree-shaken out of the build. The contract says "not red" without saying what instead,
+so the guard holds those two rules in a dated quarantine list rather than the allow-list. **Ask the
+owner: delete `RankModule` outright, or name its ink.** Either answer removes the quarantine.
+
+**Smaller things from the same validation, all fixed:** the migrations row's no-icon mark now has
+the dashed sunken 6px tile the mockup gives the popover's; `html { overflow-y: scroll }` stops the
+page shifting 15px when toggling to the one view that does not scroll (`scrollbar-gutter: stable`
+measured inert on the viewport scroller in Chrome 152, on both `body` and `html`); the disclosure in
+`index.html` was rewritten twice because it kept counting the gap wrong rather than missing it — it
+had said the shell was "the last surface still in the retired world" while `ViewToggle` is the old
+world's component too. The three pinned strings in `direction-contract.test.ts` now each name a gap
+open today.
+
+**The popover, vertical half — fixed and validated (second commit of 2026-09-02).** The flip
+had tested the stylesheet's 60vh ceiling instead of the box's measured height, so at 1280×720 every
+first-band tile's popover ran past the bottom edge and in a short viewport the flip could cover half
+the tile it described. `apps/web/src/popover-placement.ts` is now a pure function (below if the
+whole box fits, else above if it fits, else the side with more room, near edge pinned 12px from the
+tile, overflow away from the tile); `App.tsx` measures the rendered box in a layout effect before
+paint. A validator's own sweep of 2.76M tile/box/viewport combinations found zero overlaps. The
+validator also found — and the implementer then fixed — an intermittent React #185 crash (the layout
+effect chased a moving anchor on momentum scroll; now it reacts only to the box's own size, and
+scroll/resize re-place once per animation frame), Escape not closing a peek (pre-existing since
+`d9001b1`), and an asymmetric fits-above test. **One limit stays, stated in the disclosure:** a box
+that fits on neither side overflows on its far edge, and below 480px the bottom sheet covers part of
+its tile by 115–143px — that last one is a design question for the owner.
+
+**Facts the shell needs that the repo does not have — do not guess them.** The mockup's profile menu
+shows a name, an email and a plan; there is no account system until Phase 5. The settings panel
+(appearance, density, brand-icon colour, default view) implies persisted preferences; nothing here
+persists anything, and FIRST VIEWPORT says "nothing that writes". The help menu and footer link to
+"Documentation" with no URL anywhere in the repo. The footer's CLI version is not in `ViewPayload`
+yet (add `cliVersion` from the CLI's own `package.json`). The shell brief is split: structure first
+(top bar, rail, view rail in a sticky board-head, footer — all derivable), the three menus second,
+once the owner answers what a settings toggle does and what the profile menu holds with no account.
+
+#### State of the tree at this handoff
+
+**Baseline: 1317 tests / 75 files**, green on consecutive runs, `pnpm typecheck` clean across all
+four packages, after the popover commit. 1284/74 at `d9001b1` (+31 for `signal-red.test.ts`, +1 for
+the migrations fallback mark over the session's starting 1252/73); +33 for the popover placement
+(one new pure-function test file, and `App.test.tsx`'s crash, throttle and Escape tests). Before that, 1226/72 at `e1f7dba`.
 
 ### The form is settled: candidate E, the home screen — approved 2026-08-26
 
@@ -428,18 +501,18 @@ Each of these is its own brief. `CLAUDE.md`'s sizing rule applies hard here — 
 repo handed one agent a wide brief it spent 422k tokens doing serially what several agents would have
 done in parallel.
 
-1. **The wall** — `ServiceTile`, `BandModule`, `ProjectBoard`. Bare icons on the ground, two-line
+1. ✅ (2026-08-31, `e1f7dba`) **The wall** — `ServiceTile`, `BandModule`, `ProjectBoard`. Bare icons on the ground, two-line
    label (vendor name then `id`), corner status badge, desaturated mark and worded status. This is
    the biggest piece and the one the owner will look at first.
-2. **The shell** — `AppShell` gains the help / settings / profile cluster, their menus, and the
+2. ⬜ **The shell** — `AppShell` gains the help / settings / profile cluster, their menus, and the
    footer. Reproduce the approved mockup rather than reinterpreting it; the owner has already called
    this design finished.
-3. **The service page** — `ServicePage` in the new world.
-4. **Graph and Migrations** — both are already citizens of the *old* world as of earlier on
+3. ✅ (2026-09-02, `d9001b1`) **The service page** — `ServicePage` in the new world.
+4. ✅ (2026-09-02, `d9001b1`) **Graph and Migrations** — both are already citizens of the *old* world as of earlier on
    2026-08-26. They have to move again. Do not skip this: the last time one view moved and the others
    did not, toggling between them changed the app underneath the reader, and that is written up two
    handoffs below as a defect worth avoiding twice.
-5. **The popover's edge behaviour** — a real defect inherited from the mockup, named below.
+5. ✅ horizontal (2026-08-31), ✅ vertical (2026-09-02) **The popover's edge behaviour** — a real defect inherited from the mockup, named below.
 
 **A defect to fix rather than inherit.** In `candidate-e-homescreen.html`, hover popovers on icons in
 the grid's **edge columns** extend past the viewport between 768 and 1280px. The mockup centres them

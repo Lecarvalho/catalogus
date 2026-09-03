@@ -54,6 +54,7 @@
 //
 // It carries no close button and traps no focus, because it is a peek, not a
 // dialog. The page is where a reader lands and stays.
+import type { Ref } from "react";
 import type { ViewService } from "@catalogus/cli";
 
 import { tagsFor } from "../service-tags.js";
@@ -67,6 +68,16 @@ export interface ServicePopoverProps {
   readAt: string;
   /** Viewport-relative placement, computed by App.tsx from the anchor element. */
   position: { top: number; left: number };
+  /**
+   * The rendered box, handed back to App.tsx so it can measure it. The
+   * vertical placement needs this element's real height, and the only party
+   * that can supply it is the element itself -- an estimate is what
+   * popover-placement.ts's header records two shipped defects for. Same
+   * mechanism and same reason as `ServicePage`'s `pageRef`: a ref prop rather
+   * than `forwardRef`, so the component stays an ordinary function and the
+   * prop says what it is for.
+   */
+  popoverRef?: Ref<HTMLDivElement>;
   /** This entry's edges, resolved by App.tsx from the payload. */
   dependsOn: string[];
   dependedOnBy: string[];
@@ -100,12 +111,23 @@ const STATUS_TEXT = new Map<ViewService["status"], string>([
   ["removed", "Removed"],
 ]);
 
-export function ServicePopover({ service, readAt, position, dependsOn, dependedOnBy, labelForId, onPointerEnter, onPointerLeave }: ServicePopoverProps) {
+export function ServicePopover({
+  service,
+  readAt,
+  position,
+  dependsOn,
+  dependedOnBy,
+  labelForId,
+  onPointerEnter,
+  onPointerLeave,
+  popoverRef,
+}: ServicePopoverProps) {
   const tags = tagsFor(service, readAt);
   const statusText = STATUS_TEXT.get(service.status) ?? service.status;
 
   return (
     <div
+      ref={popoverRef}
       className={styles.popover}
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
       // Not a dialog and not `aria-live`: this mirrors content the tile
