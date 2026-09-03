@@ -61,7 +61,9 @@ import { describe, expect, it } from "vitest";
 const srcDir = fileURLToPath(import.meta.url).replace(/signal-red\.test\.ts$/, "");
 
 /**
- * Both signal values: the light ground's, and the dark translation's. The
+ * Both signal values: the light ground's, and the dark translation's -- the
+ * dark palette was removed 2026-09-03, and its red stays in this pattern so
+ * that a return of that palette, or of its red alone, is caught here. The
  * optional pair after the six digits is the eight-digit alpha form: `\b`
  * alone cannot match between `0` and `f`, so `#d40010ff` slipped past the
  * first version of this line -- found by a validator's mutation, 2026-09-02.
@@ -225,9 +227,11 @@ const redSites = allDeclarations.filter(
  * the reasoning). A fact line, a tab, a tag, a count, a link hover, a border on
  * anything else: not licensed, and each of those has been tried.
  *
- * `--color-signal` itself is listed three times because it is declared three
- * times -- once for light, twice for dark (media query and pinned attribute).
- * Listing the declarations rather than exempting tokens.css is the whole point:
+ * `--color-signal` itself is listed because it is a declaration, not exempt as
+ * a token: it was listed three times while the dark palette existed (light,
+ * media query, pinned attribute) and is listed once since 2026-09-03, when the
+ * owner removed dark -- this list is self-cleaning, so the two dark entries
+ * had to go with the blocks. Listing declarations rather than exempting the file is the whole point:
  * `--tag-phasing-line: var(--color-signal)` sits in that same `:root` block and
  * must fail there, which a file-level exemption would have prevented forever.
  *
@@ -244,8 +248,6 @@ const LICENSED: readonly Site[] = [
   { file: "components/ServiceNode.module.css", selector: ".status", property: "color" },
   { file: "components/MigrationList.module.css", selector: ".status", property: "color" },
   { file: "tokens.css", selector: ":root", property: "--color-signal" },
-  { file: "tokens.css", selector: ':root:not([data-theme="light"])', property: "--color-signal" },
-  { file: "tokens.css", selector: ':root[data-theme="dark"]', property: "--color-signal" },
 ];
 
 /**
@@ -326,7 +328,8 @@ describe("the allow-list cannot rot", () => {
     // future reader is most likely to misread as duplication and tidy away.
     expect(LICENSED.filter((site) => site.selector === ".badge")).toHaveLength(4);
     expect(LICENSED.filter((site) => site.selector === ".status")).toHaveLength(3);
-    expect(LICENSED.filter((site) => site.property === "--color-signal")).toHaveLength(3);
+    // One declaration since the dark palette left on 2026-09-03; it was three.
+    expect(LICENSED.filter((site) => site.property === "--color-signal")).toHaveLength(1);
   });
 
   it.each(ALLOWED.map((site) => [label(site), site] as const))(

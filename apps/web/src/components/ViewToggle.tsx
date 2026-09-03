@@ -10,6 +10,13 @@
 // "what still needs a decision" -- when the scope widened on 2026-08-25.
 // The list stays the default.
 //
+// It rendered in the main field, above the board, until 2026-09-03; it is
+// handed to `AppShell` now and drawn inside the board head, which is sticky, so
+// a reader who has scrolled a long board still has the three views in reach.
+// Only its placement and its visuals moved -- everything below this comment is
+// unchanged, because what it announces and how it takes a key are not the
+// shell's to redecide.
+//
 // A radio group, not a row of buttons or a checkbox: the views are mutually
 // exclusive options of one setting. `role="radiogroup"`/`role="radio"`
 // announce that relationship to assistive tech, but a role only describes --

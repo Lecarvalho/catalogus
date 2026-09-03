@@ -23,7 +23,6 @@ import { AppShell } from "./components/AppShell.js";
 import { ErrorState } from "./components/ErrorState.js";
 import { LoadingState } from "./components/LoadingState.js";
 import { MigrationList } from "./components/MigrationList.js";
-import { ProjectHeader } from "./components/ProjectHeader.js";
 import { ServicePage } from "./components/ServicePage.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
 import { serviceTileDomId } from "./components/ServiceTile.js";
@@ -92,6 +91,22 @@ export function App() {
   // panel from any of the three views -- the migration board joined the
   // same toggle for the same reason (ViewToggle.tsx's top comment).
   const [mode, setMode] = useState<ViewMode>("list");
+
+  // The moment this page was opened, for the footer's "read <relative time>".
+  //
+  // Read once, in a lazy initializer, rather than on every render: the footer
+  // states how stale the snapshot was when the reader arrived, and a value
+  // recomputed per render would make the same sentence say different things
+  // depending on what else happened to re-render. It does not tick either --
+  // the manifest is read once at server start (commands/view.ts) and nothing
+  // about it changes while this tab is open, so a timer here would spend a
+  // wakeup a second to redraw a phrase that only crosses a boundary once an
+  // hour.
+  //
+  // `Date.now()` lives here for the same reason `fetch` and `window` do: this
+  // is the one impure component in the app, and every component below it takes
+  // its instants as props (relative-time.ts's header).
+  const [renderedAt] = useState(() => Date.now());
 
   // Panel focus management: a click captures whatever had focus (the node
   // button just activated) so Escape can hand focus back to it, and the
@@ -555,97 +570,97 @@ export function App() {
   }, [selectedService]);
 
   return (
-    <AppShell manifestPath={state.kind === "loaded" ? state.payload.manifestPath : undefined}>
-      <main className={`${styles.page} ${mode === "graph" && !selectedService ? styles.wide : ""}`}>
-        {state.kind === "loading" && <LoadingState />}
-        {state.kind === "error" && <ErrorState message={state.message} />}
-        {state.kind === "loaded" && edgeMaps && (
-          <>
-            {/*
-              The masthead is the board's, not the app's. On a service page the
-              breadcrumb already names the project, and rendering both put two
-              `<h1>`s on one document -- the project's and the service's -- which
-              is wrong for a page whose subject is the service. A reader on a
-              service page needs the way back, which the breadcrumb is, not the
-              project's entry counts.
-            */}
-            {!selectedService && (
-              <ProjectHeader
-                project={state.payload.project}
-                serviceCount={state.payload.services.length}
-                edgeCount={state.payload.edges.length}
-                readAt={state.payload.readAt}
-              />
-            )}
+    // The masthead is gone as of 2026-09-03, with no replacement on the board.
+    // It stated the project's name, slug, visibility, architecture sentence and
+    // counts at the top of the field; the approved shell puts the first four in
+    // the left rail and the counts in the footer, and draws no masthead at all.
+    // Below 900px the rail is hidden, so the project name survives only in the
+    // top bar and the architecture sentence is then shown nowhere -- that is
+    // what the mockup does, and AppShell.module.css's breakpoint comment carries
+    // the cost of it rather than leaving it to be discovered.
+    //
+    // `showBandIndex` is the list view's alone: the rail's anchors point at the
+    // `<section>`s the board mounts, and the graph, the migrations board and a
+    // service page mount none.
+    <AppShell
+      payload={state.kind === "loaded" ? state.payload : undefined}
+      showBandIndex={state.kind === "loaded" && !selectedService && mode === "list"}
+      boardHead={state.kind === "loaded" && !selectedService ? <ViewToggle mode={mode} onChange={setMode} /> : undefined}
+      now={renderedAt}
+    >
+      {state.kind === "loading" && <LoadingState />}
+      {state.kind === "error" && <ErrorState message={state.message} />}
+      {state.kind === "loaded" && edgeMaps && (
+        <>
+          {/*
+            The page replaces the board rather than docking beside it. That is
+            the difference between a panel and a page, and leaving the old
+            panel on the click path produced a visible defect once the same
+            content became the hover popover: hovering a tile and then
+            clicking it rendered the identical facts twice, once floating and
+            once docked on the right.
 
-            {/*
-              The page replaces the board rather than docking beside it. That is
-              the difference between a panel and a page, and leaving the old
-              panel on the click path produced a visible defect once the same
-              content became the hover popover: hovering a tile and then
-              clicking it rendered the identical facts twice, once floating and
-              once docked on the right.
-
-              The toggle goes with the board. It selects between three views of
-              the *project*, and a service page is not one of them -- leaving it
-              on screen would offer to switch a view that is no longer showing.
-            */}
-            {selectedService ? (
-              <ServicePage
-                service={selectedService}
-                projectName={state.payload.project.name}
-                readAt={state.payload.readAt}
-                dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
-                dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
-                labelForId={edgeMaps.labelForId}
-                onBack={handleClose}
-                pageRef={panelRef}
-              />
-            ) : (
-              <>
-                <ViewToggle mode={mode} onChange={setMode} />
-                <div className={styles.body}>
-                  {mode === "list" ? (
-                    <ProjectBoard
-                      services={state.payload.services}
-                      readAt={state.payload.readAt}
-                      selectedId={selectedId}
-                      onActivate={handleActivate}
-                      onPeek={handlePeek}
-                      onPeekEnd={handlePeekEnd}
-                    />
-                  ) : mode === "graph" ? (
-                    <Suspense fallback={<p>Loading the graph…</p>}>
-                      <GraphCanvas
-                        services={state.payload.services}
-                        edges={state.payload.edges}
-                        selectedId={selectedId}
-                        onSelect={handleSelect}
-                        layout={layoutWithElk}
-                      />
-                    </Suspense>
-                  ) : (
-                    <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
-                  )}
-                </div>
-                {peek && mode === "list" && (
-                  <ServicePopover
-                    service={peek.service}
+            The toggle goes with the board. It selects between three views of
+            the *project*, and a service page is not one of them -- leaving it
+            on screen would offer to switch a view that is no longer showing.
+            It is handed to the shell as the board head now rather than
+            rendered here (see the `boardHead` prop above), so that condition
+            is stated once, up there, instead of twice.
+          */}
+          {selectedService ? (
+            <ServicePage
+              service={selectedService}
+              projectName={state.payload.project.name}
+              readAt={state.payload.readAt}
+              dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
+              dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
+              labelForId={edgeMaps.labelForId}
+              onBack={handleClose}
+              pageRef={panelRef}
+            />
+          ) : (
+            <>
+              <div className={styles.body}>
+                {mode === "list" ? (
+                  <ProjectBoard
+                    services={state.payload.services}
                     readAt={state.payload.readAt}
-                    position={peek.position}
-                    dependsOn={edgeMaps.dependsOn.get(peek.service.id) ?? []}
-                    dependedOnBy={edgeMaps.dependedOnBy.get(peek.service.id) ?? []}
-                    labelForId={edgeMaps.labelForId}
-                    onPointerEnter={cancelClose}
-                    onPointerLeave={handlePeekEnd}
-                    popoverRef={popoverRef}
+                    selectedId={selectedId}
+                    onActivate={handleActivate}
+                    onPeek={handlePeek}
+                    onPeekEnd={handlePeekEnd}
                   />
+                ) : mode === "graph" ? (
+                  <Suspense fallback={<p>Loading the graph…</p>}>
+                    <GraphCanvas
+                      services={state.payload.services}
+                      edges={state.payload.edges}
+                      selectedId={selectedId}
+                      onSelect={handleSelect}
+                      layout={layoutWithElk}
+                    />
+                  </Suspense>
+                ) : (
+                  <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
                 )}
-              </>
-            )}
-          </>
-        )}
-      </main>
+              </div>
+              {peek && mode === "list" && (
+                <ServicePopover
+                  service={peek.service}
+                  readAt={state.payload.readAt}
+                  position={peek.position}
+                  dependsOn={edgeMaps.dependsOn.get(peek.service.id) ?? []}
+                  dependedOnBy={edgeMaps.dependedOnBy.get(peek.service.id) ?? []}
+                  labelForId={edgeMaps.labelForId}
+                  onPointerEnter={cancelClose}
+                  onPointerLeave={handlePeekEnd}
+                  popoverRef={popoverRef}
+                />
+              )}
+            </>
+          )}
+        </>
+      )}
     </AppShell>
   );
 }

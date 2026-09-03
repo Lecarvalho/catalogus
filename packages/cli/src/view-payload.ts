@@ -12,8 +12,32 @@
 // mean". If that ever needs to change, change it in both places or extract
 // a shared helper; this file does not re-derive the rule from the schema
 // description on its own.
-import { edgeEndpoints, type CatalogusManifestV1, type ServiceEntry } from "@catalogus/schema";
+import { createRequire } from "node:module";
+
+import { catalogusSchemaV1, edgeEndpoints, type CatalogusManifestV1, type ServiceEntry } from "@catalogus/schema";
 import { getCatalogEntry, resolveIcon } from "@catalogus/core";
+
+/**
+ * This CLI's own version, read from its package.json rather than repeated
+ * here -- the same reason and the same mechanism as cli.ts's
+ * `packageVersion()`, which exists because a hardcoded copy had already
+ * drifted (`--version` said 0.1.0 while the package said 0.0.1). Two readers
+ * of one file, not two answers.
+ *
+ * `"../package.json"` resolves correctly from both layouts this module runs
+ * in: `src/view-payload.ts` under vitest and the tsup bundle sitting directly
+ * under `dist/`. package.json is package root's, and `src/` and `dist/` are
+ * both one level below it -- the same fact commands/view.ts's
+ * `findPackageRoot()` relies on from the other direction.
+ *
+ * Read once at module load, not per call: it is a property of the binary that
+ * is running, and it cannot change while the process lives.
+ */
+const CLI_VERSION: string = (() => {
+  const require = createRequire(import.meta.url);
+  const pkg = require("../package.json") as { version?: string };
+  return pkg.version ?? "0.0.0";
+})();
 
 export interface ViewPayload {
   /** Absolute path of the manifest file being served. */
@@ -26,6 +50,30 @@ export interface ViewPayload {
    * Phase 3.7 hardening pass).
    */
   readAt: string;
+  /**
+   * The version of the `catalogus` CLI serving this payload, from its own
+   * package.json (see CLI_VERSION below).
+   *
+   * It is here rather than fetched or guessed by the browser for the reason
+   * this whole module exists: the viewer is served *by* the CLI and has no
+   * other way to learn anything about it. The footer states it beside the
+   * schema URL so a reader looking at a screenshot, or filing a bug against
+   * the viewer, can say which binary drew it.
+   */
+  cliVersion: string;
+  /**
+   * The `$schema` URL this manifest is written against -- `catalogusSchemaV1`'s
+   * own `$id`, which is the same string `catalogus init` writes into the
+   * modeline at the top of every manifest.
+   *
+   * Carried in the payload rather than imported by the viewer because
+   * `@catalogus/schema`'s entry point pulls ajv in with it, and the sentence
+   * at the top of this file -- the browser gets plain data, never ajv -- is
+   * the reason this module exists at all. A literal typed into a stylesheet
+   * or a component would be a third copy of a string that already has one
+   * source of truth.
+   */
+  schemaUrl: string;
   project: {
     name: string;
     slug: string;
@@ -140,6 +188,8 @@ export async function buildViewPayload(
   return {
     manifestPath,
     readAt,
+    cliVersion: CLI_VERSION,
+    schemaUrl: catalogusSchemaV1.$id,
     project: {
       name: manifest.project.name,
       slug: manifest.project.slug,

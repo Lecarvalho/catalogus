@@ -73,10 +73,10 @@ const srcDir = fileURLToPath(import.meta.url).replace(/token-references\.test\.t
 
 const tokensCss = readFileSync(join(srcDir, "tokens.css"), "utf8");
 
-// Every custom property tokens.css declares, in any of its three blocks (the
-// light `:root`, the `prefers-color-scheme: dark` override, and the explicit
-// `:root[data-theme="dark"]` pin) -- a name declared in only one of the
-// three is still a name a stylesheet can legitimately reference. Matched
+// Every custom property tokens.css declares. There is one palette block since
+// 2026-09-03 (the dark override and its `data-theme` pin were removed by the
+// owner's decision), but the match is over the whole file on purpose, so a
+// block added later declares names this guard sees without an edit. Matched
 // only at the start of a line (after leading whitespace) so the deleted
 // migration bridge's replacement comment -- prose that *names* several
 // identifiers without declaring them -- is never mistaken for a declaration.

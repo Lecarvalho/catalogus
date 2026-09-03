@@ -23,10 +23,9 @@ import type { ViewPayload, ViewService } from "@catalogus/cli";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App.js";
-import appStyles from "./App.module.css";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
 import { serviceTileDomId } from "./components/ServiceTile.js";
-import { makeViewService } from "./test-support/fixtures.js";
+import { makeViewPayload, makeViewService } from "./test-support/fixtures.js";
 
 // elk-layout.ts reaches its worker through a Vite `?worker` import that
 // cannot be evaluated outside a browser -- importing it under jsdom throws at
@@ -82,16 +81,13 @@ beforeAll(() => {
  * but naming a real slug for each is what every test below actually means.
  */
 function payload(overrides: { services?: ViewService[]; edges?: { from: string; to: string }[] } = {}): ViewPayload {
-  return {
-    manifestPath: "C:/scratch/project/catalogus.yaml",
-    readAt: "2026-08-24T00:00:00.000Z",
-    project: { name: "Scratch", slug: "scratch" },
+  return makeViewPayload({
     services: overrides.services ?? [
       makeViewService({ id: "fly-api", role: "hosting-api", rollup: "hosting", name: "Fly.io", service: "flyio" }),
       makeViewService({ id: "supabase-db", role: "database", rollup: "database", name: "Supabase", service: "supabase" }),
     ],
     edges: overrides.edges ?? [{ from: "fly-api", to: "supabase-db" }],
-  };
+  });
 }
 
 /** Renders App with `fetch` answering one payload, and waits for the first tile to appear. */
@@ -283,16 +279,24 @@ describe("App -- the service page route", () => {
     await waitFor(() => expect(servicePage()).not.toBeNull());
   });
 
-  // The page replaces the board outright (App.tsx's own comment: two <h1>s
-  // on one document is wrong for a page whose subject is the service), so
-  // the toggle and the masthead must not still be sitting underneath it.
-  it("hides the board, the view toggle and the masthead while the page is open", async () => {
+  // The page replaces the board outright, so the toggle must not still be
+  // sitting underneath it -- it selects between three views of the project and
+  // a page is not one of them. Since 2026-09-03 the toggle is handed to the
+  // shell as the board head rather than rendered beside the board, so this also
+  // covers that App stops handing it over rather than merely stops rendering it.
+  //
+  // The masthead half of this test is gone with the masthead: there is no
+  // `<h1>` for the project anywhere any more (the rail names it as chrome), so
+  // asserting its absence on a service page would pass for the wrong reason.
+  // What replaced it is the rail's band index, which must also go: its anchors
+  // point at sections a service page does not mount.
+  it("hides the board, the view toggle and the band index while the page is open", async () => {
     await renderLoaded();
     fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
     await waitFor(() => expect(servicePage()).not.toBeNull());
     expect(screen.queryByRole("radiogroup")).toBeNull();
     expect(screen.queryByRole("heading", { level: 2, name: "Holds data" })).toBeNull();
-    expect(screen.queryByRole("heading", { level: 1, name: "Scratch" })).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Bands" })).toBeNull();
   });
 
   it("carries a back control that names the project and returns to the board", async () => {
@@ -1143,40 +1147,124 @@ describe("App -- the view toggle", () => {
     asserts();
   });
 
-  // The wide page is the canvas's alone -- a graph needs the horizontal room,
-  // a list, a board and the service page do not. This asserts the class
-  // App.tsx actually applies, not that the stylesheet defines a rule for it:
-  // vitest's CSS Module proxy synthesises a class name for *any* key
-  // (probed: an undefined key comes back as `_doesNotExist_<hash>`), so no
-  // test in this suite can see whether `.wide` still exists in
-  // App.module.css. What this can and does prove is App.tsx's own
-  // conditional -- both files resolve `styles.wide` to the same fabricated
-  // string, so the comparison is meaningful for that, and only that.
-  it("widens the page for the canvas only, and drops it once a service page opens", async () => {
-    // `!` because the base tsconfig sets noUncheckedIndexedAccess and
-    // vite/client types a CSS Module as an index signature.
-    const wide = appStyles.wide!;
-    await renderLoaded(migratingPayload());
-    const main = () => document.querySelector("main")!;
-    expect(main().classList.contains(wide)).toBe(false);
+  /*
+   * Two tests stood here until 2026-09-03 and are recorded rather than quietly
+   * dropped, because deleting a test is a claim that what it protected no
+   * longer exists.
+   *
+   * They asserted that `App.tsx` put a `wide` class on `<main>` for the graph
+   * and only the graph -- App.module.css's `.page` capped the app at a 1680px
+   * measure and `.wide` was the canvas's exemption from it, since a
+   * left-to-right layered DAG has no comfortable measure at all. What they
+   * could prove was narrow and they said so: vitest's CSS Module proxy
+   * synthesises a class name for any key, so no test in this suite could see
+   * whether `.wide` still existed in the stylesheet -- only that App applied
+   * whatever `styles.wide` resolved to.
+   *
+   * The approved shell has no measure to be exempt from. `<main>` is the
+   * shell's element now, the board fills whatever the rail leaves, and both
+   * rules were deleted with the wiring that applied them (App.module.css's
+   * header carries the full account). There is no conditional left for a test
+   * to check: the graph gets the window at every width, which is what `.wide`
+   * existed to arrange.
+   */
 
-    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
-    await waitFor(() => expect(main().classList.contains(wide)).toBe(true));
-
-    fireEvent.click(screen.getByRole("radio", { name: "Migrations" }));
-    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull());
-    expect(main().classList.contains(wide)).toBe(false);
-  });
-
-  it("drops the wide class once a service page opens from the graph, even though mode is still 'graph'", async () => {
-    const wide = appStyles.wide!;
+  // What survives from those two is the part that was never about the measure:
+  // the graph and the migrations board are three views of the project and the
+  // service page replaces all of them, so the shell's board head must be gone
+  // on a page opened from the graph even though `mode` is still "graph".
+  it("drops the view rail when a service page opens from the graph, though the mode is still 'graph'", async () => {
     await renderLoaded();
-    const main = () => document.querySelector("main")!;
     fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
-    await waitFor(() => expect(main().classList.contains(wide)).toBe(true));
+    await waitFor(() => expect(screen.queryByText(/Arrows point from a service/)).not.toBeNull());
 
     fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
     await waitFor(() => expect(servicePage()).not.toBeNull());
-    expect(main().classList.contains(wide)).toBe(false);
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+  });
+});
+
+/*
+ * The shell, from App's side of the wiring. What the top bar, the rail and the
+ * footer *say* is covered by their own suites; what is only visible from here
+ * is which of them App turns on, and when.
+ */
+describe("App wires the shell", () => {
+  /** One entry phasing out, so the migrations board has something to head with. */
+  const migrating = () =>
+    payload({
+      services: [
+        makeViewService({ id: "fly-api", role: "hosting-api", rollup: "hosting", name: "Fly.io", service: "flyio" }),
+        makeViewService({
+          id: "supabase-db",
+          role: "database",
+          rollup: "database",
+          name: "Supabase",
+          service: "supabase",
+          status: "phasing_out",
+          replaced_by: "fly-api",
+        }),
+      ],
+    });
+
+  it("frames every view in the shell -- top bar, rail, footer -- once the payload arrives", async () => {
+    await renderLoaded();
+    expect(screen.getByRole("banner").textContent).toContain("Catalogus");
+    expect(screen.getByRole("navigation", { name: "Bands" })).not.toBeNull();
+    expect(screen.getByRole("contentinfo").textContent).toContain("2 services");
+  });
+
+  it("states the CLI version and the schema URL the payload carries, and nothing this app made up", async () => {
+    await renderLoaded(payload());
+    const footer = screen.getByRole("contentinfo").textContent!;
+    // makeViewPayload's default is deliberately not @catalogus/cli's own
+    // version, so a footer reading the package instead of the payload fails.
+    expect(footer).toContain("catalogus 9.9.9");
+    expect(footer).toContain("catalogus.dev/schema/v1.json");
+  });
+
+  // The band anchors point at sections only the list view mounts. The rail's
+  // identity block survives everywhere; the index does not.
+  it("keeps the rail on the graph and the migrations board but drops the band index there", async () => {
+    // Two elements name the project -- the top bar and the rail -- so the
+    // count is the assertion: one alone would mean the rail went with its
+    // index, which is a different shell at three of the four destinations.
+    const namesTheProject = () => screen.getAllByText("Scratch").length;
+    await renderLoaded(migrating());
+    expect(screen.getByRole("navigation", { name: "Bands" })).not.toBeNull();
+    expect(namesTheProject()).toBe(2);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
+    await waitFor(() => expect(screen.queryByRole("navigation", { name: "Bands" })).toBeNull());
+    expect(namesTheProject()).toBe(2);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Migrations" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull());
+    expect(screen.queryByRole("navigation", { name: "Bands" })).toBeNull();
+    expect(namesTheProject()).toBe(2);
+  });
+
+  // Every band the rail indexes has to have its section on the board. This
+  // resolves each href against the rendered document rather than trusting that
+  // two files agree about `band-<id>`.
+  it("gives every band anchor in the rail a section on the board to land on", async () => {
+    await renderLoaded();
+    const hrefs = screen.getAllByRole("link").map((link) => link.getAttribute("href")!);
+    expect(hrefs.length).toBeGreaterThan(0);
+    for (const href of hrefs) {
+      expect(document.getElementById(href.slice(1)), `${href} points at nothing on the board`).not.toBeNull();
+    }
+  });
+
+  // While the payload is still in flight there is no path, no project and no
+  // counts -- so the rail and the footer are not rendered at all. A shell that
+  // drew them empty would be showing placeholders for facts it does not have.
+  it("renders the bar but no rail and no footer while the payload is still loading", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    render(<App />);
+    expect(screen.getByRole("banner").textContent).toContain("Catalogus");
+    expect(screen.getByRole("status")).not.toBeNull();
+    expect(screen.queryByRole("contentinfo")).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Bands" })).toBeNull();
   });
 });

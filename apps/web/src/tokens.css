@@ -243,6 +243,18 @@
    * ServicePopover.module.css still render the bordered-tile world above,
    * nothing here is consumed by a component yet, and nothing above this
    * group was changed to make room for it.
+   *
+   * Two sentences of that paragraph have since stopped being true, and they
+   * are corrected here rather than left standing. The components named above
+   * were rebuilt against these tokens on 2026-08-31, so "nothing here is
+   * consumed by a component yet" describes a state that lasted five days. And
+   * this block used to end by saying the app shell "is separately approved and
+   * frozen, unchanged from before, so none of its geometry is added here" --
+   * which was accurate while the shell was the retired world's bar, and became
+   * wrong the moment the shell was built to the mockup on 2026-09-03. Frozen
+   * means *do not reinterpret it*; it never meant the numbers stay out of the
+   * token layer. The shell's own block sits below, read off the same file as
+   * everything else here.
    */
 
   /*
@@ -409,6 +421,131 @@
   --graph-legend-gap: 16px;
   --graph-message-padding: 24px;
 
+  /*
+   * The app shell -- top bar, left rail, the board's frame, footer. Added
+   * 2026-09-03, when the shell was finally built; every value is read off
+   * candidate-e-homescreen.html's `.topbar`, `.tb-btn`, `.avatar`, `.rail`,
+   * `.board`, `.board-head`, `.view-tab` and `.footer` rules, the same way the
+   * board and popover blocks above were read off theirs.
+   *
+   * The owner approved this shell on sight and froze it -- "your new app shell
+   * is perfect, don't touch it" -- so unlike the service page and the graph
+   * node further up, not one number here is chosen. That is the whole reason
+   * the block is this granular: a frozen artifact's geometry is a record, and
+   * a record kept as literals scattered across four stylesheets is a record
+   * nobody can check against the artifact.
+   *
+   * **Nothing here rounds onto the `--space-*` ramp**, and the near-misses that
+   * would have produced are the reason the rule is restated here: 26px, 18px,
+   * 14px, 13.5px, 10.5px, 7px, 2px. That ramp (2/4/8/12/16/24/32) belongs to
+   * the dense world above and its steps are not this world's -- the icon
+   * label's own three gaps carry the same note for the same reason.
+   *
+   * The two breakpoints the shell turns on -- 900px, where the rail leaves and
+   * the board's padding tightens, and 480px, where the top bar, board and
+   * footer tighten again -- are not tokens: a media query prelude cannot read a
+   * custom property. They are written as literals in AppShell.module.css, and
+   * that file's comment is where they are recorded.
+   *
+   * The three menu surface widths (272px, 340px, 300px) are deliberately
+   * absent. The help / settings / profile menus are a separate brief and no
+   * menu surface exists yet; a width sitting here with nothing reading it is
+   * exactly the "permission that outlived its rule" shape signal-red.test.ts
+   * refuses in its own allow-list.
+   */
+  --topbar-height: 60px;
+  --topbar-padding-x: 28px;
+  --topbar-padding-x-narrow: 14px;
+  /* The wordmark is set to the mockup's own `.wordmark`, which is mixed case
+     at 16.5px with negative tracking -- not the caps-and-positive-tracking
+     treatment BrandMark wore in the dense world, where it was deliberately
+     quieter than the page's `<h1>`. There is no `<h1>` in the chrome now; the
+     rail carries the project name and the bar carries the product's. */
+  --topbar-lockup-gap: 14px;
+  --text-wordmark: 16.5px;
+  --track-wordmark: -0.01em;
+  --text-topbar-sep: 15px;
+  --text-topbar-project: 14.5px;
+
+  /* The help / settings / profile cluster. The buttons exist and their menus
+     do not yet, so these size the triggers only. */
+  --topbar-cluster-gap: 4px;
+  --tb-btn-padding: 7px 12px;
+  --tb-btn-gap: 7px;
+  --text-tb-btn: 13.5px;
+  --tb-icon-size: 16px;
+  --avatar-size: 26px;
+  --text-avatar: 11px;
+
+  /* The left rail: identity, then the band index. Its width is the one number
+     in this block that a reader of the layout has to know -- the board takes
+     whatever is left of the window after it. */
+  --rail-width: 240px;
+  --rail-padding: 26px 20px 20px;
+  --text-rail-project: 17px;
+  --rail-visibility-gap: 8px;
+  --rail-visibility-padding: 2px 7px;
+  --text-rail-visibility: 10.5px;
+  --track-rail-visibility: 0.04em;
+  --rail-sentence-gap: 12px;
+  --text-rail-sentence: 12.5px;
+  --leading-rail-sentence: 1.6;
+  --rail-manifest-gap: 10px;
+  --text-rail-manifest: 11px;
+  --rail-divider-gap: 20px;
+  --text-rail-heading: 11px;
+  --track-rail-heading: 0.04em;
+  --rail-heading-gap: 10px;
+  /* The band rows are inset by their own horizontal padding (`margin: 0 -8px`
+     against `padding: 7px 8px`) so the hover fill bleeds past the text while
+     the labels stay flush with the heading above them. Two numbers, one
+     alignment -- they move together or the column loses its left edge. */
+  --rail-band-padding: 7px 8px;
+  --rail-band-inset: 8px;
+  --text-rail-band: 13.5px;
+  --text-rail-count: 12px;
+
+  /* The board's own frame, which is the shell's rather than the board's: the
+     rail bounds it on the left and the window on the right, and both of the
+     shell's breakpoints move these. `--board-head-padding-top/bottom` above
+     belong to the same surface and were added with the board's block. */
+  --board-padding-x: 40px;
+  --board-padding-bottom: 64px;
+  --board-padding-x-mid: 20px;
+  --board-padding-bottom-mid: 48px;
+  --board-padding-x-narrow: 14px;
+  --board-padding-bottom-narrow: 40px;
+  --board-head-gap: 8px;
+  --view-rail-gap: 26px;
+  --view-tab-padding: 4px 0 12px;
+  --text-view-tab: 14px;
+  /*
+   * The head's rendered height, derived rather than measured: its two
+   * paddings, one tab (type at the body leading, the tab's own 4px + 12px
+   * padding, the 2px underline every tab reserves) and the hairline. It exists
+   * for one consumer, the band sections' `scroll-margin-top`
+   * (BandModule.module.css): the rail's anchors jump a band to y=0, which is
+   * where the sticky head sits, so without the offset every heading a reader
+   * clicks lands 44px behind the view rail and the page reads as if it never
+   * scrolled. Found by a validator at 1280 and 1024 on 2026-09-03; the mockup
+   * cannot show it because its own `overflow-x: hidden` on html/body stops its
+   * head from ever sticking. If any term below changes, this changes with it.
+   */
+  --board-head-height: calc(
+    var(--board-head-padding-top) + var(--board-head-padding-bottom) +
+    var(--text-view-tab) * var(--leading-body) + 16px + 2px + 1px
+  );
+
+  /* The footer: the session's facts on the same header fill as the top bar,
+     which is what makes the two read as one frame around the document. */
+  --footer-padding: 16px 28px;
+  --footer-padding-narrow: 14px;
+  --footer-gap: 24px;
+  --footer-group-gap: 18px;
+  --text-footer: 12px;
+  --text-footer-manifest: 11.5px;
+  --text-footer-schema: 11px;
+
   /* Transient surfaces: this world's popover carries the radius and shadow
      "soft transients" allows, in place of the old world's hard offset block
      (ServicePopover.module.css) wherever this world's popover ships. */
@@ -420,81 +557,23 @@
 }
 
 /*
- * System preference only -- no in-app toggle (PLAN.md's Phase 3.7 scope
- * explicitly declines one). This is the light design translated, not a
- * second design: the same one-signal-colour rule, the same hairline mosaic,
- * ink and ground swapped. The signal lightens because #d40010 on near-black
- * fails contrast; everything else is a direct inversion.
- */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --color-bg: #14120f;
-    --color-surface: #1b1815;
-    --color-surface-sunken: #100e0c;
-    --color-header-fill: #24201b;
-    --color-text: #f2eee4;
-    --color-text-muted: #a39d90;
-    --color-text-faint: #7a7568;
-
-    --color-line: #332f28;
-    --color-line-strong: #f2eee4;
-
-    --color-signal: #ff6b60;
-    --color-signal-ink: #1a0c0a;
-    --color-signal-wash: #2c1815;
-
-    --tag-deprecated-bg: #f2eee4;
-    --tag-deprecated-ink: #14120f;
-    --tag-removed-bg: #423d34;
-    --tag-removed-ink: #ccc5b6;
-
-    --icon-fallback-fill: #8d8778;
-    --icon-fallback-bg: #24201b;
-    --icon-tile-line: #332f28;
-
-    color-scheme: dark;
-  }
-}
-
-/*
- * The same dark values under an explicit `data-theme="dark"`, and the
- * `:not([data-theme="light"])` guard above, so the theme can be pinned rather
- * than only inherited from the OS.
+ * No dark palette, as of 2026-09-03, by the owner's decision. Two blocks stood
+ * here: a `prefers-color-scheme: dark` translation of the light palette, and
+ * the same values pinned under `:root[data-theme="dark"]` as a seam for
+ * viewing either palette on any OS. Both were the old world's, kept past its
+ * retirement, and they had one effect nobody intended: this app was built on a
+ * dark-set machine and the owner's own machine is dark-set, so the approved
+ * cream world -- the one the candidates were drawn in and chosen from -- was
+ * never once what the app showed to the person who approved it. The first
+ * real-inventory run (docs/PLAN.md, 2026-09-03) came back as dark screenshots
+ * with a near-black brand mark reported invisible. The owner: "Remove dark for
+ * now, the approved was light."
  *
- * This is **not** the in-app toggle Phase 3.7's scope declined: nothing in
- * the UI sets this attribute and no control exists to. It is a seam, and it
- * exists because without it the light palette -- which is the committed
- * design, the one the world was chosen for -- cannot be looked at on a
- * machine whose OS is set to dark, which is the machine this was built on.
- * A design nobody can view is a design nobody has checked.
+ * So `color-scheme: light` above is the whole answer to the OS, and there is
+ * no `data-theme` attribute anywhere for anything to set. A dark theme, if one
+ * returns, is a settings-menu fact (the shell's menus brief) with a design of
+ * its own, not an inversion of this one.
  */
-:root[data-theme="dark"] {
-  --color-bg: #14120f;
-  --color-surface: #1b1815;
-  --color-surface-sunken: #100e0c;
-  --color-header-fill: #24201b;
-  --color-text: #f2eee4;
-  --color-text-muted: #a39d90;
-  --color-text-faint: #7a7568;
-
-  --color-line: #332f28;
-  --color-line-strong: #f2eee4;
-
-  --color-signal: #ff6b60;
-  --color-signal-ink: #1a0c0a;
-  --color-signal-wash: #2c1815;
-
-  --tag-deprecated-bg: #f2eee4;
-  --tag-deprecated-ink: #14120f;
-  --tag-removed-bg: #423d34;
-  --tag-removed-ink: #ccc5b6;
-
-  --icon-fallback-fill: #8d8778;
-  --icon-fallback-bg: #24201b;
-  --icon-tile-line: #332f28;
-
-  color-scheme: dark;
-}
 
 /*
  * The migration bridge that stood here is gone, 2026-08-26. It aliased eight

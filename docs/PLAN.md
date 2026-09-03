@@ -74,9 +74,10 @@ design decisions; this file tracks *what has been built* against it and what rem
   rendered candidates. `japanese-high-density-web` is retired; what replaces it is a Notion-register
   world on the same warm cream ground, with the board as a smartphone home screen — bare icons, no
   card. The app shell is separately approved and frozen. The mockups are committed at
-  `apps/web/docs/candidates/` and are the specification for the component work, **which has not
-  started**. See the newest handoff, directly under "Start here".
-- **Last updated:** 2026-08-26
+  `apps/web/docs/candidates/` and are the specification for the component work, **which is built
+  and validated as of 2026-09-03 except the three shell menus and the portfolio page**. See the
+  newest handoff, directly under "Start here".
+- **Last updated:** 2026-09-03
 
 ## Start here on a fresh session
 
@@ -85,7 +86,7 @@ trusting anything below. **In that order**: the direction contract guard compare
 `apps/web/index.html` against the build output, so a `pnpm test` run against a `dist` older than your
 last edit to that file fails on a difference you created and already fixed.
 
-**The expected total as of 2026-09-02 is 1317 tests / 75 files** (see the newest handoff). The paragraph that follows is the 2026-08-26 history of why this line once named none.
+**The expected total as of 2026-09-03 is 1375 tests / 77 files** (see the newest handoff). The paragraph that follows is the 2026-08-26 history of why this line once named none.
 
 **The expected total moved on 2026-08-26 and this line no longer names one.** It said **1218 tests /
 72 files**, which was correct at the start of that session and is the number to compare against if
@@ -128,6 +129,96 @@ validation pass, which is the more interesting number of the two.)
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
+
+### Handoff — 2026-09-03, the shell's structure is built, and one defect the mockup could not show
+
+**Read this first.** One session, one brief: `docs/shell-brief.md` (kept as the record of what was
+asked; it has been run and is not to be run again). The design is unchanged. What is left of the
+component work is **the three shell menus**, blocked on the owner, and the portfolio page.
+
+**What is built and verified.** The top bar (60px, relative, not sticky), the 240px left rail
+(identity block, visibility chip only when the payload has one, band index as plain anchors), the
+view rail moved into a sticky board head, and the footer (manifest path, "read <relative time>",
+service / dependency / rollup counts, `catalogus <version>`, schema URL) — all in `apps/web/src`
+as `AppShell`, `Rail`, `Footer`, `ViewToggle`, with `relative-time.ts` as a pure helper.
+`ViewPayload` gained `cliVersion` (from the CLI's own `package.json`, the same mechanism as
+`--version`) and `schemaUrl` (from `catalogusSchemaV1.$id`, because the web app cannot import the
+schema package without bundling ajv — a validator confirmed ajv is absent from `apps/web/dist`).
+`ProjectHeader.*` is deleted; identity lives in the rail. A validator that did not write it drove
+the built app and the mockup side by side at **1600 / 1440 / 1280 / 1024 / 900 / 768 / 480 / 390**
+(same-origin iframes, because Chrome's resize tool reports success and leaves the window at 2326px
+— record that before trusting a "resized to" line again) and found every shell value identical to
+the mockup at every width, both breakpoints firing together, no horizontal overflow anywhere, and
+the popover unclipped and off its tile with the rail and sticky head around it at 1280×720 and
+1024×768.
+
+**The one defect, and why no test or mockup could show it.** Clicking a rail anchor scrolled the
+band to y=0, where the 84px sticky head sits, so every heading a reader clicked landed 44px behind
+the view rail and the page read as if it had not scrolled. The mockup cannot reproduce it: its own
+`overflow-x: hidden` on `html, body` stops its head from ever sticking, so the mockup's head is
+sticky in name only. jsdom has no layout, so the 1379 passing tests are no evidence either way.
+Fixed with `--board-head-height` in `tokens.css` (a calc of the head's own tokens, 84px) and
+`scroll-margin-top` on the band section; re-validated at 1280 and 1024 — all eight anchors land the
+heading 40px clear of the head. **The lesson is the standing one, in a new shape: a static mockup
+is a specification for what it draws, not for what it does, and "sticky" is a behaviour.**
+
+**Two files were edited outside the brief's allocation, both necessarily.** `BrandMark.module.css`
+(the wordmark rule the brief asked to match lives only there; CSS Modules hash per file) and
+`App.module.css` (`.page`'s 1680px max-width would have absorbed the rail row's free space, the
+defect the old `AppShell` comment warned about; `.page` and `.wide` are gone with the wiring that
+applied them).
+
+**Deliberate deviations from the mockup, all small and all recorded in code:** singular forms at a
+count of one (the mockup can only show 35/48/21); `cursor: pointer` on the cluster triggers; the
+avatar disc is empty (no account until Phase 5); **no Documentation link is rendered** anywhere,
+because no URL exists, and the `index.html` disclosure names that as an open item with a pinned
+string in `direction-contract.test.ts` so it cannot be closed by guessing.
+
+**Two observations, not defects, for the owner:** a popover that flips above its tile in the last
+band covers the view rail while open (unclipped, dismissable; a design call); and below about 480px
+the project is named nowhere on the page — the rail is gone and the cluster takes the bar's width,
+which the mockup does identically at 390. The architecture sentence has no home below 900px, as
+before.
+
+**State of the tree at this handoff: 1375 tests / 77 files**, green on consecutive runs,
+`pnpm typecheck` clean across four packages. 1379 / 77 after the shell; four fewer after the dark
+palette left (the per-licence and per-block cases in `signal-red.test.ts` that guarded it).
+Uncommitted at the time of writing; the previous baseline was 1317 / 75 at `cfefea7`.
+
+**What the next session does first:** the three menus, once the owner answers the questions in the
+2026-09-02 handoff below (plus the Documentation URL, which now blocks the footer as well as the
+help menu). Nothing else in the shell is open.
+
+#### The owner's first run against a real inventory — 2026-09-03, six findings, in the order to take them
+
+The owner ran `catalogus view` on Clapline (36 services) — the first real-inventory run, closing
+open item 1 of the 2026-08-25 list. Their screenshots were **dark**: the OS is dark and `tokens.css`
+still carries the old world's `prefers-color-scheme: dark` block, so the approved cream world has
+never been what the owner saw in the app. That one fact explains two of the six findings. Order:
+
+1. ✅ **Cream only** (2026-09-03, same session). The owner: *"Remove dark for now, the approved was
+   light."* Both dark blocks and the `data-theme` seam are gone from `tokens.css`; the two dark
+   licences left `signal-red.test.ts`'s self-cleaning list with them. Expected to fix finding 3
+   for free: Anthropic's brand hex is `#191919`, invisible on near-black and ink-strength on cream.
+   Re-check icon contrast on cream *after* this, not before — nobody has seen the icons on cream
+   against a real inventory yet.
+2. **Missing icons — AWS, C#, OpenAI, Slack, Loki, Vertex AI.** Not a bug: `simple-icons@16.28`
+   carries none of the first four (trademark removals) nor Loki, and Vertex AI has no row; the
+   initials tile is the designed fallback. **Owner's answer:** the source is https://thesvg.org/
+   — check its licence terms per icon before bundling any, record the licence beside each, and
+   route the six named brands through it first. Hand-drawn brand-shaped marks stay forbidden
+   (`fallback-icons.tsx`).
+3. **Board width on wide screens.** Owner asked whether to centre. Recommendation recorded in the
+   session reply: cap the rail+board row at a max width and centre it (the old `.page` did 1680px;
+   the mockup was only ever drawn at 1600). **Owner said OK** to centring; the number is still
+   theirs (1600 or 1680) — ask once, then a small edit.
+4. **One tile per brand.** Fly.io ×5, Vertex AI ×2, Namecheap ×2 in one band; Supabase across two
+   bands. Tile per brand, popover lists the entries briefly, the brand's page lists them, each
+   entry keeps its own page. **Owner's answer: per band, for v1** — Supabase keeps a tile in each
+   of its two bands; "if it repeats too much we improve later." This changes the wall, the popover,
+   the service page, the graph node and the counts — a brief per surface, not one brief.
+5. **The service page needs to breathe.** Design work; brief it together with 4, since the brand
+   page and the entry page become two pages.
 
 ### Handoff — 2026-09-02, the three views join the world, and the red rule is finally guarded
 
@@ -198,7 +289,7 @@ once the owner answers what a settings toggle does and what the profile menu hol
 The owner stopped the session near the 5-hour limit with the shell brief just launched; the agent
 was killed before it edited anything, and the tree is clean at `cfefea7` plus this file and the brief.
 
-1. **Run `docs/shell-brief.md`.** It is the shell's *structure* — top bar, left rail with the band
+1. ~~**Run `docs/shell-brief.md`.**~~ ✅ done 2026-09-03, see the handoff above. It is the shell's *structure* — top bar, left rail with the band
    index, the view rail moved into a sticky board-head, the footer — every value derivable from the
    mockup and the payload. One opus agent, allowed to fan out; its file allocation is in the brief.
    Then one validator driving the built app against `candidate-e-homescreen.html` at
@@ -215,10 +306,8 @@ was killed before it edited anything, and the tree is clean at `cfefea7` plus th
   `signal-red.test.ts` until answered.)
 - Profile menu with no account system until Phase 5: omit the trigger, or show it with a menu that
   says so?
-- Settings panel: appearance / density / brand-icon colour / default view imply persisted
-  preferences and a dark theme. Nothing persists today, and the approved world is cream only —
-  `tokens.css` still carries a `prefers-color-scheme: dark` block from the old world that renders a
-  dark app on a dark OS. Keep dark (then the contract needs amending) or remove it?
+- ~~Settings panel: dark theme — keep or remove?~~ **Answered 2026-09-03: removed.** What a
+  settings panel holds with nothing persisted is still open.
 - Documentation link target in help menu and footer: there is no docs URL in the repo.
 - Popover below 480px: the bottom sheet covers 115–143px of its tile. Accept, or place it elsewhere?
 
@@ -533,9 +622,11 @@ done in parallel.
 1. ✅ (2026-08-31, `e1f7dba`) **The wall** — `ServiceTile`, `BandModule`, `ProjectBoard`. Bare icons on the ground, two-line
    label (vendor name then `id`), corner status badge, desaturated mark and worded status. This is
    the biggest piece and the one the owner will look at first.
-2. ⬜ **The shell** — `AppShell` gains the help / settings / profile cluster, their menus, and the
-   footer. Reproduce the approved mockup rather than reinterpreting it; the owner has already called
-   this design finished.
+2. ✅ structure (2026-09-03), ⬜ menus **The shell** — `AppShell` gains the help / settings / profile
+   cluster, their menus, and the footer. Reproduce the approved mockup rather than reinterpreting it;
+   the owner has already called this design finished. The top bar, rail, sticky board head and
+   footer are built and measured against the mockup at eight widths; the three menus wait on the
+   owner's answers (see the 2026-09-03 handoff).
 3. ✅ (2026-09-02, `d9001b1`) **The service page** — `ServicePage` in the new world.
 4. ✅ (2026-09-02, `d9001b1`) **Graph and Migrations** — both are already citizens of the *old* world as of earlier on
    2026-08-26. They have to move again. Do not skip this: the last time one view moved and the others

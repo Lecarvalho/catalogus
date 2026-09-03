@@ -1,0 +1,92 @@
+/*
+ * The footer, drawn to the approved shell's `.footer` rules
+ * (docs/candidates/candidate-e-homescreen.html). Header fill and a hairline on
+ * top -- the same two the top bar spends, which is what makes the pair read as
+ * one frame around the document rather than as two unrelated strips.
+ *
+ * `flex: 0 0 auto` in a column that is `min-height: 100vh`: the footer sits
+ * after the content, at the bottom of a short page and after the scroll on a
+ * long one. It is not fixed and not sticky. A pinned footer on a board whose
+ * whole argument is "one screen you scroll rather than one you must fit into"
+ * (THESIS) would spend a permanent 50px of that screen restating facts nobody
+ * is reading twice.
+ *
+ * Both groups wrap. At 900px the rail leaves and the board widens, but the
+ * right-hand group is six items of running text and there is a width where it
+ * cannot share a line with the path -- `flex-wrap` on the container puts the
+ * groups on two lines and `flex-wrap` on each group breaks within one, rather
+ * than either overflowing or being truncated. No signal red anywhere in here:
+ * a count is the clause OWN-WORLD names directly ("not a view, not a count").
+ */
+.footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--footer-gap);
+  padding: var(--footer-padding);
+  background: var(--color-header-fill);
+  border-top: 1px solid var(--color-line);
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--footer-group-gap);
+  font-size: var(--text-footer);
+  color: var(--color-text-muted);
+}
+
+/* The numeral in each count, and the version. Full-strength ink against the
+   muted noun beside it, which is the whole hierarchy this strip has: the
+   numbers are what a reader scans for and the words are what they mean. */
+.group b {
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+}
+
+/*
+ * The manifest path. Mono for the same reason it is mono everywhere else in
+ * this app -- it is a literal a reader may need to copy -- and left to wrap
+ * rather than truncated, because this strip already wraps and there is no
+ * second copy of the path below the 900px breakpoint where the rail's copy
+ * disappears.
+ */
+.manifest {
+  font-family: var(--font-mono);
+  font-size: var(--text-footer-manifest);
+  color: var(--color-text-faint);
+  word-break: break-all;
+}
+
+/* The separator, drawn in the hairline colour so it reads as punctuation
+   rather than as a word. `aria-hidden` in the component; this is its whole
+   appearance. */
+.dot {
+  color: var(--color-line);
+}
+
+.schema {
+  font-family: var(--font-mono);
+  font-size: var(--text-footer-schema);
+  color: var(--color-text-faint);
+}
+
+/*
+ * The mockup's own `@media (max-width: 480px) { .footer { padding: 14px } }` --
+ * a single value, so the strip loses its extra horizontal air at the width
+ * where the top bar and the board lose theirs. The 900px breakpoint does not
+ * touch the footer: the rail leaving gives the board more room and takes none
+ * from this.
+ *
+ * The rule is here rather than with the shell's other two breakpoints for the
+ * reason AppShell.module.css states: CSS Modules hash each file's class names
+ * separately, so `.footer` written there would select nothing.
+ */
+@media (max-width: 480px) {
+  .footer {
+    padding: var(--footer-padding-narrow);
+  }
+}

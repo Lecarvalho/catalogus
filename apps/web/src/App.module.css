@@ -1,28 +1,31 @@
-/* The measure used to be 960px, on the reasoning that "the list is a column
-   of tiles that reads badly past a comfortable measure" while "the graph
-   wants the window". The first half of that stopped being true when the list
-   became a mosaic: a multi-column field of band modules spends width the way
-   the DAG does -- every extra column is another band visible without
-   scrolling -- and 960px on a 1440px screen was two-fifths of the display
-   holding a project that was supposed to fit on one screen.
-
-   1680px rather than none, because the columns are 300px and an unbounded
-   width on a very wide display eventually produces a row of modules so long
-   that the eye loses which band it is in. */
-.page {
-  max-width: 1680px;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-/* The graph still wants every pixel: a left-to-right layered DAG has no
-   comfortable measure at all, and panning is the cost of any bound. */
-.wide {
-  max-width: none;
-}
+/*
+ * `.page` and `.wide` were here until 2026-09-03 and are recorded rather than
+ * silently deleted, because what retired them is a decision and not a tidy-up.
+ *
+ * `.page` was the app's own measure: 1680px, centred, with the page's padding
+ * on it. It had been 960px before the board became a mosaic, and it was widened
+ * on the argument that "every extra column is another band visible without
+ * scrolling" while a bound was still worth keeping, since an unbounded row of
+ * 300px modules on a very wide display loses the reader track of which band
+ * they are in. `.wide` was the graph's exemption from that bound -- a
+ * left-to-right layered DAG has no comfortable measure at all, and panning is
+ * the cost of any bound -- applied by `App.tsx` on the canvas and only there.
+ *
+ * The approved shell has no measure to exempt anything from. The rail bounds
+ * the board on the left and the window bounds it on the right, the board's own
+ * padding is the shell's (AppShell.module.css's `.board`, at three widths), and
+ * `<main>` is the shell's element now rather than this file's. So `.wide` has
+ * nothing to widen and `.page` has nothing left to hold: both were deleted with
+ * the wiring that applied them, in the same change, rather than left behind as
+ * rules nothing selects.
+ *
+ * The mosaic argument that produced the 1680px bound is not wrong; it is moot.
+ * Candidate E is a single vertical stack of full-width bands
+ * (ProjectBoard.module.css), so there is no row of columns for a reader to lose
+ * their place in, and the widest display just gives each band more icons per
+ * row. If a measure is ever wanted again it is the shell's to add, on `.board`,
+ * where the padding already lives.
+ */
 
 /* Holds whichever of the three views is showing -- the board, the graph
    canvas or the migration board -- and nothing else.

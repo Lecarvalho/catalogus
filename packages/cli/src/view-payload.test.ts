@@ -1,4 +1,6 @@
-import { parseManifest } from "@catalogus/schema";
+import { createRequire } from "node:module";
+
+import { catalogusSchemaV1, parseManifest } from "@catalogus/schema";
 import { describe, expect, it } from "vitest";
 
 import { buildViewPayload } from "./view-payload.js";
@@ -82,6 +84,29 @@ describe("buildViewPayload", () => {
       architecture: "two-tier",
       vcs: { visibility: "private" },
     });
+  });
+
+  // Asserted against package.json read here rather than against the literal
+  // "0.0.1", because a literal in a test is the second hardcoded copy of the
+  // version -- the exact thing cli.ts's `packageVersion()` exists to prevent,
+  // and the exact way a version test goes on passing after the package is
+  // bumped and the payload is not. The equality is what is under test; the
+  // number is not this file's to know.
+  it("states the version of the CLI that built it, read from the package rather than repeated", async () => {
+    const pkg = createRequire(import.meta.url)("../package.json") as { version: string };
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
+    expect(payload.cliVersion).toBe(pkg.version);
+    expect(payload.cliVersion).not.toBe("");
+  });
+
+  // The same shape of check for the schema URL: `catalogusSchemaV1.$id` is the
+  // one source, and it is also the string `catalogus init` writes into every
+  // manifest's `$schema` modeline. Comparing the payload to that constant
+  // fails if either side is retyped; comparing it to a literal here would only
+  // prove that two literals match.
+  it("states the schema URL as @catalogus/schema's own $id, not as a second copy of it", async () => {
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
+    expect(payload.schemaUrl).toBe(catalogusSchemaV1.$id);
   });
 
   it("omits project fields the manifest never set, rather than inventing a placeholder", async () => {

@@ -1,0 +1,139 @@
+/*
+ * The rail, drawn to the approved shell's `.rail` rules
+ * (docs/candidates/candidate-e-homescreen.html). Every value here is a token
+ * from tokens.css's shell block, and every one of those was read off that
+ * file -- the owner froze this shell on sight, so none of this geometry is
+ * anyone's to choose.
+ *
+ * A surface fill and a hairline on the right edge, which is where OWN-WORLD
+ * says this world's greys live now: "hairline grey and light grey move off the
+ * services entirely and onto the shell -- the topbar, the footer, a rail
+ * divider, a popover's own rule". The services carry no border precisely so
+ * that these three can.
+ *
+ * The rail does not scroll independently of the page and is not sticky. The
+ * board is one long scroll and the band anchors jump within it; a rail pinned
+ * beside a scrolling board is a second scroll container, and the mockup draws
+ * neither.
+ *
+ * The 900px breakpoint that hides it is the shell's, and it is written at the
+ * foot of this file rather than beside the shell's other two because CSS
+ * Modules hash each file's class names separately -- `.rail` written in
+ * AppShell.module.css compiles to a selector that matches nothing at all, with
+ * no build error and no runtime one. That file's breakpoint comment carries
+ * the rest of what the disappearance costs.
+ */
+.rail {
+  width: var(--rail-width);
+  flex: 0 0 var(--rail-width);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-line);
+  padding: var(--rail-padding);
+}
+
+.name {
+  font-size: var(--text-rail-project);
+  font-weight: var(--weight-bold);
+}
+
+/*
+ * The visibility chip. `inline-block` so the border wraps the word rather than
+ * the column, which is the difference between a chip and a banner.
+ *
+ * Uppercased in CSS rather than in the component: the manifest's value is
+ * `private` or `public` in lower case and that is what the DOM should carry --
+ * a reader copying the text out of the page gets the manifest's own word, and
+ * a test asserting on it does not have to know about a display transform.
+ */
+.visibility {
+  display: inline-block;
+  margin-top: var(--rail-visibility-gap);
+  padding: var(--rail-visibility-padding);
+  font-size: var(--text-rail-visibility);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--track-rail-visibility);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-line);
+}
+
+.sentence {
+  margin: var(--rail-sentence-gap) 0 0;
+  font-size: var(--text-rail-sentence);
+  line-height: var(--leading-rail-sentence);
+  color: var(--color-text-muted);
+}
+
+/*
+ * The manifest path. Mono, because it is a literal a reader may need to copy,
+ * and `break-all` rather than the top bar's left-truncating ellipsis: 240px is
+ * not enough for an absolute Windows path on one line, and in a column with
+ * room below it wrapping shows the whole string where truncation would hide
+ * either the drive or the filename. The bar and the footer are single-line
+ * strips and make the opposite trade.
+ */
+.manifest {
+  margin-top: var(--rail-manifest-gap);
+  font-family: var(--font-mono);
+  font-size: var(--text-rail-manifest);
+  color: var(--color-text-faint);
+  word-break: break-all;
+}
+
+.divider {
+  height: 1px;
+  margin: var(--rail-divider-gap) 0;
+  background: var(--color-line);
+}
+
+.heading {
+  margin-bottom: var(--rail-heading-gap);
+  font-size: var(--text-rail-heading);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--track-rail-heading);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+/*
+ * One band row. The negative horizontal margin cancels the row's own padding,
+ * so the hover fill runs 8px wider than the text on both sides while the
+ * labels stay flush with the heading above them -- the two numbers are one
+ * decision and tokens.css keeps them named together.
+ *
+ * No current-band state and no scroll-spy: the mockup marks none, and the
+ * rail has no way to know which band a reader is looking at that does not
+ * involve watching the scroll (see Rail.tsx's header).
+ */
+.band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--rail-band-padding);
+  margin: 0 calc(-1 * var(--rail-band-inset));
+  font-size: var(--text-rail-band);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.band:hover {
+  background: var(--color-surface-sunken);
+}
+
+.count {
+  font-size: var(--text-rail-count);
+  color: var(--color-text-faint);
+}
+
+/*
+ * Below 900px the rail is gone entirely -- the mockup's own `@media
+ * (max-width: 900px) { .rail { display: none } }`, and the board takes the
+ * whole width. Hidden rather than collapsed to a drawer or a row of chips:
+ * there is no such affordance in the approved shell, and inventing one is
+ * exactly the reinterpretation the freeze rules out.
+ */
+@media (max-width: 900px) {
+  .rail {
+    display: none;
+  }
+}

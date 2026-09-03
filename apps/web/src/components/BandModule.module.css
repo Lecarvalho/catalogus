@@ -12,6 +12,10 @@
 .band {
   padding: var(--band-spacing-top) 0 var(--band-spacing-bottom);
   border-bottom: 1px solid var(--color-line);
+  /* The rail's `#band-<id>` anchors scroll this section to the top of the
+     viewport, where the sticky board head already is; the margin keeps the
+     heading below it. The value is the head's own height (tokens.css). */
+  scroll-margin-top: var(--board-head-height);
 }
 
 .band:last-of-type {

@@ -171,24 +171,38 @@
     each of these is a place where the built world and the contract disagree and
     the contract has not been amended.
 
-      - **The shell is unbuilt, and the view rail is still the old world's
-        component.** Two surfaces, not one. `AppShell.tsx` is a top bar
-        carrying the wordmark and the manifest path, and nothing else: FIRST
-        VIEWPORT's left rail with the band index, its footer, and its help /
-        settings / profile cluster and their menus are all still unbuilt, so
-        the contract describes a first viewport no reader of `catalogus view`
-        has seen. `ViewToggle` is the second, and it is a different kind of
-        gap: it sits in the main field above the board and it works — three
-        views, one tab stop, arrow keys — but it is the dense-module world's
-        tab rail rather than the board-head the mockup draws, so the surface
-        is functional and its world is the retired one. Rewritten 2026-09-02,
-        when this entry claimed the shell was "the last surface still in the
-        retired world" and a validator found that it was not. That is the
-        second time this bullet has had to be corrected for counting the gap
-        wrong rather than for missing it: on 2026-08-31 it still claimed none
-        of candidate E had reached the shipped app, by which time the board,
-        the popover, the service page, the migrations board and the graph had
-        all been rebuilt against it. Both are separate, tracked work.
+      - **The three shell menus have no surface behind them.** The shell's
+        structure was built on 2026-09-03 — the top bar, the 240px left rail
+        with the identity block and the band index, the sticky board head that
+        now carries the view rail, and the footer with the counts, the CLI
+        version and the schema URL — all of it reproduced from the mockup the
+        owner froze. What is not built is the part FIRST VIEWPORT describes as
+        "a help / settings / profile cluster right, **each opening its own
+        menu**". The three triggers render; nothing opens. They deliberately
+        carry no `aria-haspopup` and no `aria-expanded`, because announcing a
+        menu that nothing opens is worse than announcing none.
+
+        Two facts inside that cluster are not the menus' to decide and are
+        recorded here because they will be asked again: **the profile disc is
+        empty**, since there is no account system at all (Phase 5 is unbuilt)
+        and therefore no name, initial, email or plan that could be rendered
+        without inventing one; and **the footer's documentation link is not
+        rendered**, since this repo holds no documentation URL and a guessed
+        href is a link that 404s in front of the first reader who trusts it.
+        Both are owner questions, not implementation gaps.
+
+        This bullet has been corrected twice for counting the gap wrong rather
+        than for missing it, and that history is kept because it is the reason
+        the entry now names one thing. On 2026-08-31 it claimed none of
+        candidate E had reached the shipped app, by which time the board, the
+        popover, the service page, the migrations board and the graph had all
+        been rebuilt against it. Its replacement claimed the shell was "the
+        last surface still in the retired world", which was untrue the day it
+        was written — `ViewToggle` was sitting in the main field in the retired
+        world's tab rail, and a validator found it on 2026-09-02. A claim about
+        one named surface can be checked by looking at that surface; a claim
+        about a count can only be checked by auditing every surface, which is
+        why nobody did.
       - **The mockup's edge-column popover limitation is solved in both
         axes now, and the entry that had the vertical half still open is
         retired with this rewrite.** A hover popover on an icon in the grid's

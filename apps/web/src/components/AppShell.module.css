@@ -1,97 +1,266 @@
 /*
- * A full-bleed bar with a hairline under it, and an inner measure that lines
- * up with the page's.
+ * The shell's own geometry, drawn to the approved mockup
+ * (docs/candidates/candidate-e-homescreen.html, `.app` / `.topbar` /
+ * `.shell` / `.board` / `.board-head`). Every number is a token from
+ * tokens.css's shell block and every one of those was read off that file: the
+ * owner froze this shell on sight, so nothing here is chosen.
  *
- * Full-bleed rather than inset because a shell that stops where the content
- * stops is not a shell -- it reads as one more module in the mosaic, which is
- * the thing this exists to sit above. The bar spans the window; only its
- * contents are held to the 1680px measure `App.module.css` uses, so the
- * wordmark sits directly over the first band module rather than floating
- * somewhere left of it.
+ * ---------------------------------------------------------------------
+ * Three decisions this file used to record, and what happened to each.
  *
- * `--color-header-fill` rather than the ground: the same fill the band module
- * headers use. The shell and the module headers are the same kind of surface
- * -- a strip that names what is under it -- so they get the same treatment,
- * which is what makes the chrome look like part of this world rather than
- * like a bar bolted on top of it.
+ * **The bar was full-bleed with an inner measure**, so that the wordmark sat
+ * directly over the first band module rather than floating left of it. That
+ * measure is gone with the mockup's layout: the rail bounds the board on the
+ * left and the window bounds it on the right, there is no 1680px column to
+ * line anything up with, and the bar simply spans the window like the footer
+ * does. `--color-header-fill` survives the change and for the original reason
+ * -- the bar and the footer are the same kind of surface, a strip that frames
+ * what is between them, so they get the same fill.
+ *
+ * **The bar was sticky**, "not fixed: fixed would need the page to reserve its
+ * height and would cover content on any short viewport". It is `position:
+ * relative` now, and that is a change of which element sticks rather than a
+ * reversal of that reasoning. The mockup sticks the *board head* -- the view
+ * rail, which is the one control a reader scrolling a long board needs within
+ * reach -- and sticking both would pin the bar's 60px plus the head's 70-odd
+ * to the top of a page whose whole argument (THESIS) is that it is scrolled.
+ *
+ * **`.shell` was block layout, deliberately**, because App.module.css's
+ * `.page` centred itself with `margin: 0 auto` and an auto inline margin
+ * inside a flex column absorbs the free space instead of centring: the board
+ * shrank to its content width and thirty-five services rendered as one 300px
+ * stack down the middle of a 1440px screen, with nothing erroring and nothing
+ * failing. That comment ended "if this ever needs flex again -- a footer
+ * pinned to the bottom is the obvious reason -- `.page` needs `width: 100%` in
+ * the same change, not afterwards." This is that change, and the condition is
+ * met the other way: `.page` is retired (see App.module.css) and `<main>` is
+ * `.board` below, a flex item with `flex: 1 1 auto` and no auto margins at
+ * all, so there is no free space for one to absorb.
  */
-/*
- * Block layout, deliberately, and this is a defect worth recording because
- * it renders as a plausible page rather than as a broken one.
- *
- * The first version made this a column flex container. `.page` in
- * App.module.css centres itself with `margin: 0 auto`, and in a *flex*
- * column an auto inline margin absorbs the free space instead of centring a
- * full-width item -- so the main element shrank to its content width, the
- * board's `column-width` mosaic had one column's worth of space to work
- * with, and thirty-five services rendered as a single 300px stack down the
- * middle of a 1440px screen. Nothing errored, no test failed, and it looked
- * like a design decision.
- *
- * A block container has no free space to absorb, so `margin: 0 auto` means
- * what it means everywhere else. If this ever needs flex again -- a footer
- * pinned to the bottom is the obvious reason -- `.page` needs `width: 100%`
- * in the same change, not afterwards.
- */
-.shell {
+.app {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-.bar {
-  background: var(--color-header-fill);
-  border-bottom: 1px solid var(--color-line);
-  /* Sticky, not fixed: fixed would need the page to reserve its height and
-     would cover content on any short viewport. */
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-/* The measure and the horizontal padding both match `.page` in
-   App.module.css. Two files describing one alignment -- if the page's
-   measure changes, this changes with it. */
-.inner {
-  max-width: 1680px;
-  margin: 0 auto;
-  padding: var(--space-3) var(--space-5);
+/*
+ * `z-index: 30` with nothing to sit above yet. It is the mockup's value and it
+ * is what the three menus will hang off when their brief lands -- the board
+ * head below is 5 and the popover is higher still, so the ordering the shell
+ * needs is already declared rather than discovered later by a menu that opens
+ * behind a tile.
+ */
+.topbar {
+  flex: 0 0 auto;
+  height: var(--topbar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-5);
+  padding: 0 var(--topbar-padding-x);
+  background: var(--color-header-fill);
+  border-bottom: 1px solid var(--color-line);
+  position: relative;
+  z-index: 30;
 }
 
-/*
- * The manifest path. Mono because it is a literal a reader may need to copy,
- * which is the same reason the slug and every local id in this app are mono.
- *
- * It truncates from the left rather than the right: these are absolute paths
- * and the informative end is the filename, so clipping the tail would hide
- * the only part that differs between two projects. `direction: rtl` with
- * `text-align: left` is the CSS-only way to move an ellipsis to the front;
- * the `bdi` isolation is what stops it reordering the path's own characters.
- */
-.source {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-label);
-  color: var(--color-text-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  direction: rtl;
-  text-align: left;
-  unicode-bidi: plaintext;
+/* `min-width: 0` so the project name below can actually shrink and ellipsis:
+   a flex item's default minimum is its content, which would push the cluster
+   off the right edge instead. */
+.lockup {
+  display: flex;
+  align-items: center;
+  gap: var(--topbar-lockup-gap);
   min-width: 0;
 }
 
+.separator {
+  font-size: var(--text-topbar-sep);
+  color: var(--color-text-faint);
+}
+
 /*
- * Below this the path is the first thing to go. It is the least important
- * element in the bar -- the brand has to survive every width, the path does
- * not -- and keeping both on a phone would either wrap the bar to two rows or
- * squeeze the wordmark, and the wordmark is the whole reason the bar exists.
+ * The project name, muted and one step below the wordmark. It is the first
+ * thing to give way when the bar runs out of room -- the wordmark has to
+ * survive every width, and below 900px, where the rail leaves, this is the
+ * only place the project is named at all.
  */
-@media (max-width: 640px) {
-  .source {
-    display: none;
+.project {
+  font-size: var(--text-topbar-project);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--topbar-cluster-gap);
+}
+
+/*
+ * A cluster trigger. The transparent 1px border is the mockup's, and it is
+ * load-bearing rather than decorative: the open state fills the button and
+ * draws a hairline round it, and a border that appears only when open would
+ * move the label by a pixel every time a menu opened. That state has no
+ * rule here yet -- there are no menus (AppShell.tsx's cluster comment) -- and
+ * the border is kept so the one that lands does not have to re-solve this.
+ */
+.tbBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--tb-btn-gap);
+  padding: var(--tb-btn-padding);
+  font: inherit;
+  font-size: var(--text-tb-btn);
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.tbBtn:hover {
+  color: var(--color-text);
+}
+
+.tbIcon {
+  display: block;
+  width: var(--tb-icon-size);
+  height: var(--tb-icon-size);
+}
+
+/*
+ * The profile disc, and the one radius in this world outside the icon tile and
+ * the transient surfaces. A circle is what an avatar is; OWN-WORLD's "sharp
+ * structure" is about panels and cards, and a squared-off avatar would read as
+ * a missing image rather than as a house style.
+ *
+ * It is empty. The mockup sets initials in it and there is no account system to
+ * take them from (Phase 5 is unbuilt) -- see AppShell.tsx. An ink disc with
+ * nothing in it is a slot that visibly has nothing in it, which is the state.
+ */
+.avatar {
+  flex: 0 0 auto;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+  background: var(--color-text);
+  color: var(--color-surface);
+  font-size: var(--text-avatar);
+  font-weight: var(--weight-semibold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The rail-plus-board row. `align-items: stretch` is what carries the rail's
+   fill and its right-hand hairline the full height of a short page; without it
+   the rail would end where its own text does. */
+.shell {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+}
+
+/* `min-width: 0` for the reason ProjectBoard.module.css states at length: a
+   flex item's automatic minimum is its content's, and the band grids inside
+   declare `auto-fill` columns with a minimum width, so without this the board
+   refuses to shrink and the grid sizes against its own intrinsic minimum
+   instead of the room the row actually gives it. */
+.board {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Longhands, not the `padding: 0 x y` shorthand the mockup writes. The
+     shorthand sets `padding-top: 0` too, so every breakpoint below would reset
+     the top padding `.headless` supplies and win on source order -- a service
+     page whose title sits flush against the top bar at exactly two widths, and
+     correct at every width anyone tests first. */
+  padding-right: var(--board-padding-x);
+  padding-left: var(--board-padding-x);
+  padding-bottom: var(--board-padding-bottom);
+}
+
+/*
+ * The board head: the view rail, on a rule, sticky at the top of the scroll.
+ *
+ * `background: var(--color-bg)` is not decoration -- a sticky element with a
+ * transparent ground has the page's content scroll visibly through it. The
+ * ground rather than the header fill, because this head belongs to the board
+ * it heads, not to the chrome above it.
+ */
+.boardHead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--board-head-padding-top) 0 var(--board-head-padding-bottom);
+  margin-bottom: var(--board-head-gap);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-line);
+}
+
+/*
+ * A board with no head -- the service page, the loading state, the error
+ * state. `.board` has no top padding of its own because the head supplies it,
+ * so without this the first line of a service page sits flush against the top
+ * bar. The value is the head's own top padding rather than a new number: the
+ * air above the board's first element is the same air whichever element it is.
+ */
+.headless {
+  padding-top: var(--board-head-padding-top);
+}
+
+/*
+ * The shell's two breakpoints, both the mockup's own.
+ *
+ * These are literals, and they have to be: a media query prelude cannot read a
+ * custom property, so there is no token form of a breakpoint for CSS to
+ * resolve. tokens.css's shell block says so and points here, which is the
+ * closest this can get to keeping them findable.
+ *
+ * **900px: the board's padding tightens**, and the rail leaves. The rail's own
+ * `display: none` is in Rail.module.css and not here, and that is not a
+ * preference: CSS Modules hash each file's class names separately, so `.rail`
+ * written in this file would compile to a selector matching nothing. The rule
+ * has to sit in the file that owns the class. Both files' comments say so, in
+ * both directions, because a rule that silently matches nothing is invisible.
+ *
+ * With the rail goes the architecture sentence, which is then shown nowhere on
+ * the page -- the manifest path survives in the footer, and the project name
+ * in the top bar only while the bar has room for it: at 390px the cluster
+ * takes the width and the name's box measures 4px, so below about 480px the
+ * project is named nowhere on the page. The mockup does exactly the same at
+ * 390 (measured 2026-09-03, both rects identical), so this reproduces it. It
+ * is a real loss on a phone and it is recorded rather than quietly patched,
+ * because the alternative is inventing a placement the owner has not seen for
+ * the one piece of prose a human wrote about the project on purpose.
+ *
+ * **480px: everything tightens.** The top bar, the board and the footer trade
+ * their generous horizontal padding for 14px, which is the width at which the
+ * board's icon grid also reflows (BandModule.module.css, the same media query
+ * and the same reasoning). The footer's share of that is in
+ * Footer.module.css, for the same class-name reason as the rail's.
+ */
+@media (max-width: 900px) {
+  .board {
+    padding-right: var(--board-padding-x-mid);
+    padding-left: var(--board-padding-x-mid);
+    padding-bottom: var(--board-padding-bottom-mid);
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar {
+    padding: 0 var(--topbar-padding-x-narrow);
+  }
+
+  .board {
+    padding-right: var(--board-padding-x-narrow);
+    padding-left: var(--board-padding-x-narrow);
+    padding-bottom: var(--board-padding-bottom-narrow);
   }
 }

@@ -1,54 +1,65 @@
 /*
- * Rebuilt 2026-08-25 for the dense-module world. It was a pill-shaped
- * segmented control with a 14px radius and a drop shadow on the chosen
- * option -- the stock control, in an interface that has no radius above 2px
- * and no shadows except on the one element that floats.
+ * The view rail -- List, Graph, Migrations -- as the approved shell draws it
+ * (docs/candidates/candidate-e-homescreen.html's `.view-rail` / `.view-tab`).
+ * Rebuilt into that world 2026-09-03, when the shell was built and this
+ * component moved into the board head.
  *
- * It is now a tab rail: options sit on a baseline rule, and the current one
- * is marked by an ink underline sitting *on* that rule. That is the source
- * world's own device for a primary nav.
+ * It has been three controls. It was a pill-shaped segmented control with a
+ * 14px radius and a drop shadow -- the stock control, in an interface that has
+ * no radius above 2px and no shadows except on the one element that floats.
+ * On 2026-08-25 it became the dense world's tab rail: options on a baseline
+ * rule, the current one marked by an ink underline sitting *on* that rule,
+ * drawn as a pseudo-element so the button's box never changed height between
+ * states. That version was correct for the world it was written in and outlived
+ * it by a week -- a validator found it on 2026-09-02 sitting above a candidate
+ * E board in the retired world's caps-and-tracking register, which is how the
+ * direction contract's disclosure came to name this file by name.
  *
- * The underline was signal red until 2026-09-02, and the sentence that stood
- * here called that "the only place on this page besides a count where the
- * signal colour is spent" -- a licence this file never had. OWN-WORLD spends
- * red on the status badge and the status word "and nowhere else: not a view,
- * not a count", so a view rail is the *not a view* clause named directly and
- * a count is the other half of the same sentence. The owner was asked on
+ * What the mockup draws instead: 14px, mixed case, faint until chosen, and a
+ * 2px border-bottom that is transparent on every tab and ink on the current
+ * one. The pseudo-element goes with the change -- with a transparent border
+ * already reserving the two pixels on every tab there is no height to shift,
+ * so the reason it existed is gone rather than being worked around. The rule
+ * the old underline sat on goes too: it belonged to this component and now
+ * belongs to the board head above it, 18px below these tabs
+ * (AppShell.module.css).
+ *
+ * The current tab also goes to 600, which the mockup does and which moves the
+ * tabs beside it by a pixel or two as the selection travels. That is the
+ * approved artifact's behaviour and it is reproduced rather than corrected;
+ * the shell is frozen.
+ *
+ * **No red anywhere.** The underline was signal red until 2026-09-02 under a
+ * comment claiming this was "the only place on this page besides a count where
+ * the signal colour is spent" -- a licence this file never had. OWN-WORLD
+ * spends red on the status badge and the status word "and nowhere else: not a
+ * view, not a count", so a view rail is the *not a view* clause named directly
+ * and a count is the other half of the same sentence. The owner was asked on
  * 2026-08-31 whether to amend the contract instead and ruled that the rule
- * stands and the build is corrected; the correction pass moved the popover's
- * uncatalogued marker and left this file untouched, which a validator caught
- * on 2026-09-02. The comment above is why it was possible to read past it:
- * a wrong claim written down beside the code that makes it reads as the
- * decision rather than as the defect.
- *
- * `--color-text` now, which is what the mockup's `.view-tab.is-active` sets
- * (a transparent 2px border-bottom on every tab, `border-bottom-color:
- * var(--color-text)` on the active one), and
- * `src/signal-red.test.ts` fails the suite if red returns here.
- *
- * The rule runs the full width while the options do not, so the toggle reads
- * as attached to the board below it rather than floating above it -- the
- * defect the old inline-flex pill had once the page went full width, where a
- * small rounded control sat alone in a very wide empty row.
+ * stands and the build is corrected. `src/signal-red.test.ts` now fails the
+ * suite if red returns here, which is what the comment alone could not do:
+ * every one of the four sites that pass found had a paragraph beside it
+ * discussing the rule at length.
  */
 .toggle {
   display: flex;
-  gap: var(--space-5);
-  border-bottom: 1px solid var(--color-line);
+  gap: var(--view-rail-gap);
 }
 
+/*
+ * The 2px transparent border is reserved on every tab, not added to the
+ * current one: a border that appears on selection moves every tab in the rail
+ * down two pixels as the selection travels.
+ */
 .option {
-  position: relative;
-  padding: var(--space-2) 0 var(--space-3);
+  padding: var(--view-tab-padding);
   border: 0;
+  border-bottom: 2px solid transparent;
   border-radius: 0;
   background: transparent;
   font: inherit;
-  font-size: var(--text-label);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  font-size: var(--text-view-tab);
+  color: var(--color-text-faint);
   cursor: pointer;
 }
 
@@ -57,39 +68,25 @@
 }
 
 /*
- * The app-wide focus ring (tokens.css) is an offset outline, which on a
- * baseline-attached tab would be clipped by the rule below it. This keeps
- * the same two-cue treatment -- a visible ring that survives greyscale --
- * with the offset it needs here.
+ * No `:focus-visible` rule here any more, and that is a removal *with* a
+ * replacement rather than a removal. This file used to override the app-wide
+ * ring with an inset one, because the ring's 1px offset was clipped by the
+ * baseline rule this component drew directly under its own tabs. That rule is
+ * gone -- it belongs to the board head now and sits 18px below -- so
+ * tokens.css's one focus treatment fits with room to spare, and a per-component
+ * override kept past the reason for it is the next component's excuse for one.
  */
-.option:focus-visible {
-  outline: 2px solid var(--color-line-strong);
-  outline-offset: -2px;
-}
 
 /*
- * The chosen view. `aria-checked` carries this for assistive tech; for
- * sighted readers it is full-strength ink *plus* a 2px underline, so the cue
- * is never a hue difference alone -- the same rule ServiceTile's `.selected`
- * follows, and for the same reason: the previous viewer shipped a selection
- * state whose only two cues were both colour, and it was one of the five
- * defects a validation pass found (docs/PLAN.md).
- *
- * The underline is drawn as a pseudo-element overlapping the container's
- * rule rather than as a border on the button, so the option's box never
- * changes height between states and the rail cannot shift by a pixel when
- * the selection moves.
+ * The chosen view. `aria-checked` carries this for assistive tech; for sighted
+ * readers it is full-strength ink, a heavier weight *and* a 2px underline, so
+ * the cue is never a hue difference alone -- the same rule ServiceTile's
+ * `.selected` follows, and for the same reason: the previous viewer shipped a
+ * selection state whose only two cues were both colour, and it was one of the
+ * five defects a validation pass found (docs/PLAN.md).
  */
 .current {
   color: var(--color-text);
-}
-
-.current::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-  background: var(--color-text);
+  font-weight: var(--weight-semibold);
+  border-bottom-color: var(--color-text);
 }

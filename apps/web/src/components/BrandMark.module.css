@@ -2,18 +2,21 @@
  * The wordmark, set rather than drawn -- there is no glyph yet and this file
  * must not invent one (see BrandMark.tsx).
  *
- * Caps with positive tracking, which is the same treatment the band module
- * headers get. That is deliberate: the product name is chrome, not content,
- * and setting it in the same register as the app's own labels keeps it from
- * competing with the project name, which is the `<h1>` and is the largest
- * thing on the page. A brand that shouts over the document it frames is the
- * failure mode of every app header.
+ * Mixed case, 16.5px, bold, negative tracking -- the approved shell's own
+ * `.wordmark` (candidate-e-homescreen.html), read off the mockup rather than
+ * chosen here, like every other number in that shell.
  *
- * One step up from the 11px label size, though, because with the glyph
- * deferred the wordmark is carrying the identity on its own. `--text-body` is
- * still quieter than every heading on the page, so the ranking above is
- * unchanged; it just stops the only brand element on screen reading as a
- * caption. Revisit when a mark lands and the two share the work.
+ * It used to be caps with positive tracking one step above the 11px label
+ * size, and the argument for that is worth keeping because it is what
+ * changed rather than what was wrong: the product name is chrome, not
+ * content, and setting it in the app's own label register kept it from
+ * competing with the project name, which was the page's `<h1>`. The shell
+ * retired that competition instead of managing it. There is no masthead on
+ * the board any more and no `<h1>` in the chrome at all -- the project name
+ * moved into the top bar beside this, at 14.5px and muted, and into the rail
+ * at 17px -- so the wordmark can be set at reading size without shouting over
+ * anything. It is still the quietest kind of loud on the page: no red (see
+ * below), no glyph, one weight.
  *
  * No red. The owner's brand decision on 2026-08-25 was **ink only**, and the
  * reasoning is load-bearing rather than aesthetic: `#d40010` is a signal
@@ -31,10 +34,9 @@
 }
 
 .wordmark {
-  font-size: var(--text-body);
+  font-size: var(--text-wordmark);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-wordmark);
   color: var(--color-text);
   white-space: nowrap;
 }

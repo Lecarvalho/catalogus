@@ -257,16 +257,35 @@ describe("the direction contract is present in apps/web/index.html", () => {
   // arriving a third time rather than a new one. "The shell is the last surface
   // still in the retired world" was written on 2026-08-31 to replace a claim
   // that had gone stale, and it was itself untrue the day it was written:
-  // `ViewToggle` sits in the main field, above the board, and is the retired
-  // world's tab rail. So the entry was not stale, it was *wrong*, and pinning it
-  // kept a wrong count present in the page a reader is served. The replacement
-  // names the surface rather than the count -- a claim about one named component
-  // can be checked by looking at that component, where "the last surface" can
-  // only be checked by auditing every surface, which is why nobody did.
+  // `ViewToggle` sat in the main field, above the board, in the retired world's
+  // tab rail. So the entry was not stale, it was *wrong*, and pinning it kept a
+  // wrong count present in the page a reader is served. The replacement names
+  // the surface rather than the count -- a claim about one named component can
+  // be checked by looking at that component, where "the last surface" can only
+  // be checked by auditing every surface, which is why nobody did.
+  //
+  // Moved a fourth time on 2026-09-03, and this one is the mechanism working
+  // rather than failing. The shell's structure was built that day -- top bar,
+  // rail, board head, footer, and `ViewToggle` rebuilt into the board head --
+  // so "the view rail is still the old world's component" and "still unbuilt"
+  // both stopped being true, the suite went red, and whoever closed the gap had
+  // to come here and say what is left. What is left is the three menus, which
+  // FIRST VIEWPORT describes and which have no surface behind them.
+  //
+  // The second string is the one worth explaining. It pins the *footer's absent
+  // documentation link*, not another restatement of the menus, because that is
+  // the entry most likely to be closed by guessing rather than by asking: there
+  // is a word in the mockup, an obvious-looking href, and nobody would notice a
+  // plausible URL going in. Pinning the absence means an invented link has to
+  // pass through this file, where the reason it is absent is written down.
   it("carries its disclosure section, naming what the build does not do", () => {
     const disclosure = flat(regionBetween(sourceContract ?? "", DISCLOSURE_HEADING, FINISH_LINE));
     expect(disclosure.length, "the disclosure section is empty or its FINISH boundary moved").toBeGreaterThan(500);
-    for (const known of ["the view rail is still the old world's component", "still unbuilt", "mark is still deferred"]) {
+    for (const known of [
+      "three shell menus have no surface behind them",
+      "documentation link is not rendered",
+      "mark is still deferred",
+    ]) {
       expect(disclosure).toContain(known);
     }
   });
@@ -459,10 +478,10 @@ describe("the owner's hardest named constraints survive in the page", () => {
 describe("the contract's colour facts match the token layer", () => {
   const tokensCss = readFileSync(join(srcDir, "tokens.css"), "utf8");
 
-  // Read out of tokens.css's light `:root` block rather than the whole file:
-  // the dark translation below it redeclares the same names with different
-  // values, and the contract describes the light world, which tokens.css's own
-  // header calls "the committed design, not a preference".
+  // Read out of tokens.css's `:root` block rather than the whole file. Until
+  // 2026-09-03 a dark translation below it redeclared the same names with
+  // different values; that block is gone, and the slice stays because the
+  // contract describes the palette, not whatever a later block might declare.
   const lightRoot = tokensCss.slice(tokensCss.indexOf(":root {"), tokensCss.indexOf("@media"));
   const declaredValues = new Set(
     Array.from(lightRoot.matchAll(/^\s*--[\w-]+\s*:\s*(#[0-9a-fA-F]{3,8})\s*;/gm), (match) => match[1]!.toLowerCase())
