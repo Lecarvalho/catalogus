@@ -193,6 +193,35 @@ yet (add `cliVersion` from the CLI's own `package.json`). The shell brief is spl
 (top bar, rail, view rail in a sticky board-head, footer — all derivable), the three menus second,
 once the owner answers what a settings toggle does and what the profile menu holds with no account.
 
+#### Where this session stopped, and what the next one does first
+
+The owner stopped the session near the 5-hour limit with the shell brief just launched; the agent
+was killed before it edited anything, and the tree is clean at `cfefea7` plus this file and the brief.
+
+1. **Run `docs/shell-brief.md`.** It is the shell's *structure* — top bar, left rail with the band
+   index, the view rail moved into a sticky board-head, the footer — every value derivable from the
+   mockup and the payload. One opus agent, allowed to fan out; its file allocation is in the brief.
+   Then one validator driving the built app against `candidate-e-homescreen.html` at
+   1600/1440/1280/1024/900/768/480/390; that validator also covers the popover placement in the
+   new layout (the popover fix at `cfefea7` was validated by property sweep and browser, but not yet
+   with a rail and a sticky board-head around it).
+2. **The three menus** (help / settings / profile) are a second brief, blocked on the owner's
+   answers below.
+3. Then tick item 2 in the 2026-08-26 list below, and Phase 3.7 is closed less the portfolio page.
+
+**Questions for the owner, none answered yet:**
+
+- `RankModule` paints red and has no caller: delete it, or name its ink? (Quarantined in
+  `signal-red.test.ts` until answered.)
+- Profile menu with no account system until Phase 5: omit the trigger, or show it with a menu that
+  says so?
+- Settings panel: appearance / density / brand-icon colour / default view imply persisted
+  preferences and a dark theme. Nothing persists today, and the approved world is cream only —
+  `tokens.css` still carries a `prefers-color-scheme: dark` block from the old world that renders a
+  dark app on a dark OS. Keep dark (then the contract needs amending) or remove it?
+- Documentation link target in help menu and footer: there is no docs URL in the repo.
+- Popover below 480px: the bottom sheet covers 115–143px of its tile. Accept, or place it elsewhere?
+
 #### State of the tree at this handoff
 
 **Baseline: 1317 tests / 75 files**, green on consecutive runs, `pnpm typecheck` clean across all
