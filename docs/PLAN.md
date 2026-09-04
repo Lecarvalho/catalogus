@@ -77,7 +77,7 @@ design decisions; this file tracks *what has been built* against it and what rem
   `apps/web/docs/candidates/` and are the specification for the component work, **which is built
   and validated as of 2026-09-03 except the three shell menus and the portfolio page**. See the
   newest handoff, directly under "Start here".
-- **Last updated:** 2026-09-04
+- **Last updated:** 2026-09-04 (evening)
 
 ## Start here on a fresh session
 
@@ -130,31 +130,71 @@ three of six consecutive runs while every single run *of that file alone* passed
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
 
-### Handoff — 2026-09-04, the board is capped, a service names its own icon, and a brand is one tile per band
+### Handoff — 2026-09-04 (evening), the brand tile is on a real inventory and the owner's three fixes are in
 
-**Read this first.** One session, three slices, each briefed, implemented on a smaller model and
-validated by a separate agent against the built artifact: `docs/custom-icon-brief.md` (two parts,
-run), `docs/brand-tile-brief.md` (three parts, run), and finding 3 as a small edit by the main
-session. Both briefs are kept as the record and are not to be run again. What is left of the
-component work is still **the three shell menus** (blocked on the owner's 2026-09-02 answers plus
-the Documentation URL) and **the portfolio page**; two open items were added below.
+**Read this first.** Two sessions in one day. The first (morning) ran three briefed slices, each
+implemented on a smaller model and validated by a separate agent against the built artifact:
+`docs/custom-icon-brief.md` (two parts, run), `docs/brand-tile-brief.md` (three parts, run), and
+the board cap as a small edit. The second (evening) closed the brand-tile validation (four
+defects plus one born of a fix), committed everything, and then took the owner's first look at
+it on Clapline: three requests, each a bounded edit by the main session, each validated in the
+browser, each committed. Both briefs are kept as the record and are not to be run again.
+
+**Commits, in order, all on `main`:** `719a718` (icons: `packages/*`, `skills/`), `72ef00d`
+(viewer: shell cap and brand tile together — both live in `apps/web` and were not separable by
+path), `2cacbf5` (docs), `92f4cf6` (the evening's three fixes: entry-page width, four tiles to a
+phone line, no popover on a tap, plus two side findings), `6da7294` (the entry-page width revised
+after the owner saw it on Clapline: panel docked, board keeps the wall's left edge).
+
+**State of the tree at this handoff: 1621 tests / 81 files**, green on consecutive runs, `pnpm
+typecheck` clean across four packages, working tree clean at `6da7294`. The owner's last words on
+the build: *"I see that now, it's better."*
 
 #### What the next session does first
 
-1. ~~**Commit.**~~ ✅ Done 2026-09-04 as two commits — `719a718` (icons: `packages/*`,
-   `skills/`) and `72ef00d` (viewer: shell cap and brand tile together, since both live in
-   `apps/web` and were not separable by path) — on a tree green at 1617 / 81 on two consecutive
-   runs, typecheck clean.
-2. **Owner's second look at the brand tile on a real inventory** — the Clapline run that found
-   findings 4 and 5 is the only place the collapse has been seen with real repeats (Fly.io ×5,
-   Supabase across two bands). The layout-stress example has Fly.io ×3 and Postgres ×2 in one band
-   and is what the validator drove.
-3. **The three menus**, once the owner answers.
-4. **Open, new this session:** `rename` leaves a vendored icon under the old `<id>.svg` name (the
-   pointer stays valid, so nothing breaks, but the `<id>.svg` convention `icons` and the skill
-   teach no longer holds) and `remove` orphans the file — both are a small edit to move/delete the
-   file through the same `manifest-edit` transaction. And **the graph does not fit to view**
-   (recorded under the decisions below; pre-existing).
+1. **The three shell menus** (help / settings / profile) — still blocked on the owner's
+   2026-09-02 questions below (`RankModule`, profile with no account, what a settings panel holds
+   with nothing persisted, the Documentation URL). Ask once, then one brief.
+2. **`rename` and `remove` versus a vendored icon** — `rename` leaves the file under the old
+   `<id>.svg` name (the pointer stays valid, so nothing breaks, but the `<id>.svg` convention
+   `icons` and the skill teach no longer holds) and `remove` orphans it. A small edit to move or
+   delete the file through the same `manifest-edit` transaction, plus a test each.
+3. **The graph does not fit to view** (recorded under the decisions below; pre-existing).
+4. **The portfolio page** (Phase 3.7's one open item; HANDOFF §4.2).
+5. **Not to do:** re-derive the entry page's width geometry, the phone grid's numbers, or the
+   popover's tap rule — each was drawn, chosen by the owner, validated and recorded below, and
+   the CSS comments carry the declined alternatives so they are not re-proposed.
+
+#### Things a fresh session would otherwise rediscover
+
+- **Chrome's resize tool is a no-op in this environment** (the window stays at whatever width the
+  owner left it: 2326 in the morning, 368 in the evening). Every width measurement this day was
+  made by loading the built app in a same-origin iframe sized to the exact CSS width; media
+  queries and `documentElement.clientWidth` both see the iframe's viewport, `document.activeElement`
+  reads through `contentDocument`, and real key and pointer events reach it. The validator's
+  brief should say so up front rather than let it be discovered again.
+- **`btn.focus()` is not a keyboard focus for validation purposes.** A control that would pass
+  without the fix is not a control: the tap-guard's first browser check used it and read "no
+  popover" for a wrong reason. Dispatch `focusin` explicitly (React's `onFocus` listens to it)
+  and report the popover's *header name* after every dispatched event, not a boolean, so a stale
+  popover is distinguishable from a new one.
+- **`scrollTo` plus `requestAnimationFrame` hangs in that iframe** — the window reports
+  `visibilityState: "hidden"` and rAF is paused, so the popover's scroll-tracking path cannot be
+  driven there at all. Nobody has re-validated it since 2026-09-03; it is untested, not broken.
+- **The popover mounts after the whole board in the DOM**, so Tab from a tile never reaches its
+  rows; ArrowDown/ArrowUp are the keyboard path in, Escape from a row returns focus to the tile,
+  and a row that holds focus holds the popover against a pointer brushing a neighbour. All in
+  `App.tsx`'s peek keydown effect and `handlePeek` / `handlePeekEnd`.
+- **A tap focuses a button on Chrome for Android, not on Safari.** That is why the popover
+  appeared on a phone though `onPointerEnter` already skipped touch, and why the guard lives on
+  focus (`usePeekHandlers`, `ServiceTile.tsx`), not on the pointer.
+- **`layout-stress` hides shrink-to-fit defects** because its bands always exceed a phone's
+  width; the validator's own small (eight-service) fixture is what found the board hugging the
+  left edge below 720px. Keep using a small fixture alongside it.
+- **Entry-page width, final:** panel docked at the window's edge; board cap 1360 − 300 beside a
+  panel, own auto margins, so its left edge equals the wall's at every width. Two other
+  geometries were built, seen by the owner, and declined (item 1 below and the comment on
+  `.withPanel > .board` in `AppShell.module.css`).
 
 #### The owner's evening look, 2026-09-04 — three requests, done the same evening
 
