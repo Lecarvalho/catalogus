@@ -141,10 +141,10 @@ the Documentation URL) and **the portfolio page**; two open items were added bel
 
 #### What the next session does first
 
-1. **Commit.** Everything here is uncommitted at the time of writing; the tree is green
-   (1617 / 81, typecheck clean, run more than once). Commit as three commits if the diff is
-   still separable by path (`apps/web` shell cap; `packages/*` + `skills/` icons; `apps/web`
-   brand tile) or one if it is not.
+1. ~~**Commit.**~~ ✅ Done 2026-09-04 as two commits — `719a718` (icons: `packages/*`,
+   `skills/`) and `72ef00d` (viewer: shell cap and brand tile together, since both live in
+   `apps/web` and were not separable by path) — on a tree green at 1617 / 81 on two consecutive
+   runs, typecheck clean.
 2. **Owner's second look at the brand tile on a real inventory** — the Clapline run that found
    findings 4 and 5 is the only place the collapse has been seen with real repeats (Fly.io ×5,
    Supabase across two bands). The layout-stress example has Fly.io ×3 and Postgres ×2 in one band
