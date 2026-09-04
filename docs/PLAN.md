@@ -162,17 +162,28 @@ The owner ran the committed build (`72ef00d`) and asked for three things, in thi
 was a bounded edit by the main session, each carries a test that was seen red with the change
 reverted, and each was driven in the browser by the same validator that ran the two passes above.
 
-1. **"Make sure the pages are always the same size"** — on a wide window the wall sat in its
-   1600px column but the entry page spread edge to edge: `.board` centred itself, and the panel,
-   a flex sibling with no margins, docked at the window's right edge. Now (`AppShell.module.css`,
-   `.withPanel > .board` and `.withPanel > .board + *`) the board gives the panel's 300px back
-   out of its cap and its right margin, the panel takes an auto right margin, and the pair
-   centres as one unit exactly as wide as the board alone: at 2326 the wall's board and the entry
-   page's board-plus-panel both span x 595.5 → 1955.5; at 1600 and below the margins resolve to
-   zero and nothing moves; the crossover at exactly 1600 has no seam; below it the board absorbs
-   the loss and the panel keeps 300. Validated at 3000, 2326, 1700, 1615, 1600, 1415, 1280, 1024
-   and 900, no horizontal scrollbar at any of them, sticky board head tracking the board.
-   `AppShell.test.tsx` holds the rule's text, since jsdom lays nothing out.
+1. **"Make sure the pages are always the same size"** — settled in two steps, the second on the
+   owner's own inventory. On a wide window the wall sat in its 1600px column but the entry page's
+   board, at the wall's full 1360 cap, nearly filled the room between the rail and the docked
+   panel, so its left edge jumped 150px left of the wall's and the page read as full-width. The
+   first fix capped board-plus-panel to the wall's span and centred the pair; the owner ran it on
+   Clapline and wanted the panel docked at the window's edge again ("I saw that dock a few minutes
+   ago"), "but keep the centred content not stretched". Three geometries were drawn side by side
+   and the owner chose the docked panel with a centred board. **What is built** (`AppShell.module.
+   css`, `.withPanel > .board`, one declaration): with a panel the board's cap is the wall's less
+   the panel's 300, and it keeps its own auto margins — so it centres between rail and panel, and
+   the arithmetic makes its left edge equal the wall's board's at every width (`rail + (W − rail −
+   1360) / 2` against `rail + (W − rail − 300 − 1060) / 2`); the panel, a margin-less flex sibling,
+   docks on the edge on its own; at 1600 the margins are zero and the page is artboard 3 unchanged;
+   below it the board shrinks and the panel keeps 300. The declined third option — the board exactly
+   where the wall's is at full width, the panel overlapping its empty right side below ~2200px — is
+   recorded in the CSS comment so it is not re-proposed. `AppShell.test.tsx` holds the rule's text
+   and that nothing re-centres the pair. Validated at 3000 / 2326 / 2000 / 1700 / 1615 / 1600 / 1415 / 1280 / 900: the entry board's
+   left edge equals the wall's at every width (595.5 at 2326, 432.5 at 2000, 240 once the room is
+   the constraint), the panel's right edge is the window's, the crossover at 1615 has no seam, the
+   document column is 549.84 throughout, no horizontal scrollbar; the brand page's board is the
+   wall's to the pixel. On a wide window the board and the panel no longer touch — at 2326 there is
+   355px of ground between them — which is the chosen geometry, not a defect.
 
 2. **"On mobile the icons and names take too much space; four items in the same line"** — below
    480px the grid is now `repeat(4, minmax(0, 1fr))` (`--icon-grid-columns-narrow`), not the

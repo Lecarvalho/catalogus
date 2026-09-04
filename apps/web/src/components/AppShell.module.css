@@ -194,35 +194,40 @@
  * because it carries the entry's own facts, not navigation the reader can
  * do without the way the rail's own content is -- see the query below and
  * ServicePage.module.css's own breakpoint on `.panel` for the two halves of
- * that mechanism. Nothing is declared against `.withPanel` alone; the two
- * rules below are against its children.
+ * that mechanism. Nothing is declared against `.withPanel` alone above that
+ * query: a class with no rule outside a media query is unusual enough to be
+ * worth this sentence, and it is deliberate rather than a forgotten rule.
  *
- * **The pair is the page, 2026-09-04 (evening).** `.board` centres itself in
- * the room the rail leaves it (its own rule below), but the panel is a flex
- * sibling with no margins of its own, so it docked at the window's right
- * edge and the board centred in what was left between the rail and it: on a
- * wide window the entry page spread from the window's left edge to its right
- * while the wall it came from sat in a 1600px column. The owner: "make sure
- * the pages are always the same size." So with a panel the board gives up
- * the panel's width from its cap and its right margin, the panel gives up
- * its left margin and takes an auto right one, and the two auto margins that
- * remain -- the board's left, the panel's right -- split the free space in
- * equal halves: the board-plus-panel pair is exactly as wide as the board
- * alone would be, and centred where it would be. At 1600 and below the
- * margins resolve to zero and nothing moves, which is why the mockup drawn
- * at 1600 could not show this. The panel is addressed as `.board`'s next
- * sibling rather than by class because its class is ServicePage.module.css's,
- * and this file cannot name another module's class; AppShell.tsx renders it
- * directly after `.board`, and its test asserts that order.
+ * **The panel is a rail and the board keeps the wall's left edge, settled
+ * by the owner 2026-09-04 (evening), in two steps.** The panel, a flex
+ * sibling with no margins of its own, docks at the window's right edge on
+ * its own; nothing here needs to say so. What this rule says is the board's
+ * cap with a panel beside it: the wall's cap less the panel's width. The
+ * arithmetic is the point. The wall's board centres in the room the rail
+ * leaves, so its left edge is `rail + (window - rail - 1360) / 2`; the entry
+ * page's board centres in the room the rail and the panel leave, so with a
+ * cap of 1360 - 300 its left edge is `rail + (window - rail - 300 - 1060) /
+ * 2` -- the same number at every width. The document starts exactly where
+ * the wall's first tile does, the panel sits on the window's edge like the
+ * rail on the other side, and at 1600 (the mockup's own width) the margins
+ * resolve to zero and the page is artboard 3 unchanged. Below that the board
+ * shrinks and the panel keeps its 300, as before.
+ *
+ * Two other builds were seen and declined the same evening, on a real
+ * inventory. With the wall's full 1360 cap the board nearly filled the room
+ * between the rails and its left edge jumped 150px left of the wall's -- the
+ * "centred content stretching into the service page" the owner first
+ * reported. Then a build that capped board-plus-panel to the wall's own span
+ * and centred the pair (`margin-right: 0` here, an auto right margin on the
+ * panel) matched the span but put the panel inboard with empty ground to its
+ * right; the owner wanted it docked. A third option, the board exactly where
+ * the wall's is at its full width with the panel overlapping its empty right
+ * side below about 2200px, was declined with it (docs/PLAN.md, the evening
+ * handoff, item 1). The panel is not addressed here at all now, and `.board`
+ * keeps its own auto margins from the rule below.
  */
 .withPanel > .board {
   max-width: calc(var(--board-max-width) - var(--page-facts-width));
-  margin-right: 0;
-}
-
-.withPanel > .board + * {
-  margin-left: 0;
-  margin-right: auto;
 }
 
 /* `min-width: 0` for the reason ProjectBoard.module.css states at length: a

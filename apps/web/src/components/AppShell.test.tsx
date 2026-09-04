@@ -221,23 +221,24 @@ describe("AppShell -- the side panel", () => {
    * trailing space appended even when there is nothing to append) that an
    * `expect(...).toContain(styles.shell)` assertion would miss entirely.
    */
-  // The pair is the page (AppShell.module.css's own comment on `.withPanel >
-  // .board`): jsdom lays nothing out, so the one thing a test can hold is
-  // the rule itself -- the board gives the panel's width back out of its cap
-  // and its right margin, the panel takes the auto right margin, and the two
-  // centre as one unit exactly as wide as the board alone.
-  it("caps board plus panel to the board's own width and centres them as one unit", () => {
+  // The panel is a rail docked at the window's edge, and the board beside it
+  // keeps the wall's left edge by giving the panel's width back out of its
+  // cap (AppShell.module.css's own comment on `.withPanel > .board` carries
+  // the arithmetic and the two builds the owner declined). jsdom lays nothing
+  // out, so what a test can hold is the rule's text: the reduced cap, and
+  // no margin on either the board or the panel that would pull the panel off
+  // the edge -- that second build was reverted the same evening, and this
+  // keeps it from coming back as a plausible tidy-up.
+  it("reduces the board's cap by the panel's width, and re-centres nothing", () => {
     const css = readFileSync(fileURLToPath(import.meta.url).replace(/AppShell\.test\.tsx$/, "AppShell.module.css"), "utf8");
     const boardStart = css.indexOf(".withPanel > .board {");
     const boardRule = css.slice(boardStart, css.indexOf("}", boardStart));
     expect(boardStart).toBeGreaterThan(-1);
     expect(boardRule).toMatch(/max-width:\s*calc\(var\(--board-max-width\)\s*-\s*var\(--page-facts-width\)\)/);
-    expect(boardRule).toMatch(/margin-right:\s*0/);
-    const panelStart = css.indexOf(".withPanel > .board + * {");
-    const panelRule = css.slice(panelStart, css.indexOf("}", panelStart));
-    expect(panelStart).toBeGreaterThan(-1);
-    expect(panelRule).toMatch(/margin-left:\s*0/);
-    expect(panelRule).toMatch(/margin-right:\s*auto/);
+    expect(boardRule).not.toMatch(/margin/);
+    // No rule against the panel (the board's next sibling) at all: a selector
+    // line, not a mention in a comment, is what this looks for.
+    expect(css).not.toMatch(/^\.withPanel\s*>\s*\.board\s*\+/m);
   });
 
   it("keeps the shell row's class string byte-identical to before this prop existed, when no panel is passed", () => {
