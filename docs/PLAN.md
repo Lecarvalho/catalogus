@@ -86,7 +86,7 @@ trusting anything below. **In that order**: the direction contract guard compare
 `apps/web/index.html` against the build output, so a `pnpm test` run against a `dist` older than your
 last edit to that file fails on a difference you created and already fixed.
 
-**The expected total as of 2026-09-04 is 1617 tests / 81 files** (see the newest handoff: +214 across the owner-supplied-icons slice, the brand-tile slice and its two validation passes — 1606 before the four D1–D4 fixes and their eleven tests; it was 1403 / 77 on the evening of 2026-09-03, 1375 / 77 that morning before the thesvg icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
+**The expected total as of 2026-09-04 (evening) is 1621 tests / 81 files** (see the newest handoff: 1617 after the brand-tile slice and its two validation passes, +4 for the evening's three owner requests; +214 across the owner-supplied-icons slice and the brand-tile slice — 1606 before the four D1–D4 fixes and their eleven tests; it was 1403 / 77 on the evening of 2026-09-03, 1375 / 77 that morning before the thesvg icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
 
 **The expected total moved on 2026-08-26 and this line no longer names one.** It said **1218 tests /
 72 files**, which was correct at the start of that session and is the number to compare against if
@@ -155,6 +155,60 @@ the Documentation URL) and **the portfolio page**; two open items were added bel
    teach no longer holds) and `remove` orphans the file — both are a small edit to move/delete the
    file through the same `manifest-edit` transaction. And **the graph does not fit to view**
    (recorded under the decisions below; pre-existing).
+
+#### The owner's evening look, 2026-09-04 — three requests, done the same evening
+
+The owner ran the committed build (`72ef00d`) and asked for three things, in this order. Each
+was a bounded edit by the main session, each carries a test that was seen red with the change
+reverted, and each was driven in the browser by the same validator that ran the two passes above.
+
+1. **"Make sure the pages are always the same size"** — on a wide window the wall sat in its
+   1600px column but the entry page spread edge to edge: `.board` centred itself, and the panel,
+   a flex sibling with no margins, docked at the window's right edge. Now (`AppShell.module.css`,
+   `.withPanel > .board` and `.withPanel > .board + *`) the board gives the panel's 300px back
+   out of its cap and its right margin, the panel takes an auto right margin, and the pair
+   centres as one unit exactly as wide as the board alone: at 2326 the wall's board and the entry
+   page's board-plus-panel both span x 595.5 → 1955.5; at 1600 and below the margins resolve to
+   zero and nothing moves; the crossover at exactly 1600 has no seam; below it the board absorbs
+   the loss and the panel keeps 300. Validated at 3000, 2326, 1700, 1615, 1600, 1415, 1280, 1024
+   and 900, no horizontal scrollbar at any of them, sticky board head tracking the board.
+   `AppShell.test.tsx` holds the rule's text, since jsdom lays nothing out.
+
+2. **"On mobile the icons and names take too much space; four items in the same line"** — below
+   480px the grid is now `repeat(4, minmax(0, 1fr))` (`--icon-grid-columns-narrow`), not the
+   mockup's auto-fill at 92px, which gave three per line on a 390 phone and two on a 360. The tile
+   comes down to 54px (32px mark, 14px radius, the board tile's own 0.6 ratio), the name to 12px,
+   id and count to 10px, gaps to 10 / 26; `tokens.css` derives every number from the 75.5px column
+   a 360px phone leaves. Validated at 480 / 390 / 360 (four per line in every band, columns
+   101.75 / 79.25 / 71.75, nothing overlapping the row below, no scrollbar) and unchanged at 481
+   and 768. **Two side findings from that pass, both fixed:** a small manifest's board hugged the
+   left edge below 720px with a wide gutter (App.module.css's `.body` column rule lacked
+   `align-items: stretch`, pre-existing and invisible on `layout-stress`, whose bands always
+   exceed a phone's width); and an unbroken "OpenTelemetry" measured 83px in a 72px column at 360
+   (`overflow-wrap: anywhere` on `.name` below 480, since `break-word` does not shrink
+   min-content). Both re-validated: the eight-service fixture's content column equals the board's inner
+   width at 720 / 481 / 480 / 390 / 360 (shortfall 0, was up to 242px), `layout-stress` bit-identical
+   at 720 and 768, graph and migrations views at 480 without a scrollbar; the obs-trace label box
+   equals its column at 360 and 390 (71.75 / 79.25, was 83.39), broken over two lines, nothing
+   clipped, no label on the board wider than its column.
+
+3. **"On mobile the popover should not open — there is no hover, only tap"** — `onPointerEnter`
+   already skipped touch; what opened it was the tile's `onFocus`, because a tap focuses the button
+   (Chrome on Android) and focus peeked for keyboard parity without asking where it came from.
+   `usePeekHandlers` in `ServiceTile.tsx` now serves both tile shapes: a pointerdown raises a flag
+   the next focus consumes instead of peeking, cleared on click and pointercancel so a Tab after a
+   press that never focused still peeks. Three tests in `ServiceTile.test.tsx`, two seen red with
+   the guard disabled. This also answers the open question below ("popover below 480px: the bottom
+   sheet covers 115–143px of its tile"): on a phone it does not open. Validated on the built bundle at 390 by dispatching what a phone tap
+   produces (pointerdown touch, focusin, pointerup, click): no popover at any step on a single tile
+   or the group tile, the click still navigating; focusin alone on the same tile afterwards peeks
+   (the flag is consumed, not stuck); pointerdown then pointercancel then focusin peeks; real Tab,
+   real hover and real click at 1280 unchanged. A process note worth keeping: the validator's first
+   tap run used `btn.focus()` and read "no popover" for a wrong reason (a flag left set by its own
+   earlier dispatches), and its first explanation of that reading was itself wrong; the second run
+   reported the popover's header name after every dispatch instead of a boolean, which is what made
+   a stale popover distinguishable from a new one. A control that would pass without the fix is
+   not a control.
 
 #### Owner decisions, asked once at the start of the session and once more mid-way
 
@@ -613,7 +667,9 @@ was killed before it edited anything, and the tree is clean at `cfefea7` plus th
 - ~~Settings panel: dark theme — keep or remove?~~ **Answered 2026-09-03: removed.** What a
   settings panel holds with nothing persisted is still open.
 - Documentation link target in help menu and footer: there is no docs URL in the repo.
-- Popover below 480px: the bottom sheet covers 115–143px of its tile. Accept, or place it elsewhere?
+- ~~Popover below 480px: the bottom sheet covers 115–143px of its tile. Accept, or place it elsewhere?~~
+  **Answered 2026-09-04: on a phone it does not open at all** — no hover, only tap (the evening
+  handoff above, item 3).
 
 #### State of the tree at this handoff
 

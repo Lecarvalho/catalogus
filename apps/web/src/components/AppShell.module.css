@@ -194,10 +194,36 @@
  * because it carries the entry's own facts, not navigation the reader can
  * do without the way the rail's own content is -- see the query below and
  * ServicePage.module.css's own breakpoint on `.panel` for the two halves of
- * that mechanism. Nothing is declared against `.withPanel` alone above that
- * query: a class with no rule outside a media query is unusual enough to be
- * worth this sentence, and it is deliberate rather than a forgotten rule.
+ * that mechanism. Nothing is declared against `.withPanel` alone; the two
+ * rules below are against its children.
+ *
+ * **The pair is the page, 2026-09-04 (evening).** `.board` centres itself in
+ * the room the rail leaves it (its own rule below), but the panel is a flex
+ * sibling with no margins of its own, so it docked at the window's right
+ * edge and the board centred in what was left between the rail and it: on a
+ * wide window the entry page spread from the window's left edge to its right
+ * while the wall it came from sat in a 1600px column. The owner: "make sure
+ * the pages are always the same size." So with a panel the board gives up
+ * the panel's width from its cap and its right margin, the panel gives up
+ * its left margin and takes an auto right one, and the two auto margins that
+ * remain -- the board's left, the panel's right -- split the free space in
+ * equal halves: the board-plus-panel pair is exactly as wide as the board
+ * alone would be, and centred where it would be. At 1600 and below the
+ * margins resolve to zero and nothing moves, which is why the mockup drawn
+ * at 1600 could not show this. The panel is addressed as `.board`'s next
+ * sibling rather than by class because its class is ServicePage.module.css's,
+ * and this file cannot name another module's class; AppShell.tsx renders it
+ * directly after `.board`, and its test asserts that order.
  */
+.withPanel > .board {
+  max-width: calc(var(--board-max-width) - var(--page-facts-width));
+  margin-right: 0;
+}
+
+.withPanel > .board + * {
+  margin-left: 0;
+  margin-right: auto;
+}
 
 /* `min-width: 0` for the reason ProjectBoard.module.css states at length: a
    flex item's automatic minimum is its content's, and the band grids inside

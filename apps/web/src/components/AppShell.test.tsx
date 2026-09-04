@@ -12,6 +12,9 @@
 // whether the rail is *visible* at a width -- only whether its content is in
 // the document, which is what these assert. The same goes for the board head
 // being sticky and for the bar no longer being.
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -218,6 +221,25 @@ describe("AppShell -- the side panel", () => {
    * trailing space appended even when there is nothing to append) that an
    * `expect(...).toContain(styles.shell)` assertion would miss entirely.
    */
+  // The pair is the page (AppShell.module.css's own comment on `.withPanel >
+  // .board`): jsdom lays nothing out, so the one thing a test can hold is
+  // the rule itself -- the board gives the panel's width back out of its cap
+  // and its right margin, the panel takes the auto right margin, and the two
+  // centre as one unit exactly as wide as the board alone.
+  it("caps board plus panel to the board's own width and centres them as one unit", () => {
+    const css = readFileSync(fileURLToPath(import.meta.url).replace(/AppShell\.test\.tsx$/, "AppShell.module.css"), "utf8");
+    const boardStart = css.indexOf(".withPanel > .board {");
+    const boardRule = css.slice(boardStart, css.indexOf("}", boardStart));
+    expect(boardStart).toBeGreaterThan(-1);
+    expect(boardRule).toMatch(/max-width:\s*calc\(var\(--board-max-width\)\s*-\s*var\(--page-facts-width\)\)/);
+    expect(boardRule).toMatch(/margin-right:\s*0/);
+    const panelStart = css.indexOf(".withPanel > .board + * {");
+    const panelRule = css.slice(panelStart, css.indexOf("}", panelStart));
+    expect(panelStart).toBeGreaterThan(-1);
+    expect(panelRule).toMatch(/margin-left:\s*0/);
+    expect(panelRule).toMatch(/margin-right:\s*auto/);
+  });
+
   it("keeps the shell row's class string byte-identical to before this prop existed, when no panel is passed", () => {
     renderShell({ sidePanel: undefined });
     const shell = screen.getByRole("main").parentElement;

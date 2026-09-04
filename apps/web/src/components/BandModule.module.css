@@ -96,12 +96,18 @@
 }
 
 /*
- * The grid tightens below 480px rather than reflowing to fewer, wider
- * columns -- the mockup's own breakpoint and values.
+ * Below 480px the grid is a fixed count of columns, not auto-fill -- four,
+ * the owner's number (tokens.css's own comment above
+ * `--icon-grid-columns-narrow` carries the words and the arithmetic). The
+ * mockup's own 480px values were auto-fill at 92px, which is three per line
+ * on a 390px phone. `minmax(0, 1fr)` rather than a bare `1fr`: `1fr` is
+ * `minmax(auto, 1fr)`, and a column's `auto` minimum is its content's, so a
+ * long unbroken name would widen its column and push the fourth off the
+ * line the count exists to keep it on.
  */
 @media (max-width: 480px) {
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(var(--icon-grid-col-min-narrow), 1fr));
+    grid-template-columns: repeat(var(--icon-grid-columns-narrow), minmax(0, 1fr));
     row-gap: var(--icon-grid-row-gap-narrow);
     column-gap: var(--icon-grid-column-gap-narrow);
   }

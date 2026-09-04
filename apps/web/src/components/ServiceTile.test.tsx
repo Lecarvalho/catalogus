@@ -333,6 +333,48 @@ describe("ServiceTile -- activation and peeking, single entry", () => {
     expect(onPeek).not.toHaveBeenCalled();
   });
 
+  // A tap focuses the button too (Chrome on Android), and that focus used
+  // to peek: on a phone every tap flashed the popover before the page took
+  // over. Owner, 2026-09-04: no popover on mobile, there is no hover, only
+  // tap. The pointer-down before the focus is what tells a tap from a Tab.
+  it("does not peek when the focus was put there by a pointer (a tap or a click)", () => {
+    const { onPeek, onActivate } = renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio" }) });
+    const tile = screen.getByRole("button");
+    fireEvent.pointerDown(tile);
+    fireEvent.focus(tile);
+    fireEvent.click(tile);
+    expect(onPeek).not.toHaveBeenCalled();
+    // And the click still activates: the shared handlers must not swallow it.
+    expect(onActivate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not peek on a tap on the group tile either", () => {
+    const { onPeek, onActivate } = renderTile({ group: multiGroup([service({ id: "a", role: "hosting", service: "flyio" }), service({ id: "b", role: "cron", service: "flyio" })]) });
+    const tile = screen.getByRole("button");
+    fireEvent.pointerDown(tile);
+    fireEvent.focus(tile);
+    fireEvent.click(tile);
+    expect(onPeek).not.toHaveBeenCalled();
+    expect(onActivate).toHaveBeenCalledTimes(1);
+  });
+
+  it("still peeks on a Tab that follows a press which never focused (already focused, or cancelled)", () => {
+    const { onPeek } = renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio" }) });
+    const tile = screen.getByRole("button");
+    // A press on an already-focused tile: pointerdown, no focus, click.
+    fireEvent.pointerDown(tile);
+    fireEvent.click(tile);
+    fireEvent.blur(tile);
+    fireEvent.focus(tile);
+    expect(onPeek).toHaveBeenCalledTimes(1);
+    // A press that became a scroll: pointerdown, pointercancel, no click.
+    fireEvent.blur(tile);
+    fireEvent.pointerDown(tile);
+    fireEvent.pointerCancel(tile);
+    fireEvent.focus(tile);
+    expect(onPeek).toHaveBeenCalledTimes(2);
+  });
+
   it("peeks on keyboard focus, for parity with hover, and ends on blur", () => {
     const { onPeek, onPeekEnd } = renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio" }) });
     const tile = screen.getByRole("button");

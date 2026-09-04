@@ -224,4 +224,27 @@
     width: var(--icon-mark-size-narrow);
     height: var(--icon-mark-size-narrow);
   }
+
+  /* The label comes down with the tile, 2026-09-04, so four fit a line --
+     tokens.css's comment above `--icon-grid-columns-narrow` derives every
+     number here from the column a 360px phone leaves. `.count` shares
+     `.id`'s size on the board and shares its narrow size too. */
+  .label {
+    margin-top: var(--icon-label-gap-narrow);
+  }
+
+  .name {
+    font-size: var(--text-icon-name-narrow);
+    /* `anywhere`, not the board's `break-word`: both break a long word, but
+       only `anywhere` lets the break count toward the label's min-content
+       width, and a grid column is sized from that -- with `break-word`, an
+       unbroken "OpenTelemetry" at 12px measured 83px inside a 72px column on
+       a 360px phone, 6px past each edge, the validator's own number. */
+    overflow-wrap: anywhere;
+  }
+
+  .id,
+  .count {
+    font-size: var(--text-icon-id-narrow);
+  }
 }

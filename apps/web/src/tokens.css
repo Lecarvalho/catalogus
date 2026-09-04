@@ -288,14 +288,30 @@
   --icon-grid-column-gap: 20px;
   --icon-grid-top: 30px;
 
-  /* The grid tightens below 480px rather than reflowing to fewer, wider
-     columns -- the mockup's own `@media (max-width: 480px)` values. */
-  --icon-grid-col-min-narrow: 92px;
-  --icon-grid-row-gap-narrow: 32px;
-  --icon-grid-column-gap-narrow: 14px;
-  --icon-tile-size-narrow: 62px;
-  --icon-tile-radius-narrow: 16px;
-  --icon-mark-size-narrow: 38px;
+  /* Below 480px the grid is four columns, fixed -- the owner's number, not
+     the mockup's (2026-09-04, on the first phone-width look at a real
+     inventory: "the icons and names are taking too much space, a good
+     version would place 4 items in the same line"). The mockup's own 480px
+     values (auto-fill columns no narrower than 92px, a 62px tile, 14px gaps)
+     gave three per line on a 390px phone and two on a 360 one. Everything
+     below is derived from four-per-line, not chosen: on a 360px window the
+     board's 14px padding and three 10px gaps leave 75.5px per column, so the
+     tile is 54px (the same 0.6 mark-to-tile ratio as the 76/46 board tile,
+     32px mark) with 10px of air either side, and the name comes down to 12px
+     so a two-word brand ("Vertex AI", "Cloud Run") holds two lines inside
+     the column rather than three. Row gap and label gap tighten with it so a
+     band's rows read as rows. `--icon-grid-columns-narrow` is a count, read
+     by BandModule.module.css's `repeat()`; there is no column minimum below
+     480px any more, because the count is the rule. */
+  --icon-grid-columns-narrow: 4;
+  --icon-grid-row-gap-narrow: 26px;
+  --icon-grid-column-gap-narrow: 10px;
+  --icon-tile-size-narrow: 54px;
+  --icon-tile-radius-narrow: 14px;
+  --icon-mark-size-narrow: 32px;
+  --text-icon-name-narrow: 12px;
+  --text-icon-id-narrow: 10px;
+  --icon-label-gap-narrow: 9px;
 
   /* Section spacing: the air above each band, and around the board's own
      head (the List/Graph view rail) -- both above the icon grid, neither

@@ -43,11 +43,24 @@
   gap: var(--space-6);
 }
 
-/* One column on a narrow viewport. With a single child this changes nothing
-   today; it stays because the moment a second element joins `.body` a row on
-   a phone is wrong, and that is easier to keep than to remember. */
+/* One column on a narrow viewport. With a single child the direction changes
+   nothing today; it stays because the moment a second element joins `.body` a
+   row on a phone is wrong, and that is easier to keep than to remember.
+
+   `align-items: stretch` is not nothing, though, and it was missing until
+   2026-09-04: in a column, `align-items` governs *width*, and the row's
+   `flex-start` above carried into it, so the one child sized shrink-to-fit
+   and any manifest whose bands were narrower than the board hugged the left
+   edge -- a validator's eight-service fixture at 481px got a single 184px
+   column beside a 242px gutter, and 304px of content in a 437px board at
+   480. `layout-stress` never showed it because its bands' max-content always
+   exceeds a phone, which clamps the child to the full width anyway. The
+   ProjectBoard's own `flex: 1 1 auto` is what fills the row above 720px and
+   says nothing about the cross axis, which is why this is the column
+   rule's to fix. */
 @media (max-width: 720px) {
   .body {
     flex-direction: column;
+    align-items: stretch;
   }
 }

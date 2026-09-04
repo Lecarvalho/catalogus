@@ -86,6 +86,8 @@
 // local `statusPhrase` below for the exact rule and what it deliberately
 // does not extend to (the badge, the desaturation, and -- since 2026-09-04
 // -- a multi-entry group).
+import { useRef, type FocusEvent, type PointerEvent } from "react";
+
 import type { ViewService } from "@catalogus/cli";
 
 import type { BandId, VendorGroup } from "../bands.js";
@@ -203,6 +205,58 @@ function groupStatusPhrase(group: VendorGroup): { entryId: string; word: string 
   return { entryId: departed.id, word: STATUS_WORDS[worst].toLowerCase() };
 }
 
+/**
+ * The peek's four handlers, shared by the single-entry tile and `GroupTile`
+ * below so the touch rule lives once.
+ *
+ * `onPointerEnter` skips a touch pointer: touch has no hover, so a popover it
+ * opened would be one the reader cannot dismiss. That alone was not enough --
+ * a tap also *focuses* the button (Chrome on Android; Safari does not), and
+ * `onFocus` opened the peek for keyboard parity without asking where the
+ * focus came from, so on a phone every tap flashed the popover before the
+ * page replaced it. The owner, 2026-09-04: "on mobile the popover should not
+ * open, since we have no hover, it's only tap." So focus peeks only when no
+ * pointer put it there: `onPointerDown` (any pointer -- a mouse click's focus
+ * has nothing to add, since its hover already peeked) raises a flag that the
+ * next `onFocus` consumes instead of peeking. The flag is cleared on click
+ * and on pointer cancel too, because a press on a tile that already has focus
+ * raises it without a focus event ever consuming it, and a press that turns
+ * into a scroll never reaches click; either way a later Tab onto the tile
+ * must still peek. `:focus-visible` would say the same thing in one selector,
+ * but a ref is testable in jsdom and does not depend on each browser's
+ * heuristic for it.
+ */
+function usePeekHandlers(group: VendorGroup, onPeek: ServiceTileProps["onPeek"], onPeekEnd: ServiceTileProps["onPeekEnd"]) {
+  const pointerFocusRef = useRef(false);
+  // No `onClick` here on purpose: the spread lands after the button's own
+  // `onClick={() => onActivate(group)}` and would replace it. The clear on
+  // click is `onClickCapture` below instead.
+  return {
+    onPointerDown: () => {
+      pointerFocusRef.current = true;
+    },
+    onPointerCancel: () => {
+      pointerFocusRef.current = false;
+    },
+    onPointerEnter: (event: PointerEvent<HTMLButtonElement>) => {
+      if (event.pointerType === "touch") return;
+      onPeek(group, event.currentTarget);
+    },
+    onPointerLeave: onPeekEnd,
+    onFocus: (event: FocusEvent<HTMLButtonElement>) => {
+      if (pointerFocusRef.current) {
+        pointerFocusRef.current = false;
+        return;
+      }
+      onPeek(group, event.currentTarget);
+    },
+    onBlur: onPeekEnd,
+    onClickCapture: () => {
+      pointerFocusRef.current = false;
+    },
+  };
+}
+
 export function ServiceTile({ group, bandId, selected, onActivate, onPeek, onPeekEnd }: ServiceTileProps) {
   const isGroup = group.entries.length > 1;
   const domId = serviceTileDomId(bandId, group);
@@ -277,18 +331,14 @@ function SingleEntryTile({ service, group, domId, selected, onActivate, onPeek, 
       // which has no hover at all, never gets a popover it cannot dismiss.
       // On touch the click path is the whole interaction, which is the right
       // degradation: the popover was only ever a shortcut to the page.
-      onPointerEnter={(event) => {
-        if (event.pointerType === "touch") return;
-        onPeek(group, event.currentTarget);
-      }}
-      onPointerLeave={onPeekEnd}
       // Keyboard parity: a focused tile peeks the same way a hovered one
       // does, so the summary is not a mouse-only affordance. For a group,
       // ArrowDown/ArrowUp then walk into the popover's rows -- App.tsx's
       // peek keydown effect owns that, since the popover is not this
-      // button's DOM neighbour and Tab cannot reach it.
-      onFocus={(event) => onPeek(group, event.currentTarget)}
-      onBlur={onPeekEnd}
+      // button's DOM neighbour and Tab cannot reach it. `usePeekHandlers`
+      // holds the one subtlety: a tap focuses the button too, and that
+      // focus must not peek.
+      {...usePeekHandlers(group, onPeek, onPeekEnd)}
     >
       {/*
         The squircle: a phone-like corner radius behind the brand mark, the
@@ -388,13 +438,7 @@ function GroupTile({ group, domId, selected, onActivate, onPeek, onPeekEnd }: Ti
       aria-label={label}
       aria-current={selected ? "true" : undefined}
       onClick={() => onActivate(group)}
-      onPointerEnter={(event) => {
-        if (event.pointerType === "touch") return;
-        onPeek(group, event.currentTarget);
-      }}
-      onPointerLeave={onPeekEnd}
-      onFocus={(event) => onPeek(group, event.currentTarget)}
-      onBlur={onPeekEnd}
+      {...usePeekHandlers(group, onPeek, onPeekEnd)}
     >
       {/*
         No `styles.desaturated` here, ever -- the header's decision 3: "the
