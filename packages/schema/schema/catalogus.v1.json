@@ -93,6 +93,11 @@
           "type": "string",
           "description": "The version in use, as the owner would say it — \"10\", \"19.2\", \"13.1.3\". Free-form on purpose: this is the number a tile displays and an end-of-life date keys off, not something to resolve or compare. Most useful on `kind: stack` entries, but allowed on any: a self-hosted component has a version too. Never a build identifier or a private tenant reference."
         },
+        "icon": {
+          "type": "string",
+          "pattern": "^\\.catalogus/icons/(?!.*\\.\\.)[a-z0-9][a-z0-9_.-]*\\.svg$",
+          "description": "Repo-relative path to an SVG mark the CLI has already vendored, always `.catalogus/icons/<name>.svg` — one directory below the manifest's own directory, never a leading `./`, never absolute, never a URL, and `<name>` may never contain `..`. Written only by `catalogus set services.<id>.icon <https-url|path>`, which fetches (or copies) the bytes exactly once, refuses them if they fail the sanitiser, and vendors the result under this path. `catalogus view` reads that file and never the network — a URL recorded here instead, for the viewer to fetch at render time, is exactly the shape this pattern exists to make unrepresentable."
+        },
         "added": {
           "type": "string",
           "format": "date",

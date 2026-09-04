@@ -25,6 +25,9 @@ import { createServer } from "node:http";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { ServiceEntry } from "@catalogus/schema";
+
+import { resolveServiceIcon } from "../icon-resolution.js";
 import { loadValidManifest } from "../load-manifest.js";
 import { resolveTargetPath } from "../paths.js";
 import type { CommandResult } from "../types.js";
@@ -45,6 +48,17 @@ export interface ViewServerHandle {
   url: string;
   port: number;
   close: () => Promise<void>;
+  /**
+   * One line per service entry whose `icon` field names a file that failed
+   * to resolve (missing, refused by the sanitiser, or outside
+   * .catalogus/icons/) -- see findStaleIconWarnings below. Empty when
+   * nothing is stale. runView prints these to stderr; they live here,
+   * rather than only being printed directly by createViewServer, so
+   * view.test.ts can assert on the list itself without capturing console
+   * output (this module is otherwise silent -- see its own top comment on
+   * why createViewServer never touches a browser or a stream directly).
+   */
+  staleIconWarnings: string[];
 }
 
 export type CreateViewServerOutcome = { ok: true; value: ViewServerHandle } | { ok: false; error: CommandResult };
@@ -490,6 +504,49 @@ function listen(server: Server, port: number): Promise<void> {
 }
 
 /**
+ * One stderr-ready line per service entry whose `icon` field points at a
+ * file that failed to resolve (missing, refused by the sanitiser, over
+ * MAX_ICON_BYTES, or -- the schema-bypass floor -- outside
+ * `.catalogus/icons/`). Only entries that actually set `icon` are worth
+ * asking about at all: resolveServiceIcon never reports `stale: true` for
+ * one that doesn't, so this skips straight past every entry without one
+ * rather than paying for a resolution buildViewPayload already did nothing
+ * useful with.
+ *
+ * Runs resolveServiceIcon a second time for exactly these entries --
+ * buildViewPayload (through view-payload.ts's buildViewService) already
+ * resolved every entry once to build the payload itself, and this doesn't
+ * share that result with it. Accepted rather than threading a second return
+ * value out of buildViewPayload: a manifest has at most a few dozen
+ * services, an entry actually naming its own `icon` is the minority case
+ * even among those, and each resolution is one small file read -- the same
+ * cost buildViewPayload's own comment already accepts for the primary
+ * pass, paid twice only for the entries this function actually needs.
+ */
+async function findStaleIconWarnings(manifestDir: string, services: readonly ServiceEntry[]): Promise<string[]> {
+  const warnings: string[] = [];
+  for (const entry of services) {
+    if (!entry.icon) continue;
+    const resolution = await resolveServiceIcon(manifestDir, entry);
+    if (resolution.stale) {
+      // The same distinction `catalogus icons` draws (D3 of the 2026-09-04
+      // validation): a missing file wants the same source fetched again, a
+      // refused one wants a different source -- an agent told "run set again"
+      // for a file the sanitiser refused re-vendors the same bytes and loops.
+      const why =
+        resolution.refusalReason !== undefined
+          ? `but it ${resolution.refusalReason} -- pick a different source and run `
+          : `but that file is missing -- run `;
+      warnings.push(
+        `services.${entry.id}.icon names "${entry.icon}", ${why}` +
+          `"catalogus set services.${entry.id}.icon <https-url|path>" again.`
+      );
+    }
+  }
+  return warnings;
+}
+
+/**
  * Starts the view server: checks the built web assets exist, loads and
  * validates the manifest, builds the payload once, and listens. Never opens
  * a browser -- see this module's top comment for why that split exists.
@@ -569,6 +626,13 @@ export async function createViewServer(targetDir: string, options: { port: numbe
   const readAt = new Date().toISOString();
   const payload = await buildViewPayload(loaded.value.location.filePath, loaded.value.manifest, readAt);
 
+  // A stale services.<id>.icon pointer doesn't fail startup -- see this
+  // module's own top comment and findStaleIconWarnings below -- but it is
+  // worth telling the operator about, since the tile it names is silently
+  // falling back to its catalog icon or to initials instead of the mark
+  // they thought they'd vendored.
+  const staleIconWarnings = await findStaleIconWarnings(loaded.value.location.dir, loaded.value.manifest.services);
+
   const server = createServer();
 
   try {
@@ -603,6 +667,7 @@ export async function createViewServer(targetDir: string, options: { port: numbe
     value: {
       url: `http://127.0.0.1:${boundPort}`,
       port: boundPort,
+      staleIconWarnings,
       // Gap (Phase 3.7 hardening pass, second round): `server.close()`
       // alone stops accepting new connections but its callback doesn't
       // fire until every currently-open connection ends on its own --
@@ -724,7 +789,7 @@ export async function runView(pathArg: string | undefined, options: ViewCommandO
   if (!started.ok) {
     return started.error;
   }
-  const { url } = started.value;
+  const { url, staleIconWarnings } = started.value;
 
   if (options.open !== false) {
     openBrowser(url);
@@ -733,6 +798,11 @@ export async function runView(pathArg: string | undefined, options: ViewCommandO
   return {
     exitCode: 0,
     stdout: [`Serving ${targetDir} at ${url}`, "  press Ctrl+C to stop"],
-    stderr: [],
+    // One line per stale services.<id>.icon pointer -- see
+    // findStaleIconWarnings' own comment. A stale pointer never fails
+    // startup (the viewer degrades to the catalog fallback or to
+    // initials, same as any other unresolved icon); this is what tells the
+    // operator it happened at all.
+    stderr: staleIconWarnings,
   };
 }

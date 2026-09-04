@@ -31,8 +31,28 @@
 // record). Both sources resolve through the one exported function below,
 // to the one ResolvedIcon shape, so a caller never has to know which source
 // a given ref came from.
+//
+// Added 2026-09-04 (docs/custom-icon-brief.md): a third, unrelated concept
+// lives in this file too now -- resolveLocalIcon, near the bottom. A
+// CatalogEntry.icon ref (above) names a slug into this package's own fixed
+// ICON_OVERLAY/THESVG_ICON_OVERLAY tables; a *service entry's* own `icon`
+// field (packages/schema/src/schema.ts) names a file the CLI fetched from
+// a URL the owner supplied, or copied from a local path, exactly once, and
+// vendored under `.catalogus/icons/` beside the manifest. Different input
+// (arbitrary, not from a table this package controls), same output shape
+// and the same untrusted-bytes posture, so it goes through the same
+// sanitiser (parseIconMarkup, renamed this same day from
+// parseThesvgMarkup -- see that function's own comment) rather than a
+// second copy of it.
+//
+// Same day, later pass: a validator running the built binary found that
+// resolveLocalIcon's single null could not answer "should the caller try
+// fetching this again, or is there simply nothing here yet" (D3,
+// docs/custom-icon-brief.md's follow-up). describeLocalIconRefusal, beside
+// resolveLocalIcon below, is the fix -- see its own comment and
+// LocalIconRefusal's.
 import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 
 // createRequire(import.meta.url), not a bare `import.meta.resolve` call:
 // both were verified to resolve `simple-icons/icons/<ref>.svg` correctly
@@ -73,7 +93,7 @@ const SAFE_ICON_REF = /^[a-z0-9_]+$/;
  * including nginx.svg -- so the first (only) `d="..."` match is the whole
  * answer; there's no second path to be greedy about. This does not
  * generalise to the vendored thesvg files below, which are not one-path
- * files -- see parseThesvgMarkup's own comment for why that file needs a
+ * files -- see parseIconMarkup's own comment for why that file needs a
  * different approach rather than a second, greedier version of this one.
  */
 function extractPathData(svg: string): string | null {
@@ -226,8 +246,42 @@ async function resolveSimpleIconsIcon(icon: string): Promise<ResolvedIcon | null
  */
 const FORBIDDEN_MARKUP_RE = /<script\b|<foreignobject\b|<style\b|\bon[a-zA-Z-]*\s*=|\bhref\s*=/i;
 
+/**
+ * D8 (validator, 2026-09-04): `url(...)` -- an SVG/CSS functional value, not
+ * an element or attribute FORBIDDEN_MARKUP_RE's own checks were ever built
+ * to see -- is legal on `fill`, `stroke`, `clip-path`, `mask`, `filter`, and
+ * inside a plain `style="..."` attribute (which nothing above refuses; only
+ * a <style> *block* is), and a browser resolves a non-fragment argument to
+ * it as a real network fetch: `style="fill:url(https://evil.example/x)"`
+ * makes the viewer's browser request that URL the moment the mark renders,
+ * off a `catalogus.yaml` value the CLI itself vendored. `url(#grad)` -- a
+ * same-document reference to a `<linearGradient id="grad">` this same SVG
+ * defines -- is the one legitimate use this repo's own fill machinery
+ * relies on (a gradient a brand mark defines and immediately references),
+ * so the rule is specifically "the argument must start with `#`", not "no
+ * url() at all".
+ *
+ * Matches every `url(...)` in the document regardless of which attribute or
+ * block it sits inside -- scoping this to `fill`/`style` specifically would
+ * miss `stroke`, `clip-path`, `mask`, `filter`, and any future property a
+ * hostile file could put it on, and there is no legitimate reason for this
+ * sanitiser to draw that line narrower than "everywhere".
+ */
+const URL_FUNCTION_RE = /\burl\(\s*(['"]?)([^'")]*)\1\s*\)/gi;
+
+/** True when a `url(...)` argument matched by URL_FUNCTION_RE is not a same-document fragment reference (`#...`) -- see URL_FUNCTION_RE's own comment for why that is the one shape this sanitiser allows. */
+function hasUnsafeUrlFunction(svg: string): boolean {
+  for (const match of svg.matchAll(URL_FUNCTION_RE)) {
+    const argument = (match[2] ?? "").trim();
+    if (!argument.startsWith("#")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function hasForbiddenMarkup(svg: string): boolean {
-  return FORBIDDEN_MARKUP_RE.test(svg);
+  return FORBIDDEN_MARKUP_RE.test(svg) || hasUnsafeUrlFunction(svg);
 }
 
 /** Reads one double-quoted attribute value out of a raw attribute string (an already-isolated `<tag ...>`'s inside, never the whole document). */
@@ -252,7 +306,7 @@ const OPENING_TAG_RE = /<([a-zA-Z][\w:-]*)((?:\s[^<>]*?)?)\s*(\/)?>/g;
  * Materialises an inherited default onto every element in `markup` that has
  * no attribute of its own by that name -- used only for `fill`/`fill-rule`,
  * and only when the source file's root <svg> set one (see
- * parseThesvgMarkup's own comment on why aws.svg is the one vendored file
+ * parseIconMarkup's own comment on why aws.svg is the one vendored file
  * that needs this). Applying it to every element regardless of nesting
  * depth, not just the root's direct children, is deliberate: SVG's own
  * inheritance cascades the same way, so this is the more faithful
@@ -320,38 +374,50 @@ function applyKnockout(markup: string, knockoutHexValues: readonly string[]): st
   });
 }
 
-interface ParsedThesvgMarkup {
+interface ParsedIconMarkup {
   readonly viewBox: string;
   readonly body: string;
 }
 
 /**
- * Turns a vendored thesvg.org file's raw bytes into `{ viewBox, body }` --
+ * Turns raw SVG bytes -- a vendored thesvg.org file, or (as of 2026-09-04,
+ * docs/custom-icon-brief.md) an owner-supplied file the CLI has fetched or
+ * copied and vendored under `.catalogus/icons/` -- into `{ viewBox, body }`,
  * the two pieces of a ResolvedIcon that come straight off the file, before
- * the per-icon fill policy (THESVG_ICONS below) runs. Never throws: every
- * malformed- or unsafe-shaped input returns null, same contract as the rest
- * of this module.
+ * whatever per-icon fill policy the caller applies runs (THESVG_ICONS below
+ * for a vendored file; resolveLocalIcon applies none at all -- see its own
+ * comment). Never throws: every malformed- or unsafe-shaped input returns
+ * null, same contract as the rest of this module.
+ *
+ * Named parseIconMarkup, not parseThesvgMarkup as it was until 2026-09-04:
+ * the function itself never changed, only the fact that its caller is no
+ * longer only "one of five files this package vendors" -- an owner-supplied
+ * file is exactly as untrusted as a vendored one, so it goes through the
+ * same sanitiser rather than a second copy of it, and the name should not
+ * claim a narrower job than the one it actually does. The rename carried
+ * every existing test in icons.test.ts across unchanged; none of the
+ * behaviour below moved.
  *
  * Not a parser -- extractPathData's own comment already covers why one
  * regex greedily grabbing every `d="..."` doesn't generalise past a
- * one-path file, and none of the five vendored files are one-path files.
- * What this function does instead is sound for a narrower reason: every one
- * of the five vendored files is `<svg …>inner</svg>` with no second,
- * nested `<svg>` (confirmed by reading all five directly), so the inner
- * markup a caller wants is exactly the substring between the root tag's own
- * `>` and the document's last `</svg>` -- no tree-walking required to find
- * it. The svgTagCount check below is what keeps that assumption from
- * silently stopping being true: a file with a second `<svg` is refused
- * rather than sliced at the wrong boundary.
+ * one-path file, and none of the five vendored files (nor any realistic
+ * owner-supplied brand mark) are one-path files. What this function does
+ * instead is sound for a narrower reason: every file it is ever handed is
+ * expected to be `<svg …>inner</svg>` with no second, nested `<svg>`, so the
+ * inner markup a caller wants is exactly the substring between the root
+ * tag's own `>` and the document's last `</svg>` -- no tree-walking
+ * required to find it. The svgTagCount check below is what keeps that
+ * assumption from silently stopping being true: a file with a second `<svg`
+ * is refused rather than sliced at the wrong boundary.
  *
  * Exported only for icons.test.ts, so the sanitiser's refusals (a synthetic
  * <script>-bearing file, a nested <svg>, a missing viewBox) can be proven
  * directly against this function rather than indirectly through a fixture
- * file on disk -- resolveThesvgIcon below only ever calls this with the
- * bytes of one of the five vendored, already-known-safe files. Not part of
- * this package's public API surface -- index.ts does not re-export it.
+ * file on disk -- resolveThesvgIcon and resolveLocalIcon below only ever
+ * call this with bytes already read off disk. Not part of this package's
+ * public API surface -- index.ts does not re-export it.
  */
-export function parseThesvgMarkup(raw: string): ParsedThesvgMarkup | null {
+export function parseIconMarkup(raw: string): ParsedIconMarkup | null {
   // Comments stripped before the forbidden-markup check, not after: a
   // <script> hidden inside <!-- --> must never have been visible to a
   // later, trusting reader, not merely "removed before it mattered". None
@@ -470,7 +536,7 @@ const THESVG_ICON_DIR = new URL("../icons/thesvg/", import.meta.url);
  * Resolves a thesvg slug (already stripped of its `thesvg:` prefix and
  * validated against SAFE_ICON_REF by resolveIcon below) to a ResolvedIcon.
  * Never throws: an unregistered slug, a missing file, or a file that fails
- * parseThesvgMarkup's checks all degrade to null.
+ * parseIconMarkup's checks all degrade to null.
  */
 async function resolveThesvgIcon(slug: string): Promise<ResolvedIcon | null> {
   const spec = THESVG_ICONS[slug];
@@ -485,7 +551,7 @@ async function resolveThesvgIcon(slug: string): Promise<ResolvedIcon | null> {
     return null;
   }
 
-  const parsed = parseThesvgMarkup(raw);
+  const parsed = parseIconMarkup(raw);
   if (!parsed) {
     return null;
   }
@@ -535,4 +601,175 @@ export async function resolveIcon(icon: string | undefined): Promise<ResolvedIco
   }
 
   return SAFE_ICON_REF.test(icon) ? resolveSimpleIconsIcon(icon) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Owner-supplied icons (2026-09-04, docs/custom-icon-brief.md). A service
+// entry's own `icon` field (packages/schema/src/schema.ts's serviceEntry.icon)
+// is not a ref into any table this package controls: it is a repo-relative
+// `.catalogus/icons/<name>.svg` path the CLI wrote after fetching the bytes
+// from an `https://` URL the manifest's author supplied, or copying them from
+// a local file, exactly once (`catalogus set services.<id>.icon <url|path>`).
+// resolveLocalIcon is the read-time half of that design: it never touches the
+// network itself -- by the time anything calls it, the bytes are already on
+// disk -- and it applies the same untrusted-input posture the vendored thesvg
+// files get, because "this file arrived over HTTPS, or via --path, from
+// outside this package" is exactly as untrusted as "this file lives in this
+// package's own tree" was before parseIconMarkup existed to check it.
+
+/**
+ * The size ceiling both `catalogus set services.<id>.icon` (packages/cli)
+ * and this module's own resolveLocalIcon enforce, so the two can never
+ * disagree about what is too big to vendor -- the CLI refuses to write a
+ * file this resolver would later refuse to read, and this resolver refuses
+ * to read a file the CLI would never have written, whichever one a given
+ * bug or hand-edit produced. 256 KiB is generous for a hand-drawn brand
+ * mark (every one of the five vendored thesvg.org files under
+ * ../icons/thesvg/ is well under 6 KB) while still cheap to stat and read
+ * on every `catalogus view` / `catalogus icons` run.
+ */
+export const MAX_ICON_BYTES = 256 * 1024;
+
+/**
+ * Why a local file failed to resolve -- `"missing"` when nothing is there at
+ * all, `"refused"` (with a human-readable `reason`) when a file *is* there
+ * but couldn't be used. Added 2026-09-04, alongside describeLocalIconRefusal
+ * below, for a defect the validator reproduced against the built binary
+ * (D3, docs/custom-icon-brief.md's follow-up): `catalogus icons` labelled a
+ * file that existed but failed the sanitiser the exact same way it labelled
+ * one nobody had ever fetched -- "(missing file)" either way -- so an agent
+ * running the skill's 7b loop had no way to tell "this has never been
+ * fetched" from "this was fetched and cannot be used; fetching the same URL
+ * again will not help" apart. The two calls for an agent to make in
+ * response are different (fetch something, versus pick a different
+ * source), and the CLI was reporting one signal for both.
+ */
+export type LocalIconRefusal = { readonly kind: "missing" } | { readonly kind: "refused"; readonly reason: string };
+
+type LocalIconOutcome = { readonly ok: true; readonly icon: ResolvedIcon } | { readonly ok: false; readonly refusal: LocalIconRefusal };
+
+/** `error instanceof Error ? error.message : String(error)`, kept local rather than imported: this package has no dependency on packages/cli's own copy (types.ts's errorMessage), and pulling one in for a single one-line helper used only in a refusal-reason string would be the wrong direction for that dependency to run. */
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The one real implementation behind both resolveLocalIcon (the hot,
+ * render-time path: succeed or degrade to null, no caller has ever needed
+ * more than that) and describeLocalIconRefusal (the cold, reporting-time
+ * path added for D3 above: a caller that already knows resolution failed
+ * and needs to say why). Kept as a single function reading the file at most
+ * once, rather than resolveLocalIcon and a second, independent diagnostic
+ * function each re-running the same stat/read/parse -- two copies of this
+ * exact sequence is how they drift, which is the same reason parseIconMarkup
+ * itself is shared with the vendored-thesvg path rather than duplicated.
+ *
+ * The size check runs first, against a `stat`, before any byte of the file
+ * is read: a resolver handed a path to a file the CLI would never itself
+ * have written (a 40 MB SVG dropped in by hand, or produced by a future bug
+ * elsewhere) has to refuse it cheaply, not by reading the whole thing into
+ * memory first and discarding it.
+ */
+async function resolveLocalIconDetailed(absolutePath: string): Promise<LocalIconOutcome> {
+  let info;
+  try {
+    info = await stat(absolutePath);
+  } catch {
+    return { ok: false, refusal: { kind: "missing" } };
+  }
+  if (info.size > MAX_ICON_BYTES) {
+    return { ok: false, refusal: { kind: "refused", reason: `over the ${MAX_ICON_BYTES}-byte size cap` } };
+  }
+
+  let raw: string;
+  try {
+    raw = await readFile(absolutePath, "utf8");
+  } catch (error) {
+    // A stat that succeeded followed by a read that failed (EISDIR on a
+    // directory, an ACL that allows stat but not open, a race where the
+    // file was removed between the two calls) is "something is there" by
+    // the same test D3 asks for -- reported as refused, not missing.
+    return { ok: false, refusal: { kind: "refused", reason: `could not be read (${describeError(error)})` } };
+  }
+
+  const parsed = parseIconMarkup(raw);
+  if (!parsed) {
+    return {
+      ok: false,
+      refusal: {
+        kind: "refused",
+        // Phrased to follow "it": the callers (`catalogus icons`, `view`'s
+        // stderr line) frame it once. The first cut began "the sanitiser
+        // refused it (...)" and both callers said so again, so the line an
+        // agent reads in the skill's 7b loop read "refused it (the sanitiser
+        // refused it (...))" -- a re-validation finding, 2026-09-04.
+        reason:
+          "failed the sanitiser: it carries a <script>, <foreignObject>, on*= handler, <a href>/<use xlink:href>, " +
+          "<style> block, a url(...) reference that isn't a same-document #fragment or a nested <svg>, " +
+          "or it has no viewBox",
+      },
+    };
+  }
+
+  return { ok: true, icon: { viewBox: parsed.viewBox, body: parsed.body, hex: null } };
+}
+
+/**
+ * Resolves an owner-supplied SVG the CLI has already vendored to disk --
+ * `absolutePath` is a real filesystem path, not a repo-relative one; see
+ * this function's own callers in packages/cli (view-payload.ts, icons.ts)
+ * for how a service entry's `icon` field becomes one. Never throws: a
+ * missing file, an unreadable file, a file over MAX_ICON_BYTES, or markup
+ * parseIconMarkup refuses all degrade to null, the same contract every
+ * other resolver in this module keeps -- a broken icon must fall back to
+ * the viewer's generic glyph, not fail the request that carries it.
+ *
+ * Always applies the `brand` fill policy with no knockout list -- every
+ * fill in the file is kept exactly as parseIconMarkup returns it, and `hex`
+ * is always null. This is deliberate, not a placeholder for a real policy
+ * later (docs/custom-icon-brief.md, "The contract..."): this module has no
+ * way to know whether a user-supplied mark is a single-ink glyph meant to
+ * invert to currentColor (the `ink` policy THESVG_ICONS gives openai.svg)
+ * or which of its own fills, if any, are letters cut out of a ground (the
+ * `knockout` policy THESVG_ICONS gives csharp.svg) -- both are per-icon
+ * facts only a human who has looked at the mark can supply, and guessing
+ * either one is exactly the shape of guess root CLAUDE.md's "ask, never
+ * guess" rule exists to forbid. Treating the file exactly as it is drawn is
+ * the one policy that requires no guess. A later field letting a manifest
+ * author record a per-icon policy, the way THESVG_ICONS does for the fixed
+ * vendored set, is a plausible future addition and is deliberately out of
+ * scope here.
+ *
+ * Knows nothing about `.catalogus/icons/`, the manifest's own directory, or
+ * containment within it -- exactly as resolveIcon above knows nothing about
+ * paths at all. That floor belongs to the caller that both knows the
+ * manifest's location and is the one place expected to hold it (packages/
+ * cli's view-payload.ts asserts the resolved absolute path is inside
+ * `<manifestDir>/.catalogus/icons/` before ever calling this).
+ */
+export async function resolveLocalIcon(absolutePath: string): Promise<ResolvedIcon | null> {
+  const outcome = await resolveLocalIconDetailed(absolutePath);
+  return outcome.ok ? outcome.icon : null;
+}
+
+/**
+ * The diagnostic sibling of resolveLocalIcon, for the one caller that has
+ * to *explain* a null instead of just rendering around it -- see
+ * LocalIconRefusal's own comment for D3, the defect this exists to fix.
+ * Returns null when `absolutePath` actually resolves (nothing to explain);
+ * callers in practice only reach for this after resolveLocalIcon has
+ * already returned null for the same path (icon-resolution.ts's
+ * resolveServiceIcon), so that branch mainly protects against a
+ * check-then-act race rather than a case any caller relies on.
+ *
+ * Deliberately not the hot path: every render-time caller (view-payload.ts,
+ * through icon-resolution.ts) keeps calling resolveLocalIcon and degrading
+ * silently on null, exactly as before -- this is a second stat+read+parse
+ * pass, paid only where a caller needs the reason, which today is just
+ * `catalogus icons`' report line and (once view.ts picks this up) its
+ * stale-pointer stderr warning.
+ */
+export async function describeLocalIconRefusal(absolutePath: string): Promise<LocalIconRefusal | null> {
+  const outcome = await resolveLocalIconDetailed(absolutePath);
+  return outcome.ok ? null : outcome.refusal;
 }

@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { parseThesvgMarkup, resolveIcon } from "./icons.js";
+import { describeLocalIconRefusal, MAX_ICON_BYTES, parseIconMarkup, resolveIcon, resolveLocalIcon } from "./icons.js";
 
 // A live ESM binding for a Node builtin (`import * as fsPromises from
 // "node:fs/promises"`) is non-configurable -- `vi.spyOn` on it throws
@@ -14,14 +16,20 @@ import { parseThesvgMarkup, resolveIcon } from "./icons.js";
 // the wrapper below calls straight through to the real implementation
 // unless a test has armed `readFileMockState.failNext` -- so every other
 // test in this file, including the sha256 drift suite's own `readFile`
-// import above, reads real files exactly as it would unmocked.
-const readFileMockState = vi.hoisted(() => ({ failNext: false }));
+// import above, reads real files exactly as it would unmocked. `calls`
+// (added 2026-09-04, alongside resolveLocalIcon) counts every invocation
+// regardless of failNext, so a test can prove readFile was never reached at
+// all -- the MAX_ICON_BYTES cap test below needs exactly that: not "it came
+// back null" (a parse refusal would look the same) but "the size check
+// short-circuited before any read was attempted".
+const readFileMockState = vi.hoisted(() => ({ failNext: false, calls: 0 }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...actual,
     readFile: (...args: Parameters<typeof actual.readFile>) => {
+      readFileMockState.calls += 1;
       if (readFileMockState.failNext) {
         readFileMockState.failNext = false;
         return Promise.reject(new Error("simulated ENOENT"));
@@ -32,6 +40,11 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 });
 
 const THESVG_DIR = new URL("../icons/thesvg/", import.meta.url);
+
+// Shared between the parseIconMarkup refusal suite and the resolveLocalIcon
+// suite below -- both write synthetic SVG bytes that start from the same
+// minimal, valid open tag.
+const VIEWBOX_SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">';
 
 describe("resolveIcon: simple-icons refs (unprefixed)", () => {
   it("resolves a known ref to real SVG body markup, wrapped in a currentColor path", async () => {
@@ -105,7 +118,7 @@ describe("resolveIcon: thesvg refs (thesvg:<slug>)", () => {
     expect(resolved!.body).toContain('fill="#F90"');
     // aws.svg sets fill="currentColor" once, as a default on the root <svg>,
     // on its one child with no fill of its own -- withElementDefault
-    // materialises that explicitly (icons.ts's parseThesvgMarkup comment),
+    // materialises that explicitly (icons.ts's parseIconMarkup comment),
     // so it must survive as a real attribute here, not merely as something
     // that used to be true only by inheritance from a tag this module drops.
     expect(resolved!.body).toContain('fill="currentColor"');
@@ -203,56 +216,57 @@ describe("resolveIcon: thesvg refs (thesvg:<slug>)", () => {
   });
 });
 
-describe("parseThesvgMarkup: sanitiser refusals on synthetic files", () => {
+describe("parseIconMarkup: sanitiser refusals on synthetic files", () => {
   // None of the five vendored files trip any of these -- confirmed by
   // reading all five directly -- so every case here is adversarial input
   // this module has never actually been handed, proving the refusal exists
-  // rather than merely asserting it never fired.
-  const VIEWBOX_SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">';
+  // rather than merely asserting it never fired. Renamed from
+  // parseThesvgMarkup 2026-09-04 (icons.ts's own comment); the cases below
+  // are unchanged.
 
   it("refuses a file containing <script>", () => {
     const svg = `${VIEWBOX_SVG_OPEN}<script>alert(1)</script><path d="M0 0"/></svg>`;
-    expect(parseThesvgMarkup(svg)).toBeNull();
+    expect(parseIconMarkup(svg)).toBeNull();
   });
 
   it("refuses a file containing <foreignObject>", () => {
     const svg = `${VIEWBOX_SVG_OPEN}<foreignObject><body xmlns="http://www.w3.org/1999/xhtml">x</body></foreignObject></svg>`;
-    expect(parseThesvgMarkup(svg)).toBeNull();
+    expect(parseIconMarkup(svg)).toBeNull();
   });
 
   it("refuses a file containing an on* event-handler attribute", () => {
     const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" onload="alert(1)"/></svg>`;
-    expect(parseThesvgMarkup(svg)).toBeNull();
+    expect(parseIconMarkup(svg)).toBeNull();
   });
 
   it("refuses a file containing an href attribute", () => {
     const svg = `${VIEWBOX_SVG_OPEN}<a href="https://evil.example"><path d="M0 0"/></a></svg>`;
-    expect(parseThesvgMarkup(svg)).toBeNull();
+    expect(parseIconMarkup(svg)).toBeNull();
   });
 
   it("refuses a file containing an xlink:href attribute", () => {
     const svg = `${VIEWBOX_SVG_OPEN}<use xlink:href="#evil"/></svg>`;
-    expect(parseThesvgMarkup(svg)).toBeNull();
+    expect(parseIconMarkup(svg)).toBeNull();
   });
 
   it("refuses a file containing a <style> block", () => {
     const svg = `${VIEWBOX_SVG_OPEN}<style>path{fill:red}</style><path d="M0 0"/></svg>`;
-    expect(parseThesvgMarkup(svg)).toBeNull();
+    expect(parseIconMarkup(svg)).toBeNull();
   });
 
   it("refuses a file with a second, nested <svg>", () => {
     const svg = `${VIEWBOX_SVG_OPEN}<svg viewBox="0 0 1 1"><path d="M0 0"/></svg></svg>`;
-    expect(parseThesvgMarkup(svg)).toBeNull();
+    expect(parseIconMarkup(svg)).toBeNull();
   });
 
   it("refuses a file with no viewBox on the root element", () => {
     const svg = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>';
-    expect(parseThesvgMarkup(svg)).toBeNull();
+    expect(parseIconMarkup(svg)).toBeNull();
   });
 
   it("accepts a clean file and strips <title>/<desc>, proving the refusals above are about content, not shape", () => {
     const svg = `${VIEWBOX_SVG_OPEN}<title>Probe</title><desc>A probe icon</desc><path d="M0 0" fill="#000"/></svg>`;
-    const parsed = parseThesvgMarkup(svg);
+    const parsed = parseIconMarkup(svg);
     expect(parsed).not.toBeNull();
     expect(parsed!.viewBox).toBe("0 0 24 24");
     expect(parsed!.body).not.toContain("<title>");
@@ -265,15 +279,207 @@ describe("parseThesvgMarkup: sanitiser refusals on synthetic files", () => {
     // (csharp's own knockout is 3-digit lowercase only) -- this is the
     // "both spellings" case icons.ts's normalizeHexValue comment promises.
     const svg = `${VIEWBOX_SVG_OPEN}<g fill="#FFF"><path d="M0 0"/></g><path d="M1 1" fill="#FFFFFF"/></svg>`;
-    const parsed = parseThesvgMarkup(svg);
+    const parsed = parseIconMarkup(svg);
     expect(parsed).not.toBeNull();
-    // parseThesvgMarkup only extracts { viewBox, body } -- the knockout
+    // parseIconMarkup only extracts { viewBox, body } -- the knockout
     // transform itself is icons.ts's private applyKnockout, exercised
     // end-to-end through resolveIcon("thesvg:csharp") above. This proves
-    // parseThesvgMarkup carries both spellings through unmodified for that
+    // parseIconMarkup carries both spellings through unmodified for that
     // later step to act on.
     expect(parsed!.body).toContain('fill="#FFF"');
     expect(parsed!.body).toContain('fill="#FFFFFF"');
+  });
+
+  // D8 (validator, 2026-09-04): a `url(...)` functional value is legal
+  // inside a plain `style="..."` attribute, which none of the checks above
+  // ever refuse (only a <style> *block* is blocked) -- and a browser
+  // resolves a non-fragment url() as a real network fetch the moment the
+  // mark renders. `style="fill:url(https://evil)"` used to sail straight
+  // through parseIconMarkup with everything else in this describe block
+  // still passing, because nothing here had ever looked inside a url()
+  // argument at all.
+  it("refuses a url() functional value whose argument is an unquoted https:// address", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style="fill:url(https://evil.example/x)"/></svg>`;
+    expect(parseIconMarkup(svg)).toBeNull();
+  });
+
+  it("refuses a url() functional value whose argument is a double-quoted https:// address", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style='fill:url("https://evil.example/x")'/></svg>`;
+    expect(parseIconMarkup(svg)).toBeNull();
+  });
+
+  it("refuses a url() functional value with leading whitespace before an http:// argument", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style="fill:url( http://evil.example/x )"/></svg>`;
+    expect(parseIconMarkup(svg)).toBeNull();
+  });
+
+  it("accepts url(#grad), a same-document fragment reference -- a local gradient a brand mark defines is legitimate", () => {
+    const svg =
+      `${VIEWBOX_SVG_OPEN}<linearGradient id="grad"><stop offset="0" stop-color="#000"/></linearGradient>` +
+      `<path d="M0 0" fill="url(#grad)"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('fill="url(#grad)"');
+  });
+});
+
+describe("resolveLocalIcon: an owner-supplied SVG the CLI has already vendored under .catalogus/icons/", () => {
+  // A fresh temp directory per test -- these tests write real files and
+  // read them back through the real filesystem (only readFile's failure
+  // mode and call count are ever faked, via readFileMockState above), the
+  // same "write the hostile bytes, do not mock the parser" standard the
+  // parseIconMarkup suite above holds itself to.
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "catalogus-core-icons-test-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  async function writeIcon(name: string, content: string): Promise<string> {
+    const filePath = join(dir, name);
+    await writeFile(filePath, content, "utf8");
+    return filePath;
+  }
+
+  it("resolves a clean multi-path SVG with hex: null and every fill kept exactly as authored", async () => {
+    const filePath = await writeIcon(
+      "loki.svg",
+      `${VIEWBOX_SVG_OPEN}<path d="M0 0" fill="#F46800"/><path d="M1 1" fill="#0033AB"/></svg>`,
+    );
+    const resolved = await resolveLocalIcon(filePath);
+    expect(resolved).not.toBeNull();
+    expect(resolved!.viewBox).toBe("0 0 24 24");
+    expect(resolved!.hex).toBeNull();
+    expect(resolved!.body).toContain('fill="#F46800"');
+    expect(resolved!.body).toContain('fill="#0033AB"');
+    expect((resolved!.body.match(/<path\b/g) ?? []).length).toBe(2);
+  });
+
+  it('keeps fill="#fff" as a plain fill -- the brand policy here carries no knockout list at all', async () => {
+    const filePath = await writeIcon("white-fill.svg", `${VIEWBOX_SVG_OPEN}<path d="M0 0" fill="#fff"/></svg>`);
+    const resolved = await resolveLocalIcon(filePath);
+    expect(resolved).not.toBeNull();
+    expect(resolved!.hex).toBeNull();
+    expect(resolved!.body).toContain('fill="#fff"');
+    expect(resolved!.body).not.toContain("data-knockout");
+  });
+
+  it("returns null rather than throwing for a missing file", async () => {
+    await expect(resolveLocalIcon(join(dir, "does-not-exist.svg"))).resolves.toBeNull();
+  });
+
+  it("returns null for a file the sanitiser refuses -- <script>", async () => {
+    const filePath = await writeIcon(
+      "hostile-script.svg",
+      `${VIEWBOX_SVG_OPEN}<script>alert(1)</script><path d="M0 0"/></svg>`,
+    );
+    await expect(resolveLocalIcon(filePath)).resolves.toBeNull();
+  });
+
+  it("returns null for a file the sanitiser refuses -- <foreignObject>", async () => {
+    const filePath = await writeIcon(
+      "hostile-foreign-object.svg",
+      `${VIEWBOX_SVG_OPEN}<foreignObject><body xmlns="http://www.w3.org/1999/xhtml">x</body></foreignObject></svg>`,
+    );
+    await expect(resolveLocalIcon(filePath)).resolves.toBeNull();
+  });
+
+  it("returns null for a file the sanitiser refuses -- an on* event-handler attribute", async () => {
+    const filePath = await writeIcon(
+      "hostile-onload.svg",
+      `${VIEWBOX_SVG_OPEN}<path d="M0 0" onload="alert(1)"/></svg>`,
+    );
+    await expect(resolveLocalIcon(filePath)).resolves.toBeNull();
+  });
+
+  it("returns null for a file the sanitiser refuses -- an href attribute", async () => {
+    const filePath = await writeIcon(
+      "hostile-href.svg",
+      `${VIEWBOX_SVG_OPEN}<a href="https://evil.example"><path d="M0 0"/></a></svg>`,
+    );
+    await expect(resolveLocalIcon(filePath)).resolves.toBeNull();
+  });
+
+  it("returns null for a file the sanitiser refuses -- a <style> block", async () => {
+    const filePath = await writeIcon(
+      "hostile-style.svg",
+      `${VIEWBOX_SVG_OPEN}<style>path{fill:red}</style><path d="M0 0"/></svg>`,
+    );
+    await expect(resolveLocalIcon(filePath)).resolves.toBeNull();
+  });
+
+  it("returns null for a file the sanitiser refuses -- a second, nested <svg>", async () => {
+    const filePath = await writeIcon(
+      "hostile-nested.svg",
+      `${VIEWBOX_SVG_OPEN}<svg viewBox="0 0 1 1"><path d="M0 0"/></svg></svg>`,
+    );
+    await expect(resolveLocalIcon(filePath)).resolves.toBeNull();
+  });
+
+  it("returns null for a file the sanitiser refuses -- no viewBox on the root element", async () => {
+    const filePath = await writeIcon(
+      "hostile-no-viewbox.svg",
+      '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>',
+    );
+    await expect(resolveLocalIcon(filePath)).resolves.toBeNull();
+  });
+
+  it("returns null for a file over MAX_ICON_BYTES, without reading it in full", async () => {
+    // Content that would parse cleanly if it were read -- this proves the
+    // null comes from the size check itself, not incidentally from content
+    // that also happens to be unparseable, and the unchanged readFile call
+    // count proves the file was never opened at all.
+    const oversized = `${VIEWBOX_SVG_OPEN}<path d="${"M0 0 ".repeat(Math.ceil(MAX_ICON_BYTES / 5))}"/></svg>`;
+    expect(Buffer.byteLength(oversized, "utf8")).toBeGreaterThan(MAX_ICON_BYTES);
+    const filePath = await writeIcon("too-big.svg", oversized);
+
+    const callsBefore = readFileMockState.calls;
+    await expect(resolveLocalIcon(filePath)).resolves.toBeNull();
+    expect(readFileMockState.calls).toBe(callsBefore);
+  });
+
+  // D3 (validator, 2026-09-04): describeLocalIconRefusal is resolveLocalIcon's
+  // diagnostic sibling -- it exists purely so a caller (icon-resolution.ts,
+  // and through it commands/icons.ts's "(missing file)" vs "(refused: ...)"
+  // label) can tell "nothing was ever fetched here" apart from "something
+  // was fetched and it cannot be used", which resolveLocalIcon's single null
+  // could never distinguish. See LocalIconRefusal's own comment for why that
+  // distinction matters to an agent following the skill's 7b loop.
+  describe("describeLocalIconRefusal", () => {
+    it('reports { kind: "missing" } for a path that does not exist', async () => {
+      const refusal = await describeLocalIconRefusal(join(dir, "does-not-exist.svg"));
+      expect(refusal).toEqual({ kind: "missing" });
+    });
+
+    it('reports { kind: "refused", reason } -- not "missing" -- for a file that exists but the sanitiser refuses', async () => {
+      const filePath = await writeIcon(
+        "hostile-script.svg",
+        `${VIEWBOX_SVG_OPEN}<script>alert(1)</script><path d="M0 0"/></svg>`,
+      );
+      const refusal = await describeLocalIconRefusal(filePath);
+      expect(refusal?.kind).toBe("refused");
+      if (refusal?.kind !== "refused") return;
+      expect(refusal.reason).toMatch(/sanitiser/i);
+    });
+
+    it('reports { kind: "refused", reason } naming the size cap for a file over MAX_ICON_BYTES', async () => {
+      const oversized = `${VIEWBOX_SVG_OPEN}<path d="${"M0 0 ".repeat(Math.ceil(MAX_ICON_BYTES / 5))}"/></svg>`;
+      const filePath = await writeIcon("too-big.svg", oversized);
+
+      const refusal = await describeLocalIconRefusal(filePath);
+      expect(refusal?.kind).toBe("refused");
+      if (refusal?.kind !== "refused") return;
+      expect(refusal.reason).toContain(`${MAX_ICON_BYTES}`);
+    });
+
+    it("returns null for a file that actually resolves -- nothing to explain", async () => {
+      const filePath = await writeIcon("loki.svg", `${VIEWBOX_SVG_OPEN}<path d="M0 0" fill="#F46800"/></svg>`);
+      await expect(describeLocalIconRefusal(filePath)).resolves.toBeNull();
+    });
   });
 });
 

@@ -37,7 +37,7 @@ The commands you will use:
 catalogus detect           # what the scanner can see, grouped by category
 catalogus init --yes [--visibility <v>]  # create the manifest: project fields only, no service entries
 catalogus add <service> --role <r> [--kind <k>] [--version <v>] [--depends-on <id>...] [--id <id>]
-catalogus set <field> <value> [<field> <value> ...]  # project fields, or a service's role/kind/version
+catalogus set <field> <value> [<field> <value> ...]  # project fields, or a service's role/kind/version/icon
 catalogus link <from> <to> # one edge between services that already exist
 catalogus unlink <from> <to> # remove that one edge, leaving both entries in place
 catalogus deprecate <id> [--status phasing_out] [--replaced-by <id>]
@@ -46,6 +46,7 @@ catalogus rename <old> <new> # change a local id, moving its edges and replaced_
 catalogus validate         # schema, referential integrity, acyclicity, private-data guard
 catalogus diff             # detected vs declared, both directions
 catalogus graph [--mermaid] # render the DAG
+catalogus icons            # which services have no icon, and where each icon file lives
 ```
 
 `catalogus add` is how services and edges get into the file. Do not append service entries by hand:
@@ -65,6 +66,7 @@ catalogus add github --role vcs
 catalogus set project.name "Sluglin" project.slug sluglin
 catalogus set services.supabase-db.role database
 catalogus set services.dotnet.version 10
+catalogus set services.loki.icon https://example.com/brand/loki.svg
 catalogus link fly-api supabase-db
 catalogus deprecate vertex --status phasing_out --replaced-by anthropic-api
 ```
@@ -121,6 +123,8 @@ services:
   - id: dotnet
     kind: stack               # service (default) | component | stack
     version: "10"             # free-form: what a tile shows, what an EOL date keys off
+  - id: loki                  # a service catalogus icons reported as "none"
+    icon: .catalogus/icons/loki.svg  # written by catalogus set services.<id>.icon <url|path>
 ```
 
 Every one of those commands validates before it writes and preserves the comments and `$schema`
@@ -504,6 +508,35 @@ fails `validate` on its own and needs no flag.
 a signal to reword the user's text.** Report it. The manifest should say what is true, and a guard
 that pushes users into worse prose needs fixing rather than accommodating.
 
+### 7b. Fill in missing icons
+
+```
+catalogus icons
+```
+
+lists every service entry and where its icon comes from: `local` (a mark this project has already
+vendored under `.catalogus/icons/`, whether the CLI fetched it from a URL or copied it from a local
+path), `simple-icons` or `thesvg` (Catalogus's own two built-in catalogs), or `none`. For each `none`
+row, search the web for the brand's official mark as an SVG — the vendor's own site, press kit or
+brand page first, then a public icon set — and set it:
+
+```
+catalogus set services.<id>.icon <https-url-or-path>
+```
+
+`set` fetches or copies the bytes exactly once, refuses them if they fail the sanitiser, and vendors
+the result under `.catalogus/icons/<id>.svg`. The sanitiser refuses a `<script>`, a `<foreignObject>`,
+an `on*=` event-handler attribute, an `<a href>`/`<use xlink:href>`, a `<style>` block, a file with no
+`viewBox`, or anything over 256 KB — any of these means that particular file cannot land, so pick a
+different source rather than retrying the same one. When nothing turns up, ask the user for a URL or
+a local file instead of inventing or approximating a mark — the same rule as everywhere else in this
+procedure.
+
+This is the one place in this document where you act on a web search rather than asking first (the
+owner's call, 2026-09-04: "the agent needs to go fetch on the web; when they don't find, they can ask
+the user"). Because of that, list every icon you set and the URL it came from in your summary to the
+user, so a wrong pick is one more `catalogus set services.<id>.icon <url>` away from corrected.
+
 ### 8. Hand the viewer to the user — do not run it yourself
 
 There is a web viewer, `catalogus view`, which serves the manifest as a browsable graph on
@@ -530,6 +563,9 @@ built is `catalogus graph`, which prints and exits.
 - **Copying configuration values.** Key names only, always.
 - **Recording tenant identifiers** — project refs, account numbers, org slugs.
 - **Inventing `added` dates.** Check git, offer a default, or leave the field for the user.
+- **Inventing or approximating an icon** when a web search for the brand's official mark turns up
+  nothing. Ask the user for a URL or a local file instead — the one exception to "ask, never guess"
+  is searching the web first, not skipping the question once the search comes up empty.
 - **Guessing past a contradiction** instead of surfacing it.
 - **Rewording good prose to satisfy a validator.** Report the false positive instead.
 - **Deleting `catalogus.yaml` and starting over.** A wrong entry is undone with `catalogus remove

@@ -94,3 +94,47 @@ describe("private-key rejection targets property names, not free-text content", 
     expect(result.valid).toBe(true);
   });
 });
+
+// Added 2026-09-04 (docs/custom-icon-brief.md) alongside serviceEntry.icon.
+// Single-quoted YAML scalars, not double-quoted: a double-quoted YAML string
+// processes backslash escapes, and the Windows-path rejection case below
+// (`C:\x.svg`) would otherwise have YAML itself choke on `\x` before the
+// value ever reached the schema. Single-quoted has no such processing.
+describe("serviceEntry.icon: only .catalogus/icons/<name>.svg is representable", () => {
+  function manifestWithIcon(icon: string): string {
+    return [
+      "catalogus: 1",
+      "project:",
+      "  name: Example App",
+      "  slug: example-app",
+      "services:",
+      "  - id: loki",
+      "    service: grafana-loki",
+      "    role: logs",
+      "    added: 2026-09-04",
+      `    icon: '${icon}'`,
+      "dependencies: []",
+      "",
+    ].join("\n");
+  }
+
+  it("accepts .catalogus/icons/loki.svg -- the one shape the CLI ever writes", () => {
+    const result = parseManifest(manifestWithIcon(".catalogus/icons/loki.svg"));
+    expect(result.valid).toBe(true);
+  });
+
+  it.each([
+    ["a leading ./", "./.catalogus/icons/x.svg"],
+    ["a .. traversal segment", ".catalogus/icons/../x.svg"],
+    ["an absolute POSIX path", "/abs/x.svg"],
+    ["an absolute Windows path", "C:\\x.svg"],
+    ["a URL -- the exact variant this pattern exists to refuse", "https://x/y.svg"],
+    ["a thesvg: catalog ref, a different field's shape entirely", "thesvg:aws"],
+    ["the wrong extension", ".catalogus/icons/x.png"],
+    ["an empty name before .svg", ".catalogus/icons/.svg"],
+    ["an empty string", ""],
+  ])("rejects %s (%j)", (_label, icon) => {
+    const result = parseManifest(manifestWithIcon(icon));
+    expect(result.valid, `expected ${JSON.stringify(icon)} to be rejected`).toBe(false);
+  });
+});

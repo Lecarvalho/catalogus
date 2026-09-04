@@ -139,6 +139,32 @@ export const catalogusSchemaV1 = {
           description:
             "The version in use, as the owner would say it — \"10\", \"19.2\", \"13.1.3\". Free-form on purpose: this is the number a tile displays and an end-of-life date keys off, not something to resolve or compare. Most useful on `kind: stack` entries, but allowed on any: a self-hosted component has a version too. Never a build identifier or a private tenant reference.",
         },
+        // Added 2026-09-04 (docs/custom-icon-brief.md, owner's answer that day):
+        // Loki and Healthchecks.io have no row in simple-icons or thesvg.org, and
+        // no source this repo can check ever will for every brand a project might
+        // name -- so instead of widening either catalog forever, a service entry
+        // can name its own mark. The pattern is the whole safety mechanism: it
+        // accepts exactly one shape, a path the CLI itself wrote
+        // (`catalogus set services.<id>.icon <https-url|path>`, which fetches or
+        // copies the bytes once, sanitises them, and vendors the result under
+        // `.catalogus/icons/`), and rejects every other shape a manifest could
+        // otherwise carry here -- most pointedly a URL, which would make the
+        // viewer fetch across the network at render time from a slug a public
+        // manifest names to anyone reading it. That variant is refused here, in
+        // the schema, rather than merely discouraged in a comment, because
+        // "the viewer stays offline" is a property this file has to make
+        // unrepresentable, not a convention an agent could get talked out of.
+        // `<name>` is deliberately not required to look like a known brand slug
+        // (SAFE_ICON_REF in packages/core/src/icons.ts is the sibling floor on
+        // the read side) -- this pattern's whole job is the path shape: one
+        // directory below the manifest's own directory, no leading `./`, never
+        // absolute, never containing `..`.
+        icon: {
+          type: "string",
+          pattern: "^\\.catalogus/icons/(?!.*\\.\\.)[a-z0-9][a-z0-9_.-]*\\.svg$",
+          description:
+            "Repo-relative path to an SVG mark the CLI has already vendored, always `.catalogus/icons/<name>.svg` — one directory below the manifest's own directory, never a leading `./`, never absolute, never a URL, and `<name>` may never contain `..`. Written only by `catalogus set services.<id>.icon <https-url|path>`, which fetches (or copies) the bytes exactly once, refuses them if they fail the sanitiser, and vendors the result under this path. `catalogus view` reads that file and never the network — a URL recorded here instead, for the viewer to fetch at render time, is exactly the shape this pattern exists to make unrepresentable.",
+        },
         added: {
           type: "string",
           format: "date",

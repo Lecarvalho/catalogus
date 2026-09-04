@@ -48,6 +48,8 @@ export { runValidate } from "./commands/validate.js";
 export { runGraph } from "./commands/graph.js";
 export type { GraphCommandOptions } from "./commands/graph.js";
 
+export { runIcons } from "./commands/icons.js";
+
 export { runAdd } from "./commands/add.js";
 export type { AddCommandOptions } from "./commands/add.js";
 

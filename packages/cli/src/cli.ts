@@ -16,6 +16,7 @@ import { runDeprecate } from "./commands/deprecate.js";
 import { runDetect } from "./commands/detect.js";
 import { runDiff } from "./commands/diff.js";
 import { runGraph } from "./commands/graph.js";
+import { runIcons } from "./commands/icons.js";
 import { runInit } from "./commands/init.js";
 import { runLink } from "./commands/link.js";
 import { runRemove } from "./commands/remove.js";
@@ -154,6 +155,14 @@ export function createProgram(): Command {
     .option("--mermaid", "emit a mermaid flowchart definition instead of ASCII")
     .action(async (path: string | undefined, opts: { mermaid?: boolean }) => {
       emit(await runGraph(path, opts));
+    });
+
+  program
+    .command("icons")
+    .description("report which icon source each service entry resolves to, and which have none")
+    .argument("[path]", "repo path (defaults to the current directory)")
+    .action(async (path: string | undefined) => {
+      emit(await runIcons(path));
     });
 
   program

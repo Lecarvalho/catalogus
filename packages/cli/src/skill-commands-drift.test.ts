@@ -53,6 +53,7 @@ import { describe, expect, it } from "vitest";
 
 import { createProgram } from "./cli.js";
 import { SETTABLE_FIELDS } from "./commands/set.js";
+import { ICON_SOURCES } from "./icon-resolution.js";
 import { findRepoRoot } from "./test-support/repo-root.js";
 
 const repoRoot = findRepoRoot(fileURLToPath(new URL(".", import.meta.url)));
@@ -384,4 +385,45 @@ describe("skills/catalogus/SKILL.md's `catalogus ...` shell lines vs. this CLI's
         `${SETTABLE_FIELDS.join(", ")}.`,
     ).toEqual([]);
   });
+
+  // D9 (validator, 2026-09-04, docs/custom-icon-brief.md's follow-up): this
+  // file already checks that `catalogus icons` is a registered command
+  // (the generic per-line checks above run against it like any other fenced
+  // line), but nothing tied *what the skill says about its output* --
+  // "7b. Fill in missing icons" names the four source words a row can show,
+  // in prose, outside any fenced block the generic checks above ever look
+  // at -- to the CLI's own vocabulary for them. A source renamed in
+  // icon-resolution.ts (or in commands/icons.ts's report) would leave the
+  // skill teaching a word `catalogus icons` no longer prints, and every
+  // check above would stay green: none of them reads prose, only fenced
+  // `catalogus ...` lines. This is the one place in this file that reads a
+  // prose section for content, not fenced-line shape -- justified because
+  // ICON_SOURCES (packages/cli/src/icon-resolution.ts) is precisely the
+  // fact this section of the skill is restating for a human, the same
+  // relationship every other check here has to a fenced line.
+  const sevenBSection = /### 7b\. Fill in missing icons\n([\s\S]*?)\n### /.exec(skillMarkdown)?.[1];
+
+  it("finds SKILL.md's \"7b. Fill in missing icons\" section to check against ICON_SOURCES", () => {
+    expect(
+      sevenBSection,
+      'could not find a "### 7b. Fill in missing icons" section followed by another "### " heading in ' +
+        `${skillPath}. Either the section was renamed/removed (a rewrite, not a tweak -- ` +
+        "docs/custom-icon-brief.md's Part B built the `catalogus icons` command specifically for this " +
+        "step), or the heading text below no longer matches. Check both before assuming this is fine.",
+    ).toBeDefined();
+  });
+
+  it.each(ICON_SOURCES)(
+    "SKILL.md's \"7b. Fill in missing icons\" section names the %s source `catalogus icons` can report",
+    (source) => {
+      if (sevenBSection === undefined) return; // Already reported by the test above.
+      expect(
+        sevenBSection,
+        `SKILL.md's "7b. Fill in missing icons" section never mentions \`${source}\` as one of the sources ` +
+          "`catalogus icons` reports (icon-resolution.ts's ICON_SOURCES) -- a reader following this step " +
+          `has no way to recognize that row, or ("${source}" was renamed away from this value) is being ` +
+          "taught a word the command no longer prints at all.",
+      ).toContain(`\`${source}\``);
+    },
+  );
 });

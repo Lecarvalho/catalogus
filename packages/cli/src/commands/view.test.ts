@@ -1,4 +1,4 @@
-import { readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { request as httpRequest } from "node:http";
 import { connect } from "node:net";
 import { dirname, join } from "node:path";
@@ -242,6 +242,95 @@ describe("createViewServer", () => {
     expect(payload.project.name).toBe("Example App");
     expect(payload.services.map((s) => s.id).sort()).toEqual(["host-api", "ingress"]);
     expect(payload.services.find((s) => s.id === "ingress")?.kind).toBe("component");
+  });
+
+  // Owner-supplied icons (2026-09-04, docs/custom-icon-brief.md): a service
+  // entry whose `icon` field names a file that fails to resolve degrades
+  // (the catalog fallback, or initials) rather than failing startup -- but
+  // createViewServer still reports it, so an operator can tell it happened.
+  it("carries one staleIconWarnings line per service entry whose icon field fails to resolve, and still serves the catalog fallback", async () => {
+    const manifestWithStaleIcon = `catalogus: 1
+project:
+  name: Example App
+  slug: example-app
+services:
+  - id: loki
+    service: loki
+    role: logging
+    added: 2025-11-02
+    icon: .catalogus/icons/loki.svg
+  - id: ingress
+    service: nginx
+    role: ingress-proxy
+    added: 2025-11-02
+    icon: .catalogus/icons/missing.svg
+dependencies: []
+`;
+    await writeFixtureFile(dir, "catalogus.yaml", manifestWithStaleIcon);
+    const outcome = await createViewServer(dir, { port: 0 });
+    if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
+    servers.push(outcome.value);
+
+    // Two entries name an icon file that was never vendored -- one with no
+    // catalog fallback ("loki" is not a catalogued slug), one whose
+    // catalog fallback (nginx, a real simple-icons row) still renders.
+    expect(outcome.value.staleIconWarnings).toHaveLength(2);
+    expect(outcome.value.staleIconWarnings.some((line) => line.includes("services.loki.icon"))).toBe(true);
+    expect(outcome.value.staleIconWarnings.some((line) => line.includes(".catalogus/icons/loki.svg"))).toBe(true);
+    expect(outcome.value.staleIconWarnings.some((line) => line.includes("catalogus set services.loki.icon"))).toBe(
+      true,
+    );
+    // Both files are absent, so both lines say so -- the refused wording
+    // below is for a file that exists and failed the sanitiser.
+    expect(outcome.value.staleIconWarnings.every((line) => line.includes("is missing"))).toBe(true);
+
+    const response = await fetch(`${outcome.value.url}/api/project`);
+    const payload = (await response.json()) as { services: { id: string; icon: unknown }[] };
+    expect(payload.services.find((s) => s.id === "loki")?.icon).toBeNull();
+    expect(payload.services.find((s) => s.id === "ingress")?.icon).not.toBeNull();
+  });
+
+  it("says a present-but-refused icon file was refused, not that it is missing, so the fix named is a different source", async () => {
+    // D3 of the 2026-09-04 validation: `catalogus icons` and this line used
+    // to call a hostile file at a valid pointer "missing", and an agent
+    // following the skill's 7b loop would re-fetch the same bytes forever.
+    const manifest = `catalogus: 1
+project:
+  name: Example App
+  slug: example-app
+services:
+  - id: loki
+    service: loki
+    role: logging
+    added: 2025-11-02
+    icon: .catalogus/icons/loki.svg
+dependencies: []
+`;
+    await writeFixtureFile(dir, "catalogus.yaml", manifest);
+    await mkdir(join(dir, ".catalogus", "icons"), { recursive: true });
+    await writeFixtureFile(
+      dir,
+      ".catalogus/icons/loki.svg",
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><script>1</script><path d="M0 0h24v24H0z"/></svg>',
+    );
+    const outcome = await createViewServer(dir, { port: 0 });
+    if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
+    servers.push(outcome.value);
+
+    expect(outcome.value.staleIconWarnings).toHaveLength(1);
+    const line = outcome.value.staleIconWarnings[0] as string;
+    expect(line).toContain("but it failed the sanitiser");
+    expect(line).toContain("pick a different source");
+    expect(line).not.toContain("is missing");
+  });
+
+  it("carries no staleIconWarnings when no entry names an icon field at all", async () => {
+    await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
+    const outcome = await createViewServer(dir, { port: 0 });
+    if (!outcome.ok) throw new Error(`expected success, got: ${outcome.error.stderr.join("\n")}`);
+    servers.push(outcome.value);
+
+    expect(outcome.value.staleIconWarnings).toEqual([]);
   });
 
   it("serves the built index.html at GET /", async () => {

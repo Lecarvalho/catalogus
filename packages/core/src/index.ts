@@ -38,8 +38,14 @@ export { mapSpecfySlug, SPECFY_TO_CATALOGUS } from "./mapping.js";
 export type { MappingEntry } from "./mapping.js";
 export { CATALOGUS_CATALOG, getCatalogEntry } from "./catalog.js";
 export type { CatalogEntry } from "./catalog.js";
-export { resolveIcon } from "./icons.js";
-export type { ResolvedIcon } from "./icons.js";
+export { resolveIcon, resolveLocalIcon, describeLocalIconRefusal, MAX_ICON_BYTES } from "./icons.js";
+export type { ResolvedIcon, LocalIconRefusal } from "./icons.js";
+// describeLocalIconRefusal/LocalIconRefusal added 2026-09-04 alongside
+// resolveLocalIcon's own export above -- packages/cli's icon-resolution.ts
+// (the only caller today) needs it re-exported here the same way every
+// other cross-package symbol in this file is, not reached through a deep
+// import into ./icons.js. See icons.ts's own comment on why this exists
+// (D3, docs/custom-icon-brief.md's follow-up).
 
 /** Thrown by detect() when repoPath doesn't name a real, absolute directory. */
 export class InvalidRepoPathError extends Error {

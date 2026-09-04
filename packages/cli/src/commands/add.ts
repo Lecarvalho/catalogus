@@ -7,7 +7,20 @@
 // validated -- schema plus acyclicity, the same check `catalogus validate`
 // runs -- before anything is written; a manifest that would fail that check
 // is never written, duplicate ids included.
+//
+// Added 2026-09-04 (docs/custom-icon-brief.md): a freshly-added entry never
+// carries its own `icon` field -- that is `set services.<id>.icon`'s job,
+// not add's (see set.ts's own module comment on why a field belongs to the
+// command whose every value is created new, not first guessed). What add
+// does do is check, once the entry is committed, whether it resolves to any
+// icon at all (getCatalogEntry + resolveIcon -- not the fuller
+// icon-resolution.ts machinery, since a just-added entry can never have a
+// local `icon` field yet) and, if not, say so -- pointing at `catalogus
+// icons` rather than repeating that check inline for every entry the way a
+// second copy of it would.
 import type { YAMLSeq } from "yaml";
+
+import { getCatalogEntry, resolveIcon } from "@catalogus/core";
 
 import { commitManifestEdit, openManifestForEdit, preferBlockStyleWhenEmpty } from "../manifest-edit.js";
 import { resolveTargetPath } from "../paths.js";
@@ -213,7 +226,7 @@ export async function runAdd(
     }
   }
 
-  return commitManifestEdit(opened.value, {
+  const result = await commitManifestEdit(opened.value, {
     failurePrefix: `Adding "${id}" would make`,
     successLines: (filePath) => {
       const lines = [`Added service "${id}" (${service}, role: ${options.role}) to ${filePath}`];
@@ -223,4 +236,20 @@ export async function runAdd(
       return lines;
     },
   });
+
+  // One extra line when the entry that was just committed resolves to no
+  // icon at all -- see this file's own module comment on why this checks
+  // the catalog only, not icon-resolution.ts's fuller local-then-catalog
+  // resolution: `entry.icon` cannot be set on a brand-new entry, `add`
+  // has no flag for it. `catalogus icons` is named rather than repeating
+  // its logic here, so the two never answer this question differently.
+  if (result.exitCode === 0) {
+    const catalogEntry = getCatalogEntry(service);
+    const icon = await resolveIcon(catalogEntry?.icon);
+    if (icon === null) {
+      result.stdout.push(`${id} has no icon yet -- catalogus icons lists every service without one.`);
+    }
+  }
+
+  return result;
 }

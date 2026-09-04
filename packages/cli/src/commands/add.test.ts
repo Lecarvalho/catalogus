@@ -232,6 +232,26 @@ describe("runAdd", () => {
       await removeTempDir(stackDir);
     }
   });
+
+  // Owner-supplied icons (2026-09-04, docs/custom-icon-brief.md): `add`
+  // itself never sets `icon` -- that's `set services.<id>.icon`'s job --
+  // but it does say so, once, when the entry it just committed resolves to
+  // no icon at all, so an agent running the skill's step 7 immediately
+  // knows to come back for step 7b rather than discovering it later via a
+  // separate `catalogus icons` run.
+  it("prints one extra line naming the entry when it resolves to no icon at all", async () => {
+    const result = await runAdd(dir, "some-slug-nobody-has-catalogued", { role: "widget-thing" });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(
+      "some-slug-nobody-has-catalogued has no icon yet -- catalogus icons lists every service without one.",
+    );
+  });
+
+  it("prints no extra line when the added service already has a verified catalog icon", async () => {
+    const result = await runAdd(dir, "nginx", { role: "ingress-proxy" });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.join("\n")).not.toContain("has no icon yet");
+  });
 });
 
 // FIX 4: `add` gets an optional positional [path] like every other command

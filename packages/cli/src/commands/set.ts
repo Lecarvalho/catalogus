@@ -45,6 +45,23 @@
 // `[path]` like every other command: the pair list is variadic, so a
 // trailing directory would be swallowed into it as a field name -- the exact
 // mistake `add` hit with `--depends-on` (see docs/PLAN.md, Phase 3.5).
+//
+// services.<id>.icon (added 2026-09-04, docs/custom-icon-brief.md) is the
+// one field here whose value isn't just written -- it names something this
+// command fetches or copies and vendors under .catalogus/icons/ before the
+// manifest is touched at all; see classifyIconValue and the icon-fetch.ts
+// import below for that pipeline.
+//
+// There is still no `unset` for any field, icon included -- clearing a
+// value back to "not answered" (the whole point of CLAUDE.md's "an absent
+// field reads as not answered yet") is not a capability this command has.
+// A vendored icon file left behind by a value that was later cleared some
+// other way is exactly the kind of dangling state that decision would need
+// to account for. Open item; nobody has needed it enough yet to design it.
+import { isScalar } from "yaml";
+
+import type { IconSourceShape, PreparedIconVendor } from "../icon-fetch.js";
+import { commitIconVendor, discardIconVendor, prepareIconVendor } from "../icon-fetch.js";
 import { commitManifestEdit, openManifestForEdit } from "../manifest-edit.js";
 import { hasBlockingPrivateFreeText, privateFlagRefusalMessage } from "../private-guard.js";
 import { isValidSlug } from "../slug.js";
@@ -127,7 +144,7 @@ const FIELDS: Record<string, SettableField> = Object.assign(
  * the resolution pass in runSet below, the same way `link`, `deprecate` and
  * `remove` can only check a known id after opening.
  */
-const SERVICE_FIELD = /^services\.([^.]+)\.(role|kind|version)$/;
+const SERVICE_FIELD = /^services\.([^.]+)\.(role|kind|version|icon)$/;
 
 // Null-prototype for the same reason as FIELDS, though the exposure here is
 // narrower: this is read with SERVICE_FIELD's second capture group, which
@@ -146,6 +163,16 @@ const SERVICE_FIELD_SPECS: Record<string, SettableField> = Object.assign(
     // Free text, not a slug: "13.1.3" and "19.2" both have dots in them, and
     // a version is a label to display rather than an identifier to resolve.
     version: { path: [], kind: "text", hint: 'e.g. 10, 19.2, 13.1.3' },
+    // `kind`/`hint` here are never actually read -- runSet special-cases
+    // `serviceField === "icon"` before it ever reaches prepareValue (see
+    // classifyIconValue below), because the eventual node value is a
+    // .catalogus/icons/<id>.svg path this command has not fetched or
+    // copied yet, not something a synchronous slug/text check could ever
+    // produce. This entry exists so SERVICE_FIELD_PLACEHOLDERS -- and
+    // through it SETTABLE_FIELDS, which the `set` command's own --help
+    // text and the unknown-field message both read off this table -- lists
+    // "services.<id>.icon" at all.
+    icon: { path: [], kind: "text", hint: "an https:// URL to fetch, or a path to a local SVG file to copy" },
   },
 );
 
@@ -217,6 +244,80 @@ function prepareValue(field: string, spec: SettableField, value: string): Prepar
   return { ok: true, node: value, shown: value };
 }
 
+type PreparedIconValue = { ok: true; shape: IconSourceShape } | { ok: false; error: CommandResult };
+
+/**
+ * The two shapes `services.<id>.icon` accepts: an `https://` URL to fetch,
+ * or a path to a local SVG file to copy. Checked here, by string shape
+ * alone, before the manifest is even opened -- the same "usage error before
+ * any I/O" property prepareValue already gives every other field. Kept as a
+ * sibling to prepareValue rather than a branch inside it because the
+ * eventual node value (a `.catalogus/icons/<id>.svg` path) can't be known
+ * until the bytes are actually fetched or copied -- that I/O is
+ * icon-fetch.ts's job, run later in runSet, after every id in this call is
+ * confirmed to exist (see the vendoring pass below).
+ *
+ * "Anything else" -- `http://`, `ftp:`, a bare `thesvg:` ref, a bare word
+ * with no dot or slash in it -- is refused here rather than let through as
+ * a "path" that would just fail later at the filesystem. A scheme other
+ * than https is caught by requiring at least two characters before the
+ * colon, so a Windows drive letter ("C:\Users\...", "D:/icons/x.svg") is
+ * never mistaken for one (drive letters are always exactly one character);
+ * a value shaped like a catalog slug (isValidSlug: lowercase, digits,
+ * single - or _ separators, no dot, no slash) reads as the mistake it
+ * almost certainly is -- there is no thesvg registry to look a bare slug up
+ * in (the owner declined that coupling, see this file's -- and
+ * docs/custom-icon-brief.md's -- own history) -- rather than an ambiguous
+ * path, because a real SVG file path on disk almost always carries a "."
+ * (an extension) or a "/" (a directory) that a bare slug never does.
+ *
+ * D7 (validator, 2026-09-04): hasBlockingPrivateFreeText now runs only
+ * inside the https:// branch below, not unconditionally over `value` the
+ * way it did before. Unconditional, it refused a perfectly ordinary local
+ * path outright -- an absolute path passing through a directory whose name
+ * happens to look credential-shaped by coincidence (a hashed temp/scratch
+ * directory, a UUID-named build output) tripped the guard's entropy
+ * heuristics at exit 2, "looks like private data", even though no value
+ * the caller typed was ever going to reach a committed file: icon-fetch.ts's
+ * own PreparedIconVendor.comment doc records that a path source gets no
+ * YAML comment at all. There was nothing here for the guard to protect. A
+ * URL is the opposite case, which is exactly why the guard stays for it:
+ * prepareIconVendor writes the URL itself into a comment on success, so a
+ * presigned URL (a credential in the query string) or a userinfo URL
+ * (`https://user:pass@host/...`) is precisely the shape
+ * scanFreeTextForPrivateValues exists to catch, and refusing it here --
+ * before any fetch, before any byte leaves this machine -- is the correct,
+ * safe outcome, not a hole this fix reopens.
+ */
+function classifyIconValue(field: string, value: string): PreparedIconValue {
+  if (value.trim() === "") {
+    return { ok: false, error: usageError([`"${field}" cannot be set to an empty value.`]) };
+  }
+
+  if (/^https:\/\//i.test(value)) {
+    if (hasBlockingPrivateFreeText(value)) {
+      return { ok: false, error: usageError([privateFlagRefusalMessage(`the value given for ${field}`)]) };
+    }
+    return { ok: true, shape: { kind: "url", url: value } };
+  }
+
+  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(value)?.[1];
+  const looksLikeAnotherScheme = scheme !== undefined && scheme.length > 1;
+  if (looksLikeAnotherScheme || isValidSlug(value)) {
+    return {
+      ok: false,
+      error: usageError([
+        `"${value}" is not a shape "${field}" accepts -- give an https:// URL to fetch, or a path to a local SVG file to copy.`,
+      ]),
+    };
+  }
+
+  // Path shape: the private-free-text guard never runs against it (see
+  // this function's own doc comment, D7) -- a value that is never written
+  // anywhere has nothing for that guard to be protecting.
+  return { ok: true, shape: { kind: "path", path: value } };
+}
+
 interface PreparedEdit {
   field: string;
   node: unknown;
@@ -230,8 +331,23 @@ interface PreparedEdit {
   path: Array<string | number>;
   /** Set only for a per-entry services.<id>.* edit; undefined for every static field. */
   serviceId?: string;
-  /** Which per-entry field: "role", "kind" or "version". Set with serviceId. */
+  /** Which per-entry field: "role", "kind", "version" or "icon". Set with serviceId. */
   serviceField?: string;
+  /**
+   * Set only for services.<id>.icon, to the shape classifyIconValue
+   * produced -- carries the raw URL or path through to the vendoring pass
+   * below, since `node` can't hold the real value yet (it isn't known
+   * until the bytes are fetched or copied).
+   */
+  iconShape?: IconSourceShape;
+  /**
+   * Set only for services.<id>.icon, once the vendoring pass below has
+   * fetched or copied its bytes successfully -- the YAML comment
+   * (icon-fetch.ts's PreparedIconVendor.comment) to attach to the node
+   * after doc.setIn writes it, or undefined for a local-path source, which
+   * gets no comment at all (see icon-fetch.ts's own doc on why).
+   */
+  iconComment?: string;
 }
 
 /**
@@ -241,8 +357,16 @@ interface PreparedEdit {
  * be checked this early is whether a services.<id>.* edit names a real
  * id -- that needs the manifest open -- so runSet checks all of those
  * before writing any of them too, in a second pass below.
+ *
+ * `fetchImpl` is threaded through to services.<id>.icon's vendoring pass
+ * (icon-fetch.ts's prepareIconVendor) and defaults to `globalThis.fetch`;
+ * it exists so tests never open a real socket to exercise this command.
  */
-export async function runSet(pathArg: string | undefined, tokens: string[]): Promise<CommandResult> {
+export async function runSet(
+  pathArg: string | undefined,
+  tokens: string[],
+  fetchImpl: typeof fetch = globalThis.fetch
+): Promise<CommandResult> {
   if (tokens.length === 0 || tokens.length % 2 !== 0) {
     return usageError([
       "set takes <field> <value> pairs, e.g. " +
@@ -301,6 +425,18 @@ export async function runSet(pathArg: string | undefined, tokens: string[]): Pro
       return usageError([`"${field}" must be one of: ${[...VALID_KINDS].join(", ")}`]);
     }
 
+    if (serviceField === "icon") {
+      const classified = classifyIconValue(field, value);
+      if (!classified.ok) {
+        return classified.error;
+      }
+      // `node` stays unset until the vendoring pass below (after every id
+      // in this call is confirmed to exist) fetches or copies the bytes
+      // and learns the real .catalogus/icons/<id>.svg path to write.
+      edits.push({ field, node: undefined, shown: value, path: [], serviceId, serviceField, iconShape: classified.shape });
+      continue;
+    }
+
     const prepared = prepareValue(field, SERVICE_FIELD_SPECS[serviceField] as SettableField, value);
     if (!prepared.ok) {
       return prepared.error;
@@ -336,17 +472,123 @@ export async function runSet(pathArg: string | undefined, tokens: string[]): Pro
     edit.path = ["services", index, edit.serviceField as string];
   }
 
-  for (const edit of edits) {
-    // setIn creates any missing intermediate map (project.vcs on a manifest
-    // that has never named a provider), which is what makes this work on a
-    // freshly scaffolded file rather than only on one that already has the
-    // shape.
-    doc.setIn(edit.path, doc.createNode(edit.node));
-  }
+  // services.<id>.icon edits vendor their bytes now -- fetched over the
+  // network, or copied from a local path -- but only after every id in
+  // this call is confirmed to exist by the loop just above: an unknown id
+  // must refuse before any fetch happens, the same property the
+  // field-shape checks earlier in this function already give every other
+  // kind of mistake (see this file's own module comment).
+  //
+  // Every icon edit is only *staged* here -- prepareIconVendor writes its
+  // sanitised bytes to a temp file under .catalogus/icons/ without ever
+  // touching the real destination path. The rename that actually commits a
+  // staged file happens below, only after commitManifestEdit has proven
+  // the whole edited document still validates: writing the real file
+  // *before* that check passes would mean an edit refused for an unrelated
+  // reason (a different pair in the same call) could still leave a
+  // vendored icon sitting on disk with no manifest field pointing at it.
+  // If any icon in this call fails to prepare, every icon that already did
+  // prepare in the same call is discarded (discardIconVendor) rather than
+  // left as a dangling temp file, and the manifest is never opened for
+  // writing at all.
+  //
+  // D1/D2 (validator, 2026-09-04): everything from here through the
+  // commitManifestEdit call below runs inside one try/catch, and the catch
+  // discards every icon staged so far before rethrowing. Before this fix,
+  // the discard above (on a returned `{ ok: false }`) and the discard below
+  // (on a non-zero exit code) were the *only* two cleanup paths, and both
+  // require the failing step to return normally -- neither one runs when a
+  // step throws instead. Two different throws reached this function
+  // unguarded: commitManifestEdit itself (writeManifestText hitting a
+  // read-only catalogus.yaml -- EPERM -- reproduced against the built
+  // binary with `attrib +R`), and prepareIconVendor's own fetch pipeline
+  // when a response's body stalls until the 15s AbortSignal.timeout fires
+  // mid-read (icon-fetch.ts's readBodyCapped, fixed the same day to frame
+  // that failure as a normal `{ ok: false }` result rather than an
+  // uncaught rejection -- see its own comment). This catch is deliberately
+  // broader than either single cause: it is the general fix the D1 report
+  // asked for ("discard in a finally-shaped path so any exit other than a
+  // successful commit removes every staged temp file"), not a special case
+  // for whichever throw was reproduced first. The original error is
+  // rethrown unchanged so the caller still sees it exactly as before this
+  // fix (cli.ts's runCli prints its message and exits 1) -- this only ever
+  // adds a cleanup step in front of that, never changes what gets reported.
+  const iconEdits = edits.filter((edit) => edit.iconShape !== undefined);
+  const preparedIcons: PreparedIconVendor[] = [];
+  try {
+    for (const edit of iconEdits) {
+      const prepared = await prepareIconVendor(
+        location.dir,
+        edit.serviceId as string,
+        edit.iconShape as IconSourceShape,
+        fetchImpl
+      );
+      if (!prepared.ok) {
+        await Promise.all(preparedIcons.map((value) => discardIconVendor(value)));
+        return { exitCode: 1, stdout: [], stderr: [`"${edit.field}": ${prepared.message}`] };
+      }
+      preparedIcons.push(prepared.value);
+      edit.node = prepared.value.relativePath;
+      // Overwrites the raw URL/path the caller typed with what was
+      // actually written -- every other field's `shown` is already the
+      // value now on disk (prepareValue sets it from the same node it
+      // returns), and an icon edit's success report should say the same
+      // kind of thing: what `catalogus view` will read, not what the
+      // caller happened to type.
+      edit.shown = prepared.value.relativePath;
+      edit.iconComment = prepared.value.comment;
+    }
 
-  const described = edits.map((edit) => `${edit.field} = ${edit.shown}`);
-  return commitManifestEdit(opened.value, {
-    failurePrefix: `Setting ${edits.map((edit) => edit.field).join(", ")} would make`,
-    successLines: (filePath) => [`Updated ${filePath}`, ...described.map((line) => `  ${line}`)],
-  });
+    for (const edit of edits) {
+      // setIn creates any missing intermediate map (project.vcs on a
+      // manifest that has never named a provider), which is what makes
+      // this work on a freshly scaffolded file rather than only on one
+      // that already has the shape.
+      doc.setIn(edit.path, doc.createNode(edit.node));
+      // The fetch date and (query/fragment-stripped) source URL, recorded
+      // as a YAML comment on the node `set` just wrote -- see
+      // icon-fetch.ts's PreparedIconVendor.comment for why a local-path
+      // source gets no comment at all.
+      if (edit.iconComment !== undefined) {
+        const written = doc.getIn(edit.path, true);
+        if (isScalar(written)) {
+          written.comment = ` ${edit.iconComment}`;
+        }
+      }
+    }
+
+    const described = edits.map((edit) => `${edit.field} = ${edit.shown}`);
+    const result = await commitManifestEdit(opened.value, {
+      failurePrefix: `Setting ${edits.map((edit) => edit.field).join(", ")} would make`,
+      successLines: (filePath) => [`Updated ${filePath}`, ...described.map((line) => `  ${line}`)],
+    });
+
+    // Only now does a staged icon become the real .catalogus/icons/<id>.svg
+    // file -- see the comment above the preparation loop for why this has
+    // to wait for commitManifestEdit's own verdict rather than running
+    // alongside it.
+    if (result.exitCode === 0) {
+      for (const prepared of preparedIcons) {
+        await commitIconVendor(prepared);
+      }
+    } else {
+      await Promise.all(preparedIcons.map((prepared) => discardIconVendor(prepared)));
+    }
+
+    return result;
+  } catch (error) {
+    await Promise.all(preparedIcons.map((prepared) => discardIconVendor(prepared)));
+    // Exit 1 with the manifest named, not a rethrow: every other failure
+    // on this path names what could not be done, and the re-validation of
+    // 2026-09-04 found a read-only catalogus.yaml surfacing as the bare
+    // "EPERM: operation not permitted, open '...'" out of runCli's generic
+    // catch. The staged icons are already discarded above, so this is the
+    // one remaining thing the caller needs to know.
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      exitCode: 1,
+      stdout: [],
+      stderr: [`could not update ${location.filePath}: ${message}`, "  nothing was written; any icon staged by this call was discarded."],
+    };
+  }
 }

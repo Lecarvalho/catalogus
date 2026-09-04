@@ -1,8 +1,12 @@
+import { mkdir } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 
 import { catalogusSchemaV1, parseManifest } from "@catalogus/schema";
-import { describe, expect, it } from "vitest";
+import type { CatalogusManifestV1 } from "@catalogus/schema";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { createTempDir, removeTempDir, writeFixtureFile } from "./test-support/temp-dir.js";
 import { buildViewPayload } from "./view-payload.js";
 
 const MANIFEST = `catalogus: 1
@@ -233,5 +237,93 @@ dependencies: []
       { from: "host-api", to: "ingress" },
       { from: "host-api", to: "dotnet" },
     ]);
+  });
+});
+
+// Owner-supplied icons (2026-09-04, docs/custom-icon-brief.md) need a real
+// manifest directory on disk -- resolveLocalIcon actually reads a file --
+// so these run against a temp dir rather than the fixed "/repo/..." path
+// the tests above use (which is never read from, since none of that
+// fixture's entries set `icon`).
+describe("buildViewPayload -- services.<id>.icon (owner-supplied icons)", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await createTempDir();
+  });
+
+  afterEach(async () => {
+    await removeTempDir(dir);
+  });
+
+  const CLEAN_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' + '<path d="M1 1h2v2h-2z" fill="#123456"/></svg>';
+
+  function manifestWith(entry: Partial<CatalogusManifestV1["services"][number]> & { id: string; service: string }) {
+    return {
+      catalogus: 1,
+      project: { name: "Example", slug: "example" },
+      services: [
+        {
+          role: "widget-thing",
+          added: "2026-01-01",
+          ...entry,
+        },
+      ],
+      dependencies: [],
+    } as unknown as CatalogusManifestV1;
+  }
+
+  it("resolves an entry's own vendored icon, with fills kept and hex null", async () => {
+    await mkdir(join(dir, ".catalogus", "icons"), { recursive: true });
+    await writeFixtureFile(dir, ".catalogus/icons/svc.svg", CLEAN_SVG);
+
+    const manifestPath = join(dir, "catalogus.yaml");
+    const manifest = manifestWith({ id: "svc", service: "some-slug-nobody-has-catalogued", icon: ".catalogus/icons/svc.svg" });
+    const payload = await buildViewPayload(manifestPath, manifest, READ_AT);
+
+    const svc = findService(payload, "svc");
+    expect(svc.icon).not.toBeNull();
+    expect(svc.icon!.hex).toBeNull();
+    expect(svc.icon!.body).toContain('fill="#123456"');
+  });
+
+  it("falls back to the catalog icon in the payload when the entry's own icon file is missing (a stale pointer)", async () => {
+    const manifestPath = join(dir, "catalogus.yaml");
+    const manifest = manifestWith({ id: "svc", service: "nginx", icon: ".catalogus/icons/missing.svg" });
+    const payload = await buildViewPayload(manifestPath, manifest, READ_AT);
+
+    const svc = findService(payload, "svc");
+    expect(svc.icon).not.toBeNull();
+    expect(svc.icon!.viewBox).toBe("0 0 24 24");
+  });
+
+  it("renders no icon (initials fallback) when a stale pointer has no catalog fallback either", async () => {
+    const manifestPath = join(dir, "catalogus.yaml");
+    const manifest = manifestWith({
+      id: "svc",
+      service: "some-slug-nobody-has-catalogued",
+      icon: ".catalogus/icons/missing.svg",
+    });
+    const payload = await buildViewPayload(manifestPath, manifest, READ_AT);
+
+    expect(findService(payload, "svc").icon).toBeNull();
+  });
+
+  // The defensive floor, proven the way docs/custom-icon-brief.md asks:
+  // building the manifest object directly rather than through
+  // @catalogus/schema's own parser, which already refuses `..` on write.
+  it("never serves a file outside .catalogus/icons/, even when the schema is bypassed", async () => {
+    await writeFixtureFile(dir, "evil.svg", CLEAN_SVG);
+
+    const manifestPath = join(dir, "catalogus.yaml");
+    const manifest = manifestWith({
+      id: "svc",
+      service: "some-slug-nobody-has-catalogued",
+      icon: ".catalogus/icons/../../evil.svg",
+    });
+    const payload = await buildViewPayload(manifestPath, manifest, READ_AT);
+
+    expect(findService(payload, "svc").icon).toBeNull();
   });
 });

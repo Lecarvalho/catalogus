@@ -12,10 +12,20 @@
 // mean". If that ever needs to change, change it in both places or extract
 // a shared helper; this file does not re-derive the rule from the schema
 // description on its own.
+//
+// Icon resolution itself (added 2026-09-04, docs/custom-icon-brief.md) is
+// not re-derived here either: buildViewService calls icon-resolution.ts's
+// resolveServiceIcon, the one place that also answers `catalogus icons`'
+// question, so the two commands can never disagree about which tiles end
+// up rendering initials.
 import { createRequire } from "node:module";
+import { dirname } from "node:path";
 
 import { catalogusSchemaV1, edgeEndpoints, type CatalogusManifestV1, type ServiceEntry } from "@catalogus/schema";
-import { getCatalogEntry, resolveIcon, type ResolvedIcon } from "@catalogus/core";
+import { getCatalogEntry } from "@catalogus/core";
+import type { ResolvedIcon } from "@catalogus/core";
+
+import { resolveServiceIcon } from "./icon-resolution.js";
 
 /**
  * This CLI's own version, read from its package.json rather than repeated
@@ -137,17 +147,23 @@ function rollupOf(role: string): string {
  * slow or failing lookup can't be conflated with the others by a caller
  * reading this function in isolation -- buildViewPayload below is the one
  * that decides how these run.
+ *
+ * `manifestDir` is the manifest's own directory, needed only to resolve an
+ * entry's own `icon` field (a repo-relative `.catalogus/icons/<name>.svg`
+ * path) to an absolute one -- see icon-resolution.ts's resolveServiceIcon,
+ * which tries that first and falls back to the catalog ref exactly as it
+ * did before this entry-level field existed.
  */
-async function buildViewService(entry: ServiceEntry): Promise<ViewService> {
+async function buildViewService(entry: ServiceEntry, manifestDir: string): Promise<ViewService> {
   const catalogEntry = getCatalogEntry(entry.service);
-  const resolved = await resolveIcon(catalogEntry?.icon);
+  const resolution = await resolveServiceIcon(manifestDir, entry);
 
   return {
     id: entry.id,
     service: entry.service,
     name: catalogEntry?.name ?? entry.service,
     known: catalogEntry !== undefined,
-    icon: resolved,
+    icon: resolution.icon,
     role: entry.role,
     rollup: rollupOf(entry.role),
     kind: entry.kind ?? "service",
@@ -175,13 +191,19 @@ async function buildViewService(entry: ServiceEntry): Promise<ViewService> {
  * most a few dozen services in a real manifest, each lookup is one small
  * file read, and this is built once per server start (see
  * commands/view.ts), not once per request.
+ *
+ * `manifestDir` is derived from `manifestPath` (dirname) rather than taken
+ * as its own parameter: it is a fact about the same file `manifestPath`
+ * already names, not new information a caller has to supply, and every
+ * existing call site keeps working unchanged.
  */
 export async function buildViewPayload(
   manifestPath: string,
   manifest: CatalogusManifestV1,
   readAt: string
 ): Promise<ViewPayload> {
-  const services = await Promise.all(manifest.services.map(buildViewService));
+  const manifestDir = dirname(manifestPath);
+  const services = await Promise.all(manifest.services.map((entry) => buildViewService(entry, manifestDir)));
   const edges = manifest.dependencies.map((edge) => edgeEndpoints(edge));
 
   return {
