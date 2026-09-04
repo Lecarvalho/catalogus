@@ -1,43 +1,79 @@
-// One manifest entry, rendered as a bare home-screen icon: the mark on the
-// ground, no card, no border, no panel. This replaces the bordered,
-// collapsed-by-vendor tile the board used before candidate E (see git
-// history for that version, and this file's own history for the doc-comment
-// that explained it).
+// One vendor's tile on the wall, rendered as a bare home-screen icon: the
+// mark on the ground, no card, no border, no panel. Candidate E's own icon
+// treatment (see git history for the pre-candidate-E bordered tile, and this
+// file's own history for the doc-comment that explained it and for the
+// "one tile per manifest entry, never collapsed" pass that stood here from
+// 2026-08-26 to 2026-09-04).
+//
+// **2026-09-04: one tile per brand per band, restored** (docs/PLAN.md, "Owner
+// decisions -- 2026-09-04", findings 4 and 5 of 2026-09-03;
+// docs/brand-tile-brief.md, Part A). The 2026-08-26 pass above retired
+// `collapseByService` from this file's call graph on the theory that a
+// bare-icon board had no card left to carry a collapsed tile's `xN` --
+// correct as far as it went, and wrong about the fix: the owner's actual
+// objection, once a real manifest (Clapline, five Fly.io entries in one
+// band) put the theory in front of them, was to the repeated MARK, not to a
+// missing count. Five identical Fly.io icons in a row say "Fly.io" five
+// times to say one thing, exactly the complaint `collapseByService` was
+// first written to answer (bands.ts's own header, 2026-08-25). So this file
+// takes a `VendorGroup` again -- one entry (unchanged rendering, in full)
+// or several (the new rendering below) -- and `collapseByService` has a
+// caller again: `BandModule.tsx`, once per band, per the shared contract
+// (docs/brand-tile-brief.md).
+//
+// **What changes for a multi-entry group, and what deliberately does not**
+// (owner decisions, 2026-09-04, and the mockup's own leading comment,
+// `docs/candidates/candidate-e-brandpage.html`, decisions 2 and 3):
+//
+//   - **The second label line is the entry count** ("5 entries"), in the id
+//     line's own slot, size and colour -- not mono, because a count is not a
+//     literal the reader may type into a `catalogus` command the way an id
+//     is (the mockup's own comment on `.icon-count`).
+//   - **The tile carries the group's worst status** (`groupStatus`,
+//     bands.ts) through the corner badge and the status word, exactly as a
+//     single entry's own status drives both today -- **but never through
+//     desaturation.** The owner's ruling, reviewing the first draft, which
+//     desaturated the whole mark and read as dimming four live Fly apps
+//     because one of the five was phasing out: "the mark stays in colour."
+//     A single-entry tile is unaffected -- desaturation, colour, the badge
+//     and the word are still all three status signals candidate E specifies
+//     for it (this file's original 2026-08-26 comment, points 1-4 below,
+//     none of it retracted for that case).
+//   - **The status word names the one entry that departs, id first, no
+//     arrow** -- "host-preview phasing out" rather than "Phasing out ->
+//     host-preview" -- because the arrow already means "replaced by
+//     <target>" everywhere else on this tile (single-entry `replaced_by`,
+//     just below) and reusing it here for "the entry that is" would
+//     overload it. Where more than one entry shares the group's worst
+//     status, the first in the group's own stable id order is named (the
+//     same tie-break `collapseByService`/`groupStatus` already use
+//     throughout bands.ts) -- the mockup's own fixture never has two, so
+//     this is this file's own choice, flagged here per CLAUDE.md rather
+//     than left silent.
+//   - **The active + `replaced_by` exception (2026-08-31 ruling, below) is
+//     not extended to a multi-entry tile.** That ruling was put to one
+//     entry's own tile specifically ("Both surfaces show it" paired it with
+//     ServicePopover's single-entry rendering); a group's status line is
+//     already a different shape (id then word, no target), and there is no
+//     source describing a fourth shape for "one of several active entries
+//     also carries a replacement", so none is invented.
 //
 // Candidate E ("the home screen", approved 2026-08-26 --
 // docs/candidates/candidate-e-homescreen.html, docs/candidates/README.md)
-// changed two things, not just the CSS:
-//
-//   - **One tile per manifest entry, not per vendor.** The old tile
-//     collapsed `host-api`, `host-web` and `host-worker` into a single
-//     Fly.io tile carrying `x3`, because three identical marks said "Fly.io"
-//     three times to say one thing. A bare icon has no card left to carry
-//     that count, and README.md is explicit that a label showing only the
-//     vendor name renders those three entries identically -- so the tile now
-//     shows the manifest `id` as a second label line instead of collapsing.
-//     `collapseByService`, `groupStatus` and `VendorGroup` (bands.ts) have no
-//     caller left in this file; the main session owns whether they still
-//     have one anywhere else.
-//   - **Colour.** `<Icon colour />`, a reversal of the old board's monochrome
-//     rule -- see Icon.tsx's own doc-comment for the case against a coloured
-//     board (a real logo and a grey fallback sit at different visual
-//     weights). Candidate E's answer to that objection is the dashed
-//     monogram tile below: it reads as deliberate next to a coloured mark
-//     where a generic category glyph read as broken.
-//
-// Owner decisions, 2026-08-26 (docs/candidates/README.md, "What E actually
-// decided, and why each was hard"):
+// changed two things, not just the CSS, for the single-entry case this file
+// still renders unchanged:
 //
 //   1. Bare icons, no card. "It doesn't need all that shell" -- meaning the
 //      card around each service, not the app chrome (separately approved
 //      and frozen).
-//   2. Two-line label: vendor name, then the manifest id. `db-primary` and
+//   2. Two-line label: vendor name, then the manifest id (or, since
+//      2026-09-04, the entry count for a group). `db-primary` and
 //      `db-replica` are both PostgreSQL; a vendor-only label would render
 //      them identically.
-//   3. Status without hover, three independent ways, none of them
-//      hue-only: a shaped corner badge, the mark desaturated, and the status
-//      spelled out in words -- verified under a full-page `grayscale(1)`
-//      filter.
+//   3. Status without hover, three independent ways for a single entry,
+//      none of them hue-only: a shaped corner badge, the mark desaturated,
+//      and the status spelled out in words -- verified under a full-page
+//      `grayscale(1)` filter.
 //   4. A service with no verified brand icon keeps its tile -- dashed
 //      border, sunken fill, a monogram from the raw slug -- rather than the
 //      generic rollup glyph the old board used for it. `monogramFor` is
@@ -48,15 +84,21 @@
 // schema permits the combination -- now shows the replacement in the status
 // row here, matching ServicePopover.tsx, which already rendered it. See the
 // local `statusPhrase` below for the exact rule and what it deliberately
-// does not extend to (the badge, the desaturation).
+// does not extend to (the badge, the desaturation, and -- since 2026-09-04
+// -- a multi-entry group).
 import type { ViewService } from "@catalogus/cli";
 
+import type { BandId, VendorGroup } from "../bands.js";
+import { groupStatus } from "../bands.js";
 import { Icon } from "./Icon.js";
 import { STATUS_WORDS, statusPhrase as sharedStatusPhrase, StatusBadgeGlyph } from "./ServiceStatus.js";
 import styles from "./ServiceTile.module.css";
 
 export interface ServiceTileProps {
-  service: ViewService;
+  /** The tile's whole content: one entry (`entries.length === 1`) or several sharing one catalog slug within this band. */
+  group: VendorGroup;
+  /** The band this group renders in -- carried for `serviceTileDomId` alone; see that function's own comment for why a band-scoped id is needed. */
+  bandId: BandId;
   /**
    * Server-stamped moment the manifest was read; every recency mark
    * measures from it. Accepted for shape parity with ServicePopover's props
@@ -66,10 +108,10 @@ export interface ServiceTileProps {
    * for it to drive.
    */
   readAt: string;
-  /** True when this entry is the currently selected one. */
+  /** True when the currently open entry page belongs to this group -- one of its entries for a multi-entry group, the entry itself for a single one. */
   selected: boolean;
-  onActivate: (service: ViewService) => void;
-  onPeek: (service: ViewService, anchor: HTMLElement) => void;
+  onActivate: (group: VendorGroup) => void;
+  onPeek: (group: VendorGroup, anchor: HTMLElement) => void;
   onPeekEnd: () => void;
 }
 
@@ -82,12 +124,12 @@ export interface ServiceTileProps {
  * the duplication mattered enough to lift.
  *
  * `statusPhrase` below is *not* the shared one, imported as
- * `sharedStatusPhrase` instead and used only for the non-active branch. The
- * owner's 2026-08-31 ruling on `active` + `replaced_by` (docs/DIRECTION.md,
- * "Signal red: the rule stands, and the build was wrong rather than the
- * rule") was put to this component specifically -- "Both surfaces show it"
- * pairs this tile with ServicePopover.tsx, which already renders the
- * combination -- and not to ServiceNode.tsx or MigrationList.tsx, so the
+ * `sharedStatusPhrase` instead and used only for a single entry's non-active
+ * branch. The owner's 2026-08-31 ruling on `active` + `replaced_by` (docs/
+ * DIRECTION.md, "Signal red: the rule stands, and the build was wrong rather
+ * than the rule") was put to this component specifically -- "Both surfaces
+ * show it" pairs this tile with ServicePopover.tsx, which already renders
+ * the combination -- and not to ServiceNode.tsx or MigrationList.tsx, so the
  * exception is layered on here rather than folded into the shared function
  * every caller already agreed on.
  *
@@ -106,18 +148,18 @@ export interface ServiceTileProps {
  *     archive box, a cross -- and none of them is captioned `active`. There
  *     is no fourth shape in the mockup to draw here, and inventing one is
  *     exactly what "ask, never guess" forbids. So the badge condition below
- *     stays `service.status !== "active"`, unchanged: this case renders the
- *     word and nothing else. If the owner wants a fourth pictogram, that is
- *     a new mockup decision, not something this file can infer from the
- *     other three.
+ *     stays keyed off `groupStatus(group) !== "active"`, unchanged in
+ *     meaning: this case renders the word and nothing else. If the owner
+ *     wants a fourth pictogram, that is a new mockup decision, not something
+ *     this file can infer from the other three.
  *   - **No desaturation.** `isActive` (below) still governs
- *     `styles.desaturated`, unchanged, so this case's mark stays at full
- *     tone. Desaturation is documented as status signal 2 of 3 alongside the
- *     badge and the word (this file's own comments, and DIRECTION.md's
- *     "corner badge ... the mark itself desaturated ... spelled out in
- *     words"), all three keyed to the same three non-active statuses -- there
- *     is no source describing a fourth, partial application of it to an
- *     `active` mark, so none is added.
+ *     `styles.desaturated` for a single-entry tile, unchanged, so this case's
+ *     mark stays at full tone. Desaturation is documented as status signal 2
+ *     of 3 alongside the badge and the word (this file's own comments, and
+ *     DIRECTION.md's "corner badge ... the mark itself desaturated ...
+ *     spelled out in words"), all three keyed to the same three non-active
+ *     statuses -- there is no source describing a fourth, partial
+ *     application of it to an `active` mark, so none is added.
  *
  * The word itself is "Active", transcribed from ServicePopover.tsx's own
  * `STATUS_TEXT.get("active")` (the surface this tile is being made to
@@ -138,7 +180,79 @@ function statusPhrase(service: ViewService): string | undefined {
   return sharedStatusPhrase(service);
 }
 
-export function ServiceTile({ service, selected, onActivate, onPeek, onPeekEnd }: ServiceTileProps) {
+/**
+ * The status line for a multi-entry group: `<entry id> <word, lower case>`,
+ * naming the one entry responsible for the group's worst status, no arrow --
+ * candidate-e-homescreen.html's own artboard-1 markup for the Fly.io tile
+ * ("host-preview phasing out"), and the file header's decision 3 above for
+ * why no arrow. `undefined` when the worst status is `active`, the same
+ * "the norm earns nothing" rule the single-entry `statusPhrase` follows.
+ *
+ * Which entry is named, when more than one shares the worst status: the
+ * first in the group's own stable id order (`group.entries` is already
+ * sorted that way -- bands.ts's `collapseByService`). This file's own
+ * choice, not stated by the mockup or the owner's decisions -- flagged here
+ * per CLAUDE.md, "ask, never guess", for anyone who wants to confirm it.
+ */
+function groupStatusPhrase(group: VendorGroup): { entryId: string; word: string } | undefined {
+  const worst = groupStatus(group);
+  if (worst === "active") {
+    return undefined;
+  }
+  const departed = group.entries.find((entry) => entry.status === worst) ?? group.entries[0];
+  return { entryId: departed.id, word: STATUS_WORDS[worst].toLowerCase() };
+}
+
+export function ServiceTile({ group, bandId, selected, onActivate, onPeek, onPeekEnd }: ServiceTileProps) {
+  const isGroup = group.entries.length > 1;
+  const domId = serviceTileDomId(bandId, group);
+
+  if (isGroup) {
+    return (
+      <GroupTile
+        group={group}
+        domId={domId}
+        selected={selected}
+        onActivate={onActivate}
+        onPeek={onPeek}
+        onPeekEnd={onPeekEnd}
+      />
+    );
+  }
+
+  return (
+    <SingleEntryTile
+      service={group.entries[0]}
+      group={group}
+      domId={domId}
+      selected={selected}
+      onActivate={onActivate}
+      onPeek={onPeek}
+      onPeekEnd={onPeekEnd}
+    />
+  );
+}
+
+interface TileShellProps {
+  group: VendorGroup;
+  domId: string;
+  selected: boolean;
+  onActivate: (group: VendorGroup) => void;
+  onPeek: (group: VendorGroup, anchor: HTMLElement) => void;
+  onPeekEnd: () => void;
+}
+
+/**
+ * A single manifest entry's tile -- candidate E's original rendering,
+ * unchanged since 2026-08-26: name, id, and, only when the entry is not
+ * `active`, the full three-signal status treatment (badge, desaturation,
+ * worded status). Split out from the group tile below rather than branched
+ * inline, because the two shapes now genuinely differ (desaturation exists
+ * on one and not the other) and a single component reading `group.entries[0]`
+ * defensively throughout was harder to see as "this case is untouched" than
+ * a second, small component is.
+ */
+function SingleEntryTile({ service, group, domId, selected, onActivate, onPeek, onPeekEnd }: TileShellProps & { service: ViewService }) {
   const isActive = service.status === "active";
   const isFallback = service.icon === null;
   const phrase = statusPhrase(service);
@@ -154,23 +268,26 @@ export function ServiceTile({ service, selected, onActivate, onPeek, onPeekEnd }
   return (
     <button
       type="button"
-      id={serviceTileDomId(service.id)}
+      id={domId}
       className={`${styles.tile} ${selected ? styles.selected : ""}`}
       aria-label={label}
       aria-current={selected ? "true" : undefined}
-      onClick={() => onActivate(service)}
+      onClick={() => onActivate(group)}
       // Pointer events rather than mouseenter/mouseleave so a touch device,
       // which has no hover at all, never gets a popover it cannot dismiss.
       // On touch the click path is the whole interaction, which is the right
       // degradation: the popover was only ever a shortcut to the page.
       onPointerEnter={(event) => {
         if (event.pointerType === "touch") return;
-        onPeek(service, event.currentTarget);
+        onPeek(group, event.currentTarget);
       }}
       onPointerLeave={onPeekEnd}
       // Keyboard parity: a focused tile peeks the same way a hovered one
-      // does, so the summary is not a mouse-only affordance.
-      onFocus={(event) => onPeek(service, event.currentTarget)}
+      // does, so the summary is not a mouse-only affordance. For a group,
+      // ArrowDown/ArrowUp then walk into the popover's rows -- App.tsx's
+      // peek keydown effect owns that, since the popover is not this
+      // button's DOM neighbour and Tab cannot reach it.
+      onFocus={(event) => onPeek(group, event.currentTarget)}
       onBlur={onPeekEnd}
     >
       {/*
@@ -210,9 +327,9 @@ export function ServiceTile({ service, selected, onActivate, onPeek, onPeekEnd }
       <span className={styles.label}>
         <span className={styles.name}>{service.name}</span>
         {/*
-          The manifest id, not just the vendor name: host-api, host-web and
-          host-worker are all Fly.io, and a label naming only the vendor
-          would render the same tile three times (docs/candidates/README.md,
+          The manifest id, not just the vendor name: db-primary and
+          db-replica are both PostgreSQL, and a label naming only the vendor
+          would render the same tile twice (docs/candidates/README.md,
           "Two-line label").
         */}
         <span className={styles.id}>{service.id}</span>
@@ -236,6 +353,83 @@ export function ServiceTile({ service, selected, onActivate, onPeek, onPeekEnd }
                 <span className={styles.statusTarget}>{service.replaced_by}</span>
               </>
             )}
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * A multi-entry group's tile -- one vendor standing for every entry it
+ * collapsed in this band (docs/candidates/candidate-e-brandpage.html,
+ * artboard 1). See this file's header for the three things that differ from
+ * a single entry's own tile and the one that deliberately does not
+ * (desaturation).
+ */
+function GroupTile({ group, domId, selected, onActivate, onPeek, onPeekEnd }: TileShellProps) {
+  const isFallback = group.icon === null;
+  const worst = groupStatus(group);
+  const departure = groupStatusPhrase(group);
+
+  // The accessible name states the same facts the label renders: the vendor
+  // name, the entry count (not an id -- there is no single id for a group),
+  // and the departure phrase when there is one. Mirrors the single-entry
+  // tile's own `label` construction just above.
+  const label = [group.name, `${group.entries.length} entries`, departure ? `${departure.entryId} ${departure.word}` : undefined]
+    .filter(Boolean)
+    .join(", ");
+
+  return (
+    <button
+      type="button"
+      id={domId}
+      className={`${styles.tile} ${selected ? styles.selected : ""}`}
+      aria-label={label}
+      aria-current={selected ? "true" : undefined}
+      onClick={() => onActivate(group)}
+      onPointerEnter={(event) => {
+        if (event.pointerType === "touch") return;
+        onPeek(group, event.currentTarget);
+      }}
+      onPointerLeave={onPeekEnd}
+      onFocus={(event) => onPeek(group, event.currentTarget)}
+      onBlur={onPeekEnd}
+    >
+      {/*
+        No `styles.desaturated` here, ever -- the header's decision 3: "the
+        mark stays in colour" for a group, regardless of `worst`. The badge
+        is the only one of the three single-entry signals a group keeps, per
+        the same decision.
+      */}
+      <span className={[styles.squircle, isFallback ? styles.fallback : ""].filter(Boolean).join(" ")} aria-hidden="true" data-testid="icon-mark">
+        {isFallback ? (
+          <span className={styles.monogram}>{monogramFor(group.service)}</span>
+        ) : (
+          <Icon icon={group.icon} rollup={group.rollup} label={group.name} colour />
+        )}
+
+        {worst !== "active" && (
+          <span className={styles.badge} data-testid="status-badge">
+            <StatusBadgeGlyph status={worst} />
+          </span>
+        )}
+      </span>
+
+      <span className={styles.label}>
+        <span className={styles.name}>{group.name}</span>
+        {/*
+          The entry count, in the id line's own slot -- see .count in
+          ServiceTile.module.css for why it is not mono.
+        */}
+        <span className={styles.count} data-testid="entry-count">
+          {group.entries.length} entries
+        </span>
+
+        {departure !== undefined && (
+          <span className={styles.status} data-testid="status-text">
+            <span className={styles.statusTarget}>{departure.entryId}</span>
+            {` ${departure.word}`}
           </span>
         )}
       </span>
@@ -293,17 +487,26 @@ export function monogramFor(slug: string): string {
 }
 
 /**
- * DOM id for one tile, keyed by the manifest entry id -- unlike the
- * collapsed board's version of this function, which keyed on the catalog
- * slug because several entries shared one tile there. A tile is one entry
- * now, and its id is the thing that already names it uniquely.
+ * DOM id for one tile. A single-entry group keys on the entry's own manifest
+ * id, unchanged from before this pass -- unique within a manifest
+ * (@catalogus/schema guarantees it), so no band qualifier is needed. A
+ * multi-entry group keys on `${bandId}-${group.service}` instead: the
+ * catalog slug alone is not unique across the *board*, because
+ * `collapseByService` runs per band (bands.ts's own header) -- Supabase as
+ * `supabase-auth` collapses inside "Runs in production" and as
+ * `supabase-db` inside "Holds data", two different tiles that would collide
+ * on one DOM id without the band in it. `bandId` is exactly the qualifier
+ * `collapseByService` itself does not carry (by design -- it "has no notion
+ * of band", bands.test.ts's own words), so this function is where that
+ * qualifier gets added back, once, for the one caller (this file's render)
+ * that needs a globally unique id out of a per-band computation.
  *
- * This exists so App.tsx can hand focus back to the tile a page was opened
- * from. A focus restore that silently finds nothing is invisible in a
- * passing test suite -- the exact failure that shipped once on the migration
- * board, where rows carried no id and closing a panel dropped focus to
- * `<body>` (docs/PLAN.md).
+ * This exists so App.tsx can hand focus back to the tile a page (entry or
+ * brand) was opened from. A focus restore that silently finds nothing is
+ * invisible in a passing test suite -- the exact failure that shipped once
+ * on the migration board, where rows carried no id and closing a panel
+ * dropped focus to `<body>` (docs/PLAN.md).
  */
-export function serviceTileDomId(id: string): string {
-  return `service-tile-${id}`;
+export function serviceTileDomId(bandId: BandId, group: VendorGroup): string {
+  return group.entries.length === 1 ? `service-tile-${group.entries[0].id}` : `service-tile-${bandId}-${group.service}`;
 }

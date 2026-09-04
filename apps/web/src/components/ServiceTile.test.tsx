@@ -1,16 +1,22 @@
 // @vitest-environment jsdom
 //
-// ServiceTile is one manifest entry, rendered as a bare home-screen icon
-// (candidate E, approved 2026-08-26): the mark, a two-line label (name then
-// id), and -- only when the entry is not `active` -- a corner badge, the
-// mark desaturated, and the status spelled out in words. No card, no entry
-// count; a tile is one entry now, not a collapsed vendor.
+// ServiceTile is one vendor's tile on the wall, rendered as a bare
+// home-screen icon (candidate E, approved 2026-08-26; the group form,
+// docs/brand-tile-brief.md, approved 2026-09-04): a single entry keeps its
+// original, unchanged treatment -- the mark, a two-line label (name then
+// id), and, only when not `active`, a corner badge, the mark desaturated,
+// and the status spelled out in words. A group of several entries sharing
+// one catalog slug in this band gets a second, narrower treatment: the mark
+// stays in colour always, the second label line is the entry count, and the
+// status word (when the group's worst status is not `active`) names the one
+// entry that departs, no arrow.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { VendorGroup } from "../bands.js";
 import { FLYIO_ICON_FIXTURE, makeViewService as service } from "../test-support/fixtures.js";
 import { monogramFor, ServiceTile, serviceTileDomId } from "./ServiceTile.js";
 
@@ -18,30 +24,44 @@ const readAt = "2026-08-24T00:00:00.000Z";
 
 afterEach(() => cleanup());
 
-function renderTile(overrides: Partial<Parameters<typeof ServiceTile>[0]> & { service: ReturnType<typeof service> }) {
+/** A one-entry `VendorGroup`, the shape every single-entry test below renders -- built from one `makeViewService` the same way bands.ts's own `collapseByService` would build it for a band with no repeats. */
+function soloGroup(overrides: Parameters<typeof service>[0]): VendorGroup {
+  const entry = service(overrides);
+  return { service: entry.service, name: entry.name, icon: entry.icon, rollup: entry.rollup, entries: [entry] };
+}
+
+/** A multi-entry `VendorGroup`: every entry must already share one `service` slug, the same invariant `collapseByService` guarantees its own output. */
+function multiGroup(entries: ReturnType<typeof service>[]): VendorGroup {
+  const [first, ...rest] = entries as [ReturnType<typeof service>, ...ReturnType<typeof service>[]];
+  return { service: first.service, name: first.name, icon: first.icon, rollup: first.rollup, entries: [first, ...rest] };
+}
+
+function renderTile(overrides: Partial<Parameters<typeof ServiceTile>[0]> & { group: VendorGroup }) {
   const onActivate = vi.fn();
   const onPeek = vi.fn();
   const onPeekEnd = vi.fn();
-  const result = render(<ServiceTile readAt={readAt} selected={false} onActivate={onActivate} onPeek={onPeek} onPeekEnd={onPeekEnd} {...overrides} />);
+  const result = render(
+    <ServiceTile bandId="production" readAt={readAt} selected={false} onActivate={onActivate} onPeek={onPeek} onPeekEnd={onPeekEnd} {...overrides} />
+  );
   return { onActivate, onPeek, onPeekEnd, unmount: result.unmount };
 }
 
-describe("ServiceTile -- the two-line label", () => {
+describe("ServiceTile -- the two-line label, single entry", () => {
   it("renders both the vendor name and the manifest id", () => {
-    renderTile({ service: service({ id: "host-api", role: "hosting-api", service: "flyio", name: "Fly.io" }) });
+    renderTile({ group: soloGroup({ id: "host-api", role: "hosting-api", service: "flyio", name: "Fly.io" }) });
     expect(screen.getByText("Fly.io")).not.toBeNull();
     expect(screen.getByText("host-api")).not.toBeNull();
   });
 
-  it("renders two same-vendor entries distinguishably by id, since the name alone would render them the same", () => {
+  it("renders two same-vendor single-entry tiles distinguishably by id, since the name alone would render them the same", () => {
     const { unmount } = renderTile({
-      service: service({ id: "host-api", role: "hosting-api", service: "flyio", name: "Fly.io" }),
+      group: soloGroup({ id: "host-api", role: "hosting-api", service: "flyio", name: "Fly.io" }),
     });
     expect(screen.getByText("host-api")).not.toBeNull();
     expect(screen.queryByText("host-web")).toBeNull();
     unmount();
 
-    renderTile({ service: service({ id: "host-web", role: "hosting-web", service: "flyio", name: "Fly.io" }) });
+    renderTile({ group: soloGroup({ id: "host-web", role: "hosting-web", service: "flyio", name: "Fly.io" }) });
     expect(screen.getByText("host-web")).not.toBeNull();
     expect(screen.queryByText("host-api")).toBeNull();
     // Both renders share the same vendor name -- that repetition is exactly
@@ -76,9 +96,9 @@ describe("ServiceTile.module.css's label stack", () => {
   });
 });
 
-describe("ServiceTile -- the no-brand-icon case", () => {
+describe("ServiceTile -- the no-brand-icon case, single entry", () => {
   it("renders the monogram, not the generic rollup glyph", () => {
-    renderTile({ service: service({ id: "a", role: "finance-ledger", service: "acme-ledger", name: "acme-ledger", icon: null }) });
+    renderTile({ group: soloGroup({ id: "a", role: "finance-ledger", service: "acme-ledger", name: "acme-ledger", icon: null }) });
     expect(screen.getByText("AL")).not.toBeNull();
     // Icon.tsx stamps its own fallback with this testid -- its absence
     // proves the tile never handed Icon a null path, not merely that a
@@ -87,7 +107,7 @@ describe("ServiceTile -- the no-brand-icon case", () => {
   });
 
   it("renders the real brand icon, not a monogram, when one resolved", () => {
-    renderTile({ service: service({ id: "a", role: "hosting-api", service: "flyio", name: "Fly.io", icon: FLYIO_ICON_FIXTURE }) });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting-api", service: "flyio", name: "Fly.io", icon: FLYIO_ICON_FIXTURE }) });
     expect(screen.queryByText("AL")).toBeNull();
     // The squircle is aria-hidden (the button's own aria-label is the one
     // accessible name), so the icon's own role="img" is deliberately
@@ -136,42 +156,42 @@ describe("monogramFor", () => {
   });
 });
 
-describe("ServiceTile -- status", () => {
+describe("ServiceTile -- status, single entry", () => {
   it("active earns no badge, no worded status and no desaturation", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio", status: "active" }) });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "active" }) });
     expect(screen.queryByTestId("status-badge")).toBeNull();
     expect(screen.queryByTestId("status-text")).toBeNull();
     expect(screen.getByTestId("icon-mark").className).not.toContain("desaturated");
   });
 
   it("phasing_out earns a badge, the worded status, and desaturation", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio", status: "phasing_out" }) });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "phasing_out" }) });
     expect(screen.getByTestId("status-badge")).not.toBeNull();
     expect(screen.getByTestId("status-text").textContent).toBe("Phasing out");
     expect(screen.getByTestId("icon-mark").className).toContain("desaturated");
   });
 
   it("deprecated earns a badge, the worded status, and desaturation", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio", status: "deprecated" }) });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "deprecated" }) });
     expect(screen.getByTestId("status-badge")).not.toBeNull();
     expect(screen.getByTestId("status-text").textContent).toBe("Deprecated");
     expect(screen.getByTestId("icon-mark").className).toContain("desaturated");
   });
 
   it("removed earns a badge, the worded status, and desaturation", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio", status: "removed" }) });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "removed" }) });
     expect(screen.getByTestId("status-badge")).not.toBeNull();
     expect(screen.getByTestId("status-text").textContent).toBe("Removed");
     expect(screen.getByTestId("icon-mark").className).toContain("desaturated");
   });
 
   it("names the replacement in the worded status when replaced_by is set", () => {
-    renderTile({ service: service({ id: "a", role: "auth-legacy", service: "auth0", status: "phasing_out", replaced_by: "auth-users" }) });
+    renderTile({ group: soloGroup({ id: "a", role: "auth-legacy", service: "auth0", status: "phasing_out", replaced_by: "auth-users" }) });
     expect(screen.getByTestId("status-text").textContent).toBe("Phasing out → auth-users");
   });
 
   it("states the status word alone when replaced_by is unset", () => {
-    renderTile({ service: service({ id: "a", role: "finance-ledger", service: "acme-ledger", status: "deprecated" }) });
+    renderTile({ group: soloGroup({ id: "a", role: "finance-ledger", service: "acme-ledger", status: "deprecated" }) });
     expect(screen.getByTestId("status-text").textContent).toBe("Deprecated");
   });
 });
@@ -183,7 +203,7 @@ describe("ServiceTile -- status", () => {
 // "Active → db-primary (PostgreSQL)"). The badge and the desaturation are
 // deliberately not extended to this case; see ServiceTile.tsx's own comment
 // on `statusPhrase` for why.
-describe("ServiceTile -- status, the active + replaced_by ruling", () => {
+describe("ServiceTile -- status, the active + replaced_by ruling, single entry", () => {
   // The regression this whole ruling is scoped around not disturbing: the
   // rule an `active` service with *no* replacement earns nothing at all is
   // the norm-suppression rule DIRECTION.md exists to protect ("tagging the
@@ -192,7 +212,7 @@ describe("ServiceTile -- status, the active + replaced_by ruling", () => {
   // -- kept as its own case here, next to the exception it is the control
   // for, rather than trusted to the pre-existing one alone.
   it("still renders no badge, no worded status and no desaturation for active with no replaced_by", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio", status: "active", replaced_by: undefined }) });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "active", replaced_by: undefined }) });
     expect(screen.queryByTestId("status-badge")).toBeNull();
     expect(screen.queryByTestId("status-text")).toBeNull();
     expect(screen.getByTestId("icon-mark").className).not.toContain("desaturated");
@@ -200,12 +220,12 @@ describe("ServiceTile -- status, the active + replaced_by ruling", () => {
   });
 
   it("shows the replacement, worded 'Active → <replaced_by>', when active carries replaced_by", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio", status: "active", replaced_by: "db-primary" }) });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "active", replaced_by: "db-primary" }) });
     expect(screen.getByTestId("status-text").textContent).toBe("Active → db-primary");
   });
 
   it("reaches the accessible name with the replacement, for active + replaced_by", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio", name: "Fly.io", status: "active", replaced_by: "db-primary" }) });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", name: "Fly.io", status: "active", replaced_by: "db-primary" }) });
     expect(screen.getByRole("button", { name: "Fly.io, a, Active → db-primary" })).not.toBeNull();
   });
 
@@ -214,7 +234,7 @@ describe("ServiceTile -- status, the active + replaced_by ruling", () => {
   // than invented a fourth shape. This is the regression guard for that
   // decision: a corner badge must not appear here even though the word does.
   it("renders no corner badge for active + replaced_by, even though the word appears", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio", status: "active", replaced_by: "db-primary" }) });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "active", replaced_by: "db-primary" }) });
     expect(screen.getByTestId("status-text")).not.toBeNull();
     expect(screen.queryByTestId("status-badge")).toBeNull();
   });
@@ -225,7 +245,7 @@ describe("ServiceTile -- status, the active + replaced_by ruling", () => {
   // the badge test above since the two are independent CSS classes on
   // independent elements.
   it("does not desaturate the mark for active + replaced_by", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio", status: "active", replaced_by: "db-primary" }) });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "active", replaced_by: "db-primary" }) });
     expect(screen.getByTestId("icon-mark").className).not.toContain("desaturated");
   });
 });
@@ -243,9 +263,9 @@ describe("ServiceTile -- status, the active + replaced_by ruling", () => {
 // This does not pin any path's `d` data, which a legitimate redraw is free
 // to change; it only pins that the three remain distinguishable from each
 // other and that none of them is contentless.
-describe("ServiceTile -- status badge glyphs are distinct shapes", () => {
+describe("ServiceTile -- status badge glyphs are distinct shapes, single entry", () => {
   function badgeSvgMarkup(status: "phasing_out" | "deprecated" | "removed") {
-    const { unmount } = renderTile({ service: service({ id: "a", role: "hosting", service: "flyio", status }) });
+    const { unmount } = renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status }) });
     const markup = screen.getByTestId("status-badge").querySelector("svg")?.innerHTML ?? "";
     unmount();
     return markup;
@@ -268,29 +288,30 @@ describe("ServiceTile -- status badge glyphs are distinct shapes", () => {
   });
 });
 
-describe("ServiceTile -- selection", () => {
+describe("ServiceTile -- selection, single entry", () => {
   it("marks aria-current when selected", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio" }), selected: true });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio" }), selected: true });
     expect(screen.getByRole("button").getAttribute("aria-current")).toBe("true");
   });
 
   it("carries no aria-current attribute at all when not selected", () => {
-    renderTile({ service: service({ id: "a", role: "hosting", service: "flyio" }), selected: false });
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio" }), selected: false });
     expect(screen.getByRole("button").hasAttribute("aria-current")).toBe(false);
   });
 });
 
-describe("ServiceTile -- activation and peeking", () => {
-  it("calls onActivate with the exact service on click", () => {
+describe("ServiceTile -- activation and peeking, single entry", () => {
+  it("calls onActivate with the entry's own one-entry group on click", () => {
     const entry = service({ id: "a", role: "hosting", service: "flyio" });
-    const { onActivate } = renderTile({ service: entry });
+    const group = multiGroup([entry]);
+    const { onActivate } = renderTile({ group });
     fireEvent.click(screen.getByRole("button"));
     expect(onActivate).toHaveBeenCalledTimes(1);
-    expect(onActivate.mock.calls[0]![0]).toBe(entry);
+    expect(onActivate.mock.calls[0]![0]).toBe(group);
   });
 
   it("peeks on pointer enter (mouse) and ends the peek on pointer leave", () => {
-    const { onPeek, onPeekEnd } = renderTile({ service: service({ id: "a", role: "hosting", service: "flyio" }) });
+    const { onPeek, onPeekEnd } = renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio" }) });
     const tile = screen.getByRole("button");
     fireEvent.pointerOver(tile, { pointerType: "mouse" });
     expect(onPeek).toHaveBeenCalledTimes(1);
@@ -301,7 +322,7 @@ describe("ServiceTile -- activation and peeking", () => {
   // Touch has no hover at all -- a popover a touch user cannot dismiss would
   // be worse than none, so touch skips straight past peeking to the click.
   it("does not peek on a touch pointer", () => {
-    const { onPeek } = renderTile({ service: service({ id: "a", role: "hosting", service: "flyio" }) });
+    const { onPeek } = renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio" }) });
     const tile = screen.getByRole("button");
     // jsdom (25.0.1) has no PointerEvent constructor, so fireEvent.pointerOver's
     // {pointerType} init is silently dropped (testing-library falls back to
@@ -313,7 +334,7 @@ describe("ServiceTile -- activation and peeking", () => {
   });
 
   it("peeks on keyboard focus, for parity with hover, and ends on blur", () => {
-    const { onPeek, onPeekEnd } = renderTile({ service: service({ id: "a", role: "hosting", service: "flyio" }) });
+    const { onPeek, onPeekEnd } = renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio" }) });
     const tile = screen.getByRole("button");
     fireEvent.focus(tile);
     expect(onPeek).toHaveBeenCalledTimes(1);
@@ -323,9 +344,161 @@ describe("ServiceTile -- activation and peeking", () => {
 });
 
 describe("serviceTileDomId", () => {
-  it("keys the DOM id on the manifest entry id, and the button carries exactly that id", () => {
-    renderTile({ service: service({ id: "host-api", role: "hosting", service: "flyio" }) });
-    expect(screen.getByRole("button").id).toBe(serviceTileDomId("host-api"));
-    expect(serviceTileDomId("host-api")).toBe("service-tile-host-api");
+  it("keys a single-entry group's DOM id on the manifest entry id alone, and the button carries exactly that id", () => {
+    const group = soloGroup({ id: "host-api", role: "hosting", service: "flyio" });
+    renderTile({ group });
+    expect(screen.getByRole("button").id).toBe(serviceTileDomId("production", group));
+    expect(serviceTileDomId("production", group)).toBe("service-tile-host-api");
+  });
+
+  it("keys a multi-entry group's DOM id on the band and the catalog slug, not on any one entry's id", () => {
+    const group = multiGroup([
+      service({ id: "host-api", role: "hosting-api", service: "flyio" }),
+      service({ id: "host-web", role: "hosting-web", service: "flyio" }),
+    ]);
+    expect(serviceTileDomId("production", group)).toBe("service-tile-production-flyio");
+  });
+
+  // The reason a band qualifier exists at all: collapseByService runs per
+  // band (bands.ts's own header), so the identical slug can name two
+  // different groups in two different bands -- Supabase as `supabase-auth`
+  // (production) and `supabase-db` (holds). Without the band in the id the
+  // two tiles would collide.
+  it("gives the same slug two different ids in two different bands", () => {
+    const group = multiGroup([
+      service({ id: "supabase-auth", role: "auth", service: "supabase" }),
+      service({ id: "supabase-auth-2", role: "auth", service: "supabase" }),
+    ]);
+    expect(serviceTileDomId("production", group)).toBe("service-tile-production-supabase");
+    expect(serviceTileDomId("holds", group)).toBe("service-tile-holds-supabase");
+    expect(serviceTileDomId("production", group)).not.toBe(serviceTileDomId("holds", group));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The multi-entry group tile (docs/brand-tile-brief.md, Part A; the mockup's
+// artboard 1, the Fly.io tile standing for five entries). One tile per
+// vendor per band, restored 2026-09-04 after standing at one-tile-per-entry
+// since 2026-08-26 -- see this file's own header for the full history and
+// the owner's reasoning.
+// ---------------------------------------------------------------------------
+
+const flyGroup = (statuses: Array<{ id: string; status?: "active" | "phasing_out" | "deprecated" | "removed" }>) =>
+  multiGroup(statuses.map(({ id, status }) => service({ id, role: `hosting-${id}`, service: "flyio", name: "Fly.io", status })));
+
+describe("ServiceTile -- the multi-entry group tile, the second label line", () => {
+  it("renders the entry count, not any one entry's id, in the id line's slot", () => {
+    renderTile({ group: flyGroup([{ id: "host-api" }, { id: "host-web" }, { id: "host-worker" }]) });
+    expect(screen.getByTestId("entry-count").textContent).toBe("3 entries");
+    expect(screen.queryByText("host-api")).toBeNull();
+    expect(screen.queryByText("host-web")).toBeNull();
+  });
+
+  it("renders no mono font-family on the count line -- a count is not a literal, unlike an id", () => {
+    // A source-level check, the same shape as the label-stack tripwire above:
+    // jsdom's CSS Modules proxy carries no real stylesheet, so the only way
+    // to see the mono face is absent is to read the rule the class name maps
+    // to, not the rendered DOM.
+    const css = readFileSync(fileURLToPath(import.meta.url).replace(/ServiceTile\.test\.tsx$/, "ServiceTile.module.css"), "utf8");
+    const countRuleStart = css.indexOf(".count {");
+    const countRule = css.slice(countRuleStart, css.indexOf("}", countRuleStart));
+    expect(countRuleStart).toBeGreaterThan(-1);
+    expect(countRule).not.toMatch(/font-family/);
+  });
+});
+
+describe("ServiceTile -- the multi-entry group tile, status", () => {
+  it("shows no badge and no status line when every entry is active", () => {
+    renderTile({ group: flyGroup([{ id: "host-api" }, { id: "host-web" }]) });
+    expect(screen.queryByTestId("status-badge")).toBeNull();
+    expect(screen.queryByTestId("status-text")).toBeNull();
+  });
+
+  // The owner's decision on review of the first draft: the mark stays in
+  // colour for a group, whatever the group's worst status is -- desaturating
+  // the whole mark reads as dimming four live apps because one is departing.
+  it("never desaturates the mark, even when the group's worst status is deprecated", () => {
+    renderTile({ group: flyGroup([{ id: "host-api" }, { id: "host-web", status: "deprecated" }]) });
+    expect(screen.getByTestId("icon-mark").className).not.toContain("desaturated");
+  });
+
+  it("carries the badge for the group's worst status", () => {
+    renderTile({ group: flyGroup([{ id: "host-api" }, { id: "host-preview", status: "phasing_out" }]) });
+    expect(screen.getByTestId("status-badge")).not.toBeNull();
+  });
+
+  // decision 3 of the mockup's own leading comment: id first, the word
+  // lower-cased, no arrow -- the arrow already means "replaced by <target>"
+  // everywhere else on this tile.
+  it("names the departing entry before the lower-cased word, with no arrow", () => {
+    renderTile({
+      group: flyGroup([{ id: "host-api" }, { id: "host-preview", status: "phasing_out" }, { id: "host-web" }]),
+    });
+    const statusText = screen.getByTestId("status-text");
+    expect(statusText.textContent).toBe("host-preview phasing out");
+    expect(statusText.textContent).not.toContain("→");
+    expect(statusText.textContent).not.toMatch(/^Phasing/);
+  });
+
+  it("carries the departing entry's id in the accessible name", () => {
+    renderTile({
+      group: flyGroup([{ id: "host-api" }, { id: "host-preview", status: "phasing_out" }]),
+    });
+    expect(screen.getByRole("button").getAttribute("aria-label")).toContain("host-preview phasing out");
+  });
+
+  it("takes the most consequential status among the entries, not the first one", () => {
+    renderTile({
+      group: flyGroup([
+        { id: "host-api", status: "removed" },
+        { id: "host-preview", status: "phasing_out" },
+      ]),
+    });
+    // phasing_out outranks removed (bands.ts's STATUS_SEVERITY) -- this is
+    // the same rule groupStatus already guards in bands.test.ts, exercised
+    // here through the tile that actually renders it.
+    expect(screen.getByTestId("status-text").textContent).toBe("host-preview phasing out");
+  });
+
+  it("deprecated and removed each render their own worded status", () => {
+    renderTile({ group: flyGroup([{ id: "host-api" }, { id: "host-web", status: "deprecated" }]) });
+    expect(screen.getByTestId("status-text").textContent).toBe("host-web deprecated");
+
+    cleanup();
+
+    renderTile({ group: flyGroup([{ id: "host-api" }, { id: "host-worker", status: "removed" }]) });
+    expect(screen.getByTestId("status-text").textContent).toBe("host-worker removed");
+  });
+});
+
+describe("ServiceTile -- the multi-entry group tile, activation and peeking", () => {
+  it("calls onActivate with the whole group, not one entry, on click", () => {
+    const group = flyGroup([{ id: "host-api" }, { id: "host-web" }]);
+    const { onActivate } = renderTile({ group });
+    fireEvent.click(screen.getByRole("button"));
+    expect(onActivate).toHaveBeenCalledTimes(1);
+    expect(onActivate.mock.calls[0]![0]).toBe(group);
+  });
+
+  it("peeks with the whole group on hover", () => {
+    const group = flyGroup([{ id: "host-api" }, { id: "host-web" }]);
+    const { onPeek } = renderTile({ group });
+    fireEvent.pointerOver(screen.getByRole("button"), { pointerType: "mouse" });
+    expect(onPeek).toHaveBeenCalledTimes(1);
+    expect(onPeek.mock.calls[0]![0]).toBe(group);
+  });
+});
+
+describe("ServiceTile -- the multi-entry group tile, one button either way", () => {
+  it("renders exactly one button for a five-entry group, not five", () => {
+    renderTile({
+      group: flyGroup([{ id: "host-api" }, { id: "host-cron" }, { id: "host-preview", status: "phasing_out" }, { id: "host-web" }, { id: "host-worker" }]),
+    });
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+  });
+
+  it("renders selected exactly as told -- which id counts as a match is BandModule.tsx's own decision, not this component's", () => {
+    renderTile({ group: flyGroup([{ id: "host-api" }, { id: "host-web" }]), selected: true });
+    expect(screen.getByRole("button").getAttribute("aria-current")).toBe("true");
   });
 });

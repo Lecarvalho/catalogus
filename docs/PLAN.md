@@ -77,7 +77,7 @@ design decisions; this file tracks *what has been built* against it and what rem
   `apps/web/docs/candidates/` and are the specification for the component work, **which is built
   and validated as of 2026-09-03 except the three shell menus and the portfolio page**. See the
   newest handoff, directly under "Start here".
-- **Last updated:** 2026-09-03 (evening)
+- **Last updated:** 2026-09-04
 
 ## Start here on a fresh session
 
@@ -86,7 +86,7 @@ trusting anything below. **In that order**: the direction contract guard compare
 `apps/web/index.html` against the build output, so a `pnpm test` run against a `dist` older than your
 last edit to that file fails on a difference you created and already fixed.
 
-**The expected total as of 2026-09-03 (evening) is 1403 tests / 77 files** (see the newest handoff; it was 1375 / 77 the same morning, before the icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
+**The expected total as of 2026-09-04 is 1617 tests / 81 files** (see the newest handoff: +214 across the owner-supplied-icons slice, the brand-tile slice and its two validation passes — 1606 before the four D1–D4 fixes and their eleven tests; it was 1403 / 77 on the evening of 2026-09-03, 1375 / 77 that morning before the thesvg icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
 
 **The expected total moved on 2026-08-26 and this line no longer names one.** It said **1218 tests /
 72 files**, which was correct at the start of that session and is the number to compare against if
@@ -130,6 +130,200 @@ three of six consecutive runs while every single run *of that file alone* passed
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
 
+### Handoff — 2026-09-04, the board is capped, a service names its own icon, and a brand is one tile per band
+
+**Read this first.** One session, three slices, each briefed, implemented on a smaller model and
+validated by a separate agent against the built artifact: `docs/custom-icon-brief.md` (two parts,
+run), `docs/brand-tile-brief.md` (three parts, run), and finding 3 as a small edit by the main
+session. Both briefs are kept as the record and are not to be run again. What is left of the
+component work is still **the three shell menus** (blocked on the owner's 2026-09-02 answers plus
+the Documentation URL) and **the portfolio page**; two open items were added below.
+
+#### What the next session does first
+
+1. **Commit.** Everything here is uncommitted at the time of writing; the tree is green
+   (1617 / 81, typecheck clean, run more than once). Commit as three commits if the diff is
+   still separable by path (`apps/web` shell cap; `packages/*` + `skills/` icons; `apps/web`
+   brand tile) or one if it is not.
+2. **Owner's second look at the brand tile on a real inventory** — the Clapline run that found
+   findings 4 and 5 is the only place the collapse has been seen with real repeats (Fly.io ×5,
+   Supabase across two bands). The layout-stress example has Fly.io ×3 and Postgres ×2 in one band
+   and is what the validator drove.
+3. **The three menus**, once the owner answers.
+4. **Open, new this session:** `rename` leaves a vendored icon under the old `<id>.svg` name (the
+   pointer stays valid, so nothing breaks, but the `<id>.svg` convention `icons` and the skill
+   teach no longer holds) and `remove` orphans the file — both are a small edit to move/delete the
+   file through the same `manifest-edit` transaction. And **the graph does not fit to view**
+   (recorded under the decisions below; pre-existing).
+
+#### Owner decisions, asked once at the start of the session and once more mid-way
+
+1. **Finding 3, board width: 1600px, and the cap is the board's, not the row's.** The mockup's
+   own width, over the old `.page` measure of 1680. The first cut capped and centred the
+   rail-plus-board row; the owner saw it within the hour and rejected it — *"We're centralizing
+   the side panel as well, this is wrong. We should only centralize the page right side
+   content."* So the rail keeps the window's left edge and `.board` alone carries
+   `max-width: var(--board-max-width)` (1600px less `--rail-width`) with auto inline margins,
+   which centre it in the room the rail leaves because it is a bounded flex item of a *row*
+   container — not the `.page` defect, which was a column. Small edit by the main session;
+   browser validation follows.
+2. **Owner-supplied icons: build now, and not the shape the 2026-09-03 handoff sketched.** The
+   owner: *"Let user point on the web. I don't want to couple with thesvg."* No `thesvg:` refs in
+   the manifest, no registry search. Mechanism confirmed on a second question: **the CLI fetches
+   once and vendors locally** — `catalogus set services.<id>.icon <https-url|path>` fetches or
+   copies the SVG one time, runs the sanitiser, writes `.catalogus/icons/<id>.svg` beside the
+   manifest and records that repo-relative path in the entry; the viewer stays offline. A URL in
+   the manifest that the viewer fetches at runtime stays refused; the schema pattern makes it
+   unrepresentable. Then, mid-session, a third decision: **the skill's agent searches the web for
+   a missing mark itself and asks the user only when it finds nothing** — *"the agent needs to
+   know which brands don't have an icon, so the agent needs to go fetch on the web; when they
+   don't find, they can ask user to provide."* That gives the CLI a read-only `catalogus icons`
+   command (one line per entry: id, service, source, detail) so the agent can know which entries
+   lack one without running the viewer. It is the one place the skill lets an agent act on a web
+   search before asking, and the skill says so. The brief is `docs/custom-icon-brief.md`, two
+   parts, contract layer first.
+3. **Finding 4, the tile's second line when it stands for several entries: the entry count.**
+4. **Finding 5, the brand page: brand summary plus entry list** — mark, name, kind and catalog
+   facts once, then the entries as rows (id, role, status, version) each linking to its own
+   entry page.
+5. **The graph stays per entry for v1.** Edges are between entries, so a per-brand node would
+   have to merge them and lose which entry depends on which; the owner took the recommendation
+   to leave the graph alone and revisit if it repeats too much.
+6. **Mockup first for the brand page and the breathing entry page.** A static candidate in
+   candidate E's vocabulary (`apps/web/docs/candidates/candidate-e-brandpage.html`: the
+   multi-entry tile with its popover, the brand page, the reworked entry page), approved on
+   sight before anything is built — the way the shell went.
+
+Recorded by the first finding-3 validator, against the reversed row cap but independent of it:
+**the graph does not fit to view** — the React Flow viewport stays at `translate(0,0) scale(1)`
+while the node extent spans about 2630px at every width, so roughly half the nodes sit off-canvas
+until the reader pans. Pre-existing, not caused by anything this session; open. Also: the popover
+clamps against the *window*, not the board, so with the board capped on a wide window a popover
+may legitimately overhang the board's side margin — transient, dismissable, acceptable until
+someone says otherwise.
+
+#### Finding 3 — built and validated
+
+`--board-max-width: calc(1600px - var(--rail-width))` on `.board`. A validator drove the built app
+through same-origin iframes at thirteen widths from 2326 down to 480: rail at x=0 and 240 wide at
+every width above 900; the board 1360 wide and centred to within the 0.5px auto-margin rounding
+above a 1616px window (the cap engages at 1616, not 1600, because the 15px scrollbar is part of
+the window and not of the room); fills the room exactly at and below; top bar and footer full
+width throughout; no horizontal overflow in list, graph, migrations or service page; sticky head
+sticks and all eight rail anchors land 40px clear of it; the popover clamps inside the window at
+1300 and 1024 where the tile is flush with the board's inner edge. The first cut (the row capped,
+rail floating) was also measured before the owner rejected it, and that table is in the
+validator's transcript, not here.
+
+#### Owner-supplied icons — built, validated, defects fixed, re-validated
+
+**The contract.** `services[].icon` is a repo-relative path matching
+`^\.catalogus/icons/(?!.*\.\.)[a-z0-9][a-z0-9_.-]*\.svg$` — one directory, never a URL, never
+absolute; the viewer reads the file and never the network. `catalogus set services.<id>.icon
+<https-url|path>` fetches (15 s timeout, https only, redirects followed but never off https,
+body counted against `MAX_ICON_BYTES` = 256 KB rather than trusting content-length) or copies
+the bytes, runs them through the same sanitiser the vendored thesvg files pass (now
+`parseIconMarkup`, which also refuses any `url(` that is not a same-document `#fragment`),
+stages them as a temp file under `.catalogus/icons/`, and renames to `<id>.svg` only after
+`commitManifestEdit` succeeds; any failure on any path discards every staged file and removes an
+empty directory it created. The YAML comment on the node records **origin and filename only**
+(`# fetched from https://host (logo.svg) on 2026-09-04`) — the first cut stripped query and
+fragment and a validator put a token in the path. The private-text guard runs on URL values
+before any fetch (a presigned or userinfo URL is refused outright, which is the safe outcome) and
+not on path values, which are never written anywhere. `catalogus icons [path]` is the read-only
+report — `<id>  <service>  <source>  <detail>`, sources `local | simple-icons | thesvg | none`,
+`(missing file)` vs `(refused: …)` on a stale pointer, and `<n> service(s) of <total> has/have no
+icon.` — and `add` prints one hint line when the entry it added has none. `view` serves the
+catalog fallback for a stale pointer and prints one stderr line per such entry, saying missing or
+refused. `validate` does not check the file exists. The same resolution step
+(`icon-resolution.ts`) serves `icons` and `view`, so they cannot disagree.
+
+**The skill** (`skills/catalogus/SKILL.md`, step 7b) tells the agent to run `catalogus icons`,
+search the web for each `none` row's official mark, set it, and ask the user only when nothing
+turns up — the owner's procedure, and the one place the skill lets an agent act on a web search
+before asking; the summary must list every icon set and its URL. The drift test now ties the
+skill's four source names to the CLI's `ICON_SOURCES`.
+
+**Validation, by an agent that wrote none of it,** against the built binary with local http and
+https servers (self-signed, trusted via `NODE_EXTRA_CA_CERTS`) and some fifty inputs: every
+sanitiser refusal, both cap edges, redirect on/off https, 404, stall before and after headers,
+lying content-length, path tokens, userinfo, hashed absolute paths, `..`, directories, the
+destination itself, unknown ids, the containment floor bypassing the schema, hand-edited manifests
+for `validate`. Four defects found and fixed (two temp-file leaks on throw paths, `icons` calling a
+refused file missing, an empty directory left behind), two no-secrets gaps closed (path tokens,
+the guard on paths), then re-validated clean apart from two wording items the main session fixed
+(a doubled "the sanitiser refused it", and `set` surfacing a read-only manifest as the bare EPERM;
+it is `could not update <path>: …` at exit 1 now). One claim of the brief turned out unreachable:
+"vendor succeeds, then a sibling field fails schema validation at commit" — every sibling value is
+pre-checked before the manifest opens, so the only post-stage failures are the two leaks, both
+fixed. `style="fill:url(...)"` was the validator's design question and is refused now.
+
+#### Brand tile — built to an approved mockup, validated
+
+**The mockup first.** `apps/web/docs/candidates/candidate-e-brandpage.html`, three artboards in
+candidate E's own CSS: the wall with a Fly.io ×5 tile and its popover; the brand page; the entry
+page reworked to breathe. The owner approved 1 and 2 on sight; 3 went through two revisions —
+first the facts as a sidebar stack, then *"place it dock on the right as a side panel"* — and was
+approved as the left rail's mirror: a 300px panel docked at the row's right edge, full row height,
+hairline on its left, stacking under the document below 900px. The mockup's comments record every
+decision including the ones it does not make (a group whose entries differ in `kind`).
+
+**What is built.** `BandModule` collapses per band through `collapseByService` (its first caller
+since `e1f7dba`); a multi-entry tile shows "N entries" (not mono) in the id's slot, the group's
+worst status as badge and red word (`<id> phasing out`, no arrow), and keeps its mark in colour;
+its popover lists the entries as real links with a focus bridge so Tab keeps it open; clicking it
+opens `#/brand/<band>/<service>` (`hash-route.ts`), a new `BrandPage` (facts once, then entry rows
+as links); `ServicePage` is split into the document and `ServicePagePanel`, mounted through a new
+`sidePanel` slot on `AppShell` (`.withPanel` only when a panel is passed, so the frozen shell's
+board views render byte-identically); an entry of a multi-entry group gets a second breadcrumb
+crumb. Counts stay entry counts everywhere; graph and migrations untouched. The group tile's DOM
+id is `service-tile-<band>-<service>` because the same slug can collapse in two bands.
+
+**Validation of the viewer slice — two passes, five defects, all fixed.** The first pass (a
+separate agent driving the built app in Chrome against the three artboards, at 1280 and 1024, with
+its own five-entry fixture spanning all four statuses) confirmed the collapse, the popover, the
+brand page, the split entry page and the counts, and found four defects: **D1** no keyboard path
+from a group tile into its popover rows (the popover mounts after the whole board, so Tab from the
+tile lands on the next tile; the "tabbing into the rows" test focused a row directly and so proved
+the focus bridge while hiding that nothing could reach it); **D2** the entry page's document column
+not rebuilt to artboard 3; **D3** the brand page's Entries block spanning the full page instead of
+the 68ch measure (1280px rows, ~310px columns); **D4** the crumb separator inheriting `body`'s 12px
+and computing 18px, pushing the header 3px down. D2–D4 were fixed by one agent (`ServicePage.
+module.css`, `BrandPage.module.css`, comments tagged `D2`/`D3`/`D4, 2026-09-04`). D1 was the main
+session's edit: `App.tsx`'s peek keydown effect now walks **ArrowDown/ArrowUp** from a focused
+group tile into its rows (first/last), wraps through them, and **Escape from a row hands focus back
+to the tile** before closing; six tests in `App.test.tsx`, each seen red with the arrow branch
+disabled.
+
+The second pass reproduced all four clean, to the digit where a number was claimed (D2's column and
+type identical to the mockup's computed values; D3's grid `126.95px ×4`, gap 14; D4's row 15px and
+header at y=141 — the mockup's 15.5 / 141.5 is its body leading of 1.55 against this app's 1.5, a
+0.5px the CSS comment now records rather than claims away). It found **one real new defect, born of
+the D1 fix**: with focus on a row, a pointer brushing a neighbouring tile replaced the peek,
+unmounted the row and dropped focus to `<body>`, where neither the arrows nor Escape had anything to
+act on. Fixed the same hour: a row that holds focus holds the popover — `handlePeek` refuses a peek
+while focus is inside the popover (only a pointer can ask from there), and `handlePeekEnd`'s timer
+re-checks at fire time so the neighbour's pointer-leave cannot close it either. One test, seen red
+with the guard removed; re-checked in the browser by the same validator (hover two neighbours, pointer through the popover
+and out, click on empty board, Escape with the pointer resting on another tile: focus and popover
+correct at every step; a click on a neighbouring tile wins over the guard, since focus leaves the
+row on mousedown, and opens that tile's page — the sane outcome; one transient, inherent to any
+refuse-the-peek design: a tile the pointer is already resting on when Escape fires does not peek
+until the pointer leaves and re-enters it). Also from that pass:
+the brand page's "Entries" heading got the mockup's 1.55 leading (it inherited body's 1.5, 28.5px
+against 29.45). **Recorded, not changed:** the entry page's `.document` is `flex: 0 1 auto` where the
+mockup's is `1 1 auto; min-width: 0` (inert, the article is not a flex row); a Tab that leaves the
+browsing context altogether closes the popover only when the browser's throttled timers fire
+(~1.5s), which is the browser, not the app; Chrome's resize tool is still a no-op at 2326px, so
+every width was produced by a same-origin iframe of that width, and scroll-tracking of an open
+popover could not be driven at all there (`visibilityState: "hidden"` pauses `requestAnimationFrame`).
+Group-status severity ranks `deprecated` above `removed`, by design (`bands.test.ts`).
+
+**One flake seen and not chased:** `App.test.tsx`'s "swaps the list for the canvas, and back" failed
+once at ~1035ms (a `waitFor` timeout while the lazy graph chunk loaded under a parallel run) and
+passed on the next three consecutive runs of the file. It is the same shape as the flakes recorded
+under "Run it more than once" above.
+
 ### Handoff — 2026-09-03 (second session), five brand marks come from thesvg.org, and two defects the tests could not see
 
 **Read this first.** One session, one brief: `docs/icons-brief.md` (kept as the record of what was
@@ -141,16 +335,16 @@ below the previous handoff. The design is unchanged. What is left of the compone
 
 The owner ran the new build on a client repo the same evening: *"Icons look good."* Then:
 
-1. **Finding 3 — centre the board.** Owner said OK; the number (1600 or 1680) is still theirs. Ask
+1. ✅ (2026-09-04, see the newest handoff) **Finding 3 — centre the board.** Owner said OK; the number (1600 or 1680) is still theirs. Ask
    once, then a small edit to the rail+board row. Do not pick one.
-2. **Findings 4 + 5 — one tile per brand per band, and the service page.** A design brief, not a
+2. ✅ (2026-09-04, mockup approved, built, see the newest handoff) **Findings 4 + 5 — one tile per brand per band, and the service page.** A design brief, not a
    fix: the wall (`collapseByService` in `bands.ts` already collapses per band and has no caller
    since `e1f7dba`), the popover listing the entries, a brand page that lists them with each entry
    keeping its own page, the graph node, and the counts. One brief per surface. The open design
    questions to put to the owner before briefing: what the tile's second label line shows when it
    stands for several entries (the id is gone), and what the brand page is that the entry page is
    not.
-3. **Owner-supplied icons — a new open item, from the owner's second look (2026-09-03 evening).**
+3. ✅ (2026-09-04, built in a different shape than sketched here — no thesvg refs, no registry search; see the newest handoff) **Owner-supplied icons — a new open item, from the owner's second look (2026-09-03 evening).**
    Loki and Healthchecks.io are on neither simple-icons nor thesvg.org, so no source this repo can
    check will ever fill them. The owner asked, without asking for it to be built: let the user set
    a specific icon when the app cannot find one, or look one up from the app. The shape that fits

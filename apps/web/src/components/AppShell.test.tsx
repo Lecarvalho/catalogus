@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { makeViewPayload, makeViewService } from "../test-support/fixtures.js";
 import { AppShell, type AppShellProps } from "./AppShell.js";
+import styles from "./AppShell.module.css";
 
 afterEach(() => cleanup());
 
@@ -151,5 +152,81 @@ describe("AppShell", () => {
     renderShell();
     const profile = screen.getByRole("button", { name: "Profile" });
     expect(profile.textContent).toBe("");
+  });
+});
+
+/*
+ * `sidePanel`, added 2026-09-04 for the entry page's facts panel
+ * (ServicePage.tsx's `ServicePagePanel`, docs/candidates/candidate-e-brandpage.html's
+ * artboard 3, decision 6). Two things this brief has to prove that no test
+ * above does: that the panel actually lands where the mockup puts it -- a
+ * flex sibling of `.board` inside `.shell`, not a child of the board or of
+ * this file's own markup -- and that a view which passes none renders a row
+ * whose class list and children are exactly what they were before this prop
+ * existed, not "the same plus a modifier that happens to do nothing yet".
+ * jsdom computes no layout, so "identically" here means the DOM structure and
+ * the class *strings* jsdom can see, not a measured pixel -- the same limit
+ * this file's own header states for the 900px/480px breakpoints.
+ */
+describe("AppShell -- the side panel", () => {
+  it("mounts the panel as a sibling of the board inside the shell row, not a child of either", () => {
+    renderShell({ sidePanel: <aside data-testid="panel">panel content</aside> });
+
+    const main = screen.getByRole("main");
+    const panel = screen.getByTestId("panel");
+    const shell = main.parentElement;
+
+    // Same parent, and that parent is the shell row -- proven by its other
+    // known child, the rail, sitting beside both.
+    expect(panel.parentElement).toBe(shell);
+    expect(main.parentElement).toBe(shell);
+    expect(shell?.contains(screen.getByRole("navigation", { name: "Bands" }))).toBe(true);
+
+    // After the board, per the mockup's own words ("a sibling of .board, not
+    // a child of it") and AppShell.tsx's own comment on render order.
+    const children = Array.from(shell?.children ?? []);
+    expect(children.indexOf(main)).toBeLessThan(children.indexOf(panel));
+
+    // The panel's own content reaches the screen through the slot -- this
+    // component supplies no chrome of its own around it (AppShellProps'
+    // `sidePanel` comment).
+    expect(screen.getByText("panel content")).not.toBeNull();
+  });
+
+  it("does not render the panel at all when none is handed to it", () => {
+    renderShell({ sidePanel: undefined });
+    expect(screen.queryByTestId("panel")).toBeNull();
+  });
+
+  it("marks the shell row `.withPanel` only when a panel is present", () => {
+    const { unmount } = renderShell({ sidePanel: <aside data-testid="panel">panel content</aside> });
+    const shellWithPanel = screen.getByRole("main").parentElement;
+    expect(shellWithPanel?.classList.contains(styles.withPanel ?? "")).toBe(true);
+    unmount();
+
+    renderShell({ sidePanel: undefined });
+    const shellWithoutPanel = screen.getByRole("main").parentElement;
+    expect(shellWithoutPanel?.classList.contains(styles.withPanel ?? "")).toBe(false);
+  });
+
+  /*
+   * The frozen shell's own promise, restated for this prop: a board view
+   * (no `sidePanel`) renders the exact row it rendered before this prop
+   * existed. Not "contains the same class plus an empty modifier" -- the
+   * class *string* itself, compared for equality, which is what catches the
+   * `${styles.shell} ${sidePanel ? styles.withPanel : ""}` shape of bug (a
+   * trailing space appended even when there is nothing to append) that an
+   * `expect(...).toContain(styles.shell)` assertion would miss entirely.
+   */
+  it("keeps the shell row's class string byte-identical to before this prop existed, when no panel is passed", () => {
+    renderShell({ sidePanel: undefined });
+    const shell = screen.getByRole("main").parentElement;
+    expect(shell?.className).toBe(styles.shell);
+  });
+
+  it("still renders exactly the rail and the board as the row's children when no panel is passed", () => {
+    renderShell({ sidePanel: undefined });
+    const shell = screen.getByRole("main").parentElement;
+    expect(shell?.children).toHaveLength(2);
   });
 });

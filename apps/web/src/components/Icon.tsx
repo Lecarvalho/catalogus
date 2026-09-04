@@ -20,7 +20,7 @@ export interface IconProps {
    * The icon @catalogus/cli's view payload resolved server-side, or null
    * when there is none -- @catalogus/core's resolveIcon never throws, so a
    * missing catalog row, an unmapped slug, or a vendored file that fails its
-   * own sanitiser (icons.ts's parseThesvgMarkup) all degrade to null here
+   * own sanitiser (icons.ts's parseIconMarkup) all degrade to null here
    * rather than reaching this component as an error.
    *
    * Typed as `ViewService["icon"]` rather than importing `ResolvedIcon` by
@@ -98,7 +98,7 @@ export function Icon({ icon, rollup, label, colour = false }: IconProps) {
           // vendored thesvg.org file whose sha256 is recorded in
           // packages/core/icons/thesvg/LICENSES.md and checked by a drift
           // test -- and every vendored file passes icons.ts's own sanitiser
-          // (parseThesvgMarkup / hasForbiddenMarkup: no <script>, no
+          // (parseIconMarkup / hasForbiddenMarkup: no <script>, no
           // <foreignObject>, no event-handler attribute, no href, no
           // <style>) before it ever becomes this string, exercised in
           // icons.test.ts against a synthetic file carrying each of those.

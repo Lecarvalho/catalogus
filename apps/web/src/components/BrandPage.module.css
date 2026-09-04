@@ -1,0 +1,276 @@
+/*
+ * The brand page: the entry page's own frame (ServicePage.module.css), read
+ * for its vocabulary rather than imported -- CSS Modules hash class names
+ * per file, so importing would not even resolve the same names, and
+ * docs/brand-tile-brief.md's own instruction for this pass is to read that
+ * file and write these rules against the same tokens. The pieces this file
+ * shares with it (breadcrumb, back, header, glyph, identity, name, slug,
+ * uncatalogued) are declared here at the same tokens for that reason.
+ *
+ * Built to artboard 2 of apps/web/docs/candidates/candidate-e-brandpage.html,
+ * approved 2026-09-04. Every value below is either a token this world
+ * already had a use for, or a literal the mockup states with no equivalent
+ * token, named as such at its own declaration -- the same way
+ * ServicePage.module.css's own header records its four page-level tokens as
+ * chosen rather than measured, and keeps its 68ch document measure as a bare
+ * literal rather than force it onto a near neighbour. No token was added to
+ * tokens.css for this page (docs/brand-tile-brief.md's shared contract:
+ * "No new token in tokens.css from Parts A or B").
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-section-gap);
+}
+
+/* Focus lands here on open -- ServicePage.module.css's identical rule and
+   identical reason: the app-wide ring drawn around the whole page reads as
+   an error, not as a destination. */
+.page:focus {
+  outline: none;
+}
+
+.breadcrumb {
+  display: flex;
+}
+
+.back {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-pop-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--track-pop-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+/* Ink, not signal, on hover -- DIRECTION.md's own restatement of the red
+   budget names "not a link" directly, and a back control is exactly that
+   (ServicePage.module.css carries the identical rule and the identical
+   reasoning). */
+.back:hover {
+  color: var(--color-text);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--page-header-gap);
+  padding-bottom: var(--page-section-gap);
+  border-bottom: 1px solid var(--color-line);
+}
+
+/* Bare mark, no squircle -- ServicePage.module.css's identical rule: the
+   icon-tile radius is candidate E's one declared exception and belongs to
+   the grid tile alone. */
+.glyph {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-mark-size);
+  height: var(--icon-mark-size);
+}
+
+.glyph svg {
+  width: var(--icon-mark-size);
+  height: var(--icon-mark-size);
+}
+
+.identity {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: var(--text-page-title);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  letter-spacing: var(--track-band-title);
+  overflow-wrap: anywhere;
+}
+
+.slug {
+  margin: var(--icon-id-gap) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-pop-id);
+  color: var(--color-text-faint);
+}
+
+.uncatalogued {
+  margin: var(--icon-id-gap) 0 0;
+  font-size: var(--text-pop-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--track-pop-label);
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+/*
+ * The brand facts, once, in the header -- mockup's `.brand-facts`: the
+ * popover's own dt/dd type (--text-pop-label / --track-pop-label /
+ * --text-pop-fact) and its own row gap (--pop-facts-row-gap, 9px), laid out
+ * as columns sized to their own content instead of the popover's 1fr 1fr,
+ * because this header is wide and three short facts should not spread
+ * across it (mockup comment, artboard 2). --icon-grid-top (30px) above is
+ * the distance this world already puts between a heading and the things
+ * under it.
+ *
+ * The 44px column gap has no token: nothing else in this world names "the
+ * gap between a few short header facts sized to their content", and a value
+ * the mockup states does not get rounded onto a token declared for
+ * something else -- the near-miss shape tokens.css's own header repeatedly
+ * warns against. Kept as a bare literal instead, the same call
+ * ServicePage.module.css already makes for its own 68ch document measure.
+ */
+.facts {
+  margin: var(--icon-grid-top) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pop-facts-row-gap) 44px;
+}
+
+.facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pop-fact-gap);
+}
+
+.facts dt {
+  margin: 0;
+  font-size: var(--text-pop-label);
+  letter-spacing: var(--track-pop-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.facts dd {
+  margin: 0;
+  font-size: var(--text-pop-fact);
+  color: var(--color-text);
+}
+
+/*
+ * D3, 2026-09-04: the Entries block -- this heading and `.rows` below --
+ * carried no width of its own, so its four-column grid and its hover stripe
+ * spanned the page's full measure: the validator measured 1280px rows with
+ * ~310px columns and a 1296px hover stripe. The mockup puts the whole block
+ * inside `.page-doc { max-width: 68ch; }` (candidate-e-brandpage.html,
+ * artboard 2, additions block: "the document measure 68ch ... are the built
+ * page's own"), which measures 549.8px against its own 15px body -- four
+ * ~127px columns. `--text-board-body` establishes that 15px context the
+ * measure resolves against, the same citation ServicePage.module.css's own
+ * `.document` makes for the identical mockup rule on the entry page's own
+ * document column.
+ */
+.doc {
+  font-size: var(--text-board-body);
+  max-width: 68ch;
+}
+
+/*
+ * The Entries section heading -- the mockup's `.page-h2` (artboard 2's
+ * "Entries"): the band heading's own 19px / -0.01em (--text-band-title /
+ * --track-band-title), not ServicePage's 10px caps `.documentHeading`. That
+ * label style marks a caps sub-label sitting over empty-state prose; this is
+ * a real second-level heading sitting over a table of rows, the same job
+ * --text-band-title already does for a band's own heading on the board.
+ */
+.entriesHeading {
+  margin: 0;
+  font-size: var(--text-band-title);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--track-band-title);
+  /* The mockup's `.page-h2` computes 29.45px of leading (19 * 1.55, its
+     body's own), and ServicePage's `.documentHeading` gets the same by
+     sitting inside `.document`'s 1.55 context; `.doc` above states only a
+     font-size, so this heading inherited body's 1.5 (28.5px) until the
+     re-validation of 2026-09-04 measured the two apart. Stated here rather
+     than on `.doc` so the rows below keep the leading they were measured
+     identical to the mockup with. */
+  line-height: var(--leading-board-body);
+}
+
+.rows {
+  margin-top: var(--icon-grid-top);
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * One row -- the mockup's own comment (artboard 2, decision 2): "the
+ * settings panel's own row, with .rail-band's 8px hover inset so the sunken
+ * hover reads as a row and not a stripe." --rail-band-inset (8px) is that
+ * inset, reused here for the same job it already names: bleeding the hover
+ * fill past the row's own text while keeping every row's content flush with
+ * the heading above it. --pop-facts-column-gap (14px) is reused for the
+ * grid's column gap -- already this world's name for "the gap between two
+ * facts side by side", and the mockup's own number for this row is the same
+ * 14px. Four equal columns because every row states the same four facts in
+ * the same order (the header row below states their names).
+ *
+ * The 10px vertical padding has no token of its own: nothing in this world
+ * names a bare "row's own vertical padding" outside --rail-band-padding
+ * (7px 8px, a different shorthand value), so it stays a literal rather than
+ * round onto a neighbour that means something else.
+ */
+.row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: baseline;
+  gap: var(--pop-facts-column-gap);
+  padding: 10px var(--rail-band-inset);
+  margin: 0 calc(var(--rail-band-inset) * -1);
+  border-top: 1px solid var(--color-line);
+  text-decoration: none;
+  color: inherit;
+  font-size: var(--text-pop-fact);
+}
+
+/*
+ * Scoped to the anchor rather than to `.row` alone: the head row below
+ * shares `.row`'s grid and spacing but is a `<div>`, not a link, so this
+ * selector never needs the mockup's own explicit
+ * `.entry-row--head:hover { background: none; }` override -- a `<div>` was
+ * never going to match `a.row:hover` in the first place.
+ */
+a.row:hover {
+  background: var(--color-surface-sunken);
+}
+
+.rowHead {
+  border-top: none;
+  padding-top: 0;
+  font-size: var(--text-pop-label);
+  letter-spacing: var(--track-pop-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+/* The entry id, mono because it is a literal from the manifest the reader
+   may need to type into a `catalogus set services.<id>...` command --
+   ServicePopover.module.css's own `.slug` states the identical reason for
+   the identical treatment. */
+.id {
+  font-family: var(--font-mono);
+  font-size: var(--text-pop-mono);
+  color: var(--color-text);
+}
+
+/*
+ * "Not tracked" reads as a state, not as a hole -- dimmed rather than the
+ * cell being empty, so the Version column is always present and a reader
+ * never has to infer that a blank cell means the manifest has no version
+ * rather than that this page forgot to ask. ServicePopover.module.css's own
+ * `.dim` states the identical reasoning for the identical treatment; see
+ * this file's header comment for why this page follows that rule and not
+ * ServiceSummary's (which omits the row outright).
+ */
+.dim {
+  font-weight: var(--weight-normal);
+  color: var(--color-text-faint);
+}

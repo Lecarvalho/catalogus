@@ -376,27 +376,108 @@
   --pop-note-rule-gap: 12px;
 
   /*
-   * The service page's own four values. Added 2026-08-31, and unlike every
-   * other token in this block they are *not* read off a mockup: candidate E
-   * is the List view only, so the service page has no approved geometry and
-   * there is nothing here to transcribe. They are recorded as chosen rather
-   * than measured, because a chosen value filed among measured ones is the
-   * shape of guess CLAUDE.md exists to prevent -- an absent measurement that
-   * reads as an answer.
+   * The service page's own values. Added 2026-08-31 as chosen rather than
+   * measured -- candidate E was the List view only, so there was no approved
+   * geometry to transcribe, and the paragraph that used to stand here said so
+   * plainly: "the owner has not seen these; they are the first thing to check
+   * when the page is looked at."
    *
-   * What they were chosen against: the title sits a step above the band
-   * heading (19px) and a step above the retired world's --text-title (26px),
-   * which held the same job on the old page. The three gaps are deliberately
-   * past --space-7 (32px), the dense world's largest step: that ramp's
-   * ceiling is the ceiling of a world whose argument was fitting one screen,
-   * and the page's own top-level rhythm is exactly where re-importing it
-   * would show. The owner has not seen these; they are the first thing to
-   * check when the page is looked at.
+   * **Confirmed 2026-09-04.** The owner has now seen them: the approved
+   * brand-page mockup (docs/candidates/candidate-e-brandpage.html, artboard 3,
+   * "additions" block, decision 6) draws the entry page at these exact three
+   * values and says so in its own comment -- "the title is the built page's
+   * 30px (tokens.css --text-page-title, the one number this world already
+   * holds for a page title); the header gap 20px = the built page's
+   * --page-header-gap". So the paragraph above is corrected rather than left
+   * standing: these are measured now, confirmed against an artifact rather
+   * than merely chosen, and the "first thing to check" caveat no longer
+   * applies to them.
+   *
+   * `--page-columns-gap` does not survive the confirmation. It was the gap
+   * between this page's two flex children, `.document` and `.facts` -- and
+   * the facts column left the page for the shell-level side panel this same
+   * pass (ServicePage.module.css's `.panel`, AppShell.tsx's `sidePanel` slot).
+   * A single remaining child has no partner to gap against, so the token is
+   * deleted rather than kept as a declaration nothing reads -- the same
+   * "permission that outlived its rule" shape signal-red.test.ts's allow-list
+   * refuses for itself.
    */
   --text-page-title: 30px;
   --page-header-gap: 20px;
   --page-section-gap: 40px;
-  --page-columns-gap: 48px;
+
+  /*
+   * The entry page's side panel, docked to the right edge of the
+   * rail-plus-board row -- added 2026-09-04, candidate-e-brandpage.html's
+   * artboard 3 and its "(3) the service summary as a side panel" comment
+   * (decision 6 of the file's leading comment). ServicePage.module.css's
+   * `.panel` and ServiceSummary.module.css read these; AppShell.module.css's
+   * `.shell` and `.board` are untouched by them -- the panel is a flex
+   * sibling of `.board`, not a resize of either.
+   *
+   * Most of the panel's own geometry is not new: the mockup's comment is
+   * explicit that it is "the rail's mirror" and states each number as an
+   * equality with something the rail or the popover already declared --
+   * `--rail-padding` (26px 20px 20px, the panel's own outer inset),
+   * `--rail-divider-gap` (20px, the rule between sections),
+   * `--text-rail-heading` / `--track-rail-heading` / `--rail-heading-gap`
+   * (11px bold caps, 0.04em, 10px under, the section headings), `--pop-padding`
+   * (16px 18px 17px, the Layer 3 block's own inset) and `--text-pop-note` /
+   * `--leading-pop-note` (12.5px/1.5, the note and the edge-list lines --
+   * "the edge lists one per line at the same size" is the mockup's own
+   * phrase for reusing the note's type). The Facts grid reuses the popover's
+   * own fact-grid tokens wholesale (`--pop-facts-row-gap`,
+   * `--pop-facts-column-gap`, `--pop-fact-gap`, `--text-pop-label`,
+   * `--track-pop-label`, `--text-pop-fact`) because the mockup's markup
+   * literally reuses `.pop-facts` for it -- "the facts inside set in the
+   * popover's own grid". None of those eight names are declared again here;
+   * this block is only the three numbers with no existing name to borrow.
+   *
+   * `--page-facts-width` promotes a literal that already existed --
+   * ServicePage.module.css's `.facts` has read `flex: 0 0 300px` since
+   * 2026-08-31 -- rather than choosing a new one; the mockup's own words are
+   * "300px, the built page's own facts-column token, not the rail's 240px",
+   * and its comment spends a full paragraph measuring 300px against this
+   * project's own fixture (the longest edge line, the Layer 3 prose) before
+   * landing on the built page's number rather than a fresh one. It gets a
+   * name now because two files (ServicePage.module.css's `.panel`,
+   * AppShell.module.css's breakpoint reasoning) need to agree on it, and a
+   * literal repeated in two places is exactly the shape this file exists to
+   * close off.
+   *
+   * `--page-facts-inset` is the one number `--rail-padding` cannot supply on
+   * its own: a shorthand custom property cannot be decomposed in CSS, and the
+   * Layer 3 block needs its horizontal component alone, negated, to bleed
+   * past the panel's own padding to its side edges -- the mockup's
+   * `.facts-overlay { margin: 20px -20px 0; }`. It is not a second measurement
+   * of the same fact; it is the same 20px `--rail-padding`'s second and third
+   * values already hold, named so a CSS `calc()` can reach it.
+   *
+   * `--page-facts-edge-gap` is the one number in the panel with no citation in
+   * the mockup's prose at all, only in its CSS (`.facts-list { gap: 2px }`) --
+   * the vertical rhythm between one dependency line and the next. It is *not*
+   * `--pop-fact-gap` (also 2px): that token is the space between one fact's
+   * own label and its own value, a different relationship that only shares a
+   * number with this one today, and this file's own history (the popover-type
+   * paragraph above, tokens.css's shell-block paragraph) is two prior findings
+   * that a shared number is not a shared name.
+   */
+  --page-facts-width: 300px;
+  --page-facts-inset: 20px;
+  --page-facts-edge-gap: 2px;
+
+  /*
+   * The breadcrumb's own second crumb, added the same pass for the same
+   * mockup: an entry of a multi-entry brand gains a crumb naming the brand,
+   * and `.crumbs { gap: 10px }` is the one number that rules, measured off the
+   * mockup's CSS rather than its prose (the prose only names the crumb's
+   * *type*, "the popover label style (10px caps, 0.03em)", which is
+   * `--text-pop-label` / `--track-pop-label` and already had a name). Not
+   * `--pop-head-gap` (also 10px, the popover header's mark-to-text gap): a
+   * different relationship again, for the reason `--page-facts-edge-gap`
+   * above states in full.
+   */
+  --page-crumb-gap: 10px;
 
   /*
    * The graph node and the canvas chrome, added 2026-08-31, and chosen rather
@@ -521,6 +602,19 @@
      belong to the same surface and were added with the board's block. */
   --board-padding-x: 40px;
   --board-padding-bottom: 64px;
+  /* The one number in this block the owner chose rather than the mockup drew.
+     The board is capped and centred in the room the rail leaves it on wide
+     screens (finding 3 of the owner's first real-inventory run, docs/PLAN.md,
+     2026-09-03): on a 2326px window a 36-service board ran edge to edge. The
+     mockup was only ever drawn at 1600, so 1600 is the widest the shell has
+     been seen at; the owner picked it over the old `.page` measure of 1680 on
+     2026-09-04. The cap is on the board alone, not on the rail-plus-board row:
+     the first cut capped the row, the rail floated in from the window's left
+     edge, and the owner rejected that on sight the same day -- "we should only
+     centralize the page right side content." So the rail keeps the window's
+     edge and the board takes 1600 less the rail's width, which is the board's
+     share of a 1600 mockup. */
+  --board-max-width: calc(1600px - var(--rail-width));
   --board-padding-x-mid: 20px;
   --board-padding-bottom-mid: 48px;
   --board-padding-x-narrow: 14px;

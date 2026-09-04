@@ -1,8 +1,23 @@
 /*
- * No chrome: no border, no background, no padding of its own. The page's
- * `.facts` aside supplies those (ServicePage.module.css) -- the only
- * caller left; see ServiceSummary.tsx's header for why `compact` and the
- * popover it existed for are both gone.
+ * No chrome: no border, no background, no padding of its own. The panel
+ * (ServicePage.module.css's `.panel`) supplies those -- the only caller left;
+ * see ServiceSummary.tsx's header for why `compact` and the popover it
+ * existed for are both gone.
+ *
+ * ---------------------------------------------------------------------
+ * Redesigned 2026-09-04 to the approved brand-page mockup's decision 6
+ * (docs/candidates/candidate-e-brandpage.html, artboard 3): "the summary's
+ * sections stacked top to bottom under rail-style headings and dividers, the
+ * facts inside set in the popover's own grid, the Layer 3 block sunken." Every
+ * rule below is new or rewritten; see ServiceSummary.tsx's own header for what
+ * changed structurally and why.
+ *
+ * The label-left, 84px-column grid this file used to draw for `.facts` is
+ * gone along with the paragraph that derived it -- it was this file's own
+ * invention (nothing in candidate E has a label-left arrangement to derive
+ * it from), and the mockup's panel replaces it outright with the popover's
+ * own label-above-value grid rather than revising it, so there is nothing
+ * left for that paragraph to explain.
  */
 .summary {
   display: flex;
@@ -10,52 +25,61 @@
 }
 
 /*
- * A two-column definition list on a fixed label column, so every value starts
- * on one vertical line. That alignment is what lets a reader scan down the
- * values without reading the labels twice -- the previous panel used a
- * flowing dl where "Replaced by" pushed its value further right than "Role"
- * did.
- *
- * Moved into candidate E on 2026-08-31, corrected the same day. The first
- * pass here left the row/column gaps and every section's own padding on
- * --space-2 / --space-3 / --space-4, reasoning that the label-left shape
- * has no equivalent in candidate-e-homescreen.html to round onto the wrong
- * ramp. True, and beside the point: landing on --space-* at all still
- * takes this panel's whole density from the retired world's ramp, whose
- * own argument was fitting one screen without scrolling -- this world's is
- * the opposite. Importing the ceiling is the same defect as rounding onto
- * a step; it just leaves no near-miss value behind to catch later.
- *
- * The correction: every gap and every section's padding below is derived
- * from ServicePopover.module.css's own fact geometry --
- * --pop-facts-row-gap (9px), --pop-facts-column-gap (14px), --pop-fact-gap
- * (2px) and --pop-padding (16px 18px 17px) -- because that geometry is
- * measured, is already in this world, and states the same kind of fact
- * this grid does (this file already reused the popover's *type* for
- * exactly that reason). The 300px facts aside (ServicePage.module.css) and
- * the popover's 268px are close enough in width that the popover's own
- * padding reads as the right amount of inset here too, not a coincidence
- * this file is stretching to use. `--pop-facts-row-gap` is the space
- * between one fact and the next everywhere in this panel a "next fact"
- * exists (this grid's own rows, the two dependency lines, the state line
- * before the Layer 3 prose); `--pop-fact-gap` is kept for the one place a
- * label sits directly on its own value the way a `dt` sits on its `dd` in
- * the popover, not for space between two different facts.
- *
- * The 84px label column itself is restated, not re-derived: nothing in the
- * popover measures a label-left arrangement (its own fact grid is
- * label-above-value), so there is genuinely nothing to derive it from, and
- * 84px already fits every label below ("Replaced by" is the longest).
+ * The rule between one section and the next -- Rail.module.css's own
+ * `.divider`, reused rather than re-derived: `--rail-divider-gap` is the same
+ * 20px above and below on both surfaces, and the mockup's own words for this
+ * rule are "sections divided by .rail-divider (1px, 20px above and below)".
+ */
+.divider {
+  height: 1px;
+  margin: var(--rail-divider-gap) 0;
+  background: var(--color-line);
+}
+
+/*
+ * One heading per section, styled and spaced exactly as Rail.module.css's
+ * own `.heading` -- the mockup's own words are "headed by .rail-heading (11px
+ * bold caps, 0.04em, 10px under)". A plain `<div>`, not an `<h3>`, for the
+ * same reason Rail.tsx's own heading is a div and not one: this is chrome
+ * labelling a section, not a heading in the document outline the page's own
+ * `<h1>` and `<h2>` already build.
+ */
+.heading {
+  margin-bottom: var(--rail-heading-gap);
+  font-size: var(--text-rail-heading);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--track-rail-heading);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+/*
+ * The Facts grid: ServicePopover.module.css's own `.facts` / `.facts > div` /
+ * `.facts dt` / `.facts dd`, read and reused rather than imported (CSS
+ * Modules hash per file, so there is nothing to import) -- the mockup's own
+ * markup makes the source explicit, setting this section's `<dl>` as
+ * `class="pop-facts"` verbatim. No `margin-top` here the way the popover's
+ * own rule carries one (13px, before its header): this grid's "header" is the
+ * `.heading` div above it, which already supplies its own margin-bottom, and
+ * a second gap on top of that would put two gaps between one label and the
+ * value under it.
  */
 .facts {
-  display: grid;
-  grid-template-columns: 84px 1fr;
-  gap: var(--pop-facts-row-gap) var(--pop-facts-column-gap);
   margin: 0;
-  padding: var(--pop-padding);
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--pop-facts-row-gap) var(--pop-facts-column-gap);
+}
+
+.facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pop-fact-gap);
 }
 
 .facts dt {
+  margin: 0;
   font-size: var(--text-pop-label);
   letter-spacing: var(--track-pop-label);
   text-transform: uppercase;
@@ -65,65 +89,70 @@
 .facts dd {
   margin: 0;
   font-size: var(--text-pop-fact);
+  color: var(--color-text);
   overflow-wrap: anywhere;
 }
 
 /*
- * The manifest's own `notes` -- the same fact ServicePopover.module.css's
- * `.note` states about the same entry, so this reuses that rule's own type
- * (--text-pop-note / --leading-pop-note) rather than the dense world's
- * --text-body / --leading-body or a fresh size chosen to look about right.
- * Padding is --pop-padding, the same call as `.facts` above, so every
- * section's content lines up on one left edge down the panel.
+ * The manifest's own `notes`, quoted the way ServicePopover.module.css's own
+ * `.note` quotes the same field on the same entry (added 2026-09-04 -- see
+ * ServiceSummary.tsx's header for why the two surfaces agree on this now
+ * where they used to disagree). `--text-pop-note` / `--leading-pop-note`,
+ * this panel's own body type -- see `.edge` below for the rest of what reads
+ * at this size.
  */
-.notes {
+.note {
   margin: 0;
-  padding: var(--pop-padding);
-  border-top: 1px solid var(--color-line);
   font-size: var(--text-pop-note);
   line-height: var(--leading-pop-note);
+  font-style: italic;
+  color: var(--color-text-muted);
 }
 
-.deps {
+/*
+ * One dependency per line, replacing the old comma-joined paragraph -- the
+ * mockup's own words are "the edges by name, one per line ... instead of
+ * eighteen comma-joined labels in a paragraph". `--page-facts-edge-gap` is
+ * this list's own vertical rhythm (tokens.css records why it is not
+ * `--pop-fact-gap`, despite sharing that token's 2px).
+ */
+.list {
   display: flex;
   flex-direction: column;
-  gap: var(--pop-facts-row-gap);
-  padding: var(--pop-padding);
-  border-top: 1px solid var(--color-line);
+  gap: var(--page-facts-edge-gap);
 }
 
-.depLine {
+/*
+ * One line. `--text-pop-note` / `--leading-pop-note` again -- "the edge lists
+ * one per line at the same size" is the mockup's own phrase for reusing the
+ * note's type here, not a fresh size chosen to look about right. Ink, not
+ * muted: this is the panel's one place a resolved value (a dependency's own
+ * label) stands on its own line rather than beside a `dt`, and every other
+ * value in this file (`.facts dd`, `.overlayState`) reads in ink for the same
+ * reason -- see ServiceSummary.tsx's header for why this is plain text and
+ * not the mockup's link.
+ */
+.edge {
   margin: 0;
-  font-size: var(--text-pop-note);
-  line-height: var(--leading-pop-note);
   overflow-wrap: anywhere;
 }
 
 /*
- * The label is a block above its list rather than an inline prefix. With
- * fourteen dependents on one line -- which `fly-api` has -- an inline label
- * is lost at the start of a wrapped paragraph and the reader cannot tell
- * where "depends on" ends and "depended on by" begins.
- */
-.depLabel {
-  display: block;
-  font-size: var(--text-pop-label);
-  letter-spacing: var(--track-pop-label);
-  text-transform: uppercase;
-  color: var(--color-text-faint);
-}
-
-/*
- * Layer 3. Sunken rather than bordered, because it is a different *kind* of
- * content from the facts above it: everything above is what the manifest
- * says, and this is an explanation of something the manifest deliberately
- * does not hold. Padding is --pop-padding, the same call as every section
- * above -- this box no longer earns a tighter top inset than the others
- * (the old --space-3/--space-4/--space-4 asymmetry), because --pop-padding
- * already carries its own small top/bottom asymmetry (16px / 17px) and a
- * second, independent one on top of it had no source but a guess.
+ * Layer 3. Sunken, and bled to the panel's own side edges rather than sitting
+ * inset with the sections above it -- the mockup's own words: "the sunken
+ * block's own top rule stands in for a divider (its 20px margin-top is the
+ * divider's own gap), so two rules never sit 20px apart; it bleeds to the
+ * panel's side edges only -- the panel stretches to the row, so there is no
+ * foot for it to sit on." `--page-facts-inset`, negated, is the panel's own
+ * horizontal padding (ServicePage.module.css's `.panel`, `--rail-padding`'s
+ * second and third values) named so this `calc()` can reach it -- tokens.css
+ * records why a shorthand cannot supply it directly. `--pop-padding` re-insets
+ * the block's own content once the bleed has taken it past the panel's
+ * padding -- the mockup's own words are "the popover's 16px 18px 17px inset,
+ * bled to the panel's side edges".
  */
 .overlay {
+  margin: var(--rail-divider-gap) calc(-1 * var(--page-facts-inset)) 0;
   padding: var(--pop-padding);
   border-top: 1px solid var(--color-line);
   background: var(--color-surface-sunken);
@@ -131,15 +160,15 @@
 
 /*
  * The heading sits directly on "Not connected" the way a `dt` sits on its
- * `dd` in the popover -- the one place in this file where a label meets its
- * own value rather than the next fact along, so this is --pop-fact-gap
- * (2px), not --pop-facts-row-gap.
+ * `dd` in the Facts grid above -- the one place in this section a label meets
+ * its own value rather than the next section along, so this is
+ * `--pop-fact-gap` (2px), not the panel's usual `--rail-heading-gap` (10px).
  */
 .overlayHeading {
   margin: 0 0 var(--pop-fact-gap);
-  font-size: var(--text-pop-label);
+  font-size: var(--text-rail-heading);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--track-pop-label);
+  letter-spacing: var(--track-rail-heading);
   text-transform: uppercase;
   color: var(--color-text-faint);
 }
@@ -153,6 +182,7 @@
   margin: 0 0 var(--pop-facts-row-gap);
   font-size: var(--text-pop-fact);
   font-weight: var(--weight-bold);
+  color: var(--color-text);
 }
 
 .overlayBody {

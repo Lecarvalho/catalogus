@@ -1,0 +1,937 @@
+<!--
+  Catalogus viewer — candidate E, continued: THE BRAND PAGE
+  Three artboards in one file, drawn at 1600px in candidate-e-homescreen.html's own vocabulary:
+  (1) the wall with one tile standing for five Fly.io entries and its popover open, (2) the brand
+  page that tile opens, (3) the entry page for host-api, reworked to breathe. The CSS up to the
+  "additions" block is candidate E's, verbatim; the shell (topbar, rail, board, footer) is the
+  approved one and is not touched. Fixture: examples/layout-stress.catalogus.yaml, plus two
+  Fly.io entries the fixture does not have (host-cron, host-preview) because the owner's finding
+  was drawn against Fly.io x5 on Clapline and three would not show the problem.
+
+  What this mockup decides (owner decisions 2026-09-04, docs/PLAN.md, findings 4 and 5):
+
+  1. One tile per brand PER BAND. Auth0, Clerk, Cloudflare Workers, Fly.io, NGINX: five tiles for
+     nine entries. Tiles keep candidate E's own order rule for groups -- sorted on the catalog
+     slug (bands.ts collapseByService), so Fly.io sits fourth, after cloudflare-workers.
+
+  2. The multi-entry tile's second line is the entry count ("5 entries"), in the id line's exact
+     size and colour but NOT in mono. Mono in this world marks a literal the reader may type into
+     a `catalogus set` command (ServicePopover.module.css, `.slug`); a count is not one. A
+     single-entry tile is unchanged.
+
+  3. The tile carries the group's worst status (bands.ts groupStatus) through TWO of candidate
+     E's three signals: the corner badge and the red status word. The mark stays in colour.
+     Owner's decision, 2026-09-04, on review of the first draft, which desaturated the whole
+     mark and dimmed four live Fly apps because one was phasing out; a single-entry tile keeps
+     all three signals, unchanged. The status word names WHICH entry, in the mockup's own mono
+     `arrow-target` style, but without the arrow -- "host-preview phasing out" rather than
+     "Phasing out -> host-preview", because the arrow form already means "replaced by <target>"
+     on every other tile and must not be overloaded to mean "the entry that is".
+
+  4. The popover keeps its header (mark, name, "5 entries" in the id slot) and puts the entry list
+     IN PLACE OF the six-fact grid, not above it. Four of the six facts (Role, Version, Status, the
+     two edge counts) are per-entry and have no single value for a group; Kind is the one that
+     could be stated once and it is on the brand page. A grid of "varies" cells would be a fact
+     grid with nothing in it. Each row is a link to its entry page and carries what the grid
+     would have carried for that entry: id (mono), role beneath it, and the status word on the
+     right, red, ONLY when the entry departs from active -- the same rule as the tile, so a
+     reader scanning five rows sees the one that matters. The per-entry note and the hint line
+     are dropped from the group popover: a note belongs to one entry, and the mockup never had a
+     hint line. A single-entry popover is unchanged.
+
+  5. The brand page is the entry page's own shape with the document column replaced by the entry
+     list: breadcrumb, header (bare mark, name, catalog slug), the brand facts once as a fact grid
+     in the header's own identity block (Kind, Band, Entries), then the entries as rows -- id,
+     role, status, version -- each row a link to its entry page. In a LABELLED status column the
+     word is set in ink, exactly as candidate E's own popover fact grid sets "Phasing out ->
+     auth-users" in ink: red is licensed for the status word, but the fact grid already chose
+     not to spend it inside a labelled fact, and a column with a header is a labelled fact.
+
+  6. The entry page breathes by hierarchy and rhythm, with candidate E's own numbers: 40px between
+     sections (the band's own top padding), the document heading at the band heading's 19px
+     rather than a 10px caps label, body at the board's 15px/1.55, and the two edge lists set
+     one entry per line (mono id, name after it) instead of eighteen comma-joined labels in a
+     paragraph. The service summary is a SIDE PANEL DOCKED RIGHT (owner, 2026-09-04, in two
+     reviews: the first draft drew it as an unboxed aside inside the page's measure, the
+     second as a boxed stack in the same place; the owner's words on the second were "the
+     visual was not necessarily wrong, I was asking to place it dock on the right as a side
+     panel"). So: the left rail's mirror, a sibling of the board on the shell row, full height
+     of the row, the rail's treatment with its hairline on the left edge, the summary's sections
+     stacked top to bottom under rail-style headings and dividers, the facts inside set in the
+     popover's own grid, the Layer 3 block sunken. 300px wide, not the rail's 240 -- measured
+     against the fixture's longest edge line and the Layer 3 prose; the additions block has
+     the numbers. The document column takes the board between the two panels, with the same
+     air. This makes the entry page THE ONE SURFACE WITH TWO DOCKED PANELS: the board and the
+     brand page have the rail alone.
+
+     Below the shell's 900px breakpoint, where the rail leaves, the panel should not leave with
+     it -- the rail is navigation the board can do without, the panel is the entry's own facts.
+     It should stack under the document: the shell row wraps, the panel becomes full-width
+     with its hairline on top instead of on the left, keeping its inset and section order.
+     Drawn here at 1600px only; that behaviour is stated so it is not left to be guessed.
+     The breadcrumb gains the brand as a second crumb ("Layout Stress / Fly.io") when the entry
+     belongs to a multi-entry brand, since that page now exists to go back to. Same content as
+     ServicePage + ServiceSummary, no new facts: Role, Added, the note, the edges by name, the
+     Layer 3 block. Kind and Version keep ServiceSummary's own omit-when-default behaviour.
+
+  What it does not decide:
+  - The graph. Per entry, owner 2026-09-04. Not drawn.
+  - (Settled, owner 2026-09-04.) The band count reads 9 (entries), not 5 (tiles), so it agrees
+    with the rail's counts and the footer's "37 services", all of which count entries; the tile's
+    "5 entries" line is what reconciles the two. Drawn that way in the first draft as a side
+    taken; the owner confirmed it on review.
+  - Whether a group whose entries differ in `kind` shows Kind once or per row. The schema allows
+    it; this fixture has no such group; the brand page draws the once form the owner asked for
+    and the row form would be the per-entry columns it already has.
+  - Which of the five is phasing out, and why. The brief said one is; host-preview was picked
+    because a preview host is the one a reader would believe. It carries no `replaced_by`, since
+    inventing a target is the defect class CLAUDE.md names, and a status with no target is a
+    shape the mockup already draws (legacy-ledger).
+
+  Numbers introduced that candidate E did not already have: none in the design. The artboard
+  scaffolding at the top of the stylesheet (the 1600px frame, its label, the gap between frames)
+  is this file's own and is not part of any page.
+
+  Mockup-only: every href is "#". Nothing here is script; the open popover is forced with a class
+  the way candidate E forces db-primary's.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catalogus &middot; Brand page</title>
+<style>
+  :root {
+    --color-bg: #f4f1ea;
+    --color-surface: #fbf9f4;
+    --color-surface-sunken: #ece8de;
+    --color-header-fill: #e9e4d8;
+    --color-text: #24211c;
+    --color-text-muted: #5e5a50;
+    --color-text-faint: #7e7a6e;
+    --color-signal: #d40010;
+    --color-hairline: #d5cebe;
+
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; overflow-x: hidden; }
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  h1, h2, h3, p, dl, dd { margin: 0; }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: default; }
+
+  /* ---------- app shell (unchanged from candidate D, per Addendum 2) ---------- */
+  .app { min-height: 100vh; display: flex; flex-direction: column; }
+
+  .topbar {
+    height: 60px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    background: var(--color-header-fill);
+    border-bottom: 1px solid var(--color-hairline);
+    position: relative;
+    z-index: 30;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .wordmark { font-size: 16.5px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
+  .topbar-sep { color: var(--color-text-faint); font-size: 15px; }
+  .topbar-project { font-size: 14.5px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .topbar-right { display: flex; align-items: center; gap: 4px; }
+  .tb-btn {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 12px;
+    font-size: 13.5px;
+    color: var(--color-text-muted);
+    border: 1px solid transparent;
+  }
+  .tb-btn:hover { color: var(--color-text); }
+  .tb-btn.is-active { color: var(--color-text); background: var(--color-surface); border-color: var(--color-hairline); }
+  .tb-btn svg { width: 16px; height: 16px; }
+  .tb-icon { display: block; }
+
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--color-text);
+    color: var(--color-surface);
+    font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    flex: 0 0 auto;
+  }
+  .tb-profile { position: relative; }
+
+  /* ---------- layout: rail + board ---------- */
+  .shell { display: flex; flex: 1 1 auto; align-items: stretch; min-height: 0; }
+
+  .rail {
+    width: 240px;
+    flex: 0 0 240px;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-hairline);
+    padding: 26px 20px 20px;
+  }
+  .rail-project-name { font-size: 17px; font-weight: 700; }
+  .rail-visibility {
+    display: inline-block; margin-top: 8px;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-hairline);
+    padding: 2px 7px;
+  }
+  .rail-sentence { margin-top: 12px; font-size: 12.5px; color: var(--color-text-muted); line-height: 1.6; }
+  .rail-manifest { margin-top: 10px; font-size: 11px; color: var(--color-text-faint); font-family: var(--font-mono); word-break: break-all; }
+
+  .rail-divider { height: 1px; background: var(--color-hairline); margin: 20px 0; }
+  .rail-heading { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-faint); margin-bottom: 10px; }
+  .rail-band {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 8px; margin: 0 -8px;
+    font-size: 13.5px; color: var(--color-text); text-decoration: none;
+  }
+  .rail-band:hover { background: var(--color-surface-sunken); }
+  .rail-count { color: var(--color-text-faint); font-size: 12px; }
+
+  .board { flex: 1 1 auto; padding: 0 40px 64px; min-width: 0; }
+
+  .board-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 26px 0 18px;
+    border-bottom: 1px solid var(--color-hairline);
+    margin-bottom: 8px;
+    position: sticky; top: 0; background: var(--color-bg); z-index: 5;
+  }
+  .view-rail { display: flex; gap: 26px; }
+  .view-tab { font-size: 14px; padding: 4px 0 12px; color: var(--color-text-faint); border-bottom: 2px solid transparent; }
+  .view-tab.is-active { color: var(--color-text); font-weight: 600; border-bottom-color: var(--color-text); }
+
+  /* ---------- bands ---------- */
+  .band { padding: 40px 0 8px; border-bottom: 1px solid var(--color-hairline); }
+  .band:last-of-type { border-bottom: none; }
+  .band-head { display: flex; align-items: baseline; gap: 10px; }
+  .band-head h2 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+  .band-count { font-size: 13px; color: var(--color-text-faint); font-weight: 500; }
+  .band-note { margin-top: 6px; font-size: 13px; color: var(--color-text-muted); font-style: italic; max-width: 62ch; }
+
+  /* ---------- the home screen: bare icons on the ground, no card ---------- */
+  .icon-grid {
+    margin-top: 30px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    row-gap: 44px;
+    column-gap: 20px;
+  }
+
+  .app-icon {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* the ONE declared radius: a phone-like squircle behind the brand mark. Nothing else on the
+     page takes this radius. */
+  .icon-mark {
+    position: relative;
+    width: 76px;
+    height: 76px;
+    border-radius: 20px;
+    background: var(--color-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+  .icon-mark svg { display: block; width: 46px; height: 46px; }
+  .app-icon:focus-visible .icon-mark,
+  .app-icon.is-open .icon-mark {
+    outline: 2px solid var(--color-text-faint);
+    outline-offset: 3px;
+  }
+
+  .icon-mark--fallback {
+    background: var(--color-surface-sunken);
+    border: 1.5px dashed var(--color-hairline);
+  }
+  .mono-glyph { font-size: 16px; font-weight: 700; letter-spacing: 0.02em; color: var(--color-text-faint); font-family: var(--font-mono); }
+
+  /* status: the icon itself desaturates and dims — a lightness/saturation change, not a hue */
+  .app-icon--phasing_out .icon-mark svg,
+  .app-icon--deprecated .icon-mark svg,
+  .app-icon--removed .icon-mark svg { filter: grayscale(0.9) opacity(0.5); }
+  .app-icon--phasing_out .icon-mark:not(.icon-mark--fallback),
+  .app-icon--deprecated .icon-mark:not(.icon-mark--fallback),
+  .app-icon--removed .icon-mark:not(.icon-mark--fallback) { background: var(--color-surface-sunken); }
+
+  /* status: a corner badge on the icon, glyph-shaped so it reads before any word does and
+     survives greyscale on shape alone */
+  .status-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 23px;
+    height: 23px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 1.5px solid var(--color-signal);
+    color: var(--color-signal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .status-badge svg { width: 12px; height: 12px; }
+
+  .icon-label { margin-top: 13px; }
+  .icon-name { font-size: 13.5px; font-weight: 600; color: var(--color-text); line-height: 1.3; }
+  .icon-id { margin-top: 3px; font-size: 11px; color: var(--color-text-faint); font-family: var(--font-mono); }
+
+  /* status: spelled out in words under the label — plain text, so it needs no colour at all to
+     be read; red here decorates the one thing red is reserved for, it does not carry the meaning */
+  .icon-status {
+    margin-top: 5px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--color-signal);
+    line-height: 1.35;
+  }
+  .icon-status .arrow-target { font-family: var(--font-mono); font-weight: 500; }
+
+  /* ---------- popover ---------- */
+  .popover {
+    position: absolute;
+    top: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 268px;
+    max-width: calc(100vw - 24px);
+    background: var(--color-surface);
+    border: 1px solid var(--color-hairline);
+    border-radius: 6px;
+    box-shadow: 0 12px 30px -8px rgba(36,33,28,0.30), 0 2px 8px -2px rgba(36,33,28,0.14);
+    padding: 16px 18px 17px;
+    text-align: left;
+    z-index: 50;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    cursor: default;
+  }
+  .app-icon:hover .popover,
+  .app-icon:focus .popover { visibility: visible; opacity: 1; pointer-events: auto; }
+  .popover--forced { visibility: visible; opacity: 1; pointer-events: auto; }
+
+  .pop-head { display: flex; align-items: center; gap: 10px; }
+  .pop-mark { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .pop-mark svg { display: block; max-width: 100%; max-height: 100%; }
+  .pop-mark--fallback { background: var(--color-surface-sunken); border: 1px dashed var(--color-hairline); border-radius: 6px; }
+  .mono-glyph--pop { font-size: 9.5px; }
+  .pop-head-text { min-width: 0; }
+  .pop-name { font-size: 14px; font-weight: 700; }
+  .pop-id { font-size: 11px; color: var(--color-text-faint); font-family: var(--font-mono); margin-top: 1px; }
+
+  .pop-facts { margin-top: 13px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px; }
+  .pop-facts > div { display: flex; flex-direction: column; gap: 2px; }
+  .pop-facts dt { font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-text-faint); }
+  .pop-facts dd { font-size: 13px; color: var(--color-text); margin: 0; }
+  .pop-facts .dim { color: var(--color-text-faint); font-weight: 400; }
+  .mono-inline { font-family: var(--font-mono); font-size: 12px; }
+
+  .pop-note { margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--color-hairline); font-size: 12.5px; color: var(--color-text-muted); font-style: italic; line-height: 1.5; }
+
+  /* ---------- footer ---------- */
+  .footer {
+    flex: 0 0 auto;
+    border-top: 1px solid var(--color-hairline);
+    background: var(--color-header-fill);
+    padding: 16px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .footer-group { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--color-text-muted); }
+  .footer-group b { color: var(--color-text); font-weight: 600; }
+  .footer-manifest { font-family: var(--font-mono); font-size: 11.5px; color: var(--color-text-faint); }
+  .footer-dot { color: var(--color-hairline); }
+  .footer-schema { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-faint); }
+
+  /* =====================================================================================
+     Additions for this mockup. Every value below is one candidate E already states; the
+     rule it was taken from is named beside it. The artboard scaffolding at the end is the
+     one exception and is not part of any page.
+     ===================================================================================== */
+
+  /* --- (1) the multi-entry tile ---
+     The count line takes .icon-id's slot, size, gap and colour, minus the mono face: a count is
+     not a literal the reader will type. */
+  .icon-count { margin-top: 3px; font-size: 11px; color: var(--color-text-faint); }
+
+  /* --- (1) the group popover's entry list, in place of .pop-facts ---
+     Block gap 13px = .pop-facts margin-top. Row padding/negative margin = .rail-band's, the
+     world's existing hoverable list row; row gap 10px = .pop-head's gap. Id = .mono-inline
+     (12px mono, ink); role = .pop-id's 11px faint, 2px under the id (.pop-facts > div gap);
+     status word = .icon-status, red because it IS the status word, shown only off the norm. */
+  .pop-count { font-size: 11px; color: var(--color-text-faint); margin-top: 1px; }
+  .pop-entries { margin-top: 13px; display: flex; flex-direction: column; }
+  .pop-entry {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 7px 8px; margin: 0 -8px;
+    text-decoration: none; color: inherit;
+  }
+  .pop-entry:hover { background: var(--color-surface-sunken); }
+  .pop-entry-id { display: block; font-family: var(--font-mono); font-size: 12px; color: var(--color-text); }
+  .pop-entry-role { display: block; margin-top: 2px; font-size: 11px; color: var(--color-text-faint); }
+  .pop-entry-status { flex: 0 0 auto; font-size: 10.5px; font-weight: 600; color: var(--color-signal); line-height: 1.35; }
+
+  /* --- (2) and (3) the page: brand and entry share one frame ---
+     Vertical rhythm is the band's own 40px top padding; the breadcrumb sits at the board-head's
+     26px; the crumb is the popover label style (10px caps, 0.03em); the mark is the tile's bare
+     46px mark with no squircle (the radius belongs to the grid tile alone); the title is the
+     built page's 30px (tokens.css --text-page-title, the one number this world already holds
+     for a page title); the header gap 20px = the built page's --page-header-gap; the columns
+     gap 48px = the built page's --page-columns-gap; the document measure 68ch and the facts
+     column 300px are the built page's own. */
+  .page { padding-top: 26px; }
+  .crumbs { display: flex; align-items: baseline; gap: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--color-text-muted); }
+  .crumbs a { text-decoration: none; }
+  .crumbs a:hover { color: var(--color-text); }
+  .crumb-sep { color: var(--color-text-faint); font-weight: 400; }
+
+  .page-head { display: flex; align-items: flex-start; gap: 20px; margin-top: 40px; padding-bottom: 40px; border-bottom: 1px solid var(--color-hairline); }
+  .page-mark { width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .page-mark svg { display: block; width: 46px; height: 46px; }
+  .page-identity { flex: 1 1 auto; min-width: 0; }
+  .page-title { font-size: 30px; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; }
+  .page-slug { margin-top: 3px; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-faint); }
+
+  /* the brand facts, once, in the header: .pop-facts' own dt/dd type and gaps, laid out as
+     columns sized to their content rather than 1fr 1fr, because the header is wide and three
+     facts should not spread across 1200px. 30px above = .icon-grid's margin-top, the distance
+     this world already puts between a heading and the things under it. */
+  .brand-facts { margin-top: 30px; display: flex; gap: 9px 44px; flex-wrap: wrap; }
+  .brand-facts > div { display: flex; flex-direction: column; gap: 2px; }
+  .brand-facts dt { font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-text-faint); }
+  .brand-facts dd { font-size: 13px; color: var(--color-text); }
+
+  .page-columns { display: flex; align-items: flex-start; gap: 48px; margin-top: 40px; }
+  .page-doc { flex: 1 1 auto; min-width: 0; max-width: 68ch; }
+  .page-h2 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+  .doc-empty { margin-top: 30px; font-size: 15px; font-weight: 700; line-height: 1.55; }
+  .doc-body { margin-top: 13px; font-size: 15px; line-height: 1.55; color: var(--color-text-muted); }
+
+  /* --- (2) the entry rows ---
+     A row is the settings panel's own row (10px 0 padding, hairline above), with .rail-band's
+     8px hover inset so the sunken hover reads as a row and not a stripe. Four equal columns;
+     the header row is .pop-facts' dt. The status column is a labelled fact, so it is ink,
+     exactly as .pop-facts dd sets "Phasing out -> auth-users". */
+  .entry-rows { margin-top: 30px; display: flex; flex-direction: column; }
+  .entry-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; align-items: baseline;
+    padding: 10px 8px; margin: 0 -8px;
+    border-top: 1px solid var(--color-hairline);
+    text-decoration: none; color: inherit;
+    font-size: 13px;
+  }
+  .entry-row:hover { background: var(--color-surface-sunken); }
+  .entry-row--head { border-top: none; padding-top: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-text-faint); }
+  .entry-row--head:hover { background: none; }
+  .entry-row .mono-inline { color: var(--color-text); }
+  .entry-row .dim { color: var(--color-text-faint); font-weight: 400; }
+
+  /* --- (3) the service summary as a side panel, docked right (owner, 2026-09-04, twice) ---
+     The left rail's mirror: a flex item of .shell after .board, so it stretches to the row's
+     full height under the shell's own align-items: stretch, exactly as the rail does. Its
+     treatment is the rail's -- surface fill, a 1px hairline on its LEFT edge (the rail's is on
+     its right), no radius (structure, not a transient), the rail's 26px 20px 20px inset,
+     sections divided by .rail-divider (1px, 20px above and below) and headed by .rail-heading
+     (11px bold caps, 0.04em, 10px under). Inside each section the popover's own fact
+     vocabulary: .pop-facts verbatim for the fact grid (label over value, 9px/14px gaps, 2px
+     label-to-value), the note at .pop-note's 12.5px/1.5 italic muted, the edge lists one per
+     line at the same size, mono id then name. The Layer 3 block is the one sunken thing in
+     the stack, exactly as ServiceSummary sinks it today, with the popover's 16px 18px 17px
+     inset, bled to the panel's side edges.
+
+     Width: 300px, the built page's own facts-column token, not the rail's 240px. Measured
+     against this fixture rather than preferred: at 240px the inset leaves 200px, and the
+     longest edge line ("blob-store" in 12px mono, a 10px gap, "Google Cloud Storage" at
+     12.5px) is about 207px, so it wraps; the Layer 3 prose at 200px runs to nine lines. At
+     300px the inset leaves 260px, every edge line sits on one line, and the prose is the six
+     lines it is in the built page. The rail's width is sized to band names and counts; this
+     panel is sized to facts, and 300px is the number this world already holds for exactly
+     that content. */
+  .page-facts { width: 300px; flex: 0 0 300px; background: var(--color-surface); border-left: 1px solid var(--color-hairline); padding: 26px 20px 20px; }
+  .facts-divider { height: 1px; background: var(--color-hairline); margin: 20px 0; }
+  .facts-heading { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-faint); margin-bottom: 10px; }
+  .page-facts .pop-facts { margin-top: 0; }
+  .facts-note { font-size: 12.5px; line-height: 1.5; font-style: italic; color: var(--color-text-muted); }
+  .facts-list { display: flex; flex-direction: column; gap: 2px; }
+  .facts-list a { display: flex; gap: 10px; align-items: baseline; text-decoration: none; font-size: 12.5px; line-height: 1.5; }
+  .facts-list a:hover { color: var(--color-text); }
+  .facts-list .mono-inline { color: var(--color-text); }
+  .facts-list .dep-name { color: var(--color-text-muted); }
+  /* the sunken block's own top rule stands in for a divider (its 20px margin-top is the divider's own gap), so two rules never sit 20px apart;
+     it bleeds to the panel's side edges only -- the panel stretches to the row, so there is no foot for it to sit on */
+  .facts-overlay { margin: 20px -20px 0; padding: 16px 18px 17px; border-top: 1px solid var(--color-hairline); background: var(--color-surface-sunken); }
+  .facts-overlay .facts-heading { margin-bottom: 2px; }
+  .overlay-state { font-size: 13px; font-weight: 700; }
+  .overlay-body { margin-top: 9px; font-size: 12.5px; line-height: 1.5; color: var(--color-text-muted); }
+  .overlay-cmd { padding: 1px 4px; border: 1px solid var(--color-hairline); background: var(--color-surface); font-family: var(--font-mono); font-size: 11px; color: var(--color-text); }
+
+  /* --- artboard scaffolding: not part of any page ---
+     A 1600px frame per artboard, a label above it, and the body's overflow-x let go so the frames
+     can be scrolled to in a narrower window. None of these numbers belongs to the design. */
+  body { overflow-x: auto; }
+  .artboards { padding: 48px 0 96px; }
+  .artboard { width: 1600px; margin: 0 auto 96px; }
+  .artboard-label { width: 1600px; margin: 0 auto 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-faint); }
+  .artboard-label b { color: var(--color-text); }
+  .artboard .app { border: 1px solid var(--color-hairline); }
+</style>
+</head>
+<body>
+
+<div class="artboards">
+
+<!-- ============================================================================================
+     ARTBOARD 1 — the wall, one band, Fly.io standing for five entries, its popover open
+     ============================================================================================ -->
+<div class="artboard-label"><b>Artboard 1</b> &middot; The wall, &ldquo;Runs in production&rdquo;: nine entries, five tiles, the Fly.io tile&rsquo;s popover open</div>
+<div class="artboard">
+<div class="app">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="wordmark">Catalogus</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-project">Layout Stress</span>
+    </div>
+    <div class="topbar-right">
+      <div style="position:relative;">
+        <button class="tb-btn" type="button">
+          <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.7-1.2c.5.9.2 1.7-.6 2.4-.8.6-1.6 1-1.6 2.3" stroke-linecap="round"/><circle cx="12" cy="16.6" r="0.9" fill="currentColor" stroke="none"/></svg>
+          Help
+        </button>
+      </div>
+      <div style="position:relative;">
+        <button class="tb-btn" type="button">
+          <svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V19a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          Settings
+        </button>
+      </div>
+      <div class="tb-profile">
+        <button class="tb-btn" type="button"><span class="avatar">LC</span></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="rail">
+      <div class="rail-project-name">Layout Stress</div>
+      <span class="rail-visibility">Private</span>
+      <p class="rail-sentence">Deliberately overgrown: an API hub with eighteen outgoing dependencies, two lifecycle migrations in flight, and one entry nothing depends on.</p>
+      <div class="rail-manifest">examples/layout-stress.catalogus.yaml</div>
+      <div class="rail-divider"></div>
+      <div class="rail-heading">Bands</div>
+      <a class="rail-band" href="#"><span>Runs in production</span><span class="rail-count">9</span></a>
+      <a class="rail-band" href="#"><span>Holds data</span><span class="rail-count">7</span></a>
+      <a class="rail-band" href="#"><span>Calls out to</span><span class="rail-count">6</span></a>
+      <a class="rail-band" href="#"><span>Runs on</span><span class="rail-count">4</span></a>
+      <a class="rail-band" href="#"><span>Watched by</span><span class="rail-count">4</span></a>
+      <a class="rail-band" href="#"><span>Built and shipped by</span><span class="rail-count">5</span></a>
+      <a class="rail-band" href="#"><span>Registered at</span><span class="rail-count">1</span></a>
+      <a class="rail-band" href="#"><span>Unplaced</span><span class="rail-count">1</span></a>
+    </nav>
+
+    <main class="board">
+      <div class="board-head">
+        <div class="view-rail">
+          <span class="view-tab is-active">List</span>
+          <span class="view-tab">Graph</span>
+          <span class="view-tab">Migrations</span>
+        </div>
+      </div>
+
+      <section class="band" id="band-production">
+        <div class="band-head">
+          <h2>Runs in production</h2>
+          <!-- entries, not tiles (owner, 2026-09-04): the rail and the footer count entries, and
+               one page should count one thing. The tile's own "5 entries" line reconciles the
+               nine with the five. -->
+          <span class="band-count">9</span>
+        </div>
+        <div class="icon-grid">
+
+          <!-- single-entry tiles: unchanged from candidate E -->
+          <div class="app-icon app-icon--phasing_out" tabindex="0">
+            <div class="icon-mark"><svg viewBox="0 0 24 24" width="46" height="46" aria-hidden="true"><path fill="#EB5424" d="M21.98 7.448L19.62 0H4.347L2.02 7.448c-1.352 4.312.03 9.206 3.815 12.015L12.007 24l6.157-4.552c3.755-2.81 5.182-7.688 3.815-12.015l-6.16 4.58 2.343 7.45-6.157-4.597-6.158 4.58 2.358-7.433-6.188-4.55 7.63-.045L12.008 0l2.356 7.404 7.615.044z"/></svg></div>
+            <span class="status-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2.5h10M7 21.5h10M8 2.5c0 4.2 3.1 5.9 4 6.4.9-.5 4-2.2 4-6.4M8 21.5c0-4.2 3.1-5.9 4-6.4.9.5 4 2.2 4 6.4"/></svg></span>
+            <div class="icon-label">
+              <div class="icon-name">Auth0</div>
+              <div class="icon-id">auth-legacy</div>
+              <div class="icon-status">Phasing out <span class="arrow-target">&rarr; auth-users</span></div>
+            </div>
+          </div>
+
+          <div class="app-icon" tabindex="0">
+            <div class="icon-mark"><svg viewBox="0 0 24 24" width="46" height="46" aria-hidden="true"><path fill="#6C47FF" d="m21.47 20.829-2.881-2.881a.572.572 0 0 0-.7-.084 6.854 6.854 0 0 1-7.081 0 .576.576 0 0 0-.7.084l-2.881 2.881a.576.576 0 0 0-.103.69.57.57 0 0 0 .166.186 12 12 0 0 0 14.113 0 .58.58 0 0 0 .239-.423.576.576 0 0 0-.172-.453Zm.002-17.668-2.88 2.88a.569.569 0 0 1-.701.084A6.857 6.857 0 0 0 8.724 8.08a6.862 6.862 0 0 0-1.222 3.692 6.86 6.86 0 0 0 .978 3.764.573.573 0 0 1-.083.699l-2.881 2.88a.567.567 0 0 1-.864-.063A11.993 11.993 0 0 1 6.771 2.7a11.99 11.99 0 0 1 14.637-.405.566.566 0 0 1 .232.418.57.57 0 0 1-.168.448Zm-7.118 12.261a3.427 3.427 0 1 0 0-6.854 3.427 3.427 0 0 0 0 6.854Z"/></svg></div>
+            <div class="icon-label">
+              <div class="icon-name">Clerk</div>
+              <div class="icon-id">auth-users</div>
+            </div>
+          </div>
+
+          <div class="app-icon" tabindex="0">
+            <div class="icon-mark"><svg viewBox="0 0 24 24" width="46" height="46" aria-hidden="true"><path fill="#F38020" d="m8.213.063 8.879 12.136-8.67 11.739h2.476l8.665-11.735-8.89-12.14Zm4.728 0 9.02 11.992-9.018 11.883h2.496L24 12.656v-1.199L15.434.063ZM7.178 2.02.01 11.398l-.01 1.2 7.203 9.644 1.238-1.676-6.396-8.556 6.361-8.313Z"/></svg></div>
+            <div class="icon-label">
+              <div class="icon-name">Cloudflare Workers</div>
+              <div class="icon-id">host-edge</div>
+            </div>
+          </div>
+
+          <!-- THE MULTI-ENTRY TILE. Five Fly.io entries in this band share it. Status is the
+               group's worst (phasing_out, from host-preview) through the badge and the word
+               ONLY -- the mark stays in colour (owner, 2026-09-04): no app-icon--phasing_out
+               modifier here, so the desaturation rule never applies. The second line is the
+               count; the word names the entry that departs, without the arrow, because "->"
+               already means "replaced by" on every other tile. -->
+          <div class="app-icon is-open" tabindex="0">
+            <div class="icon-mark"><svg viewBox="0 0 24 24" width="46" height="46" aria-hidden="true"><path fill="#24175B" d="M11.987 0c-2.45-.01-5.002.925-6.541 2.897-1.17 1.502-1.664 3.474-1.49 5.356.29 2.112 1.476 3.96 2.676 5.672a41.5 41.5 0 0 0 4.216 4.831c-1.063.832-1.943 2.286-1.357 3.644.821 2.32 4.665 2.05 5.122-.372.39-1.288-.694-2.533-1.428-3.309 2.388-2.431 4.706-5.036 6.17-8.145.595-1.32.902-2.802.614-4.24-.28-2.341-1.823-4.473-3.967-5.46C14.76.266 13.364.016 11.987 0m-.236 1.577v15.534C9.881 13.483 7.724 9.266 8.73 5.069c.35-1.539 1.253-3.309 3.02-3.492m1.996.04c1.534.357 3.031 1.096 3.906 2.48 1.3 1.93 1.318 4.55.1 6.521-1.268 2.395-3.06 4.463-4.916 6.415 1.472-2.974 3.074-6.106 3.182-9.5-.043-2.08-.438-4.612-2.272-5.916M11.97 20.103c.848.342 1.597 1.983.153 2.173-.664.15-1.367-.599-.995-1.222.213-.355.488-.73.842-.95"/></svg></div>
+            <span class="status-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2.5h10M7 21.5h10M8 2.5c0 4.2 3.1 5.9 4 6.4.9-.5 4-2.2 4-6.4M8 21.5c0-4.2 3.1-5.9 4-6.4.9.5 4 2.2 4 6.4"/></svg></span>
+            <div class="icon-label">
+              <div class="icon-name">Fly.io</div>
+              <div class="icon-count">5 entries</div>
+              <div class="icon-status"><span class="arrow-target">host-preview</span> phasing out</div>
+            </div>
+
+            <!-- THE GROUP POPOVER. Header kept; the entry list stands where the six-fact grid
+                 stood -- see the file comment, decision 4, for why "in place of" and not
+                 "above". Rows are links to entry pages; the status word appears only off the
+                 norm, red, as on the tile. No note (per entry), no hint (the mockup has none). -->
+            <div class="popover popover--forced" role="tooltip">
+              <div class="pop-head">
+                <span class="pop-mark"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#24175B" d="M11.987 0c-2.45-.01-5.002.925-6.541 2.897-1.17 1.502-1.664 3.474-1.49 5.356.29 2.112 1.476 3.96 2.676 5.672a41.5 41.5 0 0 0 4.216 4.831c-1.063.832-1.943 2.286-1.357 3.644.821 2.32 4.665 2.05 5.122-.372.39-1.288-.694-2.533-1.428-3.309 2.388-2.431 4.706-5.036 6.17-8.145.595-1.32.902-2.802.614-4.24-.28-2.341-1.823-4.473-3.967-5.46C14.76.266 13.364.016 11.987 0m-.236 1.577v15.534C9.881 13.483 7.724 9.266 8.73 5.069c.35-1.539 1.253-3.309 3.02-3.492m1.996.04c1.534.357 3.031 1.096 3.906 2.48 1.3 1.93 1.318 4.55.1 6.521-1.268 2.395-3.06 4.463-4.916 6.415 1.472-2.974 3.074-6.106 3.182-9.5-.043-2.08-.438-4.612-2.272-5.916M11.97 20.103c.848.342 1.597 1.983.153 2.173-.664.15-1.367-.599-.995-1.222.213-.355.488-.73.842-.95"/></svg></span>
+                <div class="pop-head-text">
+                  <div class="pop-name">Fly.io</div>
+                  <div class="pop-count">5 entries</div>
+                </div>
+              </div>
+              <div class="pop-entries">
+                <a class="pop-entry" href="#"><span><span class="pop-entry-id">host-api</span><span class="pop-entry-role">hosting-api</span></span></a>
+                <a class="pop-entry" href="#"><span><span class="pop-entry-id">host-cron</span><span class="pop-entry-role">hosting-cron</span></span></a>
+                <a class="pop-entry" href="#"><span><span class="pop-entry-id">host-preview</span><span class="pop-entry-role">hosting-preview</span></span><span class="pop-entry-status">Phasing out</span></a>
+                <a class="pop-entry" href="#"><span><span class="pop-entry-id">host-web</span><span class="pop-entry-role">hosting-web</span></span></a>
+                <a class="pop-entry" href="#"><span><span class="pop-entry-id">host-worker</span><span class="pop-entry-role">hosting-worker</span></span></a>
+              </div>
+            </div>
+          </div>
+
+          <div class="app-icon" tabindex="0">
+            <div class="icon-mark"><svg viewBox="0 0 24 24" width="46" height="46" aria-hidden="true"><path fill="#009639" d="M12 0L1.605 6v12L12 24l10.395-6V6L12 0zm6 16.59c0 .705-.646 1.29-1.529 1.29-.631 0-1.351-.255-1.801-.81l-6-7.141v6.66c0 .721-.57 1.29-1.274 1.29H7.32c-.721 0-1.29-.6-1.29-1.29V7.41c0-.705.63-1.29 1.5-1.29.646 0 1.38.255 1.83.81l5.97 7.141V7.41c0-.721.6-1.29 1.29-1.29h.075c.72 0 1.29.6 1.29 1.29v9.18H18z"/></svg></div>
+            <div class="icon-label">
+              <div class="icon-name">NGINX</div>
+              <div class="icon-id">ingress-edge</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- the other seven bands continue below exactly as candidate E draws them; only the one
+           band the finding was about is drawn here -->
+    </main>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-group">
+      <span class="footer-manifest">examples/layout-stress.catalogus.yaml</span>
+      <span class="footer-dot">&middot;</span>
+      <span>read just now</span>
+    </div>
+    <div class="footer-group">
+      <span><b>37</b> services</span>
+      <span><b>48</b> dependencies</span>
+      <span><b>21</b> rollups</span>
+      <span class="footer-dot">&middot;</span>
+      <span>catalogus <b>0.0.1</b></span>
+      <span class="footer-dot">&middot;</span>
+      <a href="#" style="color:var(--color-text-muted); text-decoration:none;">Documentation</a>
+      <span class="footer-dot">&middot;</span>
+      <span class="footer-schema">catalogus.dev/schema/v1.json</span>
+    </div>
+  </footer>
+
+</div>
+</div>
+
+<!-- ============================================================================================
+     ARTBOARD 2 — the brand page: Fly.io in "Runs in production"
+     ============================================================================================ -->
+<div class="artboard-label"><b>Artboard 2</b> &middot; The brand page, opened by clicking the Fly.io tile</div>
+<div class="artboard">
+<div class="app">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="wordmark">Catalogus</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-project">Layout Stress</span>
+    </div>
+    <div class="topbar-right">
+      <div style="position:relative;"><button class="tb-btn" type="button"><svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.7-1.2c.5.9.2 1.7-.6 2.4-.8.6-1.6 1-1.6 2.3" stroke-linecap="round"/><circle cx="12" cy="16.6" r="0.9" fill="currentColor" stroke="none"/></svg>Help</button></div>
+      <div style="position:relative;"><button class="tb-btn" type="button"><svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V19a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button></div>
+      <div class="tb-profile"><button class="tb-btn" type="button"><span class="avatar">LC</span></button></div>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="rail">
+      <div class="rail-project-name">Layout Stress</div>
+      <span class="rail-visibility">Private</span>
+      <p class="rail-sentence">Deliberately overgrown: an API hub with eighteen outgoing dependencies, two lifecycle migrations in flight, and one entry nothing depends on.</p>
+      <div class="rail-manifest">examples/layout-stress.catalogus.yaml</div>
+      <div class="rail-divider"></div>
+      <div class="rail-heading">Bands</div>
+      <a class="rail-band" href="#"><span>Runs in production</span><span class="rail-count">9</span></a>
+      <a class="rail-band" href="#"><span>Holds data</span><span class="rail-count">7</span></a>
+      <a class="rail-band" href="#"><span>Calls out to</span><span class="rail-count">6</span></a>
+      <a class="rail-band" href="#"><span>Runs on</span><span class="rail-count">4</span></a>
+      <a class="rail-band" href="#"><span>Watched by</span><span class="rail-count">4</span></a>
+      <a class="rail-band" href="#"><span>Built and shipped by</span><span class="rail-count">5</span></a>
+      <a class="rail-band" href="#"><span>Registered at</span><span class="rail-count">1</span></a>
+      <a class="rail-band" href="#"><span>Unplaced</span><span class="rail-count">1</span></a>
+    </nav>
+
+    <main class="board">
+      <article class="page">
+        <nav class="crumbs"><a href="#"><span aria-hidden="true">&larr;</span> Layout Stress</a></nav>
+
+        <header class="page-head">
+          <span class="page-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="46" height="46"><path fill="#24175B" d="M11.987 0c-2.45-.01-5.002.925-6.541 2.897-1.17 1.502-1.664 3.474-1.49 5.356.29 2.112 1.476 3.96 2.676 5.672a41.5 41.5 0 0 0 4.216 4.831c-1.063.832-1.943 2.286-1.357 3.644.821 2.32 4.665 2.05 5.122-.372.39-1.288-.694-2.533-1.428-3.309 2.388-2.431 4.706-5.036 6.17-8.145.595-1.32.902-2.802.614-4.24-.28-2.341-1.823-4.473-3.967-5.46C14.76.266 13.364.016 11.987 0m-.236 1.577v15.534C9.881 13.483 7.724 9.266 8.73 5.069c.35-1.539 1.253-3.309 3.02-3.492m1.996.04c1.534.357 3.031 1.096 3.906 2.48 1.3 1.93 1.318 4.55.1 6.521-1.268 2.395-3.06 4.463-4.916 6.415 1.472-2.974 3.074-6.106 3.182-9.5-.043-2.08-.438-4.612-2.272-5.916M11.97 20.103c.848.342 1.597 1.983.153 2.173-.664.15-1.367-.599-.995-1.222.213-.355.488-.73.842-.95"/></svg></span>
+          <div class="page-identity">
+            <h1 class="page-title">Fly.io</h1>
+            <!-- the catalog slug: the group's identity (bands.ts VendorGroup.service), mono because
+                 it is the literal a `catalogus add` names -->
+            <div class="page-slug">fly-io</div>
+            <!-- the brand facts, once. Kind is stated once because every entry here is a
+                 `service`; see the file comment for the case where they differ. -->
+            <dl class="brand-facts">
+              <div><dt>Kind</dt><dd>service</dd></div>
+              <div><dt>Band</dt><dd>Runs in production</dd></div>
+              <div><dt>Entries</dt><dd>5</dd></div>
+            </dl>
+          </div>
+        </header>
+
+        <div class="page-columns">
+          <section class="page-doc">
+            <h2 class="page-h2">Entries</h2>
+            <div class="entry-rows">
+              <div class="entry-row entry-row--head"><span>Id</span><span>Role</span><span>Status</span><span>Version</span></div>
+              <a class="entry-row" href="#"><span class="mono-inline">host-api</span><span>hosting-api</span><span>Active</span><span class="dim">not tracked</span></a>
+              <a class="entry-row" href="#"><span class="mono-inline">host-cron</span><span>hosting-cron</span><span>Active</span><span class="dim">not tracked</span></a>
+              <a class="entry-row" href="#"><span class="mono-inline">host-preview</span><span>hosting-preview</span><span>Phasing out</span><span class="dim">not tracked</span></a>
+              <a class="entry-row" href="#"><span class="mono-inline">host-web</span><span>hosting-web</span><span>Active</span><span class="dim">not tracked</span></a>
+              <a class="entry-row" href="#"><span class="mono-inline">host-worker</span><span>hosting-worker</span><span>Active</span><span class="dim">not tracked</span></a>
+            </div>
+          </section>
+          <!-- no facts aside on the brand page: the brand's facts are the three in the header, and
+               the Layer 3 block is per entry (HANDOFF: only a service row carries cost or an
+               account reference), so it lives on each entry's page and not here -->
+        </div>
+      </article>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-group">
+      <span class="footer-manifest">examples/layout-stress.catalogus.yaml</span>
+      <span class="footer-dot">&middot;</span>
+      <span>read just now</span>
+    </div>
+    <div class="footer-group">
+      <span><b>37</b> services</span>
+      <span><b>48</b> dependencies</span>
+      <span><b>21</b> rollups</span>
+      <span class="footer-dot">&middot;</span>
+      <span>catalogus <b>0.0.1</b></span>
+      <span class="footer-dot">&middot;</span>
+      <a href="#" style="color:var(--color-text-muted); text-decoration:none;">Documentation</a>
+      <span class="footer-dot">&middot;</span>
+      <span class="footer-schema">catalogus.dev/schema/v1.json</span>
+    </div>
+  </footer>
+
+</div>
+</div>
+
+<!-- ============================================================================================
+     ARTBOARD 3 — the entry page for host-api, reworked to breathe
+     ============================================================================================ -->
+<div class="artboard-label"><b>Artboard 3</b> &middot; The entry page, host-api: same content as ServicePage + ServiceSummary, given air</div>
+<div class="artboard">
+<div class="app">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="wordmark">Catalogus</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-project">Layout Stress</span>
+    </div>
+    <div class="topbar-right">
+      <div style="position:relative;"><button class="tb-btn" type="button"><svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.7-1.2c.5.9.2 1.7-.6 2.4-.8.6-1.6 1-1.6 2.3" stroke-linecap="round"/><circle cx="12" cy="16.6" r="0.9" fill="currentColor" stroke="none"/></svg>Help</button></div>
+      <div style="position:relative;"><button class="tb-btn" type="button"><svg class="tb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V19a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button></div>
+      <div class="tb-profile"><button class="tb-btn" type="button"><span class="avatar">LC</span></button></div>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="rail">
+      <div class="rail-project-name">Layout Stress</div>
+      <span class="rail-visibility">Private</span>
+      <p class="rail-sentence">Deliberately overgrown: an API hub with eighteen outgoing dependencies, two lifecycle migrations in flight, and one entry nothing depends on.</p>
+      <div class="rail-manifest">examples/layout-stress.catalogus.yaml</div>
+      <div class="rail-divider"></div>
+      <div class="rail-heading">Bands</div>
+      <a class="rail-band" href="#"><span>Runs in production</span><span class="rail-count">9</span></a>
+      <a class="rail-band" href="#"><span>Holds data</span><span class="rail-count">7</span></a>
+      <a class="rail-band" href="#"><span>Calls out to</span><span class="rail-count">6</span></a>
+      <a class="rail-band" href="#"><span>Runs on</span><span class="rail-count">4</span></a>
+      <a class="rail-band" href="#"><span>Watched by</span><span class="rail-count">4</span></a>
+      <a class="rail-band" href="#"><span>Built and shipped by</span><span class="rail-count">5</span></a>
+      <a class="rail-band" href="#"><span>Registered at</span><span class="rail-count">1</span></a>
+      <a class="rail-band" href="#"><span>Unplaced</span><span class="rail-count">1</span></a>
+    </nav>
+
+    <main class="board">
+      <article class="page">
+        <!-- two crumbs because this entry belongs to a five-entry brand; a single-entry brand's
+             page shows only the project crumb, as the built page does today -->
+        <nav class="crumbs">
+          <a href="#"><span aria-hidden="true">&larr;</span> Layout Stress</a>
+          <span class="crumb-sep">/</span>
+          <a href="#">Fly.io</a>
+        </nav>
+
+        <header class="page-head">
+          <span class="page-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="46" height="46"><path fill="#24175B" d="M11.987 0c-2.45-.01-5.002.925-6.541 2.897-1.17 1.502-1.664 3.474-1.49 5.356.29 2.112 1.476 3.96 2.676 5.672a41.5 41.5 0 0 0 4.216 4.831c-1.063.832-1.943 2.286-1.357 3.644.821 2.32 4.665 2.05 5.122-.372.39-1.288-.694-2.533-1.428-3.309 2.388-2.431 4.706-5.036 6.17-8.145.595-1.32.902-2.802.614-4.24-.28-2.341-1.823-4.473-3.967-5.46C14.76.266 13.364.016 11.987 0m-.236 1.577v15.534C9.881 13.483 7.724 9.266 8.73 5.069c.35-1.539 1.253-3.309 3.02-3.492m1.996.04c1.534.357 3.031 1.096 3.906 2.48 1.3 1.93 1.318 4.55.1 6.521-1.268 2.395-3.06 4.463-4.916 6.415 1.472-2.974 3.074-6.106 3.182-9.5-.043-2.08-.438-4.612-2.272-5.916M11.97 20.103c.848.342 1.597 1.983.153 2.173-.664.15-1.367-.599-.995-1.222.213-.355.488-.73.842-.95"/></svg></span>
+          <div class="page-identity">
+            <h1 class="page-title">Fly.io</h1>
+            <div class="page-slug">host-api</div>
+            <!-- no tag row: host-api is active, not recently added, and kind `service` -- the
+                 norm earns no mark (service-tags.ts), exactly as the built page renders it -->
+          </div>
+        </header>
+
+        <div class="page-columns">
+          <section class="page-doc">
+            <h2 class="page-h2">Documentation</h2>
+            <p class="doc-empty">Nothing written yet.</p>
+            <p class="doc-body">This is where what you know about Fly.io in Layout Stress lives &mdash; the things that took a day to work out and should never be worked out twice.</p>
+            <p class="doc-body">Pages are Layer 3: private, per-user, and never committed to this repo. The store does not exist yet, so nothing here is editable and nothing is missing from your manifest.</p>
+          </section>
+        </div>
+      </article>
+    </main>
+
+    <!-- THE SIDE PANEL: ServiceSummary's content, top to bottom, docked to the right edge of
+         the rail-plus-board row as the rail's mirror -- a sibling of .board, not a child of the
+         page -- see the additions block, "(3) the service summary as a side panel", for what
+         was taken from where and why it is 300px and not the rail's 240. -->
+          <aside class="page-facts">
+            <!-- ServiceSummary's facts: Role, then Kind only when not `service`, Version only when
+                 set, Added, Replaced by only when set. host-api: Role and Added. -->
+            <div class="facts-heading">Facts</div>
+            <dl class="pop-facts">
+              <div><dt>Role</dt><dd>hosting-api</dd></div>
+              <div><dt>Added</dt><dd>2025-11-02</dd></div>
+            </dl>
+
+            <div class="facts-divider"></div>
+            <div class="facts-heading">Notes</div>
+            <p class="facts-note">&ldquo;the fan-out hub: 18 outgoing edges&rdquo;</p>
+
+            <!-- the edges by name, one per line: the built page joins eighteen "id (Name)" labels
+                 with commas into one paragraph, which is the densest thing on the page -->
+            <div class="facts-divider"></div>
+            <div class="facts-heading">Depends on &middot; 18</div>
+            <div class="facts-list">
+                <a href="#"><span class="mono-inline">db-primary</span><span class="dep-name">PostgreSQL</span></a>
+                <a href="#"><span class="mono-inline">db-replica</span><span class="dep-name">PostgreSQL</span></a>
+                <a href="#"><span class="mono-inline">db-cache</span><span class="dep-name">Redis</span></a>
+                <a href="#"><span class="mono-inline">db-search</span><span class="dep-name">Elasticsearch</span></a>
+                <a href="#"><span class="mono-inline">db-legacy</span><span class="dep-name">MongoDB</span></a>
+                <a href="#"><span class="mono-inline">auth-users</span><span class="dep-name">Clerk</span></a>
+                <a href="#"><span class="mono-inline">auth-legacy</span><span class="dep-name">Auth0</span></a>
+                <a href="#"><span class="mono-inline">pay-cards</span><span class="dep-name">Stripe</span></a>
+                <a href="#"><span class="mono-inline">pay-legacy</span><span class="dep-name">PayPal</span></a>
+                <a href="#"><span class="mono-inline">queue-jobs</span><span class="dep-name">RabbitMQ</span></a>
+                <a href="#"><span class="mono-inline">mail-tx</span><span class="dep-name">Resend</span></a>
+                <a href="#"><span class="mono-inline">mail-legacy</span><span class="dep-name">Mailgun</span></a>
+                <a href="#"><span class="mono-inline">obs-errors</span><span class="dep-name">Sentry</span></a>
+                <a href="#"><span class="mono-inline">obs-metrics</span><span class="dep-name">Datadog</span></a>
+                <a href="#"><span class="mono-inline">blob-store</span><span class="dep-name">Google Cloud Storage</span></a>
+                <a href="#"><span class="mono-inline">ai-chat</span><span class="dep-name">Anthropic</span></a>
+                <a href="#"><span class="mono-inline">stack-runtime</span><span class="dep-name">.NET</span></a>
+                <a href="#"><span class="mono-inline">stack-lang</span><span class="dep-name">TypeScript</span></a>
+            </div>
+
+            <div class="facts-divider"></div>
+            <div class="facts-heading">Depended on by &middot; 3</div>
+            <div class="facts-list">
+              <a href="#"><span class="mono-inline">host-web</span><span class="dep-name">Fly.io</span></a>
+              <a href="#"><span class="mono-inline">ci</span><span class="dep-name">GitHub Actions</span></a>
+              <a href="#"><span class="mono-inline">stack-mobile</span><span class="dep-name">Expo</span></a>
+            </div>
+
+            <!-- Layer 3: ServiceSummary's block, word for word, sunken as it is today; it closes
+                 the stack, bleeding to the panel's own edges the way it fills the aside's foot
+                 in the built page -->
+            <div class="facts-overlay">
+              <div class="facts-heading">Cost &amp; account</div>
+              <p class="overlay-state">Not connected</p>
+              <p class="overlay-body">Cost, plan, renewal and account reference are Layer 3: a private, per-user overlay that never touches this repo. Nothing is missing from the manifest &mdash; the schema refuses this data on write.</p>
+              <p class="overlay-body">The overlay does not exist yet. Once it does, <code class="overlay-cmd">catalogus push --private</code> is what fills this.</p>
+            </div>
+          </aside>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-group">
+      <span class="footer-manifest">examples/layout-stress.catalogus.yaml</span>
+      <span class="footer-dot">&middot;</span>
+      <span>read just now</span>
+    </div>
+    <div class="footer-group">
+      <span><b>37</b> services</span>
+      <span><b>48</b> dependencies</span>
+      <span><b>21</b> rollups</span>
+      <span class="footer-dot">&middot;</span>
+      <span>catalogus <b>0.0.1</b></span>
+      <span class="footer-dot">&middot;</span>
+      <a href="#" style="color:var(--color-text-muted); text-decoration:none;">Documentation</a>
+      <span class="footer-dot">&middot;</span>
+      <span class="footer-schema">catalogus.dev/schema/v1.json</span>
+    </div>
+  </footer>
+
+</div>
+</div>
+
+</div>
+
+</body>
+</html>

@@ -29,8 +29,17 @@
 // board still gives `fly-api` and `namecheap-registrar` identical weight. They
 // simply have no caller until the catalog is worth judging on. `dependentCounts`
 // remains in use; the popover states per-entry dependents.
+//
+// **2026-09-04: `onActivate`/`onPeek` widen to carry the band alongside the
+// group** (docs/brand-tile-brief.md, Part A -- prop threading only, no
+// change to this file's own body). `BandModule.tsx` collapses each band's
+// slice into `VendorGroup`s now and attaches its own band before calling up
+// (that file's own header explains why the attaching happens there); this
+// component still does none of the collapsing itself and still just forwards
+// what it is handed, unchanged in every line below.
 import type { ViewService } from "@catalogus/cli";
 
+import type { BandDefinition, VendorGroup } from "../bands.js";
 import { groupIntoBands } from "../bands.js";
 import { BandModule } from "./BandModule.js";
 import styles from "./ProjectBoard.module.css";
@@ -40,8 +49,8 @@ export interface ProjectBoardProps {
   /** Server-stamped moment the manifest was read; every recency mark measures from it. */
   readAt: string;
   selectedId: string | null;
-  onActivate: (service: ViewService) => void;
-  onPeek: (service: ViewService, anchor: HTMLElement) => void;
+  onActivate: (band: BandDefinition, group: VendorGroup) => void;
+  onPeek: (band: BandDefinition, group: VendorGroup, anchor: HTMLElement) => void;
   onPeekEnd: () => void;
 }
 

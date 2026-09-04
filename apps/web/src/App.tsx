@@ -15,21 +15,34 @@
 // plain `hashchange` plus the one hook below (hash-route.ts carries the
 // pure parsing, kept out of this file and out of `window` the same way
 // group-services.ts is kept out of the render tree).
+//
+// **2026-09-04: the board's tiles collapse again, and this file gained a
+// second route.** `ProjectBoard`'s tiles were one manifest entry each from
+// 2026-08-26 to 2026-09-04; `BandModule.tsx` now collapses a repeated
+// vendor into one `VendorGroup` per band again (docs/brand-tile-brief.md,
+// Part A), so `onActivate`/`onPeek` carry `(band, group)` rather than a bare
+// `ViewService`, and clicking a multi-entry group opens `BrandPage` at
+// `#/brand/<bandId>/<service>` (hash-route.ts) instead of an entry's own
+// page. `groupFor` below is the one place this file re-derives which group
+// an entry currently renders inside, for the two things that need to know:
+// the deep-link/close focus restore, and `ServicePage`'s own `brand` prop.
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ViewPayload, ViewService } from "@catalogus/cli";
 
+import { BANDS, bandOf, collapseByService, type BandDefinition, type VendorGroup } from "./bands.js";
 import styles from "./App.module.css";
 import { AppShell } from "./components/AppShell.js";
+import { BrandPage } from "./components/BrandPage.js";
 import { ErrorState } from "./components/ErrorState.js";
 import { LoadingState } from "./components/LoadingState.js";
 import { MigrationList } from "./components/MigrationList.js";
-import { ServicePage } from "./components/ServicePage.js";
+import { ServicePage, ServicePagePanel } from "./components/ServicePage.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
 import { serviceTileDomId } from "./components/ServiceTile.js";
 import { ProjectBoard } from "./components/ProjectBoard.js";
 import { ServicePopover } from "./components/ServicePopover.js";
 import { ViewToggle, type ViewMode } from "./components/ViewToggle.js";
-import { hashForServiceId, serviceIdFromHash } from "./hash-route.js";
+import { brandFromHash, hashForBrand, hashForServiceId, serviceIdFromHash } from "./hash-route.js";
 import { POPOVER_ESTIMATE, placePopover, samePlacement, type PopoverSize } from "./popover-placement.js";
 
 // Both halves of the graph view load on demand, and for two different
@@ -82,6 +95,43 @@ function currentHash(): string {
   return typeof window === "undefined" ? "" : window.location.hash;
 }
 
+/**
+ * The band and vendor group one manifest entry currently collapses into on
+ * the board -- the same computation `BandModule.tsx` performs per band
+ * (`bandOf`, then `collapseByService` over that band's own slice), redone
+ * here rather than carried on the entry because it is derived, not stored,
+ * and this file is the one place outside the board that needs it: once for
+ * the deep-link/close focus-restore fallback (which DOM id a closed entry's
+ * tile now has -- see `serviceTileDomId`'s own header for why a band
+ * qualifier is part of that id), and once for `ServicePage`'s own `brand`
+ * prop (whether this entry shares its tile with siblings, and if so what to
+ * link back to).
+ *
+ * `undefined` for an id the payload does not have, or for the vanishingly
+ * unreachable case `bandOf` names its own guard against (see below) -- both
+ * degrade to "nothing to restore/link" rather than throwing, on this app's
+ * standing rule that a stale or hostile id selects nothing (hash-route.ts's
+ * own header).
+ */
+function groupFor(services: readonly ViewService[], entryId: string): { band: BandDefinition; group: VendorGroup } | undefined {
+  const entry = services.find((service) => service.id === entryId);
+  if (!entry) {
+    return undefined;
+  }
+  const bandId = bandOf(entry.rollup);
+  const band = BANDS.find((candidate) => candidate.id === bandId);
+  if (!band) {
+    // Unreachable against BANDS's own definition: bandOf only ever returns
+    // one of BANDS's own ids or "unplaced", and "unplaced" is itself one of
+    // BANDS's entries. Kept as a type guard rather than a non-null
+    // assertion so this stays total if that invariant is ever broken.
+    return undefined;
+  }
+  const bandServices = services.filter((service) => bandOf(service.rollup) === bandId);
+  const group = collapseByService(bandServices).find((candidate) => candidate.entries.some((e) => e.id === entryId));
+  return group ? { band, group } : undefined;
+}
+
 export function App() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [hash, setHash] = useState<string>(currentHash);
@@ -116,6 +166,13 @@ export function App() {
   // side effect, never something a render should read back.
   const panelRef = useRef<HTMLElement | null>(null);
   const previousSelectedRef = useRef<{ id: string } | null>(null);
+  // The brand page's own version of the ref above -- kept separate rather
+  // than folded into one, the same "two effects, each mounted with the
+  // thing it dismisses" reasoning the peek/page Escape split already states:
+  // a service page and a brand page never coexist, so one ref with a
+  // discriminant would only be a precedence rule for a case that cannot
+  // arise.
+  const previousBrandRef = useRef<{ tileDomId: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,8 +215,12 @@ export function App() {
 
   // serviceIdFromHash never throws (see hash-route.ts) -- a hostile or
   // stale hash just fails to match any service below, which selects
-  // nothing rather than crashing.
+  // nothing rather than crashing. brandFromHash makes the identical
+  // guarantee for the other route, and the two are mutually exclusive by
+  // prefix -- a hash addresses at most one of them, so at most one of
+  // `selectedId`/`brandRoute` is ever non-null.
   const selectedId = serviceIdFromHash(hash);
+  const brandRoute = useMemo(() => brandFromHash(hash), [hash]);
 
   // useMemo, not a plain const: recomputed only when the payload identity
   // actually changes (once, on load -- this app never refetches), not on
@@ -170,6 +231,45 @@ export function App() {
     () => (state.kind === "loaded" && selectedId ? state.payload.services.find((service) => service.id === selectedId) : undefined),
     [state, selectedId]
   );
+
+  // The brand page: a real `VendorGroup` and its `BandDefinition`, resolved
+  // from the route the same way `selectedService` resolves an entry --
+  // undefined for a route naming no real band or no group in it, which
+  // renders the board rather than a page for a stale or hostile deep link.
+  // Unlike `selectedService` this does not additionally require
+  // `group.entries.length > 1`: a group that has since shrunk to one entry
+  // (a manifest edit between a bookmark being made and followed) still
+  // resolves and still opens *a* page -- `BrandPage.tsx`'s own brief
+  // requires it to "render sanely" for that case rather than this file
+  // deciding to redirect it to the entry page instead, which nothing asked
+  // for and would be inventing a second, undocumented routing rule.
+  const selectedBrand = useMemo(() => {
+    if (state.kind !== "loaded" || !brandRoute) {
+      return undefined;
+    }
+    const band = BANDS.find((candidate) => candidate.id === brandRoute.band);
+    if (!band) {
+      return undefined;
+    }
+    const bandServices = state.payload.services.filter((service) => bandOf(service.rollup) === band.id);
+    const group = collapseByService(bandServices).find((candidate) => candidate.service === brandRoute.service);
+    return group ? { band, group } : undefined;
+  }, [state, brandRoute]);
+
+  // ServicePage's own `brand` prop (the shared contract, docs/brand-tile-
+  // brief.md): present only when the open entry's band group has more than
+  // one entry. `groupFor` re-derives the group the same way `selectedBrand`
+  // above does, from the entry rather than from the route, since a service
+  // page is addressed by entry id and carries no band of its own in the URL.
+  const brandForSelectedService = useMemo(() => {
+    if (state.kind !== "loaded" || !selectedService) {
+      return undefined;
+    }
+    const info = groupFor(state.payload.services, selectedService.id);
+    return info && info.group.entries.length > 1
+      ? { name: info.group.name, entryCount: info.group.entries.length, href: hashForBrand(info.band.id, info.group.service) }
+      : undefined;
+  }, [state, selectedService]);
 
   // Opening and closing the panel *replaces* the current history entry
   // instead of pushing one. The panel is a view of this page, not a page of
@@ -229,9 +329,23 @@ export function App() {
   // scrolls or the window resizes. Keeping the anchor lets the effect below
   // re-read a *live* rect on either event and recompute, instead of holding
   // a snapshot of where the tile used to be (see that effect's own comment).
-  const [peek, setPeek] = useState<{ service: ViewService; anchor: HTMLElement; position: { top: number; left: number } } | null>(
-    null
-  );
+  // `band`/`group` replace the old bare `service`, 2026-09-04, so a peek can
+  // describe a multi-entry tile too -- `ServicePopover` reads `group`
+  // directly now. `key` is the peek's own stable identity, computed once at
+  // `handlePeek` time by the same `serviceTileDomId(band.id, group)` rule
+  // that names the tile itself: a single-entry group's key is its one
+  // entry's id, a multi-entry group's is the band-qualified slug, and
+  // either way it is exactly the value that changes if and only if a
+  // genuinely different tile is being peeked -- the effects below compare
+  // against it instead of re-deriving "which peek is this" from `service.id`
+  // the way they did before a peek could be a group.
+  const [peek, setPeek] = useState<{
+    key: string;
+    band: BandDefinition;
+    group: VendorGroup;
+    anchor: HTMLElement;
+    position: { top: number; left: number };
+  } | null>(null);
   const closeTimerRef = useRef<number | null>(null);
 
   const cancelClose = useCallback(() => {
@@ -303,12 +417,30 @@ export function App() {
     return placePopover({ top: rect.top, left: rect.left, width: rect.width, height: rect.height }, size, viewport);
   }, []);
 
+  // A row that holds keyboard focus holds the popover, 2026-09-04: once the
+  // arrow keys (the peek keydown effect below) can put focus inside the
+  // popover, a pointer brushing a neighbouring tile would otherwise replace
+  // the peek, unmount the focused row, and drop focus to `<body>`, where
+  // neither the arrows nor Escape have anything to act on -- found by the
+  // re-validation of that fix. A focus-originated peek is never inside the
+  // popover (the tile's `onFocus` fires with the tile itself focused), so
+  // this guard only ever refuses a pointer. `handlePeekEnd`'s timer makes
+  // the matching check at fire time, so the neighbour's `onPointerLeave`
+  // cannot close a popover the keyboard is still in either.
+  const focusIsInPopover = useCallback(
+    () => popoverRef.current?.contains(document.activeElement) === true,
+    []
+  );
+
   const handlePeek = useCallback(
-    (service: ViewService, anchor: HTMLElement) => {
+    (band: BandDefinition, group: VendorGroup, anchor: HTMLElement) => {
+      if (focusIsInPopover()) {
+        return;
+      }
       cancelClose();
-      setPeek({ service, anchor, position: positionFor(anchor) });
+      setPeek({ key: serviceTileDomId(band.id, group), band, group, anchor, position: positionFor(anchor) });
     },
-    [cancelClose, positionFor]
+    [cancelClose, positionFor, focusIsInPopover]
   );
 
   // The measurement pass, and the reason this is `useLayoutEffect` rather
@@ -359,10 +491,10 @@ export function App() {
     }
     measuredRef.current = { width: box.width, height: box.height };
 
-    const entryId = peek.service.id;
+    const key = peek.key;
     const measured = positionFor(peek.anchor);
     setPeek((current) =>
-      current && current.service.id === entryId && !samePlacement(current.position, measured)
+      current && current.key === key && !samePlacement(current.position, measured)
         ? { ...current, position: measured }
         : current
     );
@@ -405,14 +537,14 @@ export function App() {
   // is in -- still produced a new peek, a re-render, and another run of the
   // measuring effect. Returning `current` makes React bail out instead.
   //
-  // The frame callback re-checks the entry id because it outlives the event:
-  // a peek that closed, or a different tile that opened, between the tick and
-  // the frame must not have a stale measurement written over it.
+  // The frame callback re-checks the peek's own key because it outlives the
+  // event: a peek that closed, or a different tile that opened, between the
+  // tick and the frame must not have a stale measurement written over it.
   useEffect(() => {
     if (!peek) {
       return;
     }
-    const entryId = peek.service.id;
+    const key = peek.key;
     let frame: number | null = null;
     function reposition() {
       if (frame !== null) {
@@ -421,7 +553,7 @@ export function App() {
       frame = window.requestAnimationFrame(() => {
         frame = null;
         setPeek((current) => {
-          if (!current || current.service.id !== entryId) {
+          if (!current || current.key !== key) {
             return current;
           }
           const next = positionFor(current.anchor);
@@ -438,43 +570,62 @@ export function App() {
       window.removeEventListener("scroll", reposition, true);
       window.removeEventListener("resize", reposition);
     };
-  }, [peek?.service.id, positionFor]);
+  }, [peek?.key, positionFor]);
 
   // Scheduled, not immediate -- see the hover-bridge note above. The delay is
   // the time a pointer needs to cross a 6px gap, not a deliberate dwell.
   const handlePeekEnd = useCallback(() => {
     cancelClose();
     closeTimerRef.current = window.setTimeout(() => {
-      setPeek(null);
       closeTimerRef.current = null;
+      // Checked when the timer fires, not when it is armed: during a
+      // `focusout` the document has already let go of the old element, so
+      // arming time cannot tell "Tab left the last row" from "a pointer left
+      // a neighbouring tile while a row still has focus". 120ms later the
+      // focus has settled and the two cases read differently.
+      if (focusIsInPopover()) {
+        return;
+      }
+      setPeek(null);
     }, 120);
-  }, [cancelClose]);
+  }, [cancelClose, focusIsInPopover]);
 
   useEffect(() => cancelClose, [cancelClose]);
 
   const handleActivate = useCallback(
-    (service: ViewService) => {
-      // Every tile is one manifest entry now, so every tile has a page and
-      // clicking always opens it. This used to branch: a tile standing for
-      // several entries of one vendor had no page to open -- "Fly.io" is not
-      // a document, five Fly.io deployments are -- so it refused to navigate
-      // and left the popover's rows as the only destinations. Candidate E
-      // renders one tile per entry, so the branch and the rows went together.
+    (band: BandDefinition, group: VendorGroup) => {
+      // A single-entry group is a tile that never collapsed anything -- the
+      // 2026-08-26-to-2026-09-04 behaviour, and it still opens that entry's
+      // own page directly. A multi-entry group opens the brand page instead
+      // (owner decision, 2026-09-04): "Fly.io" standing for five deployments
+      // is not one document to read, it is an index of five, and the brand
+      // page is that index (`BrandPage.tsx`).
       setPeek(null);
-      handleSelect(service.id);
+      if (group.entries.length === 1) {
+        handleSelect(group.entries[0].id);
+      } else {
+        replaceHash(hashForBrand(band.id, group.service));
+      }
     },
-    [handleSelect]
+    [handleSelect, replaceHash]
   );
 
+  // Any navigation clears a stale peek -- `hash` rather than `selectedId`
+  // since 2026-09-04, so this also fires between the board and a brand
+  // route (where `selectedId` itself would not change, both being null).
   useEffect(() => {
     setPeek(null);
-  }, [selectedId, mode]);
+  }, [hash, mode]);
 
   // Escape closes the panel, only while one is open -- the listener is
   // added and removed with the panel's own lifetime rather than sitting on
-  // `document` permanently doing nothing.
+  // `document` permanently doing nothing. Gated on either page since
+  // 2026-09-04: a service page and a brand page never coexist (both replace
+  // the same board), so one listener covering both is not a precedence rule
+  // for a case that cannot arise, the same reasoning the peek/page Escape
+  // split just below already uses.
   useEffect(() => {
-    if (!selectedService) {
+    if (!selectedService && !selectedBrand) {
       return;
     }
     function onKeyDown(event: KeyboardEvent) {
@@ -484,7 +635,7 @@ export function App() {
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [selectedService, handleClose]);
+  }, [selectedService, selectedBrand, handleClose]);
 
   // Escape closes the peek too, and this is a separate listener rather than a
   // branch in the one above because the two never coexist: opening a page
@@ -505,19 +656,67 @@ export function App() {
   // tile still has it and keeps it, so Escape leaves the reader exactly where
   // they were and the popover stays shut until they leave the tile and come
   // back; opened by the pointer, focus was never the popover's to move.
+  //
+  // The arrow keys are the keyboard's way *into* a group popover, added
+  // 2026-09-04 after a validator drove the built app from the keyboard and
+  // found there was none: the popover mounts after the whole board in the
+  // DOM (it is `position: fixed`, measured and placed against its anchor),
+  // so Tab from a group tile lands on the next tile, never on the rows, and
+  // the focus bridge ServicePopover.tsx wires for "tabbing into the rows"
+  // could only ever be reached by a test that focused a row directly.
+  // ArrowDown on the focused tile moves focus to the first row (ArrowUp to
+  // the last); the arrows then wrap through the rows; Escape from a row
+  // hands focus back to the tile before closing, so the reader lands where
+  // they started rather than on `<body>`. The tile's own `onBlur` schedules
+  // the close and the popover's `onFocus` cancels it in the same synchronous
+  // pass, exactly as a pointer crossing the gap does. Single-entry tiles
+  // have no rows, so the arrows do nothing there.
   useEffect(() => {
     if (!peek) {
       return;
     }
+    const anchor = peek.anchor;
+    function rows(): HTMLElement[] {
+      return Array.from(popoverRef.current?.querySelectorAll<HTMLElement>("a[href]") ?? []);
+    }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        // Focus first, then close: focusing the tile re-peeks through its
+        // `onFocus`, and the `setPeek(null)` after it wins the batch, which
+        // leaves the reader on the tile with the popover shut -- the same
+        // state Escape on the tile itself produces.
+        if (popoverRef.current?.contains(document.activeElement)) {
+          anchor.focus();
+        }
         cancelClose();
         setPeek(null);
+        return;
       }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+        return;
+      }
+      const links = rows();
+      if (links.length === 0) {
+        return;
+      }
+      const active = document.activeElement;
+      const index = links.findIndex((link) => link === active);
+      const down = event.key === "ArrowDown";
+      let next: HTMLElement | undefined;
+      if (active === anchor) {
+        next = down ? links[0] : links[links.length - 1];
+      } else if (index !== -1) {
+        next = links[(index + (down ? 1 : -1) + links.length) % links.length];
+      }
+      if (!next) {
+        return;
+      }
+      event.preventDefault();
+      next.focus();
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [peek?.service.id, cancelClose]);
+  }, [peek?.key, cancelClose]);
 
   // Moves focus into the page the moment it opens (click or deep link), and
   // hands it back to the thing that opened it once it closes. Keyed on the
@@ -539,11 +738,15 @@ export function App() {
   // `service-node-` in the graph and the migration board. Trying both covers
   // all three without this file knowing which view is mounted.
   //
-  // Both now key on the **entry id**. The board's tiles used to key on the
-  // catalog slug instead, because a tile stood for every entry of one vendor
-  // and no single entry id named it; candidate E renders one tile per entry
-  // (docs/PLAN.md, "The form is settled"), so the slug branch went with the
-  // collapse and the two schemes converged.
+  // **2026-09-04: the board's tile id is no longer just the entry id.** A
+  // repeated vendor collapses to one band-qualified tile again
+  // (`serviceTileDomId`'s own header), so the id to restore focus to is
+  // recomputed here through `groupFor` -- at close time, off the still-loaded
+  // payload, exactly the same lookup `BandModule.tsx` performed to render
+  // the tile in the first place. The graph and the migration board are
+  // untouched by any of this (both stay per entry, owner decision,
+  // 2026-09-04), so `serviceNodeDomId(closed.id)` keeps keying on the bare
+  // entry id, unchanged.
   //
   // A focus restore that silently finds nothing is invisible in a passing test
   // suite -- this repo has shipped that exact defect twice now, once on the
@@ -563,11 +766,38 @@ export function App() {
     }
 
     if (closed) {
+      const info = state.kind === "loaded" ? groupFor(state.payload.services, closed.id) : undefined;
       const target =
-        document.getElementById(serviceTileDomId(closed.id)) ?? document.getElementById(serviceNodeDomId(closed.id));
+        (info ? document.getElementById(serviceTileDomId(info.band.id, info.group)) : null) ??
+        document.getElementById(serviceNodeDomId(closed.id));
       target?.focus();
     }
   }, [selectedService]);
+
+  // The brand page's own focus lifecycle -- mirrors the effect just above
+  // rather than folding into it, per `previousBrandRef`'s own comment. There
+  // is no `serviceNodeDomId` fallback here: a brand page is only ever
+  // reached from a list-view tile click or a hand-typed/deep-linked
+  // `#/brand/...` hash, never from the graph or the migration board (neither
+  // renders a control that opens one), so there is no second surface for a
+  // fallback id to name.
+  useEffect(() => {
+    const matched = selectedBrand ? { tileDomId: serviceTileDomId(selectedBrand.band.id, selectedBrand.group) } : null;
+    const closed = previousBrandRef.current;
+    if (matched?.tileDomId === closed?.tileDomId) {
+      return;
+    }
+    previousBrandRef.current = matched;
+
+    if (matched) {
+      panelRef.current?.focus();
+      return;
+    }
+
+    if (closed) {
+      document.getElementById(closed.tileDomId)?.focus();
+    }
+  }, [selectedBrand]);
 
   return (
     // The masthead is gone as of 2026-09-03, with no replacement on the board.
@@ -580,12 +810,28 @@ export function App() {
     // the cost of it rather than leaving it to be discovered.
     //
     // `showBandIndex` is the list view's alone: the rail's anchors point at the
-    // `<section>`s the board mounts, and the graph, the migrations board and a
-    // service page mount none.
+    // `<section>`s the board mounts, and the graph, the migrations board, a
+    // service page and (since 2026-09-04) a brand page mount none.
     <AppShell
       payload={state.kind === "loaded" ? state.payload : undefined}
-      showBandIndex={state.kind === "loaded" && !selectedService && mode === "list"}
-      boardHead={state.kind === "loaded" && !selectedService ? <ViewToggle mode={mode} onChange={setMode} /> : undefined}
+      showBandIndex={state.kind === "loaded" && !selectedService && !selectedBrand && mode === "list"}
+      boardHead={state.kind === "loaded" && !selectedService && !selectedBrand ? <ViewToggle mode={mode} onChange={setMode} /> : undefined}
+      // The entry page's own facts, docked by AppShell's `sidePanel` slot
+      // (Part C, 2026-09-04) -- present only for a service page, never for
+      // the board or a brand page (the brand page's own mockup, artboard 2:
+      // "No facts aside, no Layer-3 block"). Reads the same edge maps the
+      // popover and the old inline facts column already did; nothing here
+      // is new data, only a new mount point for it.
+      sidePanel={
+        state.kind === "loaded" && selectedService && edgeMaps ? (
+          <ServicePagePanel
+            service={selectedService}
+            dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
+            dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
+            labelForId={edgeMaps.labelForId}
+          />
+        ) : undefined
+      }
       now={renderedAt}
     >
       {state.kind === "loading" && <LoadingState />}
@@ -593,29 +839,37 @@ export function App() {
       {state.kind === "loaded" && edgeMaps && (
         <>
           {/*
-            The page replaces the board rather than docking beside it. That is
-            the difference between a panel and a page, and leaving the old
-            panel on the click path produced a visible defect once the same
-            content became the hover popover: hovering a tile and then
-            clicking it rendered the identical facts twice, once floating and
-            once docked on the right.
+            A page -- entry or brand -- replaces the board rather than docking
+            beside it. That is the difference between a panel and a page, and
+            leaving the old panel on the click path produced a visible defect
+            once the same content became the hover popover: hovering a tile
+            and then clicking it rendered the identical facts twice, once
+            floating and once docked on the right.
 
             The toggle goes with the board. It selects between three views of
-            the *project*, and a service page is not one of them -- leaving it
-            on screen would offer to switch a view that is no longer showing.
-            It is handed to the shell as the board head now rather than
-            rendered here (see the `boardHead` prop above), so that condition
-            is stated once, up there, instead of twice.
+            the *project*, and neither page is one of them -- leaving it on
+            screen would offer to switch a view that is no longer showing. It
+            is handed to the shell as the board head now rather than rendered
+            here (see the `boardHead` prop above), so that condition is stated
+            once, up there, instead of twice.
           */}
           {selectedService ? (
             <ServicePage
               service={selectedService}
               projectName={state.payload.project.name}
               readAt={state.payload.readAt}
-              dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
-              dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
-              labelForId={edgeMaps.labelForId}
               onBack={handleClose}
+              brand={brandForSelectedService}
+              pageRef={panelRef}
+            />
+          ) : selectedBrand ? (
+            <BrandPage
+              group={selectedBrand.group}
+              band={selectedBrand.band}
+              projectName={state.payload.project.name}
+              readAt={state.payload.readAt}
+              onBack={handleClose}
+              onOpenEntry={handleSelect}
               pageRef={panelRef}
             />
           ) : (
@@ -646,12 +900,16 @@ export function App() {
               </div>
               {peek && mode === "list" && (
                 <ServicePopover
-                  service={peek.service}
+                  group={peek.group}
                   readAt={state.payload.readAt}
                   position={peek.position}
-                  dependsOn={edgeMaps.dependsOn.get(peek.service.id) ?? []}
-                  dependedOnBy={edgeMaps.dependedOnBy.get(peek.service.id) ?? []}
+                  // Meaningless, and unread, for a multi-entry group's own
+                  // popover branch (ServicePopover.tsx's own header) -- the
+                  // single entry's edges only when there is exactly one.
+                  dependsOn={peek.group.entries.length === 1 ? (edgeMaps.dependsOn.get(peek.group.entries[0].id) ?? []) : []}
+                  dependedOnBy={peek.group.entries.length === 1 ? (edgeMaps.dependedOnBy.get(peek.group.entries[0].id) ?? []) : []}
                   labelForId={edgeMaps.labelForId}
+                  onOpenEntry={handleSelect}
                   onPointerEnter={cancelClose}
                   onPointerLeave={handlePeekEnd}
                   popoverRef={popoverRef}

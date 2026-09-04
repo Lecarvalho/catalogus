@@ -156,7 +156,20 @@
 
 /* The rail-plus-board row. `align-items: stretch` is what carries the rail's
    fill and its right-hand hairline the full height of a short page; without it
-   the rail would end where its own text does. */
+   the rail would end where its own text does. The row itself is never capped:
+   the first cut of finding 3 (2026-09-04) capped and centred this row, the
+   rail came off the window's edge with it, and the owner rejected that on
+   sight -- the cap is `.board`'s below.
+
+   A third possible child joined the rail and the board on 2026-09-04: the
+   entry page's facts panel (ServicePage.module.css's `.panel`, mounted
+   through AppShell.tsx's `sidePanel` prop as a direct child of this row, a
+   flex sibling of `.board` rather than something nested inside it -- the
+   approved mockup's own words are "a sibling of .board, not a child of it").
+   It inherits this rule's own `align-items: stretch` the same way the rail
+   always has, and needs nothing declared here for that -- see `.withPanel`
+   below for the one thing that does need declaring, and why it is scoped to
+   a modifier rather than added here unconditionally. */
 .shell {
   flex: 1 1 auto;
   display: flex;
@@ -164,14 +177,50 @@
   min-height: 0;
 }
 
+/*
+ * Present on `.shell` only when a page hands `sidePanel` to `AppShell` --
+ * AppShell.tsx picks between `styles.shell` alone and this pairing rather
+ * than always appending, so a board view's row keeps the exact class string
+ * it had before this prop existed (AppShell.tsx's own comment on that
+ * choice) and AppShell.test.tsx can assert the row is byte-identical to
+ * today's when no panel is passed.
+ *
+ * The rule itself lives entirely in the 900px query below: above that width
+ * this class carries nothing, because `.board`'s own `min-width: 0` already
+ * lets it shrink to fit beside a fixed-width rail and a fixed-width panel
+ * without ever needing to wrap (the same fact that makes `.board`'s auto
+ * margins safe on a wide window, this file's own comment above). Below
+ * 900px the panel has to move onto its own line rather than merely narrow,
+ * because it carries the entry's own facts, not navigation the reader can
+ * do without the way the rail's own content is -- see the query below and
+ * ServicePage.module.css's own breakpoint on `.panel` for the two halves of
+ * that mechanism. Nothing is declared against `.withPanel` alone above that
+ * query: a class with no rule outside a media query is unusual enough to be
+ * worth this sentence, and it is deliberate rather than a forgotten rule.
+ */
+
 /* `min-width: 0` for the reason ProjectBoard.module.css states at length: a
    flex item's automatic minimum is its content's, and the band grids inside
    declare `auto-fill` columns with a minimum width, so without this the board
    refuses to shrink and the grid sizes against its own intrinsic minimum
-   instead of the room the row actually gives it. */
+   instead of the room the row actually gives it.
+
+   `max-width` and the auto inline margins are finding 3 (2026-09-04): on a
+   window wider than the mockup was ever drawn at, the board stops growing at
+   `--board-max-width` and centres in the room the rail leaves it, while the
+   rail keeps the window's left edge. The auto margins are safe here where
+   App.module.css's old `.page` margins were not: this is a flex item of a
+   *row* container whose growth is bounded by its own max-width, so once it has
+   grown to the cap the remaining free space goes to the margins in equal
+   halves, which is centring -- `.page` failed because it was an auto-margin
+   item inside a *column* container centring on the main axis. Below the cap
+   the margins resolve to zero and nothing changes. The padding is inside the
+   cap (border-box, tokens.css). */
 .board {
   flex: 1 1 auto;
   min-width: 0;
+  max-width: var(--board-max-width);
+  margin: 0 auto;
   /* Longhands, not the `padding: 0 x y` shorthand the mockup writes. The
      shorthand sets `padding-top: 0` too, so every breakpoint below would reset
      the top padding `.headless` supplies and win on source order -- a service
@@ -244,12 +293,28 @@
  * board's icon grid also reflows (BandModule.module.css, the same media query
  * and the same reasoning). The footer's share of that is in
  * Footer.module.css, for the same class-name reason as the rail's.
+ *
+ * **`.shell.withPanel` wraps here too, added 2026-09-04.** The rail is not the
+ * only thing 900px moves: on a page carrying a side panel (`.withPanel`
+ * above), the row that lost its rail also stops laying its remaining children
+ * side by side and starts stacking them, so the panel drops under the board
+ * rather than merely narrowing beside it. `flex-wrap: wrap` is safe to add
+ * only inside this query, never to `.shell` unconditionally: above 900px
+ * `.board`'s own `min-width: 0` means the row never runs out of room to wrap
+ * over in the first place (the paragraph on `.withPanel`'s own declaration
+ * says why), so the rule would sit there doing nothing right up until it
+ * did -- and a rule that only fires under conditions nobody has tested yet is
+ * exactly the kind of surprise a frozen shell should not carry.
  */
 @media (max-width: 900px) {
   .board {
     padding-right: var(--board-padding-x-mid);
     padding-left: var(--board-padding-x-mid);
     padding-bottom: var(--board-padding-bottom-mid);
+  }
+
+  .shell.withPanel {
+    flex-wrap: wrap;
   }
 }
 

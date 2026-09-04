@@ -35,6 +35,14 @@
 // Pure, like everything else the app renders: props in, no fetch, no
 // `window`, no module-level state (App.tsx's header comment records why that
 // rule exists and what it buys).
+//
+// **`sidePanel`, added 2026-09-04**, is the one addition to that frozen
+// structure since: an optional third child of the rail-plus-board row, for
+// the entry page's facts panel (docs/candidates/candidate-e-brandpage.html's
+// artboard 3, decision 6). It does not reopen the freeze -- nothing about the
+// topbar, the rail, the board or the footer changed to make room for it, and
+// the row renders exactly as before on every view that passes none. See the
+// prop's own comment below for the rest.
 import type { ReactNode } from "react";
 import type { ViewPayload } from "@catalogus/cli";
 
@@ -76,6 +84,27 @@ export interface AppShellProps {
    * sit flush against the bar.
    */
   boardHead?: ReactNode;
+  /**
+   * A panel docked to the right edge of the rail-plus-board row, added
+   * 2026-09-04 for the entry page's facts (ServicePage.tsx's
+   * `ServicePagePanel`, docs/candidates/candidate-e-brandpage.html's artboard
+   * 3, decision 6). A prop rather than a route check in here, on the same
+   * reasoning `boardHead` already states: which page has one is App.tsx's
+   * decision, made once, not a fact this file re-derives from the URL. Not
+   * rendered at all when absent -- see AppShell.module.css's `.shell` for why
+   * that keeps every other view's row byte-identical to before this prop
+   * existed, and AppShell.test.tsx for the assertion that it does.
+   *
+   * Rendered as a direct child of `.shell`, after `.board`, so it is a flex
+   * sibling of the board rather than something nested inside it -- the
+   * mockup's own words are "a sibling of .board, not a child of it" -- and
+   * inherits `.shell`'s own `align-items: stretch` the same way the rail
+   * does, with no wrapper of this file's own in between. This file supplies
+   * no chrome for it; ServicePage.module.css's `.panel` does, the same
+   * division of labour `boardHead` already has with whatever renders inside
+   * it.
+   */
+  sidePanel?: ReactNode;
   /** Epoch milliseconds the page was rendered, for the footer's "read <relative time>". */
   now: number;
   children: ReactNode;
@@ -106,7 +135,7 @@ function SettingsIcon() {
   );
 }
 
-export function AppShell({ payload, showBandIndex, boardHead, now, children }: AppShellProps) {
+export function AppShell({ payload, showBandIndex, boardHead, sidePanel, now, children }: AppShellProps) {
   // Grouped here rather than passed in, from the same `groupIntoBands` the
   // board itself calls on the same services -- a pure function of one input,
   // so two calls cannot disagree, and the rail's counts are the board's counts
@@ -168,13 +197,28 @@ export function AppShell({ payload, showBandIndex, boardHead, now, children }: A
         </div>
       </header>
 
-      <div className={styles.shell}>
+      {/*
+        `.withPanel` on `.shell` only when `sidePanel` is actually rendered --
+        AppShell.module.css's own comment on that class explains why this
+        stays a modifier rather than an unconditional rule. The conditional
+        below picks between two whole strings rather than the
+        `.board`/`.headless` idiom's "append or append nothing" two lines
+        down, deliberately: that idiom leaves a trailing space in the
+        `className` when its own condition is false, which is harmless to
+        the cascade but is not byte-identical to `styles.shell` alone -- and
+        a board view's row is exactly the string this file rendered before
+        this prop existed, not that string plus a space, so AppShell.test.tsx
+        can assert it stayed that way.
+      */}
+      <div className={sidePanel ? `${styles.shell} ${styles.withPanel}` : styles.shell}>
         {payload && <Rail project={payload.project} manifestPath={payload.manifestPath} bands={bands} />}
 
         <main className={`${styles.board} ${boardHead ? "" : styles.headless}`}>
           {boardHead && <div className={styles.boardHead}>{boardHead}</div>}
           {children}
         </main>
+
+        {sidePanel}
       </div>
 
       {payload && <Footer payload={payload} now={now} />}

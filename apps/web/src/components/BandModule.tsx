@@ -8,25 +8,40 @@
 // reasoning; it was sound for the dense world being retired and does not
 // carry over to a single vertical stack.
 //
-// **One tile per manifest entry, not per vendor.** ServiceTile no longer
-// collapses by catalog slug -- a bare-icon board tells `host-api`,
-// `host-web` and `host-worker` apart by the tile's own two-line
-// vendor-name-then-id label, so three Fly.io entries are three tiles rather
-// than one tile carrying an `x3` a bare icon has no card left to hold. This
-// component now maps over `services` directly, in the order
-// `groupIntoBands` already put them in, and `collapseByService` has no
-// caller left here (bands.ts keeps it; the main session owns its fate).
+// **2026-09-04: one tile per brand per band, restored** (docs/PLAN.md, "Owner
+// decisions -- 2026-09-04"; docs/brand-tile-brief.md, Part A, "Shared
+// contract"). From 2026-08-26 to 2026-09-04 this component mapped over
+// `services` directly, one tile per manifest entry, because a bare-icon
+// board seemed to have no card left to carry a collapsed tile's `xN`. A real
+// manifest (Clapline, five Fly.io entries in "Runs in production") put that
+// theory in front of the owner and it did not survive contact: five
+// identical Fly.io marks in a row say "Fly.io" five times, which is exactly
+// the repetition `collapseByService` (bands.ts) was written to collapse on
+// 2026-08-25 and lost its only caller when this file stopped calling it the
+// next day. It has a caller again, here, once per band -- the shared
+// contract's own words: "**the collapse happens inside `BandModule`, once,
+// and the tile receives a `VendorGroup`**".
 //
-// That also retires the header-count argument the previous version of this
-// file made at length: the header used to count *entries* rather than
-// tiles because a collapsed tile's `xN` made the two numbers genuinely
-// different, and the entry count was the one that reconciled with the
-// manifest and the CLI. There is no collapsing left, so the header count
-// and the number of tiles on screen are now the same number, and the header
-// simply states it.
+// **`services` stays the flat entry list**, unchanged in shape from the
+// one-tile-per-entry pass: the header below still needs the true entry
+// count, and that count and the number of tiles on screen are no longer the
+// same number now that a repeated vendor collapses -- the Fly.io band reads
+// "9" in the header for five tiles, one of them carrying its own "5
+// entries" label (ServiceTile.tsx). Collapsing happens inside this
+// component's own render, once, from that flat list -- `ProjectBoard.tsx`
+// never sees a `VendorGroup` at all, and neither does anything above it.
+//
+// `onActivate`/`onPeek` widen to carry the band alongside the group
+// (`(band, group) => void` / `(band, group, anchor) => void`) rather than a
+// bare `ViewService` -- this is the one place that knows both, since a
+// `VendorGroup` alone cannot say which band it collapsed inside (bands.ts's
+// own words: `collapseByService` "has no notion of band"), and App.tsx needs
+// the band id to route a group click to `#/brand/<bandId>/<service>`
+// (hash-route.ts) and to compute `serviceTileDomId`'s own band-qualified id.
 import type { ViewService } from "@catalogus/cli";
 
-import type { BandDefinition } from "../bands.js";
+import type { BandDefinition, VendorGroup } from "../bands.js";
+import { collapseByService } from "../bands.js";
 import { ServiceTile } from "./ServiceTile.js";
 import styles from "./BandModule.module.css";
 
@@ -35,8 +50,8 @@ export interface BandModuleProps {
   services: ViewService[];
   readAt: string;
   selectedId: string | null;
-  onActivate: (service: ViewService) => void;
-  onPeek: (service: ViewService, anchor: HTMLElement) => void;
+  onActivate: (band: BandDefinition, group: VendorGroup) => void;
+  onPeek: (band: BandDefinition, group: VendorGroup, anchor: HTMLElement) => void;
   onPeekEnd: () => void;
 }
 
@@ -57,6 +72,14 @@ export function BandModule({
   const sectionId = `band-${band.id}`;
   const headingId = `${sectionId}-title`;
 
+  // Collapsed once, per band, from this band's own flat slice of the
+  // manifest -- collapseByService's own header is explicit that collapsing
+  // is per band only, never global, and this call site is the reason:
+  // handing it the whole manifest here (rather than one band's `services`)
+  // would merge Supabase-as-auth and Supabase-as-database into one tile and
+  // force a single band on a vendor that does two jobs in this project.
+  const groups = collapseByService(services);
+
   return (
     <section id={sectionId} className={styles.band} aria-labelledby={headingId}>
       <div className={styles.head}>
@@ -66,8 +89,13 @@ export function BandModule({
         {/*
           aria-hidden on the element itself -- the heading it sits beside
           already names the band, and a screen reader announcing "Runs in
-          production 7" as a heading would be reading a decoration as
+          production 9" as a heading would be reading a decoration as
           content. The rows carry the real information.
+
+          Entries, not tiles (owner, 2026-09-04): the rail and the footer
+          both count entries, and one page should count one thing. A
+          collapsed tile's own "5 entries" line (ServiceTile.tsx) is what
+          reconciles this number with the tile count on screen.
         */}
         <span className={styles.count} aria-hidden="true">
           {services.length}
@@ -83,14 +111,15 @@ export function BandModule({
       {band.note && <p className={styles.note}>{band.note}</p>}
 
       <div className={styles.grid}>
-        {services.map((service) => (
+        {groups.map((group) => (
           <ServiceTile
-            key={service.id}
-            service={service}
+            key={group.service}
+            group={group}
+            bandId={band.id}
             readAt={readAt}
-            selected={service.id === selectedId}
-            onActivate={onActivate}
-            onPeek={onPeek}
+            selected={group.entries.some((entry) => entry.id === selectedId)}
+            onActivate={(activated) => onActivate(band, activated)}
+            onPeek={(peeked, anchor) => onPeek(band, peeked, anchor)}
             onPeekEnd={onPeekEnd}
           />
         ))}

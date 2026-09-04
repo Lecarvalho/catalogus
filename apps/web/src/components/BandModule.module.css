@@ -50,13 +50,18 @@
  * Not the signal colour any more. The mosaic header spent red here, and
  * earned it there because a collapsed tile's `xN` made the header's entry
  * count and the tile count genuinely different numbers -- red singled out
- * the one that reconciled with the manifest. Candidate E collapses nothing,
- * so those two counts are now the same number and there is nothing left for
- * red to distinguish. Spending it on every band heading anyway would be the
- * same failure service-tags.ts's header describes for status pills on every
- * entry: tagging the norm spends the reader's attention on the norm, and a
- * band heading is exactly the board's norm. Red stays reserved for
- * lifecycle status.
+ * the one that reconciled with the manifest. This still counts entries, not
+ * tiles (BandModule.tsx's own header, "entries, not tiles"), and the two are
+ * genuinely different again since 2026-09-04 restored one-tile-per-vendor --
+ * but the reconciling number now lives on the collapsed tile itself
+ * ("5 entries", ServiceTile.tsx's `.count`), not here: this heading counts
+ * the same thing the rail and the footer do, so a reader comparing this
+ * number against either of those sees one figure agree three times rather
+ * than a fourth number to cross-reference. Spending red on it anyway would
+ * be the same failure service-tags.ts's header describes for status pills
+ * on every entry: tagging the norm spends the reader's attention on the
+ * norm, and a band heading is exactly the board's norm. Red stays reserved
+ * for lifecycle status.
  */
 .count {
   flex: 0 0 auto;

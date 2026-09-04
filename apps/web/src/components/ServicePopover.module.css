@@ -248,6 +248,101 @@
 }
 
 /*
+ * The multi-entry group's own header line -- .pop-count in the mockup,
+ * which states it as .pop-id's own font-size and colour with the mono face
+ * dropped (candidate-e-brandpage.html's own comment: a count is not a
+ * literal the reader will type). `--text-pop-id` and `--pop-id-gap` are
+ * `.slug`'s own two tokens, reused rather than duplicated -- the same trade
+ * ServiceTile.module.css's `.count` makes against `.id`'s tokens for the
+ * tile's identical second line. Added 2026-09-04, docs/brand-tile-brief.md,
+ * Part A; no new token, per that brief's shared contract.
+ */
+.count {
+  font-size: var(--text-pop-id);
+  color: var(--color-text-faint);
+  margin-top: var(--pop-id-gap);
+}
+
+/*
+ * The group popover's entry list, in place of `.facts` -- decision 4 of the
+ * mockup's own leading comment ("IN PLACE OF the six-fact grid, not above
+ * it"). Every number below is named against the mockup rule it was taken
+ * from, per that same comment's own accounting:
+ *
+ *   - Block gap: `--pop-facts-gap` (13px), `.facts`'s own margin-top --
+ *     the list sits where the grid used to.
+ *   - Row padding and its cancelling negative margin: `--rail-band-padding`
+ *     / `--rail-band-inset` (Rail.module.css), the world's own existing
+ *     hoverable list row -- read, not duplicated, since the mockup's
+ *     comment names `.rail-band` itself as the source.
+ *   - Row gap (id+role column against the status column):
+ *     `--pop-head-gap` (10px), `.header`'s own gap -- the mockup's comment
+ *     cites `.pop-head`'s gap for the identical purpose.
+ */
+.entries {
+  margin: var(--pop-facts-gap) 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pop-head-gap);
+  padding: var(--rail-band-padding);
+  margin: 0 calc(-1 * var(--rail-band-inset));
+  text-decoration: none;
+  color: inherit;
+}
+
+.entry:hover {
+  background: var(--color-surface-sunken);
+}
+
+/*
+ * The id, mono and ink -- `.mono-inline` in the mockup (12px mono, no
+ * colour of its own, so it inherits the row's ink): `--text-pop-mono` is
+ * this popover's own mono scale, already declared for the single-entry
+ * grid's `replaced_by` target just above.
+ */
+.entryId {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-pop-mono);
+  color: var(--color-text);
+}
+
+/*
+ * The role, beneath the id -- `.pop-id`'s own 11px/faint treatment, 2px
+ * under (`--pop-fact-gap`, `.facts > div`'s own row gap), per the mockup's
+ * comment on `.pop-entry-role`.
+ */
+.entryRole {
+  display: block;
+  margin-top: var(--pop-fact-gap);
+  font-size: var(--text-pop-id);
+  color: var(--color-text-faint);
+}
+
+/*
+ * The status word, shown only when an entry departs from `active` -- the
+ * same rule the tile's own status line applies (ServiceTile.module.css's
+ * `.status`), and, not by coincidence, the identical type: `--text-icon-
+ * status` / `--leading-icon-status` (10.5px/1.35/600) are the tile's own
+ * status-line tokens, and the mockup's `.pop-entry-status` rule states the
+ * exact same three numbers independently -- reused here rather than a
+ * `--pop-*` token invented to duplicate them.
+ */
+.entryStatus {
+  flex: 0 0 auto;
+  font-size: var(--text-icon-status);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-icon-status);
+  color: var(--color-signal);
+}
+
+/*
  * The manifest's own `notes`, quoted the way the mockup quotes it. Top-ruled
  * and appears only when the entry has one -- an entry with no note has
  * nothing here, not an empty ruled block.

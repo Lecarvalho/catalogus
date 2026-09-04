@@ -2,7 +2,10 @@
 //
 // BandModule is one full-width section of the board: a heading naming the
 // band and stating its entry count, an optional note, and a grid of bare
-// icons -- one tile per manifest entry, never collapsed by vendor.
+// icons -- one tile per catalog slug within this band (collapseByService,
+// bands.ts), restored 2026-09-04 after standing at one-tile-per-entry since
+// 2026-08-26. See BandModule.tsx's own header for the full history; this
+// file's first describe below is the regression guard for it.
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -17,13 +20,15 @@ const notedBand: BandDefinition = { id: "unplaced", label: "Unplaced", note: "Th
 
 afterEach(() => cleanup());
 
-describe("BandModule -- one tile per entry, never collapsed by vendor", () => {
-  // The regression this exists to catch: candidate E's board has no card
-  // left to carry a collapsed tile's `xN`, so three Fly.io entries must
-  // render as three distinct marks, not one Fly.io tile standing in for
-  // all three. The header count is the same number as the tile count now
-  // that nothing collapses, so this test checks both at once.
-  it("renders three entries of one vendor as three tiles, and the header count matches", () => {
+describe("BandModule -- one tile per brand per band", () => {
+  // The regression this exists to catch, and the one the 2026-09-04 pass
+  // restored: repeating a vendor's mark once per entry says the same thing
+  // several times over -- three Fly.io entries must render as one tile
+  // carrying all three, not three separate marks. The header keeps counting
+  // entries (nine, four here) even though the tile count on screen is now
+  // smaller (two: one Fly.io group, one Supabase tile) -- BandModule.tsx's
+  // own header explains why the two numbers are allowed to differ again.
+  it("collapses three entries of one vendor into one tile, and the header still states the entry count", () => {
     render(
       <BandModule
         band={band}
@@ -41,17 +46,45 @@ describe("BandModule -- one tile per entry, never collapsed by vendor", () => {
       />
     );
     expect(screen.getByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull();
-    // Four tiles, one per manifest entry -- not two (one per vendor slug).
-    expect(screen.getAllByRole("button")).toHaveLength(4);
-    expect(document.getElementById("service-tile-host-api")).not.toBeNull();
-    expect(document.getElementById("service-tile-host-web")).not.toBeNull();
-    expect(document.getElementById("service-tile-host-worker")).not.toBeNull();
-    // The old collapsed id, keyed on the vendor slug rather than the entry
-    // id, must not appear -- its presence would mean collapsing came back.
-    expect(document.getElementById("service-tile-flyio")).toBeNull();
-    // The header states the entry count, which is also the tile count now
-    // that nothing collapses.
+    // Two tiles: one collapsed Fly.io group, one single-entry Supabase tile
+    // -- not four, which is what one-tile-per-entry would have rendered.
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+    // The collapsed tile's DOM id is band-qualified (ServiceTile.tsx's own
+    // serviceTileDomId), not any one entry's id.
+    expect(document.getElementById("service-tile-production-flyio")).not.toBeNull();
+    expect(document.getElementById("service-tile-database")).not.toBeNull();
+    // None of the three Fly.io entries' own ids should have become a tile id
+    // -- their presence would mean the collapse did not happen.
+    expect(document.getElementById("service-tile-host-api")).toBeNull();
+    expect(document.getElementById("service-tile-host-web")).toBeNull();
+    expect(document.getElementById("service-tile-host-worker")).toBeNull();
+    // The header states the entry count -- four -- which is no longer the
+    // tile count now that Fly.io collapsed.
     expect(screen.getByText("4")).not.toBeNull();
+    expect(screen.getByText("3 entries")).not.toBeNull();
+  });
+
+  // A band with no repeated vendor collapses to nothing -- every group is
+  // its own single entry, so the tile count and the entry count agree, the
+  // same as before this pass.
+  it("renders one tile per entry, unchanged, when no two entries in the band share a catalog slug", () => {
+    render(
+      <BandModule
+        band={band}
+        services={[
+          service({ id: "host-api", role: "hosting-api", service: "flyio", name: "Fly.io" }),
+          service({ id: "database", role: "database", service: "supabase", name: "Supabase" }),
+        ]}
+        readAt={readAt}
+        selectedId={null}
+        onActivate={vi.fn()}
+        onPeek={vi.fn()}
+        onPeekEnd={vi.fn()}
+      />
+    );
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+    expect(document.getElementById("service-tile-host-api")).not.toBeNull();
+    expect(document.getElementById("service-tile-database")).not.toBeNull();
   });
 });
 
@@ -110,13 +143,17 @@ describe("BandModule -- the note", () => {
 });
 
 describe("BandModule -- selection reaches the right tile", () => {
-  it("marks exactly the tile whose entry id matches selectedId, and no sibling", () => {
+  // Three different vendors, so none of them collapse -- this is the
+  // single-entry-tile case, unchanged from before the group pass, and it is
+  // still true: `aria-current` marks exactly the tile whose entry id matches
+  // `selectedId`.
+  it("marks exactly the single-entry tile whose entry id matches selectedId, and no sibling", () => {
     render(
       <BandModule
         band={band}
         services={[
           service({ id: "a", role: "hosting-api", service: "flyio" }),
-          service({ id: "b", role: "hosting-web", service: "flyio" }),
+          service({ id: "b", role: "hosting-edge", service: "cloudflare-workers" }),
           service({ id: "c", role: "database", service: "supabase" }),
         ]}
         readAt={readAt}
@@ -133,15 +170,44 @@ describe("BandModule -- selection reaches the right tile", () => {
     expect(b?.getAttribute("aria-current")).toBe("true");
     expect(c?.hasAttribute("aria-current")).toBe(false);
   });
+
+  // The new case a collapsed tile introduces: `selectedId` names one entry
+  // *inside* a multi-entry group, which has no tile of its own any more --
+  // the group's own tile is what has to carry aria-current, since that is
+  // the only DOM node the selected entry renders inside now.
+  it("marks the group tile as aria-current when selectedId matches one of the entries it collapsed", () => {
+    render(
+      <BandModule
+        band={band}
+        services={[
+          service({ id: "host-api", role: "hosting-api", service: "flyio" }),
+          service({ id: "host-web", role: "hosting-web", service: "flyio" }),
+          service({ id: "database", role: "database", service: "supabase" }),
+        ]}
+        readAt={readAt}
+        selectedId="host-web"
+        onActivate={vi.fn()}
+        onPeek={vi.fn()}
+        onPeekEnd={vi.fn()}
+      />
+    );
+    const flyTile = document.getElementById("service-tile-production-flyio");
+    const supabaseTile = document.getElementById("service-tile-database");
+    expect(flyTile?.getAttribute("aria-current")).toBe("true");
+    expect(supabaseTile?.hasAttribute("aria-current")).toBe(false);
+  });
 });
 
-describe("BandModule -- callbacks reach the right tile with the right service", () => {
-  it("passes the exact ViewService for the tile that was activated and peeked, not another one", () => {
+describe("BandModule -- callbacks carry the band alongside the group", () => {
+  // Two different vendors -- the single-entry case -- proving the right
+  // service reaches the callback among more than one tile, and that the
+  // band handed back is this band, not some other one.
+  it("passes this band and a one-entry group holding the exact activated/peeked service", () => {
     const onActivate = vi.fn();
     const onPeek = vi.fn();
     const onPeekEnd = vi.fn();
     const a = service({ id: "a", role: "hosting-api", service: "flyio" });
-    const b = service({ id: "b", role: "hosting-web", service: "flyio" });
+    const b = service({ id: "b", role: "hosting-edge", service: "cloudflare-workers" });
     render(
       <BandModule
         band={band}
@@ -157,14 +223,42 @@ describe("BandModule -- callbacks reach the right tile with the right service", 
 
     fireEvent.click(tileB);
     expect(onActivate).toHaveBeenCalledTimes(1);
-    expect(onActivate.mock.calls[0]![0]).toBe(b);
+    expect(onActivate.mock.calls[0]![0]).toBe(band);
+    expect(onActivate.mock.calls[0]![1].entries).toEqual([b]);
 
     fireEvent.pointerOver(tileB, { pointerType: "mouse" });
     expect(onPeek).toHaveBeenCalledTimes(1);
-    expect(onPeek.mock.calls[0]![0]).toBe(b);
-    expect(onPeek.mock.calls[0]![1]).toBe(tileB);
+    expect(onPeek.mock.calls[0]![0]).toBe(band);
+    expect(onPeek.mock.calls[0]![1].entries).toEqual([b]);
+    expect(onPeek.mock.calls[0]![2]).toBe(tileB);
 
     fireEvent.pointerOut(tileB, { relatedTarget: document.body });
     expect(onPeekEnd).toHaveBeenCalledTimes(1);
+  });
+
+  // The group case: activating the collapsed Fly.io tile must hand back
+  // every entry it stands for, not just one -- App.tsx's own routing (open
+  // the entry page for a one-entry group, the brand page for several) reads
+  // `group.entries.length` to decide, so a callback that dropped entries
+  // here would silently misroute on click.
+  it("passes the whole group, every entry it collapsed, when the collapsed tile is activated", () => {
+    const onActivate = vi.fn();
+    const a = service({ id: "host-api", role: "hosting-api", service: "flyio" });
+    const c = service({ id: "host-web", role: "hosting-web", service: "flyio" });
+    render(
+      <BandModule
+        band={band}
+        services={[a, c]}
+        readAt={readAt}
+        selectedId={null}
+        onActivate={onActivate}
+        onPeek={vi.fn()}
+        onPeekEnd={vi.fn()}
+      />
+    );
+    fireEvent.click(document.getElementById("service-tile-production-flyio")!);
+    expect(onActivate).toHaveBeenCalledTimes(1);
+    expect(onActivate.mock.calls[0]![0]).toBe(band);
+    expect(onActivate.mock.calls[0]![1].entries).toEqual([a, c]);
   });
 });

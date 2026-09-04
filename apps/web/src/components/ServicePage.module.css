@@ -5,21 +5,19 @@
  * can have a real reading measure instead of a 220px gutter.
  *
  * Moved into candidate E (docs/candidates/candidate-e-homescreen.html,
- * approved 2026-08-26) on 2026-08-31. The structure below is untouched --
- * breadcrumb, header, two columns -- because this move is into a world
- * whose rules and tokens already exist, not a new information architecture.
- * What changed is every value. Most of the replacement already existed:
- * ServiceTile.module.css's --icon-mark-size and --icon-id-gap,
- * ServicePopover.module.css's --text-pop-id / --text-pop-label /
- * --track-pop-label, and tokens.css's own --text-board-body /
+ * approved 2026-08-26) on 2026-08-31. The structure below was untouched at
+ * the time -- breadcrumb, header, two columns -- because that move was into a
+ * world whose rules and tokens already existed, not a new information
+ * architecture. What changed then was every value. Most of the replacement
+ * already existed: ServiceTile.module.css's --icon-mark-size and
+ * --icon-id-gap, ServicePopover.module.css's --text-pop-id / --text-pop-label
+ * / --track-pop-label, and tokens.css's own --text-board-body /
  * --leading-board-body -- reused because the value and its meaning both
- * already matched, not because a near neighbour got rounded onto. Four
- * values had no match anywhere: --text-page-title, --page-header-gap,
- * --page-section-gap and --page-columns-gap are new. Candidate E's approved
- * mockup shows the List view only, so there is no artifact to lift a
- * service-page number from -- these four are this file's own design
- * decision rather than a measurement, and are reported as such rather than
- * invented and left silent.
+ * already matched, not because a near neighbour got rounded onto. Three
+ * values had no match anywhere: --text-page-title, --page-header-gap and
+ * --page-section-gap were new, chosen rather than measured (tokens.css
+ * records that they are confirmed now, 2026-09-04, against the approved
+ * brand-page mockup).
  *
  * One colour use this file used to make no longer does. `.back:hover` spent
  * --color-signal; DIRECTION.md's own restatement of "signal red is spent in
@@ -50,6 +48,27 @@
  * checking whether the site moved finds a paragraph saying it did. A
  * validator found it by reading the declaration instead. The paragraph is
  * kept as written rather than tidied, because what it got wrong is the point.
+ *
+ * ---------------------------------------------------------------------
+ * **Split in two, 2026-09-04**, for the approved brand-page mockup
+ * (docs/candidates/candidate-e-brandpage.html, artboard 3, decision 6):
+ * ServicePage.tsx's own header explains why the facts left this component's
+ * JSX. Two consequences for this file:
+ *
+ *   - `.columns` and `.facts` -- the two-column flex row this file used to
+ *     draw, `.document` beside a bordered `.facts` aside -- are both gone.
+ *     `.document` is a direct child of `.page` now, spaced by `.page`'s own
+ *     `gap` the same as `.header` is; a wrapper with one child left inside it
+ *     gaps against nothing, so it is removed rather than kept as a no-op
+ *     layer. The `@media (max-width: 860px)` rule that used to stack them is
+ *     gone with the pair it stacked -- the panel's own breakpoint, at the
+ *     shell's 900px rather than this file's old 860, is below.
+ *   - `.panel` is new: the outer chrome for `ServicePagePanel`
+ *     (ServicePage.tsx), the rail's mirror, mounted by App.tsx as a sibling
+ *     of `.board` through `AppShell`'s `sidePanel` slot rather than inside
+ *     this file's own `<article>`. Its geometry is documented at its own
+ *     declaration below, not here -- it no longer shares a comment block with
+ *     the document column it used to sit beside.
  */
 .page {
   display: flex;
@@ -65,6 +84,8 @@
 
 .breadcrumb {
   display: flex;
+  align-items: baseline;
+  gap: var(--page-crumb-gap);
 }
 
 .back {
@@ -84,6 +105,48 @@
    contract's own restatement of the red budget names "not a link"
    directly, and a back control is exactly that. */
 .back:hover {
+  color: var(--color-text);
+}
+
+/* The separator between crumbs, added 2026-09-04 -- the mockup's own
+   `.crumb-sep`: faint, not muted, and normal weight against the crumbs'
+   own bold, so it reads as punctuation rather than as a third crumb.
+   D4, 2026-09-04: this carried no font-size of its own, so with neither
+   `.breadcrumb` nor `.page` declaring one either it fell back to `body`'s
+   own `--text-body` (12px), computing an 18px line-height (12 *
+   `--leading-body`) against the crumbs' own 10px / 15px either side of it --
+   the validator measured the nav row at 18px against the mockup's 15.5,
+   pushing the entry page's header from y=141 to y=144. With the fix the
+   row measures 15px and the header sits at y=141 (re-validated
+   2026-09-04): the remaining 0.5px against the mockup's 15.5 / 141.5 is
+   the two documents' body leading, 1.5 here (`--leading-body`) against the
+   mockup's 1.55, and is left alone. The mockup's own
+   `.crumb-sep` carries no font-size either -- it inherits the 10px `.crumbs`
+   states once for the whole row (candidate-e-brandpage.html, artboard 3).
+   This file states that 10px per crumb rather than once on `.breadcrumb`
+   (ServicePage.tsx's own comment on `.crumbBrand` explains why: restating is
+   the lower-risk edit), so the fix restates `--text-pop-label` here too,
+   matching `.back` and `.crumbBrand`'s own font-size instead of moving it
+   up onto the row. */
+.crumbSep {
+  font-size: var(--text-pop-label);
+  color: var(--color-text-faint);
+  font-weight: var(--weight-normal);
+}
+
+/* The brand crumb. Same face as `.back` -- see ServicePage.tsx's own comment
+   on why this restates the rule rather than sharing it with `.back` through
+   a combined selector. */
+.crumbBrand {
+  font-size: var(--text-pop-label);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--track-pop-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.crumbBrand:hover {
   color: var(--color-text);
 }
 
@@ -164,73 +227,144 @@
 }
 
 /*
- * Document left, facts right. The document column leads because the page
- * exists for the writing -- the facts are already visible on the board and in
- * the popover, and a reader who came this far came for what is not on the
- * board.
+ * The document. A direct child of `.page` since the facts column left for
+ * the shell-level panel (see this file's header) -- `.page`'s own flex `gap`
+ * spaces it under `.header` the way it already spaced `.header` under
+ * `.breadcrumb`, so no `margin-top` of its own is needed.
+ *
+ * D2, 2026-09-04: this rule carried no font-size of its own, so its
+ * `max-width: 68ch` measured against `body`'s own `--text-body` (12px) and
+ * resolved to 439.9px -- the validator's own number -- where the mockup's
+ * `.page-doc` (candidate-e-brandpage.html, artboard 3, additions block:
+ * "the document measure 68ch ... are the built page's own") measures
+ * 549.8px against its own 15px body. `--text-board-body` /
+ * `--leading-board-body` are the same board-body tokens `.documentEmpty`
+ * and `.documentBody` already set per element below (the mockup's own
+ * "body at the board's 15px/1.55", file header decision 6) -- declared here
+ * too so the ch measure itself resolves against 15px rather than falling
+ * through to the app's compact 12px default.
  */
-.columns {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--page-columns-gap);
-}
-
 .document {
-  flex: 1 1 auto;
-  min-width: 0;
+  font-size: var(--text-board-body);
+  line-height: var(--leading-board-body);
   max-width: 68ch;
 }
 
+/*
+ * D2, 2026-09-04: this heading was the popover's own 10px caps label
+ * (`--text-pop-label`, muted), which reads as a sub-label sitting over
+ * empty-state prose, not the real section heading the mockup gives the
+ * document column. Rebuilt to artboard 3's `.page-h2`
+ * (candidate-e-brandpage.html): the band heading's own 19px / -0.01em
+ * (`--text-band-title` / `--track-band-title`), ink rather than muted caps --
+ * the same reuse BrandPage.module.css's own `.entriesHeading` already makes
+ * for its "Entries" heading, and the same reasoning stated there: a real
+ * second-level heading sitting over content, the job `--text-band-title`
+ * already does for a band's own heading on the board.
+ */
 .documentHeading {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-pop-label);
+  margin: 0;
+  font-size: var(--text-band-title);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--track-pop-label);
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  letter-spacing: var(--track-band-title);
 }
 
 /*
  * "Nothing written yet" is the state, stated plainly and in ink. It is not a
  * warning and not an error -- the store does not exist -- so it never takes
  * the signal colour, which is reserved for departures from normal.
+ *
+ * D2, 2026-09-04: the 8px below the heading (`margin: 0 0 var(--space-4)`,
+ * later corrected to `--space-4` = 12px, still not the mockup's own gap)
+ * was too tight against the mockup's own `.doc-empty { margin-top: 30px;
+ * ... }` (artboard 3) -- the validator measured an 8px heading-to-paragraph
+ * gap against the mockup's 30. `--icon-grid-top` is that same 30px, already
+ * this world's name for "the space between a heading and the things under
+ * it" (tokens.css's own comment) -- reused here on the identical
+ * relationship rather than given a second name, the same reuse
+ * BrandPage.module.css's own `.facts` and `.rows` already make for the
+ * identical gap.
  */
 .documentEmpty {
-  margin: 0 0 var(--space-4);
+  margin: var(--icon-grid-top) 0 0;
   font-size: var(--text-board-body);
   font-weight: var(--weight-bold);
   line-height: var(--leading-board-body);
 }
 
+/*
+ * D2, 2026-09-04: was `margin: 0 0 var(--space-3)` (8px below), where the
+ * mockup's own `.doc-body { margin-top: 13px; ... }` (artboard 3) puts 13px
+ * above each paragraph -- the validator measured 0px between this and the
+ * paragraph before it against the mockup's 13. Kept as a bare literal
+ * rather than reached for `--pop-facts-gap` / `--pop-note-gap` (also 13px,
+ * tokens.css): those are declared "the popover's own spacing", and coupling
+ * this column's own paragraph rhythm to a name scoped to an unrelated
+ * surface is the exact near-miss shape tokens.css's own header warns
+ * against -- the same call this file already makes for `.document`'s own
+ * bare 68ch measure, above.
+ */
 .documentBody {
-  margin: 0 0 var(--space-3);
+  margin: 13px 0 0;
   font-size: var(--text-board-body);
   line-height: var(--leading-board-body);
   color: var(--color-text-muted);
 }
 
 /*
- * A bordered, hairline-lined box with no radius -- not a service card
- * (candidate E's services carry none), but shell chrome the way a rail or a
- * popover is: this world's Notion-calm surfaces live on the shell now, not
- * on a service, and a facts sidebar is chrome around the page, not a
- * service rendering itself.
+ * The side panel, docked to the right edge of the rail-plus-board row --
+ * added 2026-09-04, `ServicePagePanel`'s only rule. The rail's own mirror,
+ * and its treatment is read off the rail's, the mockup's own words: "the
+ * rail's treatment with its hairline on the left edge" -- a surface fill, a
+ * hairline on the LEFT edge (the rail's is on its right, since the panel
+ * sits on the opposite side of the row), no radius (structure, not a
+ * transient, the same call Rail.module.css makes for itself), the rail's own
+ * `26px 20px 20px` inset.
+ *
+ * It stretches to the row's full height the same way the rail does, and for
+ * the same reason: `align-items: stretch` on `.shell` (AppShell.module.css)
+ * applies to every flex child of that row, and this panel is one -- mounted
+ * there directly through `AppShell`'s `sidePanel` slot, with no wrapper of
+ * this file's own between it and `.shell`. Nothing here declares that
+ * stretch; it is inherited, the same way it always was for the rail.
+ *
+ * `--page-facts-width` is 300px, not the rail's 240 -- tokens.css's own
+ * comment carries the mockup's full measurement (the fixture's longest edge
+ * line, the Layer 3 prose) for why.
  */
-.facts {
-  flex: 0 0 300px;
-  border: 1px solid var(--color-line);
+.panel {
+  flex: 0 0 var(--page-facts-width);
+  width: var(--page-facts-width);
   background: var(--color-surface);
+  border-left: 1px solid var(--color-line);
+  padding: var(--rail-padding);
 }
 
-/* Below the two-column measure the facts follow the document rather than
-   pinch it. */
-@media (max-width: 860px) {
-  .columns {
-    flex-direction: column;
-  }
-
-  .facts {
-    flex: 1 1 auto;
-    align-self: stretch;
+/*
+ * Below 900px, where the rail leaves (Rail.module.css's own breakpoint,
+ * AppShell.module.css's own comment on what leaves with it). The panel does
+ * not leave with the rail -- the mockup's own words: "the rail is navigation
+ * the board can do without, the panel is the entry's own facts" -- it stacks
+ * under the document instead, full width, its hairline moved from the left
+ * edge to the top (the mockup: "the panel becomes full-width with its
+ * hairline on top instead of on the left, keeping its inset and section
+ * order").
+ *
+ * `flex-basis: 100%` rather than `width: 100%` alone: `.shell` only wraps a
+ * row when a line's items cannot all fit it, and `.board`'s own `min-width: 0`
+ * (AppShell.module.css) lets it shrink to nothing rather than force a wrap on
+ * its own -- so without a basis this panel would just narrow and sit beside
+ * the board instead of dropping beneath it. A 100% basis cannot share a line
+ * with anything, which is what forces the break; AppShell.module.css's own
+ * `.shell.withPanel` carries the `flex-wrap: wrap` this depends on, and its
+ * own comment explains why that rule is scoped to a modifier class rather
+ * than added to `.shell` unconditionally.
+ */
+@media (max-width: 900px) {
+  .panel {
+    flex: 1 1 100%;
+    width: auto;
+    border-left: none;
+    border-top: 1px solid var(--color-line);
   }
 }

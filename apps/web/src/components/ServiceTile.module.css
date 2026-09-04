@@ -17,6 +17,13 @@
  * review and wrong on screen. Only the badge's 23px / 12px / −6px / 1.5px
  * and the monogram's 0.02em letter-spacing stay bare -- genuinely local,
  * single-use numbers with no scale to belong to either way.
+ *
+ * 2026-09-04: `.count` (the multi-entry group's "5 entries" line) added no
+ * token of its own -- it is `.id`'s own two tokens with the mono face
+ * dropped, per candidate-e-brandpage.html's own comment on `.icon-count`
+ * (docs/brand-tile-brief.md's shared contract forbids a new token from this
+ * pass unless the mockup introduced a number candidate E lacked, and this
+ * one did not).
  */
 
 .tile {
@@ -159,6 +166,23 @@
   margin-top: var(--icon-id-gap);
   font-size: var(--text-icon-id);
   font-family: var(--font-mono);
+  color: var(--color-text-faint);
+}
+
+/*
+ * The multi-entry group's second line -- "5 entries", in place of the id.
+ * Added 2026-09-04 for the one-tile-per-brand-per-band pass
+ * (docs/brand-tile-brief.md, Part A). Candidate-e-brandpage.html's own
+ * `.icon-count` rule states it as `.icon-id`'s slot, size and colour minus
+ * the mono face -- the mockup's own reasoning: a count is not a literal the
+ * reader will type into a `catalogus set` command, unlike an id, so it does
+ * not earn `.id`'s `font-family: mono`. `--icon-id-gap` and `--text-icon-id`
+ * are `.id`'s own tokens, reused rather than duplicated, since every number
+ * but the font family is identical.
+ */
+.count {
+  margin-top: var(--icon-id-gap);
+  font-size: var(--text-icon-id);
   color: var(--color-text-faint);
 }
 

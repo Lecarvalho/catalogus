@@ -18,13 +18,25 @@
 // docks beside it. Selectors below changed to match; the *intent* behind
 // every test that existed before this rewrite is preserved, and every place
 // that intent had to bend is called out in its own comment.
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+//
+// **2026-09-04: one tile per brand per band, and a second page route**
+// (docs/brand-tile-brief.md, Part A). Every fixture above the new
+// describe blocks still uses one entry per vendor per band (`fly-api` in
+// "production", `supabase-db` in "holds"), so none of the existing tests'
+// premises changed -- a single-entry group renders exactly the tile it
+// always did, at exactly the same DOM id. The "two entries of one vendor,
+// two tiles" describe block near the end of the click-handling section is
+// the one place a fixture's own premise inverted: it used to prove the
+// collapse stayed gone, and now proves the opposite, on purpose (see its
+// own comment). New describe blocks cover what did not exist before: the
+// brand page route, the `brand` prop reaching `ServicePage`, the group
+// popover's rows, and focus restoring to a group's own tile.
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ViewPayload, ViewService } from "@catalogus/cli";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
-import { serviceTileDomId } from "./components/ServiceTile.js";
 import { makeViewPayload, makeViewService } from "./test-support/fixtures.js";
 
 // elk-layout.ts reaches its worker through a Vite `?worker` import that
@@ -90,6 +102,40 @@ function payload(overrides: { services?: ViewService[]; edges?: { from: string; 
   });
 }
 
+/**
+ * Five Fly.io entries in "Runs in production", one of them phasing out --
+ * the mockup's own artboard-1 fixture (docs/candidates/candidate-e-
+ * brandpage.html), reproduced here rather than the layout-stress example
+ * manifest itself, since this file builds `ViewPayload`s from
+ * `makeViewService` throughout and a fixture file would be a second way to
+ * build the same shape. `host-preview` is the one that departs, unchanged
+ * from the mockup's own choice and its own reasoning for picking it (that
+ * file's leading comment, "What it does not decide"). `supabase-db` is
+ * along for the ride, unaffected in a different band, so a test can also
+ * reach a single-entry tile in this same payload -- one payload for both
+ * shapes rather than two similar ones.
+ */
+function flyGroupPayload(): ViewPayload {
+  return payload({
+    services: [
+      makeViewService({ id: "host-api", role: "hosting-api", rollup: "hosting", name: "Fly.io", service: "flyio" }),
+      makeViewService({ id: "host-cron", role: "hosting-cron", rollup: "hosting", name: "Fly.io", service: "flyio" }),
+      makeViewService({
+        id: "host-preview",
+        role: "hosting-preview",
+        rollup: "hosting",
+        name: "Fly.io",
+        service: "flyio",
+        status: "phasing_out",
+      }),
+      makeViewService({ id: "host-web", role: "hosting-web", rollup: "hosting", name: "Fly.io", service: "flyio" }),
+      makeViewService({ id: "host-worker", role: "hosting-worker", rollup: "hosting", name: "Fly.io", service: "flyio" }),
+      makeViewService({ id: "supabase-db", role: "database", rollup: "database", name: "Supabase", service: "supabase" }),
+    ],
+    edges: [],
+  });
+}
+
 /** Renders App with `fetch` answering one payload, and waits for the first tile to appear. */
 async function renderLoaded(body: ViewPayload = payload()) {
   vi.stubGlobal(
@@ -109,11 +155,25 @@ async function renderLoaded(body: ViewPayload = payload()) {
  * The service page has an unconditional, unambiguous role -- `<article>` is
  * "article" regardless of its accessible name, unlike the band modules'
  * `<section aria-labelledby>`, which computes to "region" the moment it has
- * one. The page and the board are mutually exclusive branches in App.tsx
- * (selecting a service replaces the board outright), so this is never
- * ambiguous the way `getByRole("region")` would be against a rendered board.
+ * one. The page, the brand page and the board are mutually exclusive
+ * branches in App.tsx (selecting one replaces the board outright, and the
+ * two pages never coexist), so this was never ambiguous the way
+ * `getByRole("region")` would be against a rendered board.
+ *
+ * Since 2026-09-04 two different pages both render as `<article>`
+ * (`BrandPage.tsx` matches `ServicePage.tsx`'s own role on purpose --
+ * "same shape as ServicePage.tsx", that file's own header), so `queryByRole
+ * ("article")` alone can no longer tell them apart -- it would read true for
+ * either. Every existing test above this line only ever has a
+ * `ServicePage` in play (their fixtures are single-entry groups), so this
+ * stays a safe, behaviour-preserving narrowing rather than a new
+ * assumption: it now also requires the heading id `ServicePage.tsx`'s own
+ * `headingId` produces, which `BrandPage.tsx`'s own `headingId` never does.
  */
-const servicePage = () => screen.queryByRole("article");
+const servicePage = () => document.querySelector('article[aria-labelledby^="service-page-heading-"]');
+
+/** The brand page's own version of `servicePage` above -- same reasoning, the other prefix. */
+const brandPage = () => document.querySelector('article[aria-labelledby^="brand-page-heading-"]');
 
 /**
  * Stubs one element's own `getBoundingClientRect`, the way GraphCanvas.test.tsx
@@ -436,13 +496,19 @@ describe("App -- focus when the page closes", () => {
   // nodes by entry id. Candidate E renders one tile per entry, so both key on
   // the entry id now and this asserts on `supabase-db` where it once asserted
   // on `supabase`.
+  //
+  // `supabase-db` is a single-entry group in this payload (nothing else
+  // shares its slug), so its tile still keys on the bare entry id --
+  // `serviceTileDomId`'s own header -- and the literal string below is that
+  // same id, not a hand-picked one; the band-qualified form only applies to
+  // a *multi*-entry group's own describe block further down.
   it("hands focus to the tile the page was addressed to when nothing opened it -- the deep-link case", async () => {
     window.history.replaceState(null, "", "/#/service/supabase-db");
     await renderLoaded();
     await waitFor(() => expect(servicePage()).not.toBeNull());
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(servicePage()).toBeNull());
-    expect(document.activeElement).toBe(document.getElementById(serviceTileDomId("supabase-db")));
+    expect(document.activeElement).toBe(document.getElementById("service-tile-supabase-db"));
     expect(document.activeElement).not.toBe(document.body);
   });
 
@@ -517,20 +583,21 @@ describe("App -- focus when the page closes", () => {
   });
 });
 
-// This describe used to assert the opposite of what it asserts now, and the
-// reversal is the point rather than a detail. The board collapsed every entry
-// of one vendor into a single tile, so a two-entry Fly.io tile had no page to
-// open -- "Fly.io" is not a document, two Fly.io deployments are -- and the
-// click deliberately did nothing, leaving the popover's rows as the only
-// destinations. The owner approved candidate E on 2026-08-26, which renders
-// one tile per manifest entry, so every tile now has exactly one page and the
-// refusal has nothing left to refuse (docs/PLAN.md, "The form is settled").
-//
-// The second test is the one that earns its place: two entries of one vendor
-// must reach two *different* pages. It is the App-level guard against the
-// collapse being restored, and it fails loudly rather than subtly if it is --
-// a restored collapse renders one tile where this looks for two.
-describe("App -- clicking a tile: every tile is one entry, and opens its own page", () => {
+// This describe has changed its own premise twice now. Until 2026-08-26 the
+// board collapsed every entry of one vendor into a single tile, so a
+// two-entry Fly.io tile had no page to open and the click deliberately did
+// nothing. Candidate E's one-tile-per-entry board (2026-08-26 to 2026-09-04)
+// retired that: every tile was exactly one entry, so every click opened
+// exactly one page, and the second test below proved two entries of one
+// vendor reached two *different* pages as a guard against the collapse
+// coming back. **It came back, on purpose, 2026-09-04**
+// (docs/brand-tile-brief.md, Part A) -- so this describe's second test now
+// proves the opposite of what it proved a week earlier: two entries of one
+// vendor, in the same band, are one tile, and that one tile opens the brand
+// page rather than either entry's own. The single-entry case (the first
+// test) is untouched -- a tile that never collapsed anything still opens
+// its own entry's page directly, exactly as it always has.
+describe("App -- clicking a tile: a single entry opens its own page, several open the brand page", () => {
   const twoOfOneVendor = () =>
     payload({
       services: [
@@ -539,19 +606,168 @@ describe("App -- clicking a tile: every tile is one entry, and opens its own pag
       ],
     });
 
-  it("navigates on click", async () => {
+  it("navigates a single-entry tile straight to its own entry page", async () => {
     await renderLoaded();
     fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
     await waitFor(() => expect(window.location.hash).toBe("#/service/fly-api"));
   });
 
-  it("gives two entries of one vendor two tiles, each opening its own page", async () => {
+  // The reversal: two entries of one vendor, in one band, collapse into one
+  // tile -- not two -- and that tile opens the brand page, not either
+  // entry's own. This is the App-level guard that the collapse stays
+  // restored: a regression back to one-tile-per-entry renders two buttons
+  // where this looks for one, and a regression that opens an entry page
+  // directly (rather than the brand page) fails the hash assertion.
+  it("collapses two entries of one vendor into one tile, which opens the brand page rather than either entry's own", async () => {
     await renderLoaded(twoOfOneVendor());
     const tiles = await screen.findAllByRole("button", { name: /Fly\.io/ });
-    expect(tiles).toHaveLength(2);
+    expect(tiles).toHaveLength(1);
+    expect(tiles[0]!.id).toBe("service-tile-production-flyio");
 
-    fireEvent.click(await screen.findByRole("button", { name: /Fly\.io, fly-web/ }));
-    await waitFor(() => expect(window.location.hash).toBe("#/service/fly-web"));
+    fireEvent.click(tiles[0]!);
+    await waitFor(() => expect(window.location.hash).toBe("#/brand/production/flyio"));
+    expect(servicePage()).toBeNull();
+    expect(brandPage()).not.toBeNull();
+  });
+});
+
+// The brand page route itself (docs/brand-tile-brief.md, Part A's shared
+// contract: `#/brand/<bandId>/<serviceSlug>`). Mirrors "App -- the service
+// page route" above, one test at a time, over the five-entry Fly.io group.
+describe("App -- the brand page route", () => {
+  it("opens straight from a deep link, with no click at all", async () => {
+    window.history.replaceState(null, "", "/#/brand/production/flyio");
+    await renderLoaded(flyGroupPayload());
+    expect(brandPage()).not.toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "Fly.io" })).not.toBeNull();
+    // The header's own fact grid states the entry count once -- the same
+    // number the tile's "5 entries" line and the entries table both agree
+    // with.
+    expect(screen.getByText("5")).not.toBeNull();
+    expect(screen.getAllByRole("link")).toHaveLength(5);
+  });
+
+  it("selects nothing for a hash naming a band the manifest does not have", async () => {
+    window.history.replaceState(null, "", "/#/brand/production/does-not-exist");
+    await renderLoaded(flyGroupPayload());
+    expect(brandPage()).toBeNull();
+    expect(servicePage()).toBeNull();
+  });
+
+  it("selects nothing for a hash naming a real band but no group in it", async () => {
+    window.history.replaceState(null, "", "/#/brand/holds/flyio");
+    await renderLoaded(flyGroupPayload());
+    expect(brandPage()).toBeNull();
+  });
+
+  it("closes on Escape, back to the board", async () => {
+    await renderLoaded(flyGroupPayload());
+    fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
+    await waitFor(() => expect(brandPage()).not.toBeNull());
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(brandPage()).toBeNull());
+  });
+
+  it("carries a back control that names the project and returns to the board", async () => {
+    await renderLoaded(flyGroupPayload());
+    fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
+    await waitFor(() => expect(brandPage()).not.toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: /Scratch/ }));
+    await waitFor(() => expect(brandPage()).toBeNull());
+    expect(screen.getByRole("button", { name: /Fly\.io/ })).not.toBeNull();
+  });
+
+  it("hides the board, the view toggle and the band index while it is open", async () => {
+    await renderLoaded(flyGroupPayload());
+    fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
+    await waitFor(() => expect(brandPage()).not.toBeNull());
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Bands" })).toBeNull();
+  });
+
+  // The same regression class "App -- opening and closing the page does not
+  // grow history" guards for the entry page, over the brand page instead.
+  it("adds no history entry across an open and a close", async () => {
+    await renderLoaded(flyGroupPayload());
+    const before = window.history.length;
+    fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
+    await waitFor(() => expect(brandPage()).not.toBeNull());
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(brandPage()).toBeNull());
+    expect(window.history.length).toBe(before);
+  });
+
+  // BrandPage.tsx's own rows route through `onOpenEntry` -- this is the
+  // App-level proof that App.tsx wires it to `handleSelect` (a real
+  // navigation to that entry's own page), not left unconnected.
+  it("opens an entry's own page when a row inside the brand page is clicked", async () => {
+    await renderLoaded(flyGroupPayload());
+    fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
+    await waitFor(() => expect(brandPage()).not.toBeNull());
+    fireEvent.click(screen.getByRole("link", { name: /host-preview/ }));
+    await waitFor(() => expect(window.location.hash).toBe("#/service/host-preview"));
+    expect(servicePage()).not.toBeNull();
+    expect(brandPage()).toBeNull();
+  });
+
+  describe("focus", () => {
+    it("hands focus back to the group tile that opened it", async () => {
+      await renderLoaded(flyGroupPayload());
+      const tile = screen.getByRole("button", { name: /Fly\.io/ });
+      const openerId = tile.id;
+      tile.focus();
+      fireEvent.click(tile);
+      await waitFor(() => expect(brandPage()).not.toBeNull());
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => expect(brandPage()).toBeNull());
+      expect(openerId).toBe("service-tile-production-flyio");
+      expect((document.activeElement as HTMLElement | null)?.id).toBe(openerId);
+    });
+
+    it("hands focus to the group tile when the brand page was reached by deep link", async () => {
+      window.history.replaceState(null, "", "/#/brand/production/flyio");
+      await renderLoaded(flyGroupPayload());
+      await waitFor(() => expect(brandPage()).not.toBeNull());
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => expect(brandPage()).toBeNull());
+      expect(document.activeElement).toBe(document.getElementById("service-tile-production-flyio"));
+      expect(document.activeElement).not.toBe(document.body);
+    });
+
+    it("moves focus into the page when it opens", async () => {
+      await renderLoaded(flyGroupPayload());
+      fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
+      await waitFor(() => expect(document.activeElement).toBe(brandPage()));
+    });
+  });
+});
+
+// The `brand` prop reaching `ServicePage` (shared contract, docs/brand-
+// tile-brief.md): present only for an entry whose band group collapsed to
+// more than one tile-worth of entries -- Part A's own side of the contract,
+// since `ServicePage.tsx` and its crumb belong to Part C.
+describe("App -- ServicePage's own brand prop", () => {
+  it("passes brand for an entry of a multi-entry group, naming the group and linking to its brand page", async () => {
+    window.history.replaceState(null, "", "/#/service/host-web");
+    await renderLoaded(flyGroupPayload());
+    await waitFor(() => expect(servicePage()).not.toBeNull());
+    const crumb = screen.getByRole("link", { name: "Fly.io" });
+    expect(crumb.getAttribute("href")).toBe("#/brand/production/flyio");
+  });
+
+  it("passes no brand for a single-entry group -- no second crumb, no link at all on the page", async () => {
+    window.history.replaceState(null, "", "/#/service/supabase-db");
+    await renderLoaded(flyGroupPayload());
+    await waitFor(() => expect(servicePage()).not.toBeNull());
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
+  });
+
+  it("follows the crumb back to the brand page", async () => {
+    window.history.replaceState(null, "", "/#/service/host-web");
+    await renderLoaded(flyGroupPayload());
+    await waitFor(() => expect(servicePage()).not.toBeNull());
+    fireEvent.click(screen.getByRole("link", { name: "Fly.io" }));
+    await waitFor(() => expect(window.location.hash).toBe("#/brand/production/flyio"));
   });
 });
 
@@ -662,6 +878,203 @@ describe("App -- the hover popover", () => {
       fireEvent.keyDown(document, { key: "Tab" });
       expect(screen.queryByRole("presentation")).not.toBeNull();
     });
+  });
+});
+
+// The group popover, end to end through a real board tile -- ServicePopover.
+// test.tsx already proves the component's own rendering and its focus
+// bridge in isolation; what only App.tsx can prove is that the real wiring
+// (a real ServiceTile's onPeek reaching a real ServicePopover's onOpenEntry)
+// behaves the same way, and that opening a row does not grow history.
+describe("App -- the group popover", () => {
+  it("lists every entry as a link, with the departing one's status word", async () => {
+    await renderLoaded(flyGroupPayload());
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    const popover = await screen.findByRole("presentation");
+    // Scoped to the popover itself, not the whole document -- the rail's
+    // own band index renders `<a>` links too while the board is showing,
+    // and this test is about the popover's rows, not the rail's.
+    expect(within(popover).getAllByRole("link")).toHaveLength(5);
+    expect(screen.getByText("Phasing out")).not.toBeNull();
+  });
+
+  // The brief's own requirement: reachable by Tab while the popover is
+  // pinned by focus. This is the mechanism ServicePopover.test.tsx already
+  // isolates (its own onFocus/onBlur bridge), proven here against the real
+  // tile that opens it -- tabbing from the tile into its own popover keeps
+  // the popover open rather than letting the tile's own blur close it.
+  it("stays open when focus moves from the tile into one of its own rows", async () => {
+    await renderLoaded(flyGroupPayload());
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    fireEvent.focus(tile);
+    await screen.findByRole("presentation");
+    const row = screen.getByRole("link", { name: /host-api/ });
+
+    // The same sequence a real Tab keypress produces: the tile blurs, the
+    // row gains focus, both synchronously.
+    fireEvent.blur(tile);
+    fireEvent.focus(row);
+    expect(screen.queryByRole("presentation")).not.toBeNull();
+
+    // And leaving the popover's own rows for good still closes it -- the
+    // bridge re-arms the close rather than cancelling it permanently.
+    vi.useFakeTimers();
+    fireEvent.blur(row);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(screen.queryByRole("presentation")).toBeNull();
+  });
+
+  // The keyboard's way *in*. The test above focuses a row directly, which
+  // proved the bridge and hid the gap: the popover mounts after the whole
+  // board, so a real Tab from the tile lands on the next tile, never on a
+  // row. Found 2026-09-04 by a validator driving the built app from the
+  // keyboard; ArrowDown/ArrowUp are the path now (App.tsx's peek keydown
+  // effect). `tile.focus()` here is a real focus move, so the tile's own
+  // blur and the row's focus fire the way a browser fires them.
+  describe("the arrow keys walk from the tile into its rows", () => {
+    async function focusedGroupTile() {
+      await renderLoaded(flyGroupPayload());
+      const tile = screen.getByRole("button", { name: /Fly\.io/ });
+      tile.focus();
+      fireEvent.focus(tile);
+      const popover = await screen.findByRole("presentation");
+      return { tile, links: within(popover).getAllByRole("link") };
+    }
+
+    it("ArrowDown on the tile focuses the first row and keeps the popover open", async () => {
+      const { links } = await focusedGroupTile();
+      fireEvent.keyDown(document, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(links[0]);
+      expect(links[0]?.textContent).toContain("host-api");
+      expect(screen.queryByRole("presentation")).not.toBeNull();
+    });
+
+    it("ArrowUp on the tile focuses the last row", async () => {
+      const { links } = await focusedGroupTile();
+      fireEvent.keyDown(document, { key: "ArrowUp" });
+      expect(document.activeElement).toBe(links[links.length - 1]);
+    });
+
+    it("wraps through the rows in both directions", async () => {
+      const { links } = await focusedGroupTile();
+      fireEvent.keyDown(document, { key: "ArrowDown" });
+      fireEvent.keyDown(document, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(links[1]);
+      fireEvent.keyDown(document, { key: "ArrowUp" });
+      fireEvent.keyDown(document, { key: "ArrowUp" });
+      expect(document.activeElement).toBe(links[links.length - 1]);
+      fireEvent.keyDown(document, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(links[0]);
+      expect(screen.queryByRole("presentation")).not.toBeNull();
+    });
+
+    it("Escape from a row closes the popover and hands focus back to the tile", async () => {
+      const { tile } = await focusedGroupTile();
+      fireEvent.keyDown(document, { key: "ArrowDown" });
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("presentation")).toBeNull());
+      expect(document.activeElement).toBe(tile);
+    });
+
+    it("Enter on a focused row opens that entry's page, not the brand page", async () => {
+      const { links } = await focusedGroupTile();
+      fireEvent.keyDown(document, { key: "ArrowDown" });
+      // An anchor's Enter is a click in every browser; jsdom does not
+      // synthesise it, so the click is fired on the focused row directly.
+      fireEvent.click(links[0]!);
+      await waitFor(() => expect(window.location.hash).toBe("#/service/host-api"));
+      expect(brandPage()).toBeNull();
+    });
+
+    // Found by the re-validation of this path, 2026-09-04: a pointer
+    // brushing a neighbouring tile replaced the peek, unmounted the focused
+    // row and left focus on <body>, where neither the arrows nor Escape had
+    // anything to act on. A row that holds focus now holds the popover:
+    // the neighbour's pointer-enter is refused, and its pointer-leave's
+    // scheduled close finds focus still inside and stands down.
+    it("keeps the popover, and the focused row, when a pointer brushes another tile", async () => {
+      const { links } = await focusedGroupTile();
+      fireEvent.keyDown(document, { key: "ArrowDown" });
+      fireEvent.keyDown(document, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(links[1]);
+
+      vi.useFakeTimers();
+      const neighbour = screen.getByRole("button", { name: /Supabase/ });
+      fireEvent.pointerEnter(neighbour, { pointerType: "mouse" });
+      fireEvent.pointerLeave(neighbour, { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(document.activeElement).toBe(links[1]);
+      expect(screen.queryByRole("presentation")).not.toBeNull();
+      expect(within(screen.getByRole("presentation")).getAllByRole("link")).toHaveLength(5);
+
+      // And the keyboard still owns it afterwards: the arrows keep walking
+      // and Escape still lands the reader back on the tile.
+      fireEvent.keyDown(document, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(links[2]);
+      fireEvent.keyDown(document, { key: "Escape" });
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(screen.queryByRole("presentation")).toBeNull();
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: /Fly\.io/ }));
+    });
+
+    it("does nothing on a single-entry tile, which has no rows", async () => {
+      await renderLoaded(flyGroupPayload());
+      const tile = screen.getByRole("button", { name: /Supabase/ });
+      tile.focus();
+      fireEvent.focus(tile);
+      await screen.findByRole("presentation");
+      fireEvent.keyDown(document, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(tile);
+      expect(screen.queryByRole("presentation")).not.toBeNull();
+    });
+  });
+
+  it("opens the clicked row's own entry page, not the brand page, and does not grow history", async () => {
+    await renderLoaded(flyGroupPayload());
+    const before = window.history.length;
+    fireEvent.pointerOver(screen.getByRole("button", { name: /Fly\.io/ }), { pointerType: "mouse" });
+    await screen.findByRole("presentation");
+    fireEvent.click(screen.getByRole("link", { name: /host-preview/ }));
+    await waitFor(() => expect(window.location.hash).toBe("#/service/host-preview"));
+    expect(servicePage()).not.toBeNull();
+    expect(brandPage()).toBeNull();
+    expect(window.history.length).toBe(before);
+  });
+
+  // The core new focus-restore case: an entry opened from a *group's*
+  // popover row has no tile of its own to return to -- the group's own tile
+  // is the only DOM node that entry renders inside, on the board, and this
+  // is the App-level proof that `groupFor` finds it rather than looking for
+  // an id (`service-tile-host-preview`) that was never rendered.
+  it("hands focus back to the group's own tile, not a per-entry id, when an entry opened from its popover closes", async () => {
+    await renderLoaded(flyGroupPayload());
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    const openerId = tile.id;
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    await screen.findByRole("presentation");
+    fireEvent.click(screen.getByRole("link", { name: /host-preview/ }));
+    await waitFor(() => expect(servicePage()).not.toBeNull());
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(servicePage()).toBeNull());
+    expect(document.getElementById("service-tile-host-preview")).toBeNull(); // never rendered -- the group collapsed it
+    expect((document.activeElement as HTMLElement | null)?.id).toBe(openerId);
+  });
+
+  it("clears the popover once the brand page opens from the same tile", async () => {
+    await renderLoaded(flyGroupPayload());
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    await screen.findByRole("presentation");
+    fireEvent.click(tile);
+    await waitFor(() => expect(brandPage()).not.toBeNull());
+    expect(screen.queryByRole("presentation")).toBeNull();
   });
 });
 
@@ -831,6 +1244,38 @@ describe("App -- popover position", () => {
       expect(top).toBe(-12);
       expect(top + 300).toBe(300 - 12); // the bottom edge, one gap clear of the tile
     });
+  });
+});
+
+// The brief's own requirement: the group popover's entry list runs taller
+// than the six-fact grid every test above this measures, and the placement
+// code itself is unchanged (popover-placement.ts, and App.tsx's own
+// `positionFor`) -- it measures the *real* box regardless of what is inside
+// it, so it should already clamp a taller box correctly. Proved directly,
+// not assumed: a five-entry group's popover, stubbed at a height well past
+// anything the single-entry grid reaches in this file, anchored near the
+// bottom of a short viewport.
+describe("App -- the group popover, taller than the single-entry one, still clamps", () => {
+  it("flips above rather than running past the bottom of a short viewport", async () => {
+    stubViewport(1280, 500);
+    // A five-row entry list plus its own header -- taller than every
+    // six-fact single-entry box stubbed elsewhere in this file (250-400px),
+    // and closer to what five real rows plus a header actually render at.
+    stubPopoverBox({ width: 268, height: 340 });
+    await renderLoaded(flyGroupPayload());
+    const tile = screen.getByRole("button", { name: /Fly\.io/ });
+    // Near the bottom of a 500px viewport: below has almost no room left, so
+    // a 340px box cannot fit there and the placement has to flip.
+    stubRect(tile, { top: 420, left: 100, width: 32, height: 32 });
+    fireEvent.pointerOver(tile, { pointerType: "mouse" });
+    const popover = await screen.findByRole("presentation");
+    const top = Number(popover.style.top.replace("px", ""));
+    // The same property the D2 describe above proves for the single-entry
+    // popover, over this file's own taller box: the placement never lets the
+    // box run past the viewport's bottom edge (12px inset), and it moves
+    // away from the tile (above it) rather than covering it.
+    expect(top + 340).toBeLessThanOrEqual(500 - 12);
+    expect(top).toBeLessThan(420);
   });
 });
 

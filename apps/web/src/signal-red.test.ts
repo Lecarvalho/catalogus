@@ -238,6 +238,17 @@ const redSites = allDeclarations.filter(
  * Note for whoever is editing MigrationList.module.css: the entry below names
  * `.status` + `color`. Renaming that rule fails this list until the entry
  * follows, which is intended and is not a merge conflict.
+ *
+ * `.entryStatus`, added 2026-09-04 (docs/brand-tile-brief.md, Part A): the
+ * group popover's own status word, one row per entry, in place of the
+ * six-fact grid's Status row a single-entry popover still carries in ink
+ * (ServicePopover.module.css's own `.facts dd`, not red -- that fact is
+ * inside a labelled grid, the same reasoning the mockup's own comment
+ * states for the brand page's Status column). A group's row has no label
+ * beside it the way a fact-grid cell does; it *is* the status word, shown
+ * only when the entry departs from `active` -- the fourth surface this
+ * exact rule now draws on, alongside the tile, the graph node and the
+ * migration row.
  */
 const LICENSED: readonly Site[] = [
   { file: "components/ServiceTile.module.css", selector: ".badge", property: "border" },
@@ -247,6 +258,7 @@ const LICENSED: readonly Site[] = [
   { file: "components/ServiceNode.module.css", selector: ".badge", property: "color" },
   { file: "components/ServiceNode.module.css", selector: ".status", property: "color" },
   { file: "components/MigrationList.module.css", selector: ".status", property: "color" },
+  { file: "components/ServicePopover.module.css", selector: ".entryStatus", property: "color" },
   { file: "tokens.css", selector: ":root", property: "--color-signal" },
 ];
 
