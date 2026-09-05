@@ -86,7 +86,7 @@ trusting anything below. **In that order**: the direction contract guard compare
 `apps/web/index.html` against the build output, so a `pnpm test` run against a `dist` older than your
 last edit to that file fails on a difference you created and already fixed.
 
-**The expected total as of 2026-09-05 is 1637 tests / 81 files** (+16 for `rename` and `remove` following the vendored icon; see the newest handoff. Before that, 1621 on 2026-09-04 evening: 1617 after the brand-tile slice and its two validation passes, +4 for the evening's three owner requests; +214 across the owner-supplied-icons slice and the brand-tile slice — 1606 before the four D1–D4 fixes and their eleven tests; it was 1403 / 77 on the evening of 2026-09-03, 1375 / 77 that morning before the thesvg icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
+**The expected total as of 2026-09-05 (end of day) is 1701 tests / 86 files** (1637 / 81 after the icon-following `rename` and `remove`; 1623 / 80 after `RankModule` went; 1701 / 86 with the three menus, the binary test and the preferences module. The 1637 was +16 for `rename` and `remove` following the vendored icon; see the newest handoff. Before that, 1621 on 2026-09-04 evening: 1617 after the brand-tile slice and its two validation passes, +4 for the evening's three owner requests; +214 across the owner-supplied-icons slice and the brand-tile slice — 1606 before the four D1–D4 fixes and their eleven tests; it was 1403 / 77 on the evening of 2026-09-03, 1375 / 77 that morning before the thesvg icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
 
 **The expected total moved on 2026-08-26 and this line no longer names one.** It said **1218 tests /
 72 files**, which was correct at the start of that session and is the number to compare against if
@@ -137,15 +137,106 @@ agent against the built binary, and one open item closed without code because it
 reproduce. The three shell menus stay blocked on the owner's 2026-09-02 questions; the portfolio
 page is untouched.
 
-**State of the tree at this handoff: 1637 tests / 81 files**, green, `pnpm typecheck` clean across
+**State of the tree at this handoff: 1701 tests / 86 files** at the end of the day (1637 / 81 when the morning's icon change landed), green, `pnpm typecheck` clean across
 four packages. Commits: the CLI and skill change together (they change in the same commit by
 CLAUDE.md's rule), then this board.
 
+#### The owner answered the 2026-09-02 questions, later the same day
+
+Asked once, in one batch, when the owner said "help, settings, profile, how can I help?":
+
+1. **`RankModule`: delete it.** The owner did not remember the component; told what it was (the
+   "most depended on" ranking they took off the board on 2026-08-25), they chose deletion over
+   naming its ink. Done the same hour (`1cca6ec`): component, stylesheet, test, `mostDependedOn`
+   and its tests, and the quarantine list in `signal-red.test.ts`; `dependentCounts` stays.
+   1623 tests / 80 files after it.
+2. **Profile: show the trigger; the menu says there is no account.** No name, no email, no
+   initials anywhere in the code; sign-in arrives with `catalogus login` (Phase 5).
+3. **Settings: `localStorage` for now.** The owner's framing: Catalogus will run from a server
+   and keep these under user preferences in the app's database; `localStorage` stands in.
+   **Density is omitted** — the owner did not remember the row, the mockup gives Compact no
+   values, and the owner was away from the PC: *"add a note for later when I'll be available to
+   check and decide."* So: a comment at the panel, this line here, and a screenshot of the built
+   panel sent to the owner once it exists. **Appearance is omitted** too: with the dark theme
+   removed on 2026-09-03, "Light" alone is not a setting.
+4. **Documentation → the GitHub README** (`https://github.com/Lecarvalho/catalogus#readme`)
+   until a docs site exists. The footer's Documentation link comes back with it.
+5. **"Manifest format reference" → a new user-docs folder.** *"Create a user docs folder and
+   let's start creating docs there."* `docs/user/` starts with `manifest-format.md`, written from
+   the schema, the examples and the skill; the help menu links its GitHub URL.
+
+Two briefs, run in parallel on disjoint files: `docs/menus-brief.md` (the three menus, the
+`cliCommands` payload field, the footer link, the preferences module) and
+`docs/user-docs-brief.md` (the first page). Both kept as the record; not to be run again.
+
+#### The three menus — built, validated, landed the same day
+
+`docs/menus-brief.md`, one implementer on a smaller model, one validator on the strongest driving
+the built app in Chrome. **State: 1701 tests / 86 files**, typecheck clean, `Phase 3.7` now closed
+less the portfolio page.
+
+**What is built.** Real menus behind the three triggers: click toggles, one open at a time, Escape
+closes and returns focus to the trigger, outside click closes, Tab cycles inside the surface, `?`
+opens Help (not from inside a text field). `HelpMenu`: Documentation and Manifest format reference
+(both from `links.ts`), an expanding Keyboard shortcuts list of the shortcuts the app really has
+(`?`, Escape, ArrowDown/Up, ArrowLeft/Right on the view rail), the CLI block from a new
+`cliCommands` payload field, the version. `SettingsPanel`: Brand icons (Colour / Monochrome,
+default Monochrome, switching the `Icon` component's one existing `colour` mechanism on the board's
+tiles) and Default view (List / Graph / Migrations, applied at load); the manifest path line;
+Appearance and Density omitted with a comment. `ProfileMenu`: empty disc, a note that there is no
+account yet, Preferences (opens Settings), Keyboard shortcuts (opens Help on the list),
+Documentation. Preferences in `localStorage` under `catalogus.preferences.v1` through
+`preferences.ts` (tolerant parser, every access in try/catch, a context so the tile and the panel
+share one value). The footer's Documentation link is back. `tokens.css` carries the three widths
+and the menu shadow; the `index.html` disclosure names what is still open.
+
+**The defect the implementer found and fixed, worth more than the menus:** the first cut had
+`view-payload.ts` import the command list from `cli.ts`. That compiled, passed every test, and
+**silently turned the shipped binary into a no-op** — tsup code-split `cli.ts` into a shared chunk,
+the `isMainModule` guard moved into the chunk where it is never true, and `catalogus <anything>`
+exited 0 printing nothing. The in-process CLI suite could not see it; the docs validator noticed
+because its binary stopped answering. Fix: `packages/cli/src/program.ts` holds the program
+builder and the command list, `cli.ts` is the bin entry only, and a new `cli-binary.test.ts`
+spawns `dist/cli.js` as a child process — the only kind of test that sees this class of break;
+it was proven red against the mutation. **Rule: nothing in `packages/cli/src` imports `cli.ts`.**
+
+**Validation** (Chrome, the built app, `visibilityState` reported hidden throughout and
+compensated for): triggers, one-at-a-time, Escape focus return, outside click, `?` on body and
+not in an input, both help hrefs exact, every listed shortcut executed and no unlisted one found,
+CLI block equal to `--help`'s fourteen commands in order, version equal to `--version`, the two
+settings rows and no others, colour switch measured on three marks (`rgb(36,33,28)` to the brand
+colour and back), popover and brand page staying colour, default view applied on reload,
+localStorage JSON after each change, garbage and blocked storage rendering normally, no name /
+email / initials in the DOM or the bundle (grep), footer link placement, widths 300 / 340 / 272,
+6px radius, 8px below the trigger, right-aligned at 2311 / 1600 / 1280 / 900, pinned sheets at
+390 and 480 and anchored again at 481, no horizontal scrollbar at eight widths, zero red in any
+surface, focus inside on open and Tab / Shift+Tab cycling within, console clean, binary answering.
+**Two defects, both fixed by the main session:** the profile menu's "Keyboard shortcuts" opened
+Help with the list folded (a second click for what the item promised — `HelpMenu` takes
+`initialShortcutsExpanded`, set only by that route and reset by the trigger and `?`); and
+outside-click closing was tested for Profile only (now each surface). `Icon.tsx`'s header, which
+said the monochrome rule had no live caller, corrected.
+
+**Recorded for the owner, not changed:**
+- **The graph's nodes stay in colour under Monochrome.** The brief said "the board tiles' marks";
+  the row says "Brand icons". Whether the graph joins the switch is the owner's call.
+- **`?` pressed inside the open Settings panel closes it and opens Help.** Not obviously wrong;
+  noted.
+- **Density**: the screenshot of the built panel went to the owner on 2026-09-05; the row waits
+  on their look.
+- The Help panel's `role="menu"` holds two non-item blocks (the CLI list, the version) — valid
+  enough in practice, noted.
+- `add --help` says the id is "derived from service+role when omitted"; `deriveLocalId` uses the
+  bare slug first. The docs page states the real rule; the `--help` string is one line in
+  `program.ts` to fix.
+
 #### What the next session does first
 
-1. **The three shell menus** — still blocked on the owner's 2026-09-02 questions. Ask once.
+1. **The Density row and the graph-in-colour question** — the owner has the screenshot; ask
+   once, then a small edit either way.
 2. **The portfolio page** (Phase 3.7's one open item; HANDOFF §4.2).
-3. **Not to do:** re-investigate the graph's fit-to-view; see below, and read
+3. **`add --help`'s id-derivation sentence** in `program.ts` — one line, see above.
+4. **Not to do:** re-investigate the graph's fit-to-view; see below, and read
    `document.visibilityState` before believing any viewport number from an automated tab.
 
 #### `rename` and `remove` versus a vendored icon — built, validated
@@ -835,15 +926,15 @@ was killed before it edited anything, and the tree is clean at `cfefea7` plus th
    answers below.
 3. Then tick item 2 in the 2026-08-26 list below, and Phase 3.7 is closed less the portfolio page.
 
-**Questions for the owner, none answered yet:**
+**Questions for the owner — all answered on 2026-09-05 (see that handoff at the top):**
 
-- `RankModule` paints red and has no caller: delete it, or name its ink? (Quarantined in
-  `signal-red.test.ts` until answered.)
-- Profile menu with no account system until Phase 5: omit the trigger, or show it with a menu that
-  says so?
-- ~~Settings panel: dark theme — keep or remove?~~ **Answered 2026-09-03: removed.** What a
-  settings panel holds with nothing persisted is still open.
-- Documentation link target in help menu and footer: there is no docs URL in the repo.
+- ~~`RankModule` paints red and has no caller: delete it, or name its ink?~~ **Deleted.**
+- ~~Profile menu with no account system until Phase 5: omit the trigger, or show it with a menu that
+  says so?~~ **Show it; the menu says there is no account.**
+- ~~Settings panel: dark theme — keep or remove?~~ **Answered 2026-09-03: removed.** ~~What a
+  settings panel holds with nothing persisted is still open.~~ **`localStorage`; Density deferred.**
+- ~~Documentation link target in help menu and footer: there is no docs URL in the repo.~~ **The
+  GitHub README; the manifest reference goes to a new `docs/user/` folder.**
 - ~~Popover below 480px: the bottom sheet covers 115–143px of its tile. Accept, or place it elsewhere?~~
   **Answered 2026-09-04: on a phone it does not open at all** — no hover, only tap (the evening
   handoff above, item 3).
