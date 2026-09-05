@@ -15,7 +15,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { makeViewPayload, makeViewService } from "../test-support/fixtures.js";
@@ -89,8 +89,12 @@ describe("AppShell", () => {
   it("shows the rail's identity block and its band index on the list view", () => {
     renderShell();
     expect(screen.getByText("An API and one database.")).not.toBeNull();
-    expect(screen.getByRole("navigation", { name: "Bands" })).not.toBeNull();
-    expect(screen.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["#band-production", "#band-holds"]);
+    const bandNav = screen.getByRole("navigation", { name: "Bands" });
+    // Scoped to the nav itself, not the whole render -- the footer carries
+    // its own link since docs/menus-brief.md (Documentation), and this
+    // assertion is about the rail's anchors, not a count of every link on
+    // the page.
+    expect(within(bandNav).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["#band-production", "#band-holds"]);
   });
 
   /*
@@ -110,7 +114,13 @@ describe("AppShell", () => {
     // of the two survived.
     expect(screen.getByText("An API and one database.")).not.toBeNull();
     expect(screen.queryByRole("navigation")).toBeNull();
-    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    // The band index is the rail's only link -- the footer's own
+    // Documentation link (Footer.tsx, docs/menus-brief.md) is unrelated to
+    // the band index and stays regardless, so this checks that the one link
+    // left is the footer's, not that the page carries none at all.
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0]!.textContent).toBe("Documentation");
   });
 
   it("renders the board head above the children when one is handed to it", () => {
@@ -127,18 +137,24 @@ describe("AppShell", () => {
   });
 
   /*
-   * The cluster. Three triggers, no menus -- those are a separate brief -- and
-   * the point of this test is what the triggers must *not* claim in the
-   * meantime. `aria-haspopup` and `aria-expanded` would each announce a menu
-   * that nothing opens, which is worse than announcing nothing: a screen-reader
-   * user is told to press for a menu and gets silence.
+   * The cluster's three triggers, each now claiming a real menu behind it
+   * (docs/menus-brief.md, 2026-09-05) -- `aria-haspopup="menu"` for Help and
+   * Profile (both `role="menu"`), `"true"` for Settings (a labelled region,
+   * not a menu -- SettingsPanel.tsx's own header). `aria-expanded="false"`
+   * while closed, never absent: an unbuilt trigger carried no attribute at
+   * all (the shape this test used to assert, before this brief), and the
+   * built one states its own closed state rather than saying nothing.
    */
-  it("renders the three cluster triggers, announcing no menu behind them yet", () => {
+  it("renders the three cluster triggers, each claiming its real, closed menu", () => {
     renderShell();
-    for (const name of ["Help", "Settings", "Profile"]) {
+    for (const [name, haspopup] of [
+      ["Help", "menu"],
+      ["Settings", "true"],
+      ["Profile", "menu"],
+    ] as const) {
       const button = screen.getByRole("button", { name });
-      expect(button.getAttribute("aria-haspopup")).toBeNull();
-      expect(button.getAttribute("aria-expanded")).toBeNull();
+      expect(button.getAttribute("aria-haspopup")).toBe(haspopup);
+      expect(button.getAttribute("aria-expanded")).toBe("false");
     }
   });
 
@@ -155,6 +171,167 @@ describe("AppShell", () => {
     renderShell();
     const profile = screen.getByRole("button", { name: "Profile" });
     expect(profile.textContent).toBe("");
+  });
+});
+
+/*
+ * The three menus themselves (docs/menus-brief.md, 2026-09-05): what each
+ * component's own test file covers is its content (HelpMenu.test.tsx,
+ * SettingsPanel.test.tsx, ProfileMenu.test.tsx); what belongs here is the
+ * shell behaviour every one of the three shares, because AppShell.tsx is the
+ * one file that owns it -- open/close, one at a time, Escape, outside click,
+ * and the global `?` shortcut.
+ */
+describe("AppShell -- the three menus", () => {
+  it("opens a surface on click, and its trigger's aria-expanded says so", () => {
+    renderShell();
+    const trigger = screen.getByRole("button", { name: "Help" });
+    expect(screen.queryByRole("menu", { name: "Help" })).toBeNull();
+
+    fireEvent.click(trigger);
+
+    expect(screen.getByRole("menu", { name: "Help" })).not.toBeNull();
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("toggles the same surface closed on a second click of its own trigger", () => {
+    renderShell();
+    const trigger = screen.getByRole("button", { name: "Help" });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menu", { name: "Help" })).not.toBeNull();
+
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("menu", { name: "Help" })).toBeNull();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("closes on Escape and returns focus to the trigger that opened it", () => {
+    renderShell();
+    const trigger = screen.getByRole("button", { name: "Settings" });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("region", { name: "Display settings" })).not.toBeNull();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("region", { name: "Display settings" })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("closes on a click outside the surface and its own trigger", () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    expect(screen.getByRole("menu", { name: "Profile" })).not.toBeNull();
+
+    // "document body" is App.tsx's own content, rendered by AppShell as
+    // `children` -- as far outside the cluster as this render gets.
+    fireEvent.pointerDown(screen.getByText("document body"));
+
+    expect(screen.queryByRole("menu", { name: "Profile" })).toBeNull();
+  });
+
+  // Each surface, not one standing for the three: the outside-click handler is
+  // shared, but a test that named only Profile let a mutation removing the
+  // handler fail on one assertion where the brief asked for each (validator,
+  // 2026-09-05).
+  it.each([
+    ["Help", "menu"],
+    ["Settings", "region"],
+  ] as const)("closes the %s surface on a click outside it", (trigger, role) => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: trigger }));
+    const name = trigger === "Settings" ? "Display settings" : trigger;
+    expect(screen.getByRole(role, { name })).not.toBeNull();
+
+    fireEvent.pointerDown(screen.getByText("document body"));
+
+    expect(screen.queryByRole(role, { name })).toBeNull();
+  });
+
+  it("opens Help on its shortcut list when the profile menu's Keyboard shortcuts item asked for it, and folded from the trigger", () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Keyboard shortcuts" }));
+
+    const help = screen.getByRole("menu", { name: "Help" });
+    expect(within(help).getByRole("menuitem", { name: /Keyboard shortcuts/ }).getAttribute("aria-expanded")).toBe("true");
+
+    // Close it and reopen from the trigger: folded again, as the mockup draws it.
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Help" }));
+    const reopened = screen.getByRole("menu", { name: "Help" });
+    expect(within(reopened).getByRole("menuitem", { name: /Keyboard shortcuts/ }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("does not close on a pointerdown inside the open surface itself", () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "Help" }));
+    const menu = screen.getByRole("menu", { name: "Help" });
+
+    fireEvent.pointerDown(menu);
+
+    expect(screen.getByRole("menu", { name: "Help" })).not.toBeNull();
+  });
+
+  it("keeps exactly one menu open: opening a second closes the first", () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "Help" }));
+    expect(screen.getByRole("menu", { name: "Help" })).not.toBeNull();
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(screen.queryByRole("menu", { name: "Help" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Display settings" })).not.toBeNull();
+  });
+
+  it("moves focus into the opened surface -- Settings' own first selected radio", () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(document.activeElement).toBe(screen.getByRole("radio", { name: "Monochrome" }));
+  });
+
+  it("traps Tab inside the open surface, wrapping from the last item back to the first", () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "Help" }));
+    const menu = screen.getByRole("menu", { name: "Help" });
+    const items = within(menu).getAllByRole("menuitem");
+    const last = items[items.length - 1]!;
+
+    last.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+
+    expect(document.activeElement).toBe(items[0]);
+  });
+
+  it("traps Shift+Tab inside the open surface, wrapping from the first item back to the last", () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "Help" }));
+    const menu = screen.getByRole("menu", { name: "Help" });
+    const items = within(menu).getAllByRole("menuitem");
+
+    items[0]!.focus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+
+    expect(document.activeElement).toBe(items[items.length - 1]);
+  });
+
+  // The shortcut HelpMenu.tsx itself advertises (its own "Keyboard shortcuts"
+  // row) -- this is the assertion that the key actually does what the panel
+  // claims, per docs/menus-brief.md's "a shortcut the panel advertises but
+  // the app ignores is a lie".
+  it("opens the Help menu on '?'", () => {
+    renderShell();
+    expect(screen.queryByRole("menu", { name: "Help" })).toBeNull();
+
+    fireEvent.keyDown(document, { key: "?" });
+
+    expect(screen.getByRole("menu", { name: "Help" })).not.toBeNull();
+  });
+
+  it("does nothing on '?' while nothing has loaded -- there is no cliCommands/cliVersion yet to show", () => {
+    renderShell({ payload: undefined });
+    fireEvent.keyDown(document, { key: "?" });
+    expect(screen.queryByRole("menu", { name: "Help" })).toBeNull();
   });
 });
 

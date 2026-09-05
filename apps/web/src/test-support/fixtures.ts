@@ -84,6 +84,12 @@ export function makeViewPayload(overrides: Partial<ViewPayload> = {}): ViewPaylo
     manifestPath: overrides.manifestPath ?? "C:/scratch/project/catalogus.yaml",
     readAt: overrides.readAt ?? "2026-08-24T00:00:00.000Z",
     cliVersion: overrides.cliVersion ?? "9.9.9",
+    // A synthetic roster, not @catalogus/cli's real one: this app-side
+    // fixture must not import the CLI package's command list to build its
+    // own default (that would make the viewer's tests pass by construction
+    // against whatever cli.ts happens to export), so this is a fixed,
+    // recognisably-fake set the Help panel tests can assert against by name.
+    cliCommands: overrides.cliCommands ?? ["init", "detect", "diff", "add", "set", "view"],
     schemaUrl: overrides.schemaUrl ?? "https://catalogus.dev/schema/v1.json",
     project: overrides.project ?? { name: "Scratch", slug: "scratch" },
     services: overrides.services ?? [],

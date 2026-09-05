@@ -13,19 +13,21 @@
 // question a reader forms before reading a single name, and the board no
 // longer has a masthead to answer it.
 //
-// **The documentation link is not rendered, and that is deliberate.** The
-// mockup draws the word "Documentation" between the version and the schema
-// URL; this repo has no documentation URL to point it at, and CLAUDE.md's
-// standing rule is that a plausible default is worse than an absent one -- a
-// link to a guessed address is a link that 404s in front of the first person
-// who trusts it. The word is omitted along with its separator until the owner
-// names a destination; the gap in the mockup is what a reader should see,
-// because it is the honest state.
+// **The documentation link, added 2026-09-05 (docs/menus-brief.md, owner
+// answer 3), now renders.** It did not until the owner named a destination:
+// this repo held no documentation URL, and CLAUDE.md's standing rule is that
+// a plausible default is worse than an absent one -- a link to a guessed
+// address is a link that 404s in front of the first person who trusts it.
+// The owner's answer is `links.ts`'s `DOCUMENTATION_URL` -- "the owner's
+// choice until a docs site exists" -- and both this footer and the Help
+// panel (HelpMenu.tsx) render that one constant rather than each holding its
+// own copy of the URL.
 //
 // Pure: props in, no fetch, no `window`, no clock. `now` is a parameter for
 // the same reason `readAt` is one in the payload -- see relative-time.ts.
 import type { ViewPayload, ViewService } from "@catalogus/cli";
 
+import { DOCUMENTATION_URL } from "../links.js";
 import { relativeTime } from "../relative-time.js";
 import styles from "./Footer.module.css";
 
@@ -134,6 +136,10 @@ export function Footer({ payload, now }: FooterProps) {
         <span>
           catalogus <b>{payload.cliVersion}</b>
         </span>
+        <Dot />
+        <a className={styles.documentation} href={DOCUMENTATION_URL} target="_blank" rel="noreferrer">
+          Documentation
+        </a>
         <Dot />
         <span className={styles.schema} title={payload.schemaUrl}>
           {withoutScheme(payload.schemaUrl)}

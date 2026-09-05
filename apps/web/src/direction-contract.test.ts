@@ -264,26 +264,32 @@ describe("the direction contract is present in apps/web/index.html", () => {
   // be checked by looking at that component, where "the last surface" can only
   // be checked by auditing every surface, which is why nobody did.
   //
-  // Moved a fourth time on 2026-09-03, and this one is the mechanism working
+  // Moved a fourth time on 2026-09-03, and that one was the mechanism working
   // rather than failing. The shell's structure was built that day -- top bar,
   // rail, board head, footer, and `ViewToggle` rebuilt into the board head --
   // so "the view rail is still the old world's component" and "still unbuilt"
   // both stopped being true, the suite went red, and whoever closed the gap had
-  // to come here and say what is left. What is left is the three menus, which
-  // FIRST VIEWPORT describes and which have no surface behind them.
+  // to come here and say what was left. What was left was the three menus,
+  // which FIRST VIEWPORT describes and which had no surface behind them --
+  // and the footer's documentation link, absent because this repo held no URL
+  // to point it at.
   //
-  // The second string is the one worth explaining. It pins the *footer's absent
-  // documentation link*, not another restatement of the menus, because that is
-  // the entry most likely to be closed by guessing rather than by asking: there
-  // is a word in the mockup, an obvious-looking href, and nobody would notice a
-  // plausible URL going in. Pinning the absence means an invented link has to
-  // pass through this file, where the reason it is absent is written down.
+  // **Moved a fifth time on 2026-09-05, and both of those closed** (docs/
+  // menus-brief.md): the three menus open real surfaces now, and the footer's
+  // Documentation link renders at the owner's own chosen URL. Two new pins
+  // replace them, each naming a gap the owner left open on purpose rather than
+  // one this build merely has not reached yet -- the Settings panel's missing
+  // Density row (the mockup draws it, but "Compact" carries no values the
+  // owner could decide against) and the profile menu naming no account (there
+  // is still no account system; Phase 5 is unbuilt). Both are the same shape
+  // as the mark's own pin below: a fact this contract should keep saying
+  // rather than one the next build is expected to close.
   it("carries its disclosure section, naming what the build does not do", () => {
     const disclosure = flat(regionBetween(sourceContract ?? "", DISCLOSURE_HEADING, FINISH_LINE));
     expect(disclosure.length, "the disclosure section is empty or its FINISH boundary moved").toBeGreaterThan(500);
     for (const known of [
-      "three shell menus have no surface behind them",
-      "documentation link is not rendered",
+      "Settings panel has no Density row",
+      "profile menu names no account",
       "mark is still deferred",
     ]) {
       expect(disclosure).toContain(known);

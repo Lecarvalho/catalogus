@@ -74,6 +74,15 @@
   color: var(--color-text-faint);
 }
 
+/* The mockup's own inline style (`color:var(--color-text-muted);
+   text-decoration:none;`) as a class instead -- this app's stylesheets never
+   carry an inline style, and `.group`'s own `color: var(--color-text-muted)`
+   already sets the same ink, so this rule's whole job is turning the
+   underline off. */
+.documentation {
+  text-decoration: none;
+}
+
 /*
  * The mockup's own `@media (max-width: 480px) { .footer { padding: 14px } }` --
  * a single value, so the strip loses its extra horizontal air at the width

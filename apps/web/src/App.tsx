@@ -44,6 +44,7 @@ import { ServicePopover } from "./components/ServicePopover.js";
 import { ViewToggle, type ViewMode } from "./components/ViewToggle.js";
 import { brandFromHash, hashForBrand, hashForServiceId, serviceIdFromHash } from "./hash-route.js";
 import { POPOVER_ESTIMATE, placePopover, samePlacement, type PopoverSize } from "./popover-placement.js";
+import { PreferencesProvider, loadPreferences } from "./preferences.js";
 
 // Both halves of the graph view load on demand, and for two different
 // reasons. React Flow is several hundred KB that a viewer who never leaves
@@ -140,7 +141,19 @@ export function App() {
   // stays one addressable page, and `#/service/<id>` keeps addressing the
   // panel from any of the three views -- the migration board joined the
   // same toggle for the same reason (ViewToggle.tsx's top comment).
-  const [mode, setMode] = useState<ViewMode>("list");
+  //
+  // **The initial value, added 2026-09-05 (docs/menus-brief.md), is the
+  // stored `defaultView` preference rather than the literal `"list"`.** Read
+  // once, in the lazy initializer -- the same shape `renderedAt` below uses
+  // for `Date.now()` -- because SettingsPanel.tsx's own header states the
+  // rule this follows: this preference says what the *next* load opens, not
+  // what a live toggle should do to the view already on screen. Reading it
+  // through the plain `loadPreferences()` function rather than
+  // preferences.ts's context is deliberate for the same reason: a read-once
+  // fact needs no live subscription, and `usePreferences()` could not supply
+  // one here anyway -- this call sits above the `PreferencesProvider` this
+  // component itself renders below, not inside it.
+  const [mode, setMode] = useState<ViewMode>(() => loadPreferences().defaultView);
 
   // The moment this page was opened, for the footer's "read <relative time>".
   //
@@ -812,113 +825,123 @@ export function App() {
     // `showBandIndex` is the list view's alone: the rail's anchors point at the
     // `<section>`s the board mounts, and the graph, the migrations board, a
     // service page and (since 2026-09-04) a brand page mount none.
-    <AppShell
-      payload={state.kind === "loaded" ? state.payload : undefined}
-      showBandIndex={state.kind === "loaded" && !selectedService && !selectedBrand && mode === "list"}
-      boardHead={state.kind === "loaded" && !selectedService && !selectedBrand ? <ViewToggle mode={mode} onChange={setMode} /> : undefined}
-      // The entry page's own facts, docked by AppShell's `sidePanel` slot
-      // (Part C, 2026-09-04) -- present only for a service page, never for
-      // the board or a brand page (the brand page's own mockup, artboard 2:
-      // "No facts aside, no Layer-3 block"). Reads the same edge maps the
-      // popover and the old inline facts column already did; nothing here
-      // is new data, only a new mount point for it.
-      sidePanel={
-        state.kind === "loaded" && selectedService && edgeMaps ? (
-          <ServicePagePanel
-            service={selectedService}
-            dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
-            dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
-            labelForId={edgeMaps.labelForId}
-          />
-        ) : undefined
-      }
-      now={renderedAt}
-    >
-      {state.kind === "loading" && <LoadingState />}
-      {state.kind === "error" && <ErrorState message={state.message} />}
-      {state.kind === "loaded" && edgeMaps && (
-        <>
-          {/*
-            A page -- entry or brand -- replaces the board rather than docking
-            beside it. That is the difference between a panel and a page, and
-            leaving the old panel on the click path produced a visible defect
-            once the same content became the hover popover: hovering a tile
-            and then clicking it rendered the identical facts twice, once
-            floating and once docked on the right.
-
-            The toggle goes with the board. It selects between three views of
-            the *project*, and neither page is one of them -- leaving it on
-            screen would offer to switch a view that is no longer showing. It
-            is handed to the shell as the board head now rather than rendered
-            here (see the `boardHead` prop above), so that condition is stated
-            once, up there, instead of twice.
-          */}
-          {selectedService ? (
-            <ServicePage
+    //
+    // `PreferencesProvider`, added 2026-09-05, wraps the whole shell rather
+    // than sitting inside AppShell.tsx or any file below it: both
+    // SettingsPanel.tsx (which writes `iconColour`) and ServiceTile.tsx
+    // (several components below this, past files this brief does not own)
+    // need to reach the same context, and this is the one file both are
+    // guaranteed to sit under. preferences.ts's own header carries the rest
+    // of the reasoning.
+    <PreferencesProvider>
+      <AppShell
+        payload={state.kind === "loaded" ? state.payload : undefined}
+        showBandIndex={state.kind === "loaded" && !selectedService && !selectedBrand && mode === "list"}
+        boardHead={state.kind === "loaded" && !selectedService && !selectedBrand ? <ViewToggle mode={mode} onChange={setMode} /> : undefined}
+        // The entry page's own facts, docked by AppShell's `sidePanel` slot
+        // (Part C, 2026-09-04) -- present only for a service page, never for
+        // the board or a brand page (the brand page's own mockup, artboard 2:
+        // "No facts aside, no Layer-3 block"). Reads the same edge maps the
+        // popover and the old inline facts column already did; nothing here
+        // is new data, only a new mount point for it.
+        sidePanel={
+          state.kind === "loaded" && selectedService && edgeMaps ? (
+            <ServicePagePanel
               service={selectedService}
-              projectName={state.payload.project.name}
-              readAt={state.payload.readAt}
-              onBack={handleClose}
-              brand={brandForSelectedService}
-              pageRef={panelRef}
+              dependsOn={edgeMaps.dependsOn.get(selectedService.id) ?? []}
+              dependedOnBy={edgeMaps.dependedOnBy.get(selectedService.id) ?? []}
+              labelForId={edgeMaps.labelForId}
             />
-          ) : selectedBrand ? (
-            <BrandPage
-              group={selectedBrand.group}
-              band={selectedBrand.band}
-              projectName={state.payload.project.name}
-              readAt={state.payload.readAt}
-              onBack={handleClose}
-              onOpenEntry={handleSelect}
-              pageRef={panelRef}
-            />
-          ) : (
-            <>
-              <div className={styles.body}>
-                {mode === "list" ? (
-                  <ProjectBoard
-                    services={state.payload.services}
-                    readAt={state.payload.readAt}
-                    selectedId={selectedId}
-                    onActivate={handleActivate}
-                    onPeek={handlePeek}
-                    onPeekEnd={handlePeekEnd}
-                  />
-                ) : mode === "graph" ? (
-                  <Suspense fallback={<p>Loading the graph…</p>}>
-                    <GraphCanvas
+          ) : undefined
+        }
+        now={renderedAt}
+      >
+        {state.kind === "loading" && <LoadingState />}
+        {state.kind === "error" && <ErrorState message={state.message} />}
+        {state.kind === "loaded" && edgeMaps && (
+          <>
+            {/*
+              A page -- entry or brand -- replaces the board rather than docking
+              beside it. That is the difference between a panel and a page, and
+              leaving the old panel on the click path produced a visible defect
+              once the same content became the hover popover: hovering a tile
+              and then clicking it rendered the identical facts twice, once
+              floating and once docked on the right.
+  
+              The toggle goes with the board. It selects between three views of
+              the *project*, and neither page is one of them -- leaving it on
+              screen would offer to switch a view that is no longer showing. It
+              is handed to the shell as the board head now rather than rendered
+              here (see the `boardHead` prop above), so that condition is stated
+              once, up there, instead of twice.
+            */}
+            {selectedService ? (
+              <ServicePage
+                service={selectedService}
+                projectName={state.payload.project.name}
+                readAt={state.payload.readAt}
+                onBack={handleClose}
+                brand={brandForSelectedService}
+                pageRef={panelRef}
+              />
+            ) : selectedBrand ? (
+              <BrandPage
+                group={selectedBrand.group}
+                band={selectedBrand.band}
+                projectName={state.payload.project.name}
+                readAt={state.payload.readAt}
+                onBack={handleClose}
+                onOpenEntry={handleSelect}
+                pageRef={panelRef}
+              />
+            ) : (
+              <>
+                <div className={styles.body}>
+                  {mode === "list" ? (
+                    <ProjectBoard
                       services={state.payload.services}
-                      edges={state.payload.edges}
+                      readAt={state.payload.readAt}
                       selectedId={selectedId}
-                      onSelect={handleSelect}
-                      layout={layoutWithElk}
+                      onActivate={handleActivate}
+                      onPeek={handlePeek}
+                      onPeekEnd={handlePeekEnd}
                     />
-                  </Suspense>
-                ) : (
-                  <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+                  ) : mode === "graph" ? (
+                    <Suspense fallback={<p>Loading the graph…</p>}>
+                      <GraphCanvas
+                        services={state.payload.services}
+                        edges={state.payload.edges}
+                        selectedId={selectedId}
+                        onSelect={handleSelect}
+                        layout={layoutWithElk}
+                      />
+                    </Suspense>
+                  ) : (
+                    <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
+                  )}
+                </div>
+                {peek && mode === "list" && (
+                  <ServicePopover
+                    group={peek.group}
+                    readAt={state.payload.readAt}
+                    position={peek.position}
+                    // Meaningless, and unread, for a multi-entry group's own
+                    // popover branch (ServicePopover.tsx's own header) -- the
+                    // single entry's edges only when there is exactly one.
+                    dependsOn={peek.group.entries.length === 1 ? (edgeMaps.dependsOn.get(peek.group.entries[0].id) ?? []) : []}
+                    dependedOnBy={peek.group.entries.length === 1 ? (edgeMaps.dependedOnBy.get(peek.group.entries[0].id) ?? []) : []}
+                    labelForId={edgeMaps.labelForId}
+                    onOpenEntry={handleSelect}
+                    onPointerEnter={cancelClose}
+                    onPointerLeave={handlePeekEnd}
+                    popoverRef={popoverRef}
+                  />
                 )}
-              </div>
-              {peek && mode === "list" && (
-                <ServicePopover
-                  group={peek.group}
-                  readAt={state.payload.readAt}
-                  position={peek.position}
-                  // Meaningless, and unread, for a multi-entry group's own
-                  // popover branch (ServicePopover.tsx's own header) -- the
-                  // single entry's edges only when there is exactly one.
-                  dependsOn={peek.group.entries.length === 1 ? (edgeMaps.dependsOn.get(peek.group.entries[0].id) ?? []) : []}
-                  dependedOnBy={peek.group.entries.length === 1 ? (edgeMaps.dependedOnBy.get(peek.group.entries[0].id) ?? []) : []}
-                  labelForId={edgeMaps.labelForId}
-                  onOpenEntry={handleSelect}
-                  onPointerEnter={cancelClose}
-                  onPointerLeave={handlePeekEnd}
-                  popoverRef={popoverRef}
-                />
-              )}
-            </>
-          )}
-        </>
-      )}
-    </AppShell>
+              </>
+            )}
+          </>
+        )}
+      </AppShell>
+    </PreferencesProvider>
   );
 }

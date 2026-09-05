@@ -32,10 +32,6 @@
 // needs within reach -- and having both stick would pin 110px of chrome to the
 // top of a page whose argument is that it is scrolled.
 //
-// Pure, like everything else the app renders: props in, no fetch, no
-// `window`, no module-level state (App.tsx's header comment records why that
-// rule exists and what it buys).
-//
 // **`sidePanel`, added 2026-09-04**, is the one addition to that frozen
 // structure since: an optional third child of the rail-plus-board row, for
 // the entry page's facts panel (docs/candidates/candidate-e-brandpage.html's
@@ -43,14 +39,30 @@
 // topbar, the rail, the board or the footer changed to make room for it, and
 // the row renders exactly as before on every view that passes none. See the
 // prop's own comment below for the rest.
-import type { ReactNode } from "react";
+//
+// **The three menus, built 2026-09-05 (docs/menus-brief.md).** Until this
+// pass the cluster's three triggers were the mockup's buttons with no surface
+// behind them, and this file's own header called itself "pure -- props in, no
+// fetch, no window, no module-level state", which stopped being true the
+// moment a menu needed to close on Escape, close on an outside click, and
+// trap Tab while open: all three are `document`-level listeners, added and
+// removed with the menu's own open lifetime. What stayed true: no fetch, no
+// `localStorage` read or write in this file (HelpMenu, SettingsPanel and
+// ProfileMenu each own their own facts -- SettingsPanel reads and writes
+// preferences.ts's context directly, this file never touches it), and no
+// module-level state -- `openMenu` is component state, mounted once per
+// render the same as everything else here.
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { ViewPayload } from "@catalogus/cli";
 
 import { groupIntoBands } from "../bands.js";
 import styles from "./AppShell.module.css";
 import { BrandMark } from "./BrandMark.js";
 import { Footer } from "./Footer.js";
+import { HelpMenu } from "./HelpMenu.js";
+import { ProfileMenu } from "./ProfileMenu.js";
 import { Rail } from "./Rail.js";
+import { SettingsPanel } from "./SettingsPanel.js";
 
 export interface AppShellProps {
   /**
@@ -135,6 +147,9 @@ function SettingsIcon() {
   );
 }
 
+/** The three surfaces the cluster can open, one at a time. */
+type MenuId = "help" | "settings" | "profile";
+
 export function AppShell({ payload, showBandIndex, boardHead, sidePanel, now, children }: AppShellProps) {
   // Grouped here rather than passed in, from the same `groupIntoBands` the
   // board itself calls on the same services -- a pure function of one input,
@@ -142,6 +157,143 @@ export function AppShell({ payload, showBandIndex, boardHead, sidePanel, now, ch
   // by construction rather than by a second derivation someone has to keep in
   // step.
   const bands = payload && showBandIndex ? groupIntoBands(payload.services) : [];
+
+  // One state variable for all three menus, not three booleans -- "one open
+  // at a time" (docs/menus-brief.md) is then true by construction rather than
+  // a rule three setters have to keep honouring, the same reasoning
+  // App.tsx's own `peek` state uses for the board's hover popover.
+  const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
+  // Whether the help panel, when it opens next, should open on its shortcut
+  // list: true only when the profile menu's "Keyboard shortcuts" item asked
+  // for it. Every other way in (the trigger, `?`) resets it, so the list is
+  // folded on an ordinary open the way the mockup draws it.
+  const [helpOpensOnShortcuts, setHelpOpensOnShortcuts] = useState(false);
+
+  const helpTriggerRef = useRef<HTMLButtonElement>(null);
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
+  const profileTriggerRef = useRef<HTMLButtonElement>(null);
+  const helpSurfaceRef = useRef<HTMLDivElement>(null);
+  const settingsSurfaceRef = useRef<HTMLDivElement>(null);
+  const profileSurfaceRef = useRef<HTMLDivElement>(null);
+
+  const triggerRefs: Record<MenuId, RefObject<HTMLButtonElement>> = {
+    help: helpTriggerRef,
+    settings: settingsTriggerRef,
+    profile: profileTriggerRef,
+  };
+  const surfaceRefs: Record<MenuId, RefObject<HTMLDivElement>> = {
+    help: helpSurfaceRef,
+    settings: settingsSurfaceRef,
+    profile: profileSurfaceRef,
+  };
+
+  function toggleMenu(id: MenuId) {
+    setHelpOpensOnShortcuts(false);
+    setOpenMenu((current) => (current === id ? null : id));
+  }
+
+  // The global `?` shortcut -- always listening, not scoped to a menu being
+  // open, since its whole job is to open one. Gated on `payload`: Help's own
+  // content is `payload.cliCommands`/`payload.cliVersion`, and there is
+  // nothing yet to show during the load or error state (the same "no answer
+  // yet" reasoning `showBandIndex`'s own doc comment states for the rail).
+  // The input/contentEditable guard is defensive -- this app has no text
+  // field today -- rather than reacting to one that exists; see this
+  // component's own header for why that is worth stating rather than
+  // silently correct.
+  useEffect(() => {
+    function onGlobalKeyDown(event: KeyboardEvent) {
+      if (event.key !== "?" || !payload) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      event.preventDefault();
+      setHelpOpensOnShortcuts(false);
+      setOpenMenu("help");
+    }
+    document.addEventListener("keydown", onGlobalKeyDown);
+    return () => document.removeEventListener("keydown", onGlobalKeyDown);
+  }, [payload]);
+
+  // The open menu's own behaviour: focus moves into it (the first selected
+  // radio, on the settings panel, or its first item otherwise), Tab is
+  // trapped inside it, Escape closes it and hands focus back to its trigger,
+  // and a pointerdown outside both the surface and its own trigger closes it
+  // too. One effect, torn down and rebuilt whenever `openMenu` changes
+  // (mounted with the surface it governs, dismounted with it) -- the same
+  // "each effect owns the thing it dismisses" shape App.tsx's own peek
+  // keydown effect uses, read per this brief's own instruction rather than
+  // copied: that effect owns arrow-key navigation *inside* an already-open
+  // popover, which this app still needs nowhere in a menu, so nothing here
+  // reaches for it.
+  //
+  // `pointerdown`, not `click`, for the outside check -- it fires before the
+  // triggering click's own `onClick` (below) does, which is what lets a click
+  // on a *different* trigger close this menu and let that trigger's own
+  // handler open the other one in the same gesture, rather than the two
+  // racing.
+  useEffect(() => {
+    if (!openMenu) {
+      return;
+    }
+    const menu = openMenu;
+    const surface = surfaceRefs[menu].current;
+    if (!surface) {
+      return;
+    }
+
+    function focusableItems(): HTMLElement[] {
+      return Array.from(surface!.querySelectorAll<HTMLElement>('a[href], button, [tabindex]')).filter(
+        (element) => element.tabIndex >= 0
+      );
+    }
+
+    const preferredFirst = surface.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]') ?? focusableItems()[0];
+    preferredFirst?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        triggerRefs[menu].current?.focus();
+        setOpenMenu(null);
+        return;
+      }
+      if (event.key !== "Tab") {
+        return;
+      }
+      const items = focusableItems();
+      if (items.length === 0) {
+        return;
+      }
+      const first = items[0]!;
+      const last = items[items.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (surface!.contains(target) || triggerRefs[menu].current?.contains(target)) {
+        return;
+      }
+      setOpenMenu(null);
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [openMenu]);
 
   return (
     <div className={styles.app}>
@@ -167,13 +319,18 @@ export function AppShell({ payload, showBandIndex, boardHead, sidePanel, now, ch
         </div>
 
         {/*
-          Help / settings / profile. **The three menus are a separate brief and
-          none of them exists yet**: these are the triggers the mockup draws,
-          with no surface behind them, and they carry no `aria-haspopup` and no
-          `aria-expanded` because both would announce a menu that nothing
-          opens. They are not disabled either -- unbuilt is not the same state
-          as unavailable, and saying the wrong one is worse than saying
-          neither.
+          Help / settings / profile. Each trigger sits in its own
+          `position: relative` wrapper (`.trigger`) so its menu can anchor
+          `position: absolute` under it, and carries `aria-haspopup` (`"menu"`
+          for the two that open a `role="menu"`, `"true"` for Settings, which
+          is a labelled region rather than a menu -- SettingsPanel.tsx's own
+          header says why) and `aria-expanded`, both real now that something
+          answers them. Settings and Help are gated on `payload`: both render
+          payload-derived facts (the manifest path; `cliCommands`/`cliVersion`)
+          that do not exist yet during the load or error state, the same "no
+          answer yet" reasoning `showBandIndex` states above. Profile carries
+          none of that -- there is no account to be a fact about -- so it
+          stays open to being toggled regardless.
 
           The avatar disc is empty on purpose. The mockup fills it with initials
           and its menu with a name, an email and a plan; **there is no account
@@ -183,17 +340,66 @@ export function AppShell({ payload, showBandIndex, boardHead, sidePanel, now, ch
           file may name a person.
         */}
         <div className={styles.cluster}>
-          <button type="button" className={styles.tbBtn}>
-            <HelpIcon />
-            Help
-          </button>
-          <button type="button" className={styles.tbBtn}>
-            <SettingsIcon />
-            Settings
-          </button>
-          <button type="button" className={styles.tbBtn} aria-label="Profile">
-            <span className={styles.avatar} />
-          </button>
+          <div className={styles.trigger}>
+            <button
+              type="button"
+              ref={helpTriggerRef}
+              className={styles.tbBtn}
+              aria-haspopup="menu"
+              aria-expanded={openMenu === "help"}
+              onClick={() => payload && toggleMenu("help")}
+            >
+              <HelpIcon />
+              Help
+            </button>
+            {openMenu === "help" && payload && (
+              <HelpMenu
+                rootRef={helpSurfaceRef}
+                cliCommands={payload.cliCommands}
+                cliVersion={payload.cliVersion}
+                initialShortcutsExpanded={helpOpensOnShortcuts}
+              />
+            )}
+          </div>
+
+          <div className={styles.trigger}>
+            <button
+              type="button"
+              ref={settingsTriggerRef}
+              className={styles.tbBtn}
+              aria-haspopup="true"
+              aria-expanded={openMenu === "settings"}
+              onClick={() => payload && toggleMenu("settings")}
+            >
+              <SettingsIcon />
+              Settings
+            </button>
+            {openMenu === "settings" && payload && <SettingsPanel rootRef={settingsSurfaceRef} manifestPath={payload.manifestPath} />}
+          </div>
+
+          <div className={styles.trigger}>
+            <button
+              type="button"
+              ref={profileTriggerRef}
+              className={styles.tbBtn}
+              aria-label="Profile"
+              aria-haspopup="menu"
+              aria-expanded={openMenu === "profile"}
+              onClick={() => toggleMenu("profile")}
+            >
+              <span className={styles.avatar} />
+            </button>
+            {openMenu === "profile" && (
+              <ProfileMenu
+                rootRef={profileSurfaceRef}
+                onOpenPreferences={() => setOpenMenu("settings")}
+                onOpenKeyboardShortcuts={() => {
+                  setHelpOpensOnShortcuts(true);
+                  setOpenMenu("help");
+                }}
+              />
+            )}
+          </div>
         </div>
       </header>
 

@@ -26,6 +26,7 @@ import { getCatalogEntry } from "@catalogus/core";
 import type { ResolvedIcon } from "@catalogus/core";
 
 import { resolveServiceIcon } from "./icon-resolution.js";
+import { listCommandNames } from "./program.js";
 
 /**
  * This CLI's own version, read from its package.json rather than repeated
@@ -71,6 +72,21 @@ export interface ViewPayload {
    * the viewer, can say which binary drew it.
    */
   cliVersion: string;
+  /**
+   * Every command name `catalogus` registers, in the CLI's own registration
+   * order -- `program.ts`'s `listCommandNames()`, which walks a fresh
+   * `createProgram()` rather than repeating a list. Read from `program.ts`
+   * rather than from `cli.ts` (where both functions are still re-exported,
+   * for `skill-commands-drift.test.ts` and anything else already importing
+   * `./cli.js`) specifically so this file never depends on `cli.ts` itself --
+   * program.ts's own header explains the defect that dependency caused the
+   * one time it existed. Added for the Help panel's "catalogus CLI" block
+   * (docs/menus-brief.md, owner answer 3): the mockup that block is drawn
+   * from predates the `icons` command and would otherwise ship a stale,
+   * hand-typed roster the viewer and `catalogus --help` could silently
+   * disagree about.
+   */
+  cliCommands: string[];
   /**
    * The `$schema` URL this manifest is written against -- `catalogusSchemaV1`'s
    * own `$id`, which is the same string `catalogus init` writes into the
@@ -210,6 +226,7 @@ export async function buildViewPayload(
     manifestPath,
     readAt,
     cliVersion: CLI_VERSION,
+    cliCommands: listCommandNames(),
     schemaUrl: catalogusSchemaV1.$id,
     project: {
       name: manifest.project.name,

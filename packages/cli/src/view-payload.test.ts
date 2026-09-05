@@ -7,6 +7,7 @@ import type { CatalogusManifestV1 } from "@catalogus/schema";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createTempDir, removeTempDir, writeFixtureFile } from "./test-support/temp-dir.js";
+import { listCommandNames } from "./program.js";
 import { buildViewPayload } from "./view-payload.js";
 
 const MANIFEST = `catalogus: 1
@@ -115,6 +116,18 @@ describe("buildViewPayload", () => {
   it("states the schema URL as @catalogus/schema's own $id, not as a second copy of it", async () => {
     const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
     expect(payload.schemaUrl).toBe(catalogusSchemaV1.$id);
+  });
+
+  // Compared against cli.ts's own `listCommandNames()`, not against a literal
+  // roster typed into this test -- a second hand-typed list here would be
+  // exactly the drift risk this field exists to close (view-payload.ts's own
+  // comment on `cliCommands`). `not.toHaveLength(0)` guards the comparison
+  // itself: two empty arrays are `toEqual`, so a `listCommandNames()` that
+  // silently returned nothing would still pass without this.
+  it("carries every registered command name, in the CLI's own order, agreeing with cli.ts", async () => {
+    const payload = await buildViewPayload("/repo/catalogus.yaml", await parsedManifest(), READ_AT);
+    expect(payload.cliCommands).toEqual(listCommandNames());
+    expect(payload.cliCommands.length).toBeGreaterThan(0);
   });
 
   it("omits project fields the manifest never set, rather than inventing a placeholder", async () => {

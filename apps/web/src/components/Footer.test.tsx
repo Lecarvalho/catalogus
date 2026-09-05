@@ -7,15 +7,18 @@
 // than a string in this app, and the counts are derived from the services and
 // edges actually handed over rather than from anything cached.
 //
-// The documentation link is the odd one out and is tested by its absence. The
-// mockup draws the word; this repo has no URL to point it at, and CLAUDE.md's
-// standing rule makes an omitted link the correct render rather than a
-// degraded one. A test that only checked the six facts present would go on
-// passing the day somebody invented an href, which is the failure this one
-// exists to catch.
+// **The documentation link, tested by its presence since 2026-09-05.** It was
+// tested by its absence until the owner named a destination (docs/menus-brief.md,
+// owner answer 3): this repo held no documentation URL, and CLAUDE.md's
+// standing rule made an omitted link the correct render, not a degraded one.
+// Now that `links.ts` holds a real one, the test that matters is provenance
+// again -- the href is the one `links.ts` exports, not a literal retyped
+// here, so this file cannot drift from links.test.ts's own check that the
+// URL is https and names the repo.
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { DOCUMENTATION_URL } from "../links.js";
 import { makeViewPayload, makeViewService } from "../test-support/fixtures.js";
 import { Footer, distinctRollupCount, withoutScheme } from "./Footer.js";
 
@@ -114,20 +117,31 @@ describe("Footer", () => {
     expect(schema.getAttribute("title")).toBe("https://catalogus.dev/schema/v1.json");
   });
 
-  // Not a link. Whether catalogus.dev serves anything is not a fact this repo
-  // holds, and an `<a>` is a claim that it does.
-  it("renders the schema URL as text, and renders no link anywhere in the strip", () => {
+  // The schema URL is not a link. Whether catalogus.dev serves anything is
+  // not a fact this repo holds, and an `<a>` is a claim that it does -- the
+  // strip's one link is Documentation, tested below.
+  it("renders the schema URL as text, not as a link", () => {
     renderFooter();
-    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    const schema = screen.getByText("catalogus.dev/schema/v1.json");
+    expect(schema.tagName).toBe("SPAN");
   });
 
-  // The mockup draws "Documentation" between the version and the schema URL.
-  // There is no URL for it in this repo and none may be invented, so the word
-  // is not rendered -- and this is the test that fails the day one appears
-  // without the owner having named it.
-  it("renders no documentation link, because no documentation URL exists to point one at", () => {
+  // The mockup draws "Documentation" between the version and the schema URL,
+  // and links.ts now has a real URL to point it at (docs/menus-brief.md,
+  // owner answer 3) -- so this renders it, in place of the omission that
+  // stood here until 2026-09-05.
+  it("renders the Documentation link, at links.ts's own URL, between the version and the schema", () => {
     renderFooter();
-    expect(footerFacts().join(" ")).not.toContain("Documentation");
+    const link = screen.getByRole("link", { name: "Documentation" });
+    expect(link.getAttribute("href")).toBe(DOCUMENTATION_URL);
+    const facts = footerFacts();
+    expect(facts.indexOf("Documentation")).toBeGreaterThan(facts.indexOf("catalogus 9.9.9"));
+    expect(facts.indexOf("Documentation")).toBeLessThan(facts.indexOf("catalogus.dev/schema/v1.json"));
+  });
+
+  it("is the only link in the strip", () => {
+    renderFooter();
+    expect(screen.getAllByRole("link")).toHaveLength(1);
   });
 
   it("is a contentinfo landmark, so the chrome at the foot of the page is skippable", () => {

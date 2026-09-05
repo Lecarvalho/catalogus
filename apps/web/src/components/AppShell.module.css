@@ -44,11 +44,11 @@
 }
 
 /*
- * `z-index: 30` with nothing to sit above yet. It is the mockup's value and it
- * is what the three menus will hang off when their brief lands -- the board
- * head below is 5 and the popover is higher still, so the ordering the shell
- * needs is already declared rather than discovered later by a menu that opens
- * behind a tile.
+ * `z-index: 30`, the mockup's own value. The three menus now hang off this bar
+ * (HelpMenu.module.css / SettingsPanel.module.css / ProfileMenu.module.css,
+ * each `z-index: 100`, the mockup's own `.surface` value) -- the board head
+ * below is 5, so the stack this bar sits in was already ordered correctly
+ * before a menu existed to test it against.
  */
 .topbar {
   flex: 0 0 auto;
@@ -99,12 +99,21 @@
 }
 
 /*
+ * One wrapper per trigger, `position: relative` so its menu (a direct
+ * sibling, mounted by AppShell.tsx only while that menu is open) can anchor
+ * `position: absolute` under it -- the mockup's own `<div style="position:
+ * relative">` around Help and Settings, and `.tb-profile` around the avatar,
+ * unified into one class since all three wrappers are otherwise identical.
+ */
+.trigger {
+  position: relative;
+}
+
+/*
  * A cluster trigger. The transparent 1px border is the mockup's, and it is
- * load-bearing rather than decorative: the open state fills the button and
- * draws a hairline round it, and a border that appears only when open would
- * move the label by a pixel every time a menu opened. That state has no
- * rule here yet -- there are no menus (AppShell.tsx's cluster comment) -- and
- * the border is kept so the one that lands does not have to re-solve this.
+ * load-bearing rather than decorative: the open state (below) fills the
+ * button and draws a hairline round it, and a border that appeared only when
+ * open would move the label by a pixel every time a menu opened.
  */
 .tbBtn {
   display: flex;
@@ -122,6 +131,20 @@
 
 .tbBtn:hover {
   color: var(--color-text);
+}
+
+/*
+ * The open state, the mockup's own `.tb-btn.is-active` (drawn on the Settings
+ * trigger in its static screenshot, ~line 465) -- an attribute selector
+ * against `aria-expanded` rather than a second class, since AppShell.tsx
+ * already sets that attribute from real state and a class mirroring it
+ * exactly would be one more thing to keep in step for nothing a class buys
+ * here.
+ */
+.tbBtn[aria-expanded="true"] {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-color: var(--color-line);
 }
 
 .tbIcon {

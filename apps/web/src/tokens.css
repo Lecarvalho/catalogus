@@ -554,11 +554,18 @@
    * custom property. They are written as literals in AppShell.module.css, and
    * that file's comment is where they are recorded.
    *
-   * The three menu surface widths (272px, 340px, 300px) are deliberately
-   * absent. The help / settings / profile menus are a separate brief and no
-   * menu surface exists yet; a width sitting here with nothing reading it is
-   * exactly the "permission that outlived its rule" shape signal-red.test.ts
-   * refuses in its own allow-list.
+   * The three menu surface widths (272px, 340px, 300px), and the transient
+   * shadow they share, were deliberately absent through 2026-09-04: the help
+   * / settings / profile menus were a separate, unbuilt brief, and a width
+   * sitting here with nothing reading it was exactly the "permission that
+   * outlived its rule" shape signal-red.test.ts refuses in its own
+   * allow-list. That brief has now landed (docs/menus-brief.md), so the four
+   * values are below, with the same one-record-per-mockup-number rule as
+   * everything else in this block. `--shadow-menu` is not `--shadow-popover`
+   * reused: the mockup's `.surface` rule (the three menus) and its `.popover`
+   * rule (the hover peek) spend two different shadows -- 10/28/0.28 against
+   * 12/30/0.30 on the first layer -- and reusing the popover's would be
+   * rounding one onto the other rather than reading either off the mockup.
    */
   --topbar-height: 60px;
   --topbar-padding-x: 28px;
@@ -583,6 +590,16 @@
   --tb-icon-size: 16px;
   --avatar-size: 26px;
   --text-avatar: 11px;
+
+  /* The three menu surfaces the cluster's triggers open (docs/menus-brief.md):
+     the profile menu, the settings panel, the help panel, in the mockup's own
+     `.menu` / `.panel` / `.help-panel` widths. Content sizing inside each
+     stays a literal in that component's own stylesheet -- these three are the
+     numbers a reader of the layout actually needs, the same distinction
+     `--rail-width`'s own comment draws for the rail. */
+  --menu-width: 272px;
+  --panel-width: 340px;
+  --help-panel-width: 300px;
 
   /* The left rail: identity, then the band index. Its width is the one number
      in this block that a reader of the layout has to know -- the board takes
@@ -672,6 +689,13 @@
   --radius-popover: 6px;
   --shadow-popover:
     0 12px 30px -8px rgba(36, 33, 28, 0.3), 0 2px 8px -2px rgba(36, 33, 28, 0.14);
+  /* The three menu surfaces' own shadow (mockup `.surface`), lighter than the
+     popover's -- see the shell block's comment on `--menu-width` and kin for
+     why this is not `--shadow-popover` reused. The radius is: `--radius-popover`
+     is 6px in the mockup for both `.popover` and `.surface`, so there is
+     nothing to add a second token for. */
+  --shadow-menu:
+    0 10px 28px -8px rgba(36, 33, 28, 0.28), 0 2px 8px -2px rgba(36, 33, 28, 0.14);
 
   color-scheme: light;
 }

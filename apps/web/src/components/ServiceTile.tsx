@@ -92,6 +92,7 @@ import type { ViewService } from "@catalogus/cli";
 
 import type { BandId, VendorGroup } from "../bands.js";
 import { groupStatus } from "../bands.js";
+import { usePreferences } from "../preferences.js";
 import { Icon } from "./Icon.js";
 import { STATUS_WORDS, statusPhrase as sharedStatusPhrase, StatusBadgeGlyph } from "./ServiceStatus.js";
 import styles from "./ServiceTile.module.css";
@@ -257,7 +258,22 @@ function usePeekHandlers(group: VendorGroup, onPeek: ServiceTileProps["onPeek"],
   };
 }
 
+/**
+ * **The board's brand-icon colour mechanism, wired to a preference,
+ * 2026-09-05 (docs/menus-brief.md, owner answer 2).** Both branches below
+ * used to pass `Icon`'s `colour` prop as a bare `true` -- every tile in
+ * colour, unconditionally, since candidate E (Icon.tsx's own header records
+ * that decision and its cost: a large fraction of catalog slugs have no
+ * verified icon, so a coloured board splits into real logos and grey
+ * fallbacks). `colour` is now `preferences.iconColour === "colour"` instead,
+ * read once here and threaded through `TileShellProps` rather than each
+ * subcomponent calling `usePreferences()` on its own -- one read per tile,
+ * not two. This is the one mechanism Icon.module.css already carried for
+ * exactly this switch (its monochrome rule "has no live caller" until now,
+ * Icon.tsx's own words) -- nothing new was added to make the toggle work.
+ */
 export function ServiceTile({ group, bandId, selected, onActivate, onPeek, onPeekEnd }: ServiceTileProps) {
+  const { preferences } = usePreferences();
   const isGroup = group.entries.length > 1;
   const domId = serviceTileDomId(bandId, group);
 
@@ -270,6 +286,7 @@ export function ServiceTile({ group, bandId, selected, onActivate, onPeek, onPee
         onActivate={onActivate}
         onPeek={onPeek}
         onPeekEnd={onPeekEnd}
+        colour={preferences.iconColour === "colour"}
       />
     );
   }
@@ -283,6 +300,7 @@ export function ServiceTile({ group, bandId, selected, onActivate, onPeek, onPee
       onActivate={onActivate}
       onPeek={onPeek}
       onPeekEnd={onPeekEnd}
+      colour={preferences.iconColour === "colour"}
     />
   );
 }
@@ -294,6 +312,8 @@ interface TileShellProps {
   onActivate: (group: VendorGroup) => void;
   onPeek: (group: VendorGroup, anchor: HTMLElement) => void;
   onPeekEnd: () => void;
+  /** `preferences.iconColour === "colour"`, resolved once in `ServiceTile` above. */
+  colour: boolean;
 }
 
 /**
@@ -306,7 +326,7 @@ interface TileShellProps {
  * defensively throughout was harder to see as "this case is untouched" than
  * a second, small component is.
  */
-function SingleEntryTile({ service, group, domId, selected, onActivate, onPeek, onPeekEnd }: TileShellProps & { service: ViewService }) {
+function SingleEntryTile({ service, group, domId, selected, onActivate, onPeek, onPeekEnd, colour }: TileShellProps & { service: ViewService }) {
   const isActive = service.status === "active";
   const isFallback = service.icon === null;
   const phrase = statusPhrase(service);
@@ -358,7 +378,7 @@ function SingleEntryTile({ service, group, domId, selected, onActivate, onPeek, 
           // `colour` doc-comment).
           <span className={styles.monogram}>{monogramFor(service.service)}</span>
         ) : (
-          <Icon icon={service.icon} rollup={service.rollup} label={service.name} colour />
+          <Icon icon={service.icon} rollup={service.rollup} label={service.name} colour={colour} />
         )}
 
         {/*
@@ -417,7 +437,7 @@ function SingleEntryTile({ service, group, domId, selected, onActivate, onPeek, 
  * a single entry's own tile and the one that deliberately does not
  * (desaturation).
  */
-function GroupTile({ group, domId, selected, onActivate, onPeek, onPeekEnd }: TileShellProps) {
+function GroupTile({ group, domId, selected, onActivate, onPeek, onPeekEnd, colour }: TileShellProps) {
   const isFallback = group.icon === null;
   const worst = groupStatus(group);
   const departure = groupStatusPhrase(group);
@@ -450,7 +470,7 @@ function GroupTile({ group, domId, selected, onActivate, onPeek, onPeekEnd }: Ti
         {isFallback ? (
           <span className={styles.monogram}>{monogramFor(group.service)}</span>
         ) : (
-          <Icon icon={group.icon} rollup={group.rollup} label={group.name} colour />
+          <Icon icon={group.icon} rollup={group.rollup} label={group.name} colour={colour} />
         )}
 
         {worst !== "active" && (

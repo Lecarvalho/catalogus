@@ -37,6 +37,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { App } from "./App.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
+import { PREFERENCES_STORAGE_KEY } from "./preferences.js";
 import { makeViewPayload, makeViewService } from "./test-support/fixtures.js";
 
 // elk-layout.ts reaches its worker through a Vite `?worker` import that
@@ -265,6 +266,10 @@ beforeEach(() => {
   // Every test starts from a hash-free URL on the same history entry --
   // otherwise one test's deep link is the next test's starting state.
   window.history.replaceState(null, "", "/");
+  // Every test starts from no stored preference -- this component now reads
+  // `defaultView` once at mount (preferences.ts), and a value one test wrote
+  // must not leak into the next one's initial mode.
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -272,6 +277,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   restoreViewport();
   restorePopoverBox();
+  window.localStorage.clear();
   // A test that opts into fake timers for the hover-close delay must not
   // leave them running for the next test's own waitFor() polling.
   vi.useRealTimers();
@@ -644,7 +650,11 @@ describe("App -- the brand page route", () => {
     // number the tile's "5 entries" line and the entries table both agree
     // with.
     expect(screen.getByText("5")).not.toBeNull();
-    expect(screen.getAllByRole("link")).toHaveLength(5);
+    // Scoped to the brand page itself -- the footer's own Documentation link
+    // (Footer.tsx, docs/menus-brief.md) is a fixed, unrelated link that
+    // renders on every loaded view and has nothing to do with this page's
+    // five entry links.
+    expect(within(brandPage() as HTMLElement).getAllByRole("link")).toHaveLength(5);
   });
 
   it("selects nothing for a hash naming a band the manifest does not have", async () => {
@@ -759,7 +769,10 @@ describe("App -- ServicePage's own brand prop", () => {
     window.history.replaceState(null, "", "/#/service/supabase-db");
     await renderLoaded(flyGroupPayload());
     await waitFor(() => expect(servicePage()).not.toBeNull());
-    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    // Scoped to the page itself -- the footer's own Documentation link
+    // (Footer.tsx, docs/menus-brief.md) renders regardless and is not a
+    // second crumb on this page.
+    expect(within(servicePage() as HTMLElement).queryAllByRole("link")).toHaveLength(0);
   });
 
   it("follows the crumb back to the brand page", async () => {
@@ -1489,6 +1502,17 @@ describe("App -- the view toggle", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull();
   });
 
+  // The `defaultView` preference (preferences.ts, docs/menus-brief.md's
+  // owner answer 2) is read once, at mount, through App.tsx's `mode`
+  // initializer -- this is that read proven end to end, storage to screen,
+  // rather than only at preferences.ts's own unit-test level.
+  it("starts on the stored default view instead of List, when one is set", async () => {
+    window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify({ iconColour: "monochrome", defaultView: "graph" }));
+    await renderLoaded();
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Graph" }).getAttribute("aria-checked")).toBe("true"));
+    expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).toBeNull();
+  });
+
   it("swaps the list for the canvas, and back", async () => {
     await renderLoaded();
     fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
@@ -1694,7 +1718,14 @@ describe("App wires the shell", () => {
   // two files agree about `band-<id>`.
   it("gives every band anchor in the rail a section on the board to land on", async () => {
     await renderLoaded();
-    const hrefs = screen.getAllByRole("link").map((link) => link.getAttribute("href")!);
+    // Scoped to the rail's own band index -- the footer's Documentation link
+    // (Footer.tsx, docs/menus-brief.md) is a real link on this page too now,
+    // and it points off-page by design, which this test would otherwise
+    // wrongly read as a band anchor with nowhere to land.
+    const bandNav = screen.getByRole("navigation", { name: "Bands" });
+    const hrefs = within(bandNav)
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href")!);
     expect(hrefs.length).toBeGreaterThan(0);
     for (const href of hrefs) {
       expect(document.getElementById(href.slice(1)), `${href} points at nothing on the board`).not.toBeNull();

@@ -17,12 +17,16 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { VendorGroup } from "../bands.js";
+import { PREFERENCES_STORAGE_KEY, PreferencesProvider } from "../preferences.js";
 import { FLYIO_ICON_FIXTURE, makeViewService as service } from "../test-support/fixtures.js";
 import { monogramFor, ServiceTile, serviceTileDomId } from "./ServiceTile.js";
 
 const readAt = "2026-08-24T00:00:00.000Z";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 /** A one-entry `VendorGroup`, the shape every single-entry test below renders -- built from one `makeViewService` the same way bands.ts's own `collapseByService` would build it for a band with no repeats. */
 function soloGroup(overrides: Parameters<typeof service>[0]): VendorGroup {
@@ -116,15 +120,64 @@ describe("ServiceTile -- the no-brand-icon case, single entry", () => {
     // this file reach past the a11y tree to the render itself.
     const mark = screen.getByTestId("icon-mark").querySelector("svg");
     expect(mark?.getAttribute("aria-label")).toBe("Fly.io");
-    // `colour` is on and FLYIO_ICON_FIXTURE.hex is set, so the mark's own
-    // brand colour reaches it as the svg's inline `color` (Icon.tsx's one
-    // JS-side colour value) -- jsdom's cssstyle normalises the hex to
-    // rgb(...) the moment it is set through the DOM style object, so this is
-    // that normalised form of "#24175B", not a hand-rolled expectation. The
-    // path's own `fill` attribute stays "currentColor" -- see Icon.module.css
-    // for why a fill is never rewritten by hand.
-    expect(mark?.style.color).toBe("rgb(36, 23, 91)");
+    // The path's own `fill` attribute stays "currentColor" regardless of the
+    // brand-icon-colour preference -- see Icon.module.css for why a fill is
+    // never rewritten by hand. Whether `color` itself is set is the
+    // preference's own concern, covered in its own describe block below.
     expect(mark?.querySelector("path")?.getAttribute("fill")).toBe("currentColor");
+  });
+});
+
+/**
+ * The brand-icon colour preference (preferences.ts, docs/menus-brief.md's
+ * owner answer 2), reaching the tile through Icon.tsx's own pre-existing
+ * `colour` prop mechanism -- ServiceTile.tsx's own header comment on the
+ * switch says why this is that one mechanism and not a second one. Default
+ * is monochrome, which every test above this block already renders under
+ * (no `PreferencesProvider` ancestor means preferences.ts's context default,
+ * `DEFAULT_PREFERENCES`) -- this block is the "colour" half of the switch,
+ * and the proof that toggling it actually flips the mechanism rather than
+ * two independent code paths that happen to agree today.
+ */
+describe("ServiceTile -- the brand-icon colour preference", () => {
+  function renderWithIconColour(iconColour: "colour" | "monochrome", group: VendorGroup) {
+    if (iconColour === "colour") {
+      window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify({ iconColour: "colour", defaultView: "list" }));
+    }
+    return render(
+      <PreferencesProvider>
+        <ServiceTile bandId="production" readAt={readAt} selected={false} onActivate={vi.fn()} onPeek={vi.fn()} onPeekEnd={vi.fn()} group={group} />
+      </PreferencesProvider>,
+    );
+  }
+
+  it("renders a single-entry tile's mark with no inline colour under the default, monochrome preference", () => {
+    renderWithIconColour("monochrome", soloGroup({ id: "a", role: "hosting-api", service: "flyio", name: "Fly.io", icon: FLYIO_ICON_FIXTURE }));
+    const mark = screen.getByTestId("icon-mark").querySelector("svg");
+    expect(mark?.style.color).toBe("");
+  });
+
+  it("paints a single-entry tile's mark in the brand's own colour when the preference is Colour", () => {
+    renderWithIconColour("colour", soloGroup({ id: "a", role: "hosting-api", service: "flyio", name: "Fly.io", icon: FLYIO_ICON_FIXTURE }));
+    const mark = screen.getByTestId("icon-mark").querySelector("svg");
+    // jsdom's cssstyle normalises the hex to rgb(...) the moment it is set
+    // through the DOM style object -- the same normalised form of
+    // "#24175B" view-payload.test.ts's own FLYIO_ICON_FIXTURE carries.
+    expect(mark?.style.color).toBe("rgb(36, 23, 91)");
+  });
+
+  it("applies the same preference to a multi-entry group's mark", () => {
+    const group = multiGroup([
+      service({ id: "a", role: "hosting-api", service: "flyio", name: "Fly.io", icon: FLYIO_ICON_FIXTURE }),
+      service({ id: "b", role: "hosting-api", service: "flyio", name: "Fly.io", icon: FLYIO_ICON_FIXTURE }),
+    ]);
+
+    const { unmount } = renderWithIconColour("monochrome", group);
+    expect(screen.getByTestId("icon-mark").querySelector("svg")?.style.color).toBe("");
+    unmount();
+
+    renderWithIconColour("colour", group);
+    expect(screen.getByTestId("icon-mark").querySelector("svg")?.style.color).toBe("rgb(36, 23, 91)");
   });
 });
 
