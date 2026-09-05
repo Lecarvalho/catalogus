@@ -80,6 +80,8 @@ untouched. `set` writes the remaining project-level fields (`architecture`, `vcs
 there — soft private-data warnings are printed for a person to read, not to gate on, because whether
 a word like `billing` is a leak or ordinary vocabulary depends on what the project does.
 
+For the full field-by-field reference, see [`docs/user/manifest-format.md`](docs/user/manifest-format.md).
+
 ## Why anything is manual
 
 Detection is a floor, not the answer. Run against a real .NET project, the dependency scanner found
