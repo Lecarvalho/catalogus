@@ -24,11 +24,13 @@
 // reference data nobody has finished, which is this project's recurring defect
 // wearing a new hat.
 //
-// `RankModule.tsx` and bands.ts's `mostDependedOn` are kept, not deleted: they
-// are correct, tested, and the hierarchy problem they solve is real -- the
-// board still gives `fly-api` and `namecheap-registrar` identical weight. They
-// simply have no caller until the catalog is worth judging on. `dependentCounts`
-// remains in use; the popover states per-entry dependents.
+// `RankModule.tsx` and bands.ts's `mostDependedOn` were kept callerless for
+// that reason until 2026-09-05, when the owner chose to delete them rather
+// than keep a component nothing rendered; git history has them if the
+// hierarchy problem they solved -- the board gives `fly-api` and
+// `namecheap-registrar` identical weight -- is taken up again once the
+// catalog is worth judging on. `dependentCounts` remains in use; the popover
+// states per-entry dependents.
 //
 // **2026-09-04: `onActivate`/`onPeek` widen to carry the band alongside the
 // group** (docs/brand-tile-brief.md, Part A -- prop threading only, no

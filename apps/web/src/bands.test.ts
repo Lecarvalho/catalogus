@@ -12,7 +12,6 @@ import {
   dependentCounts,
   groupIntoBands,
   groupStatus,
-  mostDependedOn,
 } from "./bands.js";
 import { FLYIO_ICON_FIXTURE, makeViewService as service, THESVG_ICON_FIXTURE } from "./test-support/fixtures.js";
 
@@ -230,59 +229,3 @@ describe("dependentCounts", () => {
   });
 });
 
-describe("mostDependedOn", () => {
-  const services = [
-    service({ id: "a", role: "hosting" }),
-    service({ id: "b", role: "hosting" }),
-    service({ id: "c", role: "hosting" }),
-  ];
-
-  it("excludes an entry with no dependents at all", () => {
-    const rows = mostDependedOn(services, [{ from: "x", to: "a" }], 10);
-    expect(rows.map((r) => r.service.id)).toEqual(["a"]);
-  });
-
-  it("orders descending by dependent count", () => {
-    const rows = mostDependedOn(
-      services,
-      [
-        { from: "x", to: "a" },
-        { from: "y", to: "b" },
-        { from: "z", to: "b" },
-      ],
-      10
-    );
-    expect(rows.map((r) => r.service.id)).toEqual(["b", "a"]);
-  });
-
-  // Without the id tiebreak, two equal-count entries would keep whatever
-  // order the Map's iteration (== edge order) happened to produce.
-  it("breaks a tie in dependent count on id, ascending", () => {
-    const rows = mostDependedOn(
-      services,
-      [
-        { from: "x", to: "b" },
-        { from: "y", to: "a" },
-      ],
-      10
-    );
-    expect(rows.map((r) => r.service.id)).toEqual(["a", "b"]);
-  });
-
-  it("respects the limit", () => {
-    const rows = mostDependedOn(
-      services,
-      [
-        { from: "x", to: "a" },
-        { from: "y", to: "b" },
-        { from: "z", to: "c" },
-      ],
-      2
-    );
-    expect(rows).toHaveLength(2);
-  });
-
-  it("returns nothing when no service has a dependent", () => {
-    expect(mostDependedOn(services, [], 10)).toEqual([]);
-  });
-});

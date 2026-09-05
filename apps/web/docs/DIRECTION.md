@@ -394,6 +394,10 @@ apps/web/dist` returns one hit and it is `@xyflow`'s, and "Most depended" appear
 in no bundle chunk. Driving the live app through no hash, a real service hash, a
 bogus one and a malformed one never renders it.
 
+*Resolved 2026-09-05: the owner chose deletion over naming the ink. `RankModule`,
+its stylesheet and test, and `mostDependedOn` are gone; the detector's one
+finding goes with them.*
+
 **A first pass filed this under the four dead selected-state treatments the
 2026-08-26 handoff records as open, and that was wrong.** Those four --
 `ServiceNode.selected`, `GraphCanvas.edgeIncident`, `MigrationList`'s
@@ -701,6 +705,8 @@ does not say what instead. The guard carries the two rules in a quarantine list,
 named per selector and dated, which is not a licence: any other red rule in that
 file still fails, and either rule going green makes its own entry stale and fails
 too. It resolves when `RankModule` next has a caller, or when the file goes.
+*It went: the owner chose deletion on 2026-09-05, and the quarantine list in
+`signal-red.test.ts` went with it.*
 
 **What the whole entry is evidence for.** Every one of the three sites had a
 comment beside it discussing the red, two of them stating the ruling correctly,

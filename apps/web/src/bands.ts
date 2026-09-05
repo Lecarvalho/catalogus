@@ -333,25 +333,3 @@ export function dependentCounts(edges: readonly { from: string; to: string }[]):
   }
   return counts;
 }
-
-/**
- * The most depended-on services, descending, at most `limit` of them, and
- * never anything with no dependents at all -- a rank list padded with zeroes
- * would imply an ordering the data does not support.
- *
- * Ties break on `id` so the order is reproducible; without it, two services
- * with four dependents each would swap places between renders depending on
- * Map iteration order, which is insertion order, which is edge order.
- */
-export function mostDependedOn(
-  services: readonly ViewService[],
-  edges: readonly { from: string; to: string }[],
-  limit: number,
-): { service: ViewService; count: number }[] {
-  const counts = dependentCounts(edges);
-  return services
-    .map((service) => ({ service, count: counts.get(service.id) ?? 0 }))
-    .filter((row) => row.count > 0)
-    .sort((a, b) => (b.count - a.count) || ordinal(a.service.id, b.service.id))
-    .slice(0, limit);
-}

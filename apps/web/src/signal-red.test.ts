@@ -263,35 +263,13 @@ const LICENSED: readonly Site[] = [
 ];
 
 /**
- * **Not a licence. A recorded question.**
- *
- * `RankModule` paints a red left border on the selected row and a red chip on
- * the top-ranked one. The chip is the contract's "not a count" clause almost
- * word for word, so neither rule can stay red -- and neither is fixed here,
- * because `RankModule` has no caller. The owner removed the ranking from the
- * board on 2026-08-25 ("the most depend panel is noise for now"), and
- * `ProjectBoard.tsx`'s header records that the component is kept rather than
- * deleted, tested and correct, waiting for a catalog worth judging on.
- *
- * So nothing paints these on any screen, and choosing what they become instead
- * is a design decision on a component the owner took off the board -- the
- * contract says *not red*, it does not say what replaces it, and CLAUDE.md's
- * standing rule is that a value nobody chose does not get written down as though
- * somebody had. Two entries here, dated, is the honest state: the red is real,
- * it reaches no reader, and it is the owner's to rule on when `RankModule` next
- * has a caller. Whichever way that goes, these entries are deleted -- the rules
- * move onto ink, or the file does.
- *
- * What this does not weaken: the entries are per-selector like the licensed
- * ones, so any *other* red rule added to `RankModule.module.css` still fails,
- * and either of these going green makes its own entry stale and fails too.
+ * There was a quarantine list here (2026-08-26 to 2026-09-05) for the two red
+ * rules in `RankModule.module.css`, a component the owner had taken off the
+ * board and that painted red where the contract says ink. The owner ruled on
+ * 2026-09-05: the file is deleted, with its component and `mostDependedOn`.
+ * The allow-list is the licensed sites and nothing else again.
  */
-const QUARANTINED: readonly Site[] = [
-  { file: "components/RankModule.module.css", selector: ".selected", property: "border-left" },
-  { file: "components/RankModule.module.css", selector: ".top", property: "background" },
-];
-
-const ALLOWED = [...LICENSED, ...QUARANTINED];
+const ALLOWED = LICENSED;
 
 function matches(site: Site, declaration: Declaration | Site): boolean {
   return (
