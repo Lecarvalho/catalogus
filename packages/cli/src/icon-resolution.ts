@@ -110,8 +110,14 @@ export interface ServiceIconResolution {
  * it: a floor under an assumption, not the mechanism enforcing it, in case
  * a manifest reaches this function some other way (hand-edited, or a
  * schema that changes shape under this code later).
+ *
+ * Exported since 2026-09-05 for `catalogus remove`: deleting a file the
+ * manifest points at is the one operation in this package where the floor
+ * matters more than it does for reading -- a stale pointer that reads
+ * outside the directory degrades a tile, one that *unlinks* outside it
+ * deletes something the manifest never owned.
  */
-function isWithinIconsDir(manifestDir: string, absolutePath: string): boolean {
+export function isWithinIconsDir(manifestDir: string, absolutePath: string): boolean {
   const iconsDir = join(manifestDir, ".catalogus", "icons");
   const iconsDirWithSep = iconsDir.endsWith(sep) ? iconsDir : iconsDir + sep;
   // `absolutePath === iconsDir` (naming the directory itself, with no file

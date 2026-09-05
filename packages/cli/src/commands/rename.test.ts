@@ -1,9 +1,28 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTempDir, removeTempDir, writeFixtureFile } from "../test-support/temp-dir.js";
+
+// One switch that makes `rename` (the fs call) fail, for the test below
+// that pins the framing of a move the filesystem refuses. A real refusal
+// needs an ACL (the 2026-09-05 validator used `icacls`), which is not
+// portable and not something a test should leave behind. Everything else
+// in node:fs/promises passes through untouched.
+const fsRename = vi.hoisted(() => ({ failWith: undefined as string | undefined }));
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    rename: async (from: string, to: string) => {
+      if (fsRename.failWith !== undefined) {
+        throw Object.assign(new Error(fsRename.failWith), { code: "EPERM" });
+      }
+      return actual.rename(from, to);
+    },
+  };
+});
 import { runRename } from "./rename.js";
 import { runValidate } from "./validate.js";
 
@@ -244,5 +263,211 @@ dependencies:
     expect(text).toContain("id: api-worker");
     expect(text).toContain("[api-worker, gateway]");
     expect((await runValidate(dir, {})).exitCode).toBe(0);
+  });
+});
+
+// The vendored-icon half of `rename` (2026-09-05). A `set services.<id>.icon`
+// leaves a file at `.catalogus/icons/<id>.svg` and a pointer to it in the
+// entry; before this, a rename moved the pointer's owner and left both file
+// and pointer under the old id's name -- valid, resolving, and quietly off
+// the `<id>.svg` convention the skill and `catalogus icons` teach.
+describe("runRename, with a vendored icon", () => {
+  let dir: string;
+
+  const CLEAN_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1 1h2v2h-2z" fill="#123456"/></svg>';
+
+  const ICON_MANIFEST = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
+project:
+  name: Example App
+  slug: example-app
+services:
+  - id: logs
+    service: loki
+    role: observability
+    added: 2025-11-02
+    icon: .catalogus/icons/logs.svg # fetched from https://example.test (loki.svg) on 2026-09-04
+  - id: metrics
+    service: loki
+    role: observability
+    added: 2025-11-02
+    icon: .catalogus/icons/loki-mark.svg
+dependencies: []
+`;
+
+  beforeEach(async () => {
+    dir = await createTempDir();
+    await writeFixtureFile(dir, "catalogus.yaml", ICON_MANIFEST);
+    await mkdir(join(dir, ".catalogus", "icons"), { recursive: true });
+    await writeFixtureFile(dir, ".catalogus/icons/logs.svg", CLEAN_SVG);
+    await writeFixtureFile(dir, ".catalogus/icons/loki-mark.svg", CLEAN_SVG);
+  });
+
+  afterEach(async () => {
+    await removeTempDir(dir);
+  });
+
+  async function fileExists(relativePath: string): Promise<boolean> {
+    try {
+      await stat(join(dir, relativePath));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  it("moves a file named after the old id to the new id's name, rewrites the pointer and keeps its comment", async () => {
+    const result = await runRename(dir, "logs", "loki-logs");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("  icon .catalogus/icons/logs.svg moved to .catalogus/icons/loki-logs.svg");
+
+    expect(await fileExists(".catalogus/icons/loki-logs.svg")).toBe(true);
+    expect(await fileExists(".catalogus/icons/logs.svg")).toBe(false);
+
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
+    expect(text).toContain("icon: .catalogus/icons/loki-logs.svg # fetched from https://example.test (loki.svg) on 2026-09-04");
+    expect(text).not.toContain("icons/logs.svg");
+    expect((await runValidate(dir, {})).exitCode).toBe(0);
+  });
+
+  it("leaves a pointer that was not named after the id alone, file and field both, and says so", async () => {
+    const result = await runRename(dir, "metrics", "loki-metrics");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(
+      '  icon .catalogus/icons/loki-mark.svg kept its name and its file (it was not named after "metrics")'
+    );
+
+    expect(await fileExists(".catalogus/icons/loki-mark.svg")).toBe(true);
+    expect(await fileExists(".catalogus/icons/loki-metrics.svg")).toBe(false);
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
+    expect(text).toContain("icon: .catalogus/icons/loki-mark.svg");
+  });
+
+  it("refuses at exit 1, touching nothing, when a file already sits at the new id's name", async () => {
+    await writeFixtureFile(dir, ".catalogus/icons/loki-logs.svg", "<svg/>");
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
+
+    const result = await runRename(dir, "logs", "loki-logs");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr[0]).toContain("a file already sits there");
+
+    expect(await readFile(join(dir, "catalogus.yaml"), "utf8")).toBe(before);
+    expect(await readFile(join(dir, ".catalogus/icons/loki-logs.svg"), "utf8")).toBe("<svg/>");
+    expect(await readFile(join(dir, ".catalogus/icons/logs.svg"), "utf8")).toBe(CLEAN_SVG);
+  });
+
+  it("moves a stale pointer with the id when no file is there, and reports that nothing moved on disk", async () => {
+    await rm(join(dir, ".catalogus", "icons", "logs.svg"));
+
+    const result = await runRename(dir, "logs", "loki-logs");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(
+      "  icon is now .catalogus/icons/loki-logs.svg (no file was at .catalogus/icons/logs.svg to move; the pointer was already stale)"
+    );
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
+    expect(text).toContain("icon: .catalogus/icons/loki-logs.svg");
+    expect(await fileExists(".catalogus/icons/loki-logs.svg")).toBe(false);
+  });
+
+  // D1–D3, D7 (validator, 2026-09-05): the manifest is consulted before the
+  // filesystem. Both states are hand-edited ones -- `set` always vendors to
+  // <id>.svg -- but they are legal by the schema, and `remove` already
+  // guards the shared case.
+  it("keeps a file another entry still names, pointer and file both, and names that entry", async () => {
+    await writeFixtureFile(dir, "catalogus.yaml", ICON_MANIFEST.replace("icon: .catalogus/icons/loki-mark.svg", "icon: .catalogus/icons/logs.svg"));
+
+    const result = await runRename(dir, "logs", "loki-logs");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('  icon .catalogus/icons/logs.svg kept its name: "metrics" still names it');
+
+    expect(await fileExists(".catalogus/icons/logs.svg")).toBe(true);
+    expect(await fileExists(".catalogus/icons/loki-logs.svg")).toBe(false);
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
+    expect(text).toContain("id: loki-logs\n");
+    expect(text).not.toContain("icons/loki-logs.svg");
+    expect((await runValidate(dir, {})).exitCode).toBe(0);
+  });
+
+  it("refuses at exit 1 when another entry already names the new id's path, whether or not a file is there", async () => {
+    // metrics names the path logs would move to; no file sits there yet, so
+    // a filesystem-only check would let the move bind metrics to logs's mark.
+    await writeFixtureFile(dir, "catalogus.yaml", ICON_MANIFEST.replace("icon: .catalogus/icons/loki-mark.svg", "icon: .catalogus/icons/loki-logs.svg"));
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
+
+    const result = await runRename(dir, "logs", "loki-logs");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr[0]).toContain('which "metrics" already names.');
+    expect(result.stderr[1]).toContain("catalogus set services.<id>.icon");
+
+    expect(await readFile(join(dir, "catalogus.yaml"), "utf8")).toBe(before);
+    expect(await fileExists(".catalogus/icons/logs.svg")).toBe(true);
+    expect(await fileExists(".catalogus/icons/loki-logs.svg")).toBe(false);
+  });
+
+  it("calls a directory at the new id's path a directory, not a file", async () => {
+    await mkdir(join(dir, ".catalogus", "icons", "loki-logs.svg"));
+
+    const result = await runRename(dir, "logs", "loki-logs");
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr[0]).toContain("but a directory already sits there.");
+    expect(result.stderr[1]).toContain("no entry in");
+  });
+
+  it("frames a move the filesystem refuses like a manifest write that throws, touching nothing (D4)", async () => {
+    fsRename.failWith = "EPERM: operation not permitted, rename";
+    const before = await readFile(join(dir, "catalogus.yaml"), "utf8");
+    try {
+      const result = await runRename(dir, "logs", "loki-logs");
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toEqual([
+        "could not move .catalogus/icons/logs.svg to .catalogus/icons/loki-logs.svg: EPERM: operation not permitted, rename",
+        "  nothing was written; the icon file was not moved.",
+      ]);
+    } finally {
+      fsRename.failWith = undefined;
+    }
+    expect(await readFile(join(dir, "catalogus.yaml"), "utf8")).toBe(before);
+    expect(await fileExists(".catalogus/icons/logs.svg")).toBe(true);
+    expect(await fileExists(".catalogus/icons/loki-logs.svg")).toBe(false);
+  });
+
+  it("leaves a directory at the source where it is, and says so", async () => {
+    await rm(join(dir, ".catalogus", "icons", "logs.svg"));
+    await mkdir(join(dir, ".catalogus", "icons", "logs.svg"));
+
+    const result = await runRename(dir, "logs", "loki-logs");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("  icon .catalogus/icons/logs.svg kept its name: a directory sits there, not a file, so nothing was moved");
+    expect(await fileExists(".catalogus/icons/logs.svg")).toBe(true);
+    expect(await fileExists(".catalogus/icons/loki-logs.svg")).toBe(false);
+    expect(await readFile(join(dir, "catalogus.yaml"), "utf8")).toContain("icon: .catalogus/icons/logs.svg");
+  });
+
+  it("moves the file back when the manifest write is refused", async () => {
+    // A manifest that already carries a cycle opens (see manifest-edit.ts)
+    // but every edit that leaves the cycle standing is refused at commit --
+    // the one refusal a valid-looking rename can reach after the file has
+    // already moved.
+    await writeFixtureFile(
+      dir,
+      "catalogus.yaml",
+      ICON_MANIFEST.replace("dependencies: []", "dependencies:\n  - [logs, metrics]\n  - [metrics, logs]")
+    );
+
+    const result = await runRename(dir, "logs", "loki-logs");
+    expect(result.exitCode).toBe(1);
+    // Reported under this command's own prefix rather than the file's:
+    // cycleKey is built from the ids, and renaming one of a cycle's nodes
+    // changes the key, so the pre-existing cycle reads as a new one. A
+    // pre-existing quirk of `rename`, recorded in docs/PLAN.md; not what
+    // this test pins. What it pins is that the refusal put the file back.
+    expect(result.stderr[0]).toContain("invalid:");
+
+    expect(await fileExists(".catalogus/icons/logs.svg")).toBe(true);
+    expect(await fileExists(".catalogus/icons/loki-logs.svg")).toBe(false);
+    const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
+    expect(text).toContain("id: logs\n");
+    expect(text).toContain("icon: .catalogus/icons/logs.svg");
   });
 });

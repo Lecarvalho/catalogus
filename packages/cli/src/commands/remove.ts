@@ -11,9 +11,24 @@
 // Phase 3.6). This command exists to close that gap, and it is deliberately
 // narrow: it deletes one entry and the edges that would otherwise dangle
 // from deleting it, nothing more.
+//
+// "Nothing more" gained one item on 2026-09-05: the entry's vendored icon
+// file. `catalogus set services.<id>.icon` writes the mark under
+// `.catalogus/icons/` and records the path in the entry, so removing the
+// entry alone orphaned a file nothing referenced -- a file `catalogus
+// icons` could no longer report and nobody would think to delete. It is
+// deleted here, after the manifest write has succeeded (a deletion is the
+// one step in this command that cannot be rolled back, so it goes last),
+// and only when no surviving entry names the same file and the path sits
+// inside `.catalogus/icons/` -- see the two guards below.
+import { unlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
+
 import { edgePairs } from "@catalogus/schema";
 import type { YAMLSeq } from "yaml";
 
+import { removeIconsDirIfEmpty } from "../icon-fetch.js";
+import { isWithinIconsDir } from "../icon-resolution.js";
 import { commitManifestEdit, openManifestForEdit } from "../manifest-edit.js";
 import { isValidSlug } from "../slug.js";
 import type { CommandResult } from "../types.js";
@@ -175,7 +190,28 @@ export async function runRemove(pathArg: string | undefined, id: string): Promis
   // "comment attachment" suite for both hazards, measured and pinned
   // rather than assumed.
 
-  return commitManifestEdit(opened.value, {
+  // The vendored icon, decided from the manifest as it was opened. Two
+  // guards, both about not deleting what this entry does not own on its
+  // own: another surviving entry pointing at the very same file (the
+  // schema allows any `<name>.svg`, so two entries can legally share one),
+  // and a path outside `.catalogus/icons/` -- unreachable through this
+  // CLI's own writes, since the schema pattern refuses it (so no test can
+  // reach this guard through runRemove; the 2026-09-05 validator showed a
+  // mutation dropping it survives the suite, and it stays as a floor under
+  // a schema change, not as tested behaviour), but this is the one place
+  // in the package that unlinks a path the manifest handed it. A lexical
+  // floor: it does not resolve links, so `.catalogus/icons` replaced by a
+  // junction to elsewhere deletes the file the manifest points at through
+  // that junction -- the user's own link, measured and accepted.
+  const removedIcon = manifest.services[index]?.icon;
+  const sharedWith = manifest.services
+    .filter((service) => service.id !== id && service.icon !== undefined && service.icon === removedIcon)
+    .map((service) => service.id);
+  const iconAbsolute = removedIcon === undefined ? undefined : join(location.dir, removedIcon);
+  const deleteIcon =
+    iconAbsolute !== undefined && sharedWith.length === 0 && isWithinIconsDir(location.dir, iconAbsolute);
+
+  const result = await commitManifestEdit(opened.value, {
     // Nothing this command does to a valid manifest reaches this branch:
     // replaced_by conflicts are refused above before the document is
     // touched, cascading the edges first means removal cannot leave a
@@ -219,7 +255,41 @@ export async function runRemove(pathArg: string | undefined, id: string): Promis
             (depsSeq.items.length === 0 ? "; the list is now empty, so it sits above nothing." : ".")
         );
       }
+      if (removedIcon !== undefined && sharedWith.length > 0) {
+        lines.push(
+          `  icon ${removedIcon} was kept: ${sharedWith.map((other) => `"${other}"`).join(", ")} still ` +
+            `${sharedWith.length === 1 ? "names" : "name"} it`
+        );
+      }
       return lines;
     },
   });
+
+  if (result.exitCode !== 0 || !deleteIcon || iconAbsolute === undefined || removedIcon === undefined) {
+    return result;
+  }
+
+  // Manifest written; now the file. A missing file is the stale-pointer
+  // case `catalogus icons` reports as "(missing file)" and is not a
+  // failure here -- the outcome the user asked for is the one on disk. Any
+  // other error is reported on stderr at exit 0: the entry is gone, which
+  // is what the command promised, and the file it could not delete is
+  // named so it does not become the orphan this step exists to prevent.
+  try {
+    await unlink(iconAbsolute);
+    result.stdout.push(`  deleted icon ${removedIcon}`);
+    await removeIconsDirIfEmpty(dirname(iconAbsolute));
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    if (code === "ENOENT") {
+      result.stdout.push(`  icon ${removedIcon} was already missing; nothing to delete`);
+      // The directory may still be empty -- the same litter the branch
+      // above sweeps (validator, 2026-09-05).
+      await removeIconsDirIfEmpty(dirname(iconAbsolute));
+    } else {
+      const message = error instanceof Error ? error.message : String(error);
+      result.stderr.push(`could not delete ${removedIcon}: ${message}`, "  the entry was removed; delete the file by hand.");
+    }
+  }
+  return result;
 }

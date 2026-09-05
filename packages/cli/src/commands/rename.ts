@@ -26,10 +26,26 @@
 // `setIn` cannot: `setIn` writes the new id whether or not the old one was
 // there, and a rename that quietly wrote over the wrong thing is the
 // failure this command is least able to afford.
+//
+// One thing outside the manifest moves with the id (added 2026-09-05): a
+// vendored icon file. `catalogus set services.<id>.icon` writes the mark
+// under `.catalogus/icons/<id>.svg` and records that path in the entry, so
+// after a rename the pointer still resolves but the file is named after an
+// id that no longer exists -- and the `<id>.svg` convention `catalogus
+// icons` and the skill teach silently stops holding for that one entry.
+// So when the entry's `icon` is exactly the old id's conventional path, the
+// file is moved to the new id's and the field rewritten. A pointer to any
+// other name is left alone, file and field both: it is legal by the schema,
+// it still resolves, and guessing that it "should" have been named after
+// the id is the kind of plausible default this repo refuses to write.
+import { rename as renameFile, stat } from "node:fs/promises";
+import { join } from "node:path";
+
 import { edgePairs } from "@catalogus/schema";
 import { isMap, isSeq } from "yaml";
 import type { Scalar, YAMLSeq } from "yaml";
 
+import { vendoredIconRelativePath } from "../icon-fetch.js";
 import { commitManifestEdit, openManifestForEdit } from "../manifest-edit.js";
 import { isValidSlug } from "../slug.js";
 import type { CommandResult } from "../types.js";
@@ -121,6 +137,79 @@ export async function runRename(
 
   const moved: string[] = [];
 
+  // The vendored-icon half, decided before anything is mutated so every
+  // refusal below still leaves the manifest and the icons directory exactly
+  // as they were. The manifest is consulted before the filesystem, both
+  // ways (validator, 2026-09-05): another entry naming the *old* path means
+  // the file is shared and stays put, as `remove` keeps a shared file;
+  // another entry naming the *new* path means the move would bind that
+  // entry to this one's mark whether or not a file is there yet, so it is
+  // refused and the entry named. Only then does the filesystem get a say --
+  // something already at the new name that no entry claims. The schema
+  // allows any `<name>.svg`, so both states are legal by hand even though
+  // `set` never produces them.
+  //
+  // Then three shapes for the entry itself: no icon or one not named after
+  // the old id (nothing to move); the conventional file present (move it);
+  // the conventional pointer with no file behind it (a stale pointer -- the
+  // field still follows the id, so `catalogus icons` keeps reporting the
+  // same "(missing file)" under the new name rather than a path to a file
+  // that was never there under either name).
+  const currentIcon = manifest.services[index]?.icon;
+  const oldIconPath = vendoredIconRelativePath(oldId);
+  const newIconPath = vendoredIconRelativePath(newId);
+  const namesIcon = (path: string): string[] =>
+    manifest.services.filter((service) => service.id !== oldId && service.icon === path).map((service) => service.id);
+  const sharedWith = currentIcon === oldIconPath ? namesIcon(oldIconPath) : [];
+  let iconMove: { from: string; to: string } | undefined;
+  let iconFileMissing = false;
+  let sourceIsDirectory = false;
+  if (currentIcon === oldIconPath && sharedWith.length === 0) {
+    const claimants = namesIcon(newIconPath);
+    if (claimants.length > 0) {
+      return {
+        exitCode: 1,
+        stdout: [],
+        stderr: [
+          `"${oldId}" cannot be renamed to "${newId}": its icon would move to ${newIconPath}, ` +
+            `which ${quoteList(claimants)} already ${claimants.length === 1 ? "names" : "name"}.`,
+          `  re-point ${claimants.length === 1 ? "that entry's icon" : "those entries' icons"} with "catalogus set services.<id>.icon", or pick another id.`,
+        ],
+      };
+    }
+    const from = join(location.dir, oldIconPath);
+    const to = join(location.dir, newIconPath);
+    // Something at the new name that no entry claims is not one this CLI
+    // vendored -- the check above proved that -- and nothing here can tell
+    // what it is, so it is not overwritten. Say what is there (a directory
+    // is not a file, and "move it" means something different for one) and
+    // leave the decision with whoever can look at it. The skill's rule
+    // against touching vendored files by hand does not cover this: an
+    // unreferenced file is not vendored.
+    const occupant = await kindAt(to);
+    if (occupant !== undefined) {
+      return {
+        exitCode: 1,
+        stdout: [],
+        stderr: [
+          `"${oldId}" cannot be renamed to "${newId}": its icon would move to ${newIconPath}, but a ${occupant} already sits there.`,
+          `  no entry in ${location.filePath} names it, so it is not one this CLI vendored. Move or delete it yourself, then rename again.`,
+        ],
+      };
+    }
+    const source = await kindAt(from);
+    if (source === "file") {
+      iconMove = { from, to };
+    } else if (source === undefined) {
+      iconFileMissing = true;
+    }
+    // A directory at the source (second validator, 2026-09-05) is neither
+    // a file to move nor a missing one: the pointer is already refused by
+    // `catalogus icons`, and moving a directory under a new icon name would
+    // report it as an icon. Left where it is, field and all, and said so.
+    sourceIsDirectory = source === "directory";
+  }
+
   const servicesSeq = doc.get("services", true) as YAMLSeq;
   const entry = servicesSeq.items[index];
   if (!isMap(entry) || !renameScalar(entry.get("id", true), oldId, newId)) {
@@ -129,6 +218,34 @@ export async function runRename(
       stdout: [],
       stderr: [`could not rewrite the id of "${oldId}" in ${location.filePath}; nothing was written.`],
     };
+  }
+
+  if (currentIcon === oldIconPath && sharedWith.length > 0) {
+    // Shared with another entry: the file stays, and so does this entry's
+    // pointer to it -- still valid, still resolving -- the way `remove`
+    // keeps a shared file. Moving it would break the other entry silently.
+    moved.push(`icon ${oldIconPath} kept its name: ${quoteList(sharedWith)} still ${sharedWith.length === 1 ? "names" : "name"} it`);
+  } else if (sourceIsDirectory) {
+    moved.push(`icon ${oldIconPath} kept its name: a directory sits there, not a file, so nothing was moved`);
+  } else if (currentIcon === oldIconPath) {
+    // The field follows the id whether or not a file is there to move --
+    // see the stale-pointer case above. Inline comment on the node (`#
+    // fetched from ... on ...`) is attached to the pair, so it survives
+    // this the same way it survives every other renameScalar call here.
+    if (!renameScalar(entry.get("icon", true), oldIconPath, newIconPath)) {
+      return {
+        exitCode: 1,
+        stdout: [],
+        stderr: [`could not rewrite the icon path of "${oldId}" in ${location.filePath}; nothing was written.`],
+      };
+    }
+    moved.push(
+      iconFileMissing
+        ? `icon is now ${newIconPath} (no file was at ${oldIconPath} to move; the pointer was already stale)`
+        : `icon ${oldIconPath} moved to ${newIconPath}`
+    );
+  } else if (currentIcon !== undefined) {
+    moved.push(`icon ${currentIcon} kept its name and its file (it was not named after "${oldId}")`);
   }
 
   // Same index correspondence `remove` relies on: edgePairs() normalizes
@@ -171,17 +288,67 @@ export async function runRename(
     }
   });
 
-  return commitManifestEdit(opened.value, {
-    failurePrefix: `Renaming "${oldId}" to "${newId}" would make`,
-    successLines: (filePath) => {
-      const lines = [`Renamed service "${oldId}" to "${newId}" in ${filePath}`];
-      for (const line of moved) {
-        lines.push(`  ${line}`);
-      }
-      if (moved.length === 0) {
-        lines.push("  no dependency edges or replaced_by references named it");
-      }
-      return lines;
-    },
-  });
+  // The file moves *before* the manifest is written and moves back if the
+  // write is refused or throws -- the same order `set` keeps with a staged
+  // icon (icon-fetch.ts): the manifest, the thing that gets committed to
+  // the repo, is only ever written once everything it points at is already
+  // where it says. A rename is cheap and exactly reversible, which is what
+  // makes the rollback honest rather than best-effort.
+  let iconMoved = false;
+  const restoreIcon = async (): Promise<void> => {
+    if (iconMove && iconMoved) {
+      await renameFile(iconMove.to, iconMove.from).catch(() => {});
+    }
+  };
+
+  let result: CommandResult;
+  try {
+    if (iconMove) {
+      // Inside the try, so a move the filesystem refuses (a directory ACL
+      // that denies deleting from `.catalogus/icons/`, reproduced by the
+      // 2026-09-05 validator) is reported with the same framing as a
+      // manifest write that throws, not as a bare errno.
+      await renameFile(iconMove.from, iconMove.to);
+      iconMoved = true;
+    }
+    result = await commitManifestEdit(opened.value, {
+      failurePrefix: `Renaming "${oldId}" to "${newId}" would make`,
+      successLines: (filePath) => {
+        const lines = [`Renamed service "${oldId}" to "${newId}" in ${filePath}`];
+        for (const line of moved) {
+          lines.push(`  ${line}`);
+        }
+        if (moved.length === 0) {
+          lines.push("  no dependency edges or replaced_by references named it");
+        }
+        return lines;
+      },
+    });
+  } catch (error) {
+    await restoreIcon();
+    const message = error instanceof Error ? error.message : String(error);
+    const failed = iconMove && !iconMoved ? `could not move ${oldIconPath} to ${newIconPath}` : `could not update ${location.filePath}`;
+    return {
+      exitCode: 1,
+      stdout: [],
+      stderr: [`${failed}: ${message}`, "  nothing was written; the icon file was not moved."],
+    };
+  }
+  if (result.exitCode !== 0) {
+    await restoreIcon();
+  }
+  return result;
+}
+
+/** What sits at `path`, as the noun a message can use, or undefined when nothing does. */
+async function kindAt(path: string): Promise<"file" | "directory" | undefined> {
+  try {
+    return (await stat(path)).isDirectory() ? "directory" : "file";
+  } catch {
+    return undefined;
+  }
+}
+
+function quoteList(ids: readonly string[]): string {
+  return ids.map((id) => `"${id}"`).join(", ");
 }

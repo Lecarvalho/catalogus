@@ -41,8 +41,8 @@ catalogus set <field> <value> [<field> <value> ...]  # project fields, or a serv
 catalogus link <from> <to> # one edge between services that already exist
 catalogus unlink <from> <to> # remove that one edge, leaving both entries in place
 catalogus deprecate <id> [--status phasing_out] [--replaced-by <id>]
-catalogus remove <id>      # delete a wrong entry, and every edge naming it
-catalogus rename <old> <new> # change a local id, moving its edges and replaced_by with it
+catalogus remove <id>      # delete a wrong entry, every edge naming it, and its vendored icon
+catalogus rename <old> <new> # change a local id, moving its edges, replaced_by and vendored icon with it
 catalogus validate         # schema, referential integrity, acyclicity, private-data guard
 catalogus diff             # detected vs declared, both directions
 catalogus graph [--mermaid] # render the DAG
@@ -525,12 +525,13 @@ catalogus set services.<id>.icon <https-url-or-path>
 ```
 
 `set` fetches or copies the bytes exactly once, refuses them if they fail the sanitiser, and vendors
-the result under `.catalogus/icons/<id>.svg`. The sanitiser refuses a `<script>`, a `<foreignObject>`,
-an `on*=` event-handler attribute, an `<a href>`/`<use xlink:href>`, a `<style>` block, a file with no
-`viewBox`, or anything over 256 KB — any of these means that particular file cannot land, so pick a
-different source rather than retrying the same one. When nothing turns up, ask the user for a URL or
-a local file instead of inventing or approximating a mark — the same rule as everywhere else in this
-procedure.
+the result under `.catalogus/icons/<id>.svg`. That file follows the entry: `rename` moves it to the
+new id's name and `remove` deletes it, so never move or delete a file the manifest points at under
+`.catalogus/icons/` by hand. The sanitiser refuses a `<script>`, a `<foreignObject>`, an `on*=` event-handler attribute, an
+`<a href>`/`<use xlink:href>`, a `<style>` block, a file with no `viewBox`, or anything over 256 KB —
+any of these means that particular file cannot land, so pick a different source rather than retrying
+the same one. When nothing turns up, ask the user for a URL or a local file instead of inventing or
+approximating a mark — the same rule as everywhere else in this procedure.
 
 This is the one place in this document where you act on a web search rather than asking first (the
 owner's call, 2026-09-04: "the agent needs to go fetch on the web; when they don't find, they can ask

@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -795,5 +795,113 @@ dependencies: []
 
     const text = await readFile(join(dir, "catalogus.yaml"), "utf8");
     expect(text).not.toContain("meant to introduce svc-c, but indented like a continuation of svc-b");
+  });
+});
+
+// The vendored-icon half of `remove` (2026-09-05). Before this, removing an
+// entry whose icon `set` had vendored left `.catalogus/icons/<id>.svg` on
+// disk with nothing pointing at it -- a file `catalogus icons` could no
+// longer report and nobody would think to delete.
+describe("runRemove, with a vendored icon", () => {
+  let dir: string;
+
+  const CLEAN_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1 1h2v2h-2z" fill="#123456"/></svg>';
+
+  const ICON_MANIFEST = `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json
+catalogus: 1
+project:
+  name: Example App
+  slug: example-app
+services:
+  - id: logs
+    service: loki
+    role: observability
+    added: 2025-11-02
+    icon: .catalogus/icons/logs.svg
+  - id: metrics
+    service: loki
+    role: observability
+    added: 2025-11-02
+    icon: .catalogus/icons/shared.svg
+  - id: traces
+    service: loki
+    role: observability
+    added: 2025-11-02
+    icon: .catalogus/icons/shared.svg
+dependencies: []
+`;
+
+  beforeEach(async () => {
+    dir = await createTempDir();
+    await writeFixtureFile(dir, "catalogus.yaml", ICON_MANIFEST);
+    await mkdir(join(dir, ".catalogus", "icons"), { recursive: true });
+    await writeFixtureFile(dir, ".catalogus/icons/logs.svg", CLEAN_SVG);
+    await writeFixtureFile(dir, ".catalogus/icons/shared.svg", CLEAN_SVG);
+  });
+
+  afterEach(async () => {
+    await removeTempDir(dir);
+  });
+
+  async function fileExists(relativePath: string): Promise<boolean> {
+    try {
+      await stat(join(dir, relativePath));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  it("deletes the removed entry's icon file and says so", async () => {
+    const result = await runRemove(dir, "logs");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("  deleted icon .catalogus/icons/logs.svg");
+    expect(await fileExists(".catalogus/icons/logs.svg")).toBe(false);
+    // The other file is untouched, so the directory stays.
+    expect(await fileExists(".catalogus/icons/shared.svg")).toBe(true);
+    expect((await runValidate(dir, {})).exitCode).toBe(0);
+  });
+
+  it("keeps a file another surviving entry still names, and names that entry", async () => {
+    const result = await runRemove(dir, "metrics");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('  icon .catalogus/icons/shared.svg was kept: "traces" still names it');
+    expect(await fileExists(".catalogus/icons/shared.svg")).toBe(true);
+  });
+
+  it("removes .catalogus/icons/ and .catalogus/ once the last file is gone", async () => {
+    await rm(join(dir, ".catalogus", "icons", "shared.svg"));
+    const result = await runRemove(dir, "logs");
+    expect(result.exitCode).toBe(0);
+    expect(await fileExists(".catalogus/icons")).toBe(false);
+    expect(await fileExists(".catalogus")).toBe(false);
+  });
+
+  it("reports a pointer whose file was already missing, at exit 0", async () => {
+    await rm(join(dir, ".catalogus", "icons", "logs.svg"));
+    const result = await runRemove(dir, "logs");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("  icon .catalogus/icons/logs.svg was already missing; nothing to delete");
+    expect(result.stderr).toEqual([]);
+  });
+
+  it("still removes an emptied .catalogus/icons/ when the file was already missing (D6)", async () => {
+    await rm(join(dir, ".catalogus", "icons", "logs.svg"));
+    await rm(join(dir, ".catalogus", "icons", "shared.svg"));
+    const result = await runRemove(dir, "logs");
+    expect(result.exitCode).toBe(0);
+    expect(await fileExists(".catalogus")).toBe(false);
+  });
+
+  it("does not touch any file when the removal itself is refused", async () => {
+    await writeFixtureFile(
+      dir,
+      "catalogus.yaml",
+      ICON_MANIFEST.replace("    icon: .catalogus/icons/shared.svg\n  - id: traces", "    icon: .catalogus/icons/shared.svg\n    replaced_by: logs\n  - id: traces")
+    );
+    const result = await runRemove(dir, "logs");
+    expect(result.exitCode).toBe(1);
+    expect(await fileExists(".catalogus/icons/logs.svg")).toBe(true);
   });
 });

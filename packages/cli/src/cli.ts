@@ -266,7 +266,7 @@ export function createProgram(): Command {
 
   program
     .command("remove")
-    .description("delete a service entry, and every dependency edge that names it")
+    .description("delete a service entry, every dependency edge that names it, and its vendored icon file")
     .argument("<id>", "local id of the entry to delete")
     .argument("[path]", "target directory (defaults to the current directory)")
     .action(async (id: string, path: string | undefined) => {
@@ -275,7 +275,7 @@ export function createProgram(): Command {
 
   program
     .command("rename")
-    .description("change a service entry's local id, moving every edge and replaced_by with it")
+    .description("change a service entry's local id, moving every edge, replaced_by and its vendored icon with it")
     .argument("<old>", "the local id as it is now")
     .argument("<new>", "the local id it should have")
     .argument("[path]", "target directory (defaults to the current directory)")

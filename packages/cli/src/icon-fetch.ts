@@ -54,6 +54,20 @@ export interface PreparedIconVendor {
 
 export type PrepareIconOutcome = { ok: true; value: PreparedIconVendor } | { ok: false; message: string };
 
+/**
+ * The one place the `.catalogus/icons/<id>.svg` convention is spelled out
+ * as a path. prepareIconVendor writes it into the manifest; `rename` uses it
+ * to recognise a file named after the id it is changing (and to name the
+ * moved file); the skill and `catalogus icons` teach it. A second copy of
+ * the string in `rename` would be a second place for the convention to
+ * drift, which is what the 2026-09-04 handoff found it already had: `rename`
+ * left the file under the old id's name, so the convention held for every
+ * entry except the ones that had been renamed.
+ */
+export function vendoredIconRelativePath(serviceId: string): string {
+  return `.catalogus/icons/${serviceId}.svg`;
+}
+
 /** How long a fetch (including every redirect hop) may take before this module gives up. */
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -283,8 +297,13 @@ function today(): string {
  * holds nothing this codebase manages besides `icons/` today, so "empty
  * after icons/ is gone" is the correct signal here, the same way "empty"
  * is the signal for icons/ itself above.
+ *
+ * Exported since 2026-09-05 for `catalogus remove`, which deletes the
+ * vendored file of the entry it removes and is then in exactly the position
+ * this function was written for: the directory it just emptied is one it
+ * has no reason to leave standing.
  */
-async function removeIconsDirIfEmpty(iconsDir: string): Promise<void> {
+export async function removeIconsDirIfEmpty(iconsDir: string): Promise<void> {
   try {
     const entries = await readdir(iconsDir);
     if (entries.length === 0) {
@@ -346,8 +365,8 @@ export async function prepareIconVendor(
     };
   }
 
-  const destPath = join(iconsDir, `${serviceId}.svg`);
-  const relativePath = `.catalogus/icons/${serviceId}.svg`;
+  const relativePath = vendoredIconRelativePath(serviceId);
+  const destPath = join(manifestDir, relativePath);
   const comment = shape.kind === "url" ? `fetched from ${originAndFilename(shape.url)} on ${today()}` : undefined;
 
   return { ok: true, value: { tempPath, destPath, relativePath, comment } };
