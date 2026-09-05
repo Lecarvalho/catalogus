@@ -86,7 +86,7 @@ trusting anything below. **In that order**: the direction contract guard compare
 `apps/web/index.html` against the build output, so a `pnpm test` run against a `dist` older than your
 last edit to that file fails on a difference you created and already fixed.
 
-**The expected total as of 2026-09-04 (evening) is 1621 tests / 81 files** (see the newest handoff: 1617 after the brand-tile slice and its two validation passes, +4 for the evening's three owner requests; +214 across the owner-supplied-icons slice and the brand-tile slice — 1606 before the four D1–D4 fixes and their eleven tests; it was 1403 / 77 on the evening of 2026-09-03, 1375 / 77 that morning before the thesvg icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
+**The expected total as of 2026-09-05 is 1637 tests / 81 files** (+16 for `rename` and `remove` following the vendored icon; see the newest handoff. Before that, 1621 on 2026-09-04 evening: 1617 after the brand-tile slice and its two validation passes, +4 for the evening's three owner requests; +214 across the owner-supplied-icons slice and the brand-tile slice — 1606 before the four D1–D4 fixes and their eleven tests; it was 1403 / 77 on the evening of 2026-09-03, 1375 / 77 that morning before the thesvg icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
 
 **The expected total moved on 2026-08-26 and this line no longer names one.** It said **1218 tests /
 72 files**, which was correct at the start of that session and is the number to compare against if
@@ -129,6 +129,132 @@ validation pass, which is the more interesting number of the two.)
 three of six consecutive runs while every single run *of that file alone* passed, because vitest
 parallelises across files and two of them were mutating the same real directory. A single green
 `pnpm test` is weaker evidence than this document has historically treated it as.
+
+### Handoff — 2026-09-05, rename and remove follow the vendored icon, and the graph "defect" was a hidden tab
+
+**Read this first.** One bounded change, done by the main session and validated by a separate
+agent against the built binary, and one open item closed without code because it did not
+reproduce. The three shell menus stay blocked on the owner's 2026-09-02 questions; the portfolio
+page is untouched.
+
+**State of the tree at this handoff: 1637 tests / 81 files**, green, `pnpm typecheck` clean across
+four packages. Commits: the CLI and skill change together (they change in the same commit by
+CLAUDE.md's rule), then this board.
+
+#### What the next session does first
+
+1. **The three shell menus** — still blocked on the owner's 2026-09-02 questions. Ask once.
+2. **The portfolio page** (Phase 3.7's one open item; HANDOFF §4.2).
+3. **Not to do:** re-investigate the graph's fit-to-view; see below, and read
+   `document.visibilityState` before believing any viewport number from an automated tab.
+
+#### `rename` and `remove` versus a vendored icon — built, validated
+
+The 2026-09-04 handoff's item 2. `catalogus set services.<id>.icon` vendors the mark under
+`.catalogus/icons/<id>.svg`; `rename` left that file under the old id's name and `remove`
+orphaned it. Now:
+
+- **`rename <old> <new>`** — when the entry's `icon` is exactly `.catalogus/icons/<old>.svg`, the
+  file is moved to `.catalogus/icons/<new>.svg` *before* the manifest is written and moved back if
+  the write is refused or throws (the same order `set` keeps with a staged icon); the field
+  follows the id; an inline `# fetched from …` comment survives because it sits on the pair. A
+  pointer to any other name is left alone, file and field both, and the report says so — guessing
+  it "should" be named after the id is the plausible default this repo refuses. A file already at
+  the new name refuses at exit 1 with nothing touched. A stale pointer (no file) still follows the
+  id, and the report says no file moved. `vendoredIconRelativePath` in `icon-fetch.ts` is now the
+  one place the `<id>.svg` convention is spelled as a path.
+- **`remove <id>`** — after the manifest write succeeds, the entry's icon file is deleted, and
+  `.catalogus/icons/` then `.catalogus/` are removed when that leaves them empty
+  (`removeIconsDirIfEmpty`, exported for it). Kept, and the report names who, when another
+  surviving entry names the same file (the schema allows any `<name>.svg`, so two entries can
+  share one). Never reaches outside `.catalogus/icons/` (`isWithinIconsDir`, exported for it —
+  unreachable through the CLI's own writes, but this is the one unlink in the package). A missing
+  file is exit 0 with a line saying so; any other unlink error is exit 0 with the entry removed and
+  the file named on stderr.
+- **Skill and `--help`** say both, and the skill now tells the agent never to move or delete a
+  file the manifest points at under `.catalogus/icons/` by hand (a stray file no entry names is
+  the one thing `rename`'s refusal does tell the user to move or delete themselves).
+
+**Validation, by an agent that wrote none of it,** against the built binary with its own scratch
+projects: the first pass reproduced every claim in the brief clean and found nine items, three of
+them real. `rename` consulted only the filesystem: it moved a file another entry still named
+(D1), adopted another entry's stale pointer to the new name and so bound that entry to this one's
+mark (D2), and its refusal claimed "no entry names that file" while one did, with advice that
+would have destroyed the other entry's icon (D3). All three are hand-edited states (`set` always
+vendors to `<id>.svg`), but the schema allows them and `remove` already guarded the shared case.
+Now the manifest is consulted before the filesystem, both ways: a file another entry names stays,
+pointer and all, and the report names the entry; a path another entry names refuses at exit 1
+whether or not a file is there yet. The rest: the file move sat outside the try, so a filesystem
+refusal escaped as a bare `EPERM` (D4, reproduced with an `icacls` deny on the directory; framed
+now); `remove`'s already-missing branch left an emptied `.catalogus/icons/` standing (D6); a
+directory at the destination was called a file (D7); the skill's new "never by hand" rule
+contradicted the refusal's "delete or move it by hand" (D8 — the skill now says "a file the
+manifest points at", the refusal says "not one this CLI vendored"); one stray period (D9).
+**D5, recorded and not fixed:** the `isWithinIconsDir` floor in `remove` survives a mutation
+dropping it, because no input reaches it through `runRemove` (the schema refuses an escaping path
+at open); it stays as a floor under a schema change, and its comment now says so and records the
+one boundary the validator measured — it is lexical, so `.catalogus/icons` replaced by a junction
+to elsewhere deletes the file the manifest points at through that junction. Fourteen tests at that point
+(eight `rename`, six `remove`); mutations dropping the restore-on-refusal, the shared-file guard
+and the destination check each go red.
+
+**The second pass, on the fixes,** reproduced all eight byte-for-byte on the message text
+(including the `icacls` refusal for D4, the shared-and-claimed-at-once case where the shared rule
+wins, three entries sharing one file, round trips, `rename` then `remove`) and found nothing in
+scope. Four items under the bar, three taken: the D4 fix had no test (a mutation hoisting the move
+back out of the try stayed green — pinned now through a `vi.mock` of `node:fs/promises`'s
+`rename`, since a real refusal needs an ACL); `those entries' icon` is `icons` now; a *directory*
+at the source was moved and reported as an icon (left where it is now, and said so). The fourth
+was this board's own wording of D8, corrected above. What it could not reach: `restoreIcon`'s own
+failure (every way to deny the directory also blocks the forward move), and `remove`'s
+non-`ENOENT` unlink branch (`attrib +R` and an `icacls` deny on the directory both still let
+Node unlink the file on Windows). Sixteen tests in the end (ten `rename`, six `remove`).
+
+**A process note from the first pass, worth more than any of the nine:** the brief told the
+validator to restore a mutated file with `git checkout -- <file>`. The change under test was
+uncommitted and unstaged, so that command would have reverted the implementation to `HEAD` and
+the validator would have validated nothing. The agent noticed, backed up with `cp` and restored
+from the copy, md5-verified. **A brief that names a restore command must say what the working
+tree holds; `cp` to scratch and back is the only restore that is safe against an uncommitted
+change.**
+
+**A pre-existing quirk seen while writing the tests, recorded and not changed:** renaming a node of a pre-existing cycle reports the
+refusal under the command's prefix (`Renaming … would make … invalid`) rather than the file's
+(`already contained a cyclic dependency`), because `cycleKey` is built from the ids and the rename
+changes the key. Harmless — exit 1, nothing written either way — but the message blames the
+rename for a cycle it did not create.
+
+#### The graph fits to view; the 2026-09-04 finding was a hidden tab
+
+Item 3 of the previous handoff — "the React Flow viewport stays at `translate(0,0) scale(1)`
+while the node extent spans about 2630px at every width" — **does not reproduce in a visible
+tab, on the committed build.** What was measured, on `examples/layout-stress` served by the built
+CLI: with the Chrome tab in the background (`document.visibilityState === "hidden"`, which is
+what the extension's tab group gives every automated tab, and what the 2026-09-04 iframes had),
+the viewport reads identity indefinitely, even with `requestAnimationFrame` polyfilled onto
+`setTimeout`; the moment the tab is made visible (a screenshot does it) the transform becomes
+`translate(62.8px, 105.99px) scale(0.4336)` and all 35 nodes sit inside the 1278×919 pane. A
+hidden tab runs no rendering steps — no rAF, and no ResizeObserver delivery, which is what React
+Flow's queued initial fit waits on — so any measurement of "did it fit" taken from a hidden tab
+reads identity for a reason that has nothing to do with the app. It is the same class as the
+"scrollTo plus rAF hangs in that iframe" note above.
+
+**A fix was written, run, and dropped.** Reading the installed store suggested `measured` on each
+node let the queued fit resolve before the pan/zoom controller existed; an `onInit` fit was
+added, and it did fit ~1s sooner *in the hidden tab*. Then the control — the build without it —
+was run the same way and fitted too, once visible. The reading predicted a defect that execution
+did not show, which is this repo's signature failure, so the change was discarded rather than
+kept as harmless. **Rule for the next validator: report `document.visibilityState` beside any
+viewport, scroll or animation measurement, and treat a reading from a hidden tab as a reading of
+the tab, not the app.**
+
+Two dev-loop things found on the way, neither a product defect: `catalogus view` reads
+`index.html` once at startup, so a rebuild that changes the entry chunk's hash leaves a running
+server handing out an index whose script 404s (blank page, no console error) — restart the server
+after a build; and a root `pnpm build` running concurrently with a served viewer produces
+"Unable to preload CSS" for the graph chunk while `tsup` has wiped `dist/web` and
+`scripts/bundle-web.mjs` has not yet recopied it (the landmine `packages/cli/tsup.config.ts`
+already documents).
 
 ### Handoff — 2026-09-04 (evening), the brand tile is on a real inventory and the owner's three fixes are in
 
