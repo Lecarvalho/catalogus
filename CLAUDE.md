@@ -8,9 +8,11 @@ The specification lives at `docs/HANDOFF.md`. Read it before making design decis
 3, 4, 5, 6 and 8 are the parts that govern implementation. This file is orientation only; the
 handoff document is the source of truth and should not be re-derived or contradicted.
 
-`docs/PLAN.md` is the status board: the phases, what is done, what is left, and the decisions
-already settled. Start there to find the current state of the work, and update it as phases
-complete — check a box only when the work is verified, not merely written.
+`docs/PLAN.md` is the status board index; the detail is under `docs/plan/`, one file per phase or
+run of handoffs, with `docs/plan/00-open-work.md` listing what is left. Together they hold the
+phases, what is done, what is left, and the decisions already settled. Start there to find the
+current state of the work, and update them as phases complete — check a box only when the work is
+verified, not merely written.
 
 ## Package layout
 

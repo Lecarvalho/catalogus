@@ -1,0 +1,87 @@
+# Decisions made, and non-goals
+
+> Split out of `docs/PLAN.md` on 2026-09-05, content verbatim. `docs/PLAN.md` is the index and the
+> only place status is summarised; this file is the record. Section headings are unchanged so a
+> code comment that names one still finds it by grep.
+
+## Decisions made
+
+From HANDOFF §9, plus decisions taken during implementation. Settled — reopen only with a reason.
+
+1. **Manifest filename** — `catalogus.yaml`. `stack.yaml` accepted as a fallback on read; writes are
+   always `catalogus.yaml`.
+2. **Slug taxonomy** — Catalogus's own namespace, with an explicit mapping table from the slugs
+   stack-analyser emits. Adopting specfy's slugs wholesale would couple the catalog to their release
+   cycle.
+3. **Acyclicity enforcement** — CLI `validate` and the application layer. No database trigger.
+4. **One service, multiple roles** — two entries with distinct local ids (`supabase-db`,
+   `supabase-auth`).
+5. **Monorepo handling inside a scanned project** — out of scope for v1.
+6. **Where the private-data guard lives** — `@catalogus/schema`, not the CLI. Phase 5 push and Phase 6
+   MCP both need the identical boundary, and a guard implemented in the CLI is bypassed by every other
+   consumer. Exactly one copy of the patterns exists in the repo; two copies is how one of them stops
+   catching things.
+7. **Two-tier guard rather than one** — a heuristic that cries wolf gets switched off, and a guard the
+   user has disabled is worth less than no guard. Hard tier is high precision only; soft tier warns and
+   leaves exit 0 unless `--strict`.
+8. **`packages/schema/schema/catalogus.v1.json` stays committed, not gitignored** — asked because
+   `pnpm build` regenerates it and it looked like a build artifact. It is a *published* one, which is
+   a different thing: `packages/schema/package.json`'s `files` ships `schema/`, and every manifest the
+   CLI writes carries `# yaml-language-server: $schema=https://catalogus.dev/schema/v1.json`, so an
+   editor fetches it over HTTP. `dist/` is ignorable precisely because nothing external fetches it by
+   URL.
+
+   **The decisive argument is what ignoring it would do to `schema-sync.test.ts`.** That test exists
+   to catch a `schema.ts` edit that was never followed by `pnpm build`, and it works only because a
+   *committed* copy is capable of being stale. With no committed copy it would compare a file the
+   build just wrote against the source that build read — a tautology, permanently green. Ignoring the
+   file would convert a real tripwire into a no-op, which is the failure shape this document already
+   records three times over.
+9. **Line endings are LF everywhere, pinned by `.gitattributes` (`* text=auto eol=lf`)** — the fix for
+   what prompted decision 8. The generator writes LF unconditionally while `core.autocrlf=true`
+   (Windows default) wants CRLF, so *every build* left that file reported as modified while being
+   byte-identical to `HEAD` — confirmed by hashing both sides to the same object id. **A file that is
+   permanently dirty and never actually changed is a file people learn to skip in `git status`**,
+   which is how a real change to it eventually gets committed unnoticed.
+
+   No renormalization commit was needed: zero committed blobs in this repo contain a CR, so the index
+   was already LF and `git add --renormalize` is a content no-op. One `git update-index
+   --really-refresh` was needed once to clear the stale stat cache; a fresh clone will not need it.
+10. **No raw control characters in source.** Found while doing the above: `packages/cli/src/toposort.ts`
+    held two literal NUL bytes as composite-map-key separators (`` `${from}\0${to}` ``), which made git
+    classify the whole file as binary — **every change to it showed as "Binary files differ" with no
+    reviewable diff.** In a repo whose review step is an agent reading a diff (see CLAUDE.md), that was
+    the one file nobody could review, and nothing would ever have reported it. NUL is still the right
+    separator (the schema's slug pattern cannot produce one); it is spelled `\u0000` now. Behaviour
+    unchanged — `toposort.test.ts`'s 7 tests and the full suite pass — and the file is plain ASCII again.
+
+11. **The skill hands `catalogus view` to the user and never runs it** — owner-confirmed
+    2026-08-24. The gap was found while building the shell-command drift check, and the obvious fix
+    was the wrong one.
+
+    `runView` returns exit 0 as soon as the socket is listening, but the listening socket holds the
+    event loop open, so the process runs until Ctrl+C — which is what its own `press Ctrl+C to stop`
+    line says. Every other fenced command in `SKILL.md` is one the agent runs itself, so a fenced
+    `catalogus view` would teach an agent to **block its own tool call**, with everything after it in
+    the agent's plan silently not happening.
+
+    So the viewer is documented in prose only, in a new `### 8. Hand the viewer to the user`
+    section, plus a Common-mistakes bullet. That turned an accidental convention into a stated one:
+    **fenced means the agent runs it, prose means it is for the user.** `catalogus graph` stays the
+    agent's own check — it prints and exits.
+
+    **A test enforces it**, because nothing else would. The four existing per-line checks all *pass*
+    on `catalogus view --no-open`: it is a registered command, those are real options, and it needs
+    no positional. It is a correct command line and still the wrong thing to teach — exactly the
+    decision that gets undone by the next person who notices the viewer is missing from the skill
+    and helpfully adds it. Mutation-checked: adding a fenced `catalogus view` to `SKILL.md` fails
+    with a message naming the fix.
+
+## Non-goals
+
+From HANDOFF §8. Worth restating because each is a plausible-sounding scope creep.
+
+- Storing secrets or credentials. Ever. Layer 3 holds *references* to an identity, never the
+  credential itself.
+- Uptime monitoring — other tools do this; integrate later at most.
+- Package-level dependency management — that is Renovate's job.

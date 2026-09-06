@@ -28,7 +28,7 @@ something to verify, copying the file is the whole job.
 ## Keeping it honest
 
 The skill embeds a worked example of the manifest format. That example must stay valid against
-`packages/schema` — see the drift check task in `docs/PLAN.md`. If you change the schema, change the
+`packages/schema` — see the drift check task in `docs/plan/phase-3.6-dogfooding.md`. If you change the schema, change the
 skill in the same commit.
 
 The skill treats the CLI as a hard prerequisite. It checks `catalogus --version` and stops if that

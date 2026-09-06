@@ -91,7 +91,7 @@ on it rather than leave it optional — a registry that drifts is worse than non
 believed. `catalogus diff` is the existing mechanism that catches drift; what does not exist yet is
 the instruction making the update non-optional.
 
-Both halves are open work, recorded in `docs/PLAN.md` rather than built.
+Both halves are open work, recorded in `docs/plan/00-open-work.md` rather than built.
 
 ## Operating Context
 
