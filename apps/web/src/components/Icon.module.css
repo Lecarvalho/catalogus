@@ -71,10 +71,12 @@
  * (@catalogus/core's icons.ts, applyKnockout). It is painted the ground
  * behind the mark, never literal white: white would sit on this world's
  * cream as a visible, off-colour patch rather than reading as a hole. Which
- * ground is the surface's to say, not this file's: the board tile and the
- * graph node paint `--color-surface` under the mark, a desaturated tile and
- * a hovered migration row paint `--color-surface-sunken`, the service page
- * paints nothing and the page ground shows through. Each of those surfaces
+ * ground is the surface's to say, not this file's: the board tile paints
+ * `--color-surface` under the mark, a desaturated tile and a hovered
+ * migration row paint `--color-surface-sunken`, the service page paints
+ * nothing and the page ground shows through. (The graph node made the same
+ * choice as the tile, until the graph view was decommissioned 2026-09-05 --
+ * docs/graph-removal-brief.md.) Each of those surfaces
  * sets `--icon-knockout` beside the background it paints, and this rule
  * reads it; tokens.css declares it as the page ground for a surface that
  * paints none.

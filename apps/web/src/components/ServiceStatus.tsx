@@ -1,7 +1,9 @@
 // The status vocabulary shared by every surface that draws a manifest
 // entry's lifecycle status on the ground rather than in a fact grid:
-// ServiceTile.tsx (the List's icon), ServiceNode.tsx (the graph's node) and
-// MigrationList.tsx (the migrations board's row). All three drew the same
+// ServiceTile.tsx (the List's icon), ServiceNode.tsx (the grouped list's
+// node -- the graph's node too, until the graph view was decommissioned
+// 2026-09-05, docs/graph-removal-brief.md) and MigrationList.tsx (the
+// migrations board's row). All three drew the same
 // three things -- the status word, the corner-badge pictogram, and the
 // word-plus-arrow-target phrase -- and until this file existed each kept its
 // own copy, because the components were built (and are still owned) by

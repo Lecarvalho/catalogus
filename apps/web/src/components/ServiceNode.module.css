@@ -8,6 +8,13 @@
  * `NODE_SIZE` lays elk out against, which this component cannot resize (see
  * ServiceNode.tsx's own header for why it did not need to).
  *
+ * **2026-09-05: the graph view, graph-layout.ts included, is gone (the
+ * owner's own call, docs/graph-removal-brief.md).** This stylesheet is not
+ * part of that removal -- ServiceNode.tsx still renders inside the grouped
+ * list (ServiceGroup.tsx), so every rule below stays, box and all. The
+ * 216x64 constraint above is now history rather than a live one; see
+ * ServiceNode.tsx's own header for the fuller account.
+ *
  * No card, no border, no background on the node itself, same as the tile:
  * "no radius and no shadow anywhere ... a graph node is not a transient
  * surface" (apps/web/docs/DIRECTION.md). The old dense-world node drew a

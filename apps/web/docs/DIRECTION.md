@@ -51,10 +51,10 @@ runs on, what holds the data, what watches it, what builds it. They click one an
 ## FIRST VIEWPORT
 
 A top bar: product identity left, a help / settings / profile cluster right, each opening its own
-menu — help lists the docs and the CLI's own command surface, settings covers appearance, density,
+menu — help lists the docs and the CLI's own command surface, settings covers
 brand-icon colour and the default view and nothing that writes, profile covers the account. Left
 rail (240px, collapses below 900px): project identity and its architecture sentence, the manifest
-path, then the band index with counts, no search field. Main field: a view rail — List, Graph,
+path, then the band index with counts, no search field. Main field: a view rail — List,
 Migrations — then the icon grid, grouped under band headings: Runs in production, Holds data, Calls
 out to, Runs on, Watched by, Built and shipped by, Registered at, and Unplaced for anything the
 mapping cannot place. A footer: the manifest path and read time, the service/dependency/rollup
@@ -407,6 +407,13 @@ came from. This one is a rule in a component the owner already removed. Differen
 item, different remedy: if the ranking ever returns, the 3px red side border is a
 real hit and should be redrawn in the world's own grammar.
 
+*One of those four stopped being true the same day this contract changed again:
+`GraphCanvas` is decommissioned on 2026-09-05 (see the revision below), so
+`edgeIncident`'s open question goes with the component, the same way
+`RankModule`'s did just above. `ServiceNode.selected`, `MigrationList`'s
+`[aria-pressed="true"]` and `ServiceTile.selected` remain live, and the design
+question about them -- should a view show where you came from -- is unchanged.*
+
 Running the detector over the *built* CSS adds nothing: its single hit is inside
 vendored `@xyflow/react` CSS, a 1px border read out of minified text. The source
 scan is the signal.
@@ -713,3 +720,42 @@ comment beside it discussing the red, two of them stating the ruling correctly,
 and one stating that the fix had been applied. Prose next to a rule is not a
 guard on that rule -- it reads as the decision, which is exactly how a reader
 gets past it.
+
+---
+
+## Revision -- 2026-09-05: the graph view is decommissioned, and Density leaves Settings
+
+Two rulings the same day, both landing in FIRST VIEWPORT's single paragraph about the top bar and
+the view rail, recorded together rather than as two separate entries because a reader diffing that
+one sentence should not have to find two different sections to learn why both words left it.
+
+### The graph view
+
+The owner, unprompted: "About the graph: let's make it simple for now and just remove it. It's not
+yet the way I'd like to read it, it's confusing. Let's finish the basic first, someday we can come
+back to that graph. Decommission all of that." FIRST VIEWPORT's view rail named three views --
+List, Graph, Migrations -- and now names two. This is not a departure the embedded copy declares
+against a frozen contract, the way the 2026-08-25 warming was: the owner's decision changes what
+the contract itself asks for, so `apps/web/index.html`'s copy is edited to match word for word, the
+same as every other candidate-E section. **The graph is deferred, not rejected**: the owner's own
+words name a return to it once the rest of the build is finished, and nothing here forecloses that.
+What does not change: `catalogus graph`, the CLI command that prints the dependency graph as data,
+is a different surface entirely and untouched by this ruling, and so is every "depends on / depended
+on by" fact the list and the service page already render -- those are the list's, not the graph's,
+and the ruling names the graph view, its layout engine and its canvas specifically.
+
+### Density
+
+Ruled the same day, closing a question the 2026-09-05 handoff (`docs/plan/handoffs-2026-09.md`)
+had left open with the owner's screenshot of the built Settings panel in front of them: "Users
+don't need to choose the density, remove it." FIRST VIEWPORT's settings sentence named four things
+the Settings menu covers -- appearance, density, brand-icon colour, the default view -- and now
+names two. Density was never built (the same handoff records the mockup's Compact giving no
+values to decide against, which is why the row had been left for the owner to look at rather than
+shipped), so this ruling closes an open question rather than removing something a reader had ever
+seen. **Appearance left the sentence the same evening, on a different ruling**: the owner
+removed the dark theme on 2026-09-03, a row whose only choice is Light is not a setting, and the
+2026-09-05 handoff had already recorded the row as omitted for that reason. The contract naming
+"appearance" was the stale half of that earlier decision, not a new one, so it was corrected
+rather than kept -- the main session's edit, recorded here so nobody reads the two-item sentence
+as an inference from the density ruling.

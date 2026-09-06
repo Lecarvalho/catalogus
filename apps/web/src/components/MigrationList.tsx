@@ -168,7 +168,7 @@ const replacementDomId = (id: string) => `migration-replacement-${id}`;
 export interface MigrationListProps {
   services: ViewService[];
   selectedId: string | null;
-  /** Called with the service id when a row is activated (click or keyboard). App.tsx turns this into the same `#/service/<id>` hash change ServiceList and GraphCanvas use -- this component never touches `window` itself. */
+  /** Called with the service id when a row is activated (click or keyboard). App.tsx turns this into the same `#/service/<id>` hash change ServiceList uses -- this component never touches `window` itself. */
   onSelect: (id: string) => void;
 }
 

@@ -62,15 +62,14 @@ describe("SettingsPanel", () => {
     expect(radio("Colour").getAttribute("aria-checked")).toBe("false");
     expect(radio("Monochrome").getAttribute("aria-checked")).toBe("true");
     expect(radio("List").getAttribute("aria-checked")).toBe("true");
-    expect(radio("Graph").getAttribute("aria-checked")).toBe("false");
     expect(radio("Migrations").getAttribute("aria-checked")).toBe("false");
   });
 
   it("reflects a preference already in storage when the panel mounts", () => {
-    window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify({ iconColour: "colour", defaultView: "graph" }));
+    window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify({ iconColour: "colour", defaultView: "migrations" }));
     renderPanel();
     expect(radio("Colour").getAttribute("aria-checked")).toBe("true");
-    expect(radio("Graph").getAttribute("aria-checked")).toBe("true");
+    expect(radio("Migrations").getAttribute("aria-checked")).toBe("true");
   });
 
   it("flips the ink-filled segment on click and writes the change to storage", () => {
@@ -129,10 +128,10 @@ describe("SettingsPanel", () => {
     const list = radio("List");
     list.focus();
     fireEvent.keyDown(list, { key: "ArrowRight" });
-    expect(radio("Graph").getAttribute("aria-checked")).toBe("true");
-    expect(document.activeElement).toBe(radio("Graph"));
+    expect(radio("Migrations").getAttribute("aria-checked")).toBe("true");
+    expect(document.activeElement).toBe(radio("Migrations"));
 
-    fireEvent.keyDown(radio("Graph"), { key: "ArrowLeft" });
+    fireEvent.keyDown(radio("Migrations"), { key: "ArrowLeft" });
     expect(radio("List").getAttribute("aria-checked")).toBe("true");
   });
 
@@ -141,7 +140,6 @@ describe("SettingsPanel", () => {
     expect(radio("Monochrome").tabIndex).toBe(0);
     expect(radio("Colour").tabIndex).toBe(-1);
     expect(radio("List").tabIndex).toBe(0);
-    expect(radio("Graph").tabIndex).toBe(-1);
     expect(radio("Migrations").tabIndex).toBe(-1);
   });
 

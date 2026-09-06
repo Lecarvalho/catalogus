@@ -221,11 +221,13 @@ const redSites = allDeclarations.filter(
  *
  * Three surfaces draw the pair, and all three are the same two things rather
  * than three separate permissions: `ServiceTile` draws them on the board,
- * `ServiceNode` on the graph canvas, and `MigrationList` on the migrations
- * board, where the corner chip is dropped because there is no squircle to pin it
- * to and what survives is the glyph and the word (that file's own header states
- * the reasoning). A fact line, a tab, a tag, a count, a link hover, a border on
- * anything else: not licensed, and each of those has been tried.
+ * `ServiceNode` on the grouped list (the graph canvas too, until it was
+ * decommissioned 2026-09-05, docs/graph-removal-brief.md), and `MigrationList`
+ * on the migrations board, where the corner chip is dropped because there is
+ * no squircle to pin it to and what survives is the glyph and the word (that
+ * file's own header states the reasoning). A fact line, a tab, a tag, a
+ * count, a link hover, a border on anything else: not licensed, and each of
+ * those has been tried.
  *
  * `--color-signal` itself is listed because it is a declaration, not exempt as
  * a token: it was listed three times while the dark palette existed (light,
@@ -247,8 +249,8 @@ const redSites = allDeclarations.filter(
  * states for the brand page's Status column). A group's row has no label
  * beside it the way a fact-grid cell does; it *is* the status word, shown
  * only when the entry departs from `active` -- the fourth surface this
- * exact rule now draws on, alongside the tile, the graph node and the
- * migration row.
+ * exact rule now draws on, alongside the tile, the node and the migration
+ * row.
  */
 const LICENSED: readonly Site[] = [
   { file: "components/ServiceTile.module.css", selector: ".badge", property: "border" },

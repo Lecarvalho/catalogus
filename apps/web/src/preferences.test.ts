@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe("parsePreferences", () => {
   it("accepts a well-formed object unchanged", () => {
-    const preferences: Preferences = { iconColour: "colour", defaultView: "graph" };
+    const preferences: Preferences = { iconColour: "colour", defaultView: "migrations" };
     expect(parsePreferences(preferences)).toEqual(preferences);
   });
 
@@ -50,14 +50,30 @@ describe("parsePreferences", () => {
     expect(parsePreferences(garbage)).toEqual(DEFAULT_PREFERENCES);
   });
 
+  // The exact case docs/graph-removal-brief.md calls out by name: a reader
+  // who set Default view to Graph before 2026-09-05, when the graph view was
+  // decommissioned, still carries `{ defaultView: "graph" }` in their
+  // `localStorage`. `"graph"` is no different from any other value
+  // `DEFAULT_VIEW_VALUES` no longer recognises -- the fixture above already
+  // covers "an object with both fields unrecognised" -- but this is the one
+  // shape that is not hypothetical: it is what today's storage actually looks
+  // like for a real reader, so it earns its own name here rather than living
+  // only as one row of the general fixture.
+  it("falls back to the default view for a stored \"graph\", the value a pre-2026-09-05 reader's storage actually carries", () => {
+    expect(parsePreferences({ iconColour: "monochrome", defaultView: "graph" })).toEqual({
+      iconColour: "monochrome",
+      defaultView: DEFAULT_PREFERENCES.defaultView,
+    });
+  });
+
   it("keeps one recognised field and falls back only the other", () => {
     expect(parsePreferences({ iconColour: "colour", defaultView: "kanban" })).toEqual({
       iconColour: "colour",
       defaultView: DEFAULT_PREFERENCES.defaultView,
     });
-    expect(parsePreferences({ iconColour: "sepia", defaultView: "graph" })).toEqual({
+    expect(parsePreferences({ iconColour: "sepia", defaultView: "migrations" })).toEqual({
       iconColour: DEFAULT_PREFERENCES.iconColour,
-      defaultView: "graph",
+      defaultView: "migrations",
     });
     // The missing field alone -- an object carrying only one of the two,
     // rather than the other one carrying a bad value.
@@ -110,8 +126,8 @@ describe("loadPreferences", () => {
   // for: save, then load again as a fresh call would after a remount, and
   // get back exactly what was saved rather than a stale in-memory copy.
   it("survives a save-then-load round trip, as a fresh render would perform it", () => {
-    savePreferences({ iconColour: "colour", defaultView: "graph" });
-    expect(loadPreferences()).toEqual({ iconColour: "colour", defaultView: "graph" });
+    savePreferences({ iconColour: "colour", defaultView: "migrations" });
+    expect(loadPreferences()).toEqual({ iconColour: "colour", defaultView: "migrations" });
   });
 });
 

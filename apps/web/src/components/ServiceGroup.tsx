@@ -28,9 +28,10 @@ export function ServiceGroup({ rollup, services, selectedId, onSelect }: Service
       <ul className={styles.list}>
         {services.map((service) => (
           // The `<li>` lives here, not inside ServiceNode: this is the one
-          // caller with a `<ul>` around it. GraphCanvas.tsx renders the same
-          // ServiceNode inside a plain `<div>` instead -- see ServiceNode.tsx's
-          // top comment for why the wrapper moved out.
+          // caller with a `<ul>` around it -- see ServiceNode.tsx's top
+          // comment for why the wrapper moved out. (GraphCanvas.tsx rendered
+          // the same ServiceNode inside a plain `<div>` instead, until the
+          // graph view was decommissioned 2026-09-05.)
           <li key={service.id} className={styles.item}>
             <ServiceNode
               service={service}

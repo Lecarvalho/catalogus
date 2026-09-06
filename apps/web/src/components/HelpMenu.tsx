@@ -14,7 +14,7 @@
 // is transcribed from what `grep -rn "event.key"` finds across
 // apps/web/src, not invented: App.tsx's panel-close and peek-close Escape
 // handlers, its peek keydown effect's ArrowDown/ArrowUp into a group tile's
-// popover rows, ViewToggle.tsx's arrow keys between the three view tabs, and
+// popover rows, ViewToggle.tsx's arrow keys between the two view tabs, and
 // this app's own new `?`. There is no test that derives this list
 // mechanically the way `cliCommands` is derived below -- a plain-English
 // description of a keyboard behaviour is not a value a payload can carry --
@@ -50,7 +50,7 @@ export const KEYBOARD_SHORTCUTS: readonly { keys: string; description: string }[
   { keys: "?", description: "Open this help panel" },
   { keys: "Esc", description: "Close the open menu, popover or page" },
   { keys: "↓ ↑", description: "Move into a grouped tile's popover rows" },
-  { keys: "← →", description: "Move between the List, Graph and Migrations tabs" },
+  { keys: "← →", description: "Move between the List and Migrations tabs" },
 ];
 
 export function HelpMenu({ rootRef, cliCommands, cliVersion, initialShortcutsExpanded = false }: HelpMenuProps) {

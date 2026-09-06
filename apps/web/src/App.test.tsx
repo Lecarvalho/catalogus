@@ -33,21 +33,12 @@
 // popover's rows, and focus restoring to a group's own tile.
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ViewPayload, ViewService } from "@catalogus/cli";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App.js";
 import { serviceNodeDomId } from "./components/ServiceNode.js";
 import { PREFERENCES_STORAGE_KEY } from "./preferences.js";
 import { makeViewPayload, makeViewService } from "./test-support/fixtures.js";
-
-// elk-layout.ts reaches its worker through a Vite `?worker` import that
-// cannot be evaluated outside a browser -- importing it under jsdom throws at
-// module load. App.tsx only ever reaches it through a dynamic import, so
-// mocking the module here means the real one is never loaded at all, and the
-// graph-mode tests below can exercise App's own wiring rather than elk's.
-vi.mock("./elk-layout.js", () => ({
-  layoutGraph: async (services: { id: string }[]) => new Map(services.map((service, index) => [service.id, { x: index * 300, y: 0 }])),
-}));
 
 /**
  * A counter around the real `placePopover`, not a replacement for it -- the
@@ -70,19 +61,6 @@ vi.mock("./popover-placement.js", async (importOriginal) => {
       return actual.placePopover(...args);
     },
   };
-});
-
-beforeAll(() => {
-  // React Flow measures its container and jsdom has no ResizeObserver. Same
-  // stub, same reasoning as GraphCanvas.test.tsx -- nothing here asserts on
-  // geometry.
-  if (!("ResizeObserver" in globalThis)) {
-    globalThis.ResizeObserver = class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as unknown as typeof ResizeObserver;
-  }
 });
 
 /**
@@ -178,11 +156,14 @@ const brandPage = () => document.querySelector('article[aria-labelledby^="brand-
 
 /**
  * Stubs one element's own `getBoundingClientRect`, the way GraphCanvas.test.tsx
- * stubs it for React Flow's measurement -- an own-property override, not a
+ * stubbed it for React Flow's measurement -- an own-property override, not a
  * prototype patch, so only the element a positioning test actually cares
  * about (the hovered tile) reports a real rect; every other element keeps
  * jsdom's default zero rect, which the rest of this file already renders
- * against without incident.
+ * against without incident. GraphCanvas.test.tsx itself is gone as of
+ * 2026-09-05, when the graph view was decommissioned
+ * (docs/graph-removal-brief.md); the technique it used lives only in this
+ * comment now.
  */
 function stubRect(element: HTMLElement, rect: { top: number; left: number; width: number; height: number }) {
   element.getBoundingClientRect = () =>
@@ -213,7 +194,7 @@ function stubViewport(width: number, height: number) {
   Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: height });
 }
 
-/** Undoes stubViewport, falling back to the inherited (jsdom-default) accessor, the same restoration GraphCanvas.test.tsx uses for `getBoundingClientRect`. */
+/** Undoes stubViewport, falling back to the inherited (jsdom-default) accessor, the same restoration GraphCanvas.test.tsx used for `getBoundingClientRect` before that file was deleted 2026-09-05 along with the graph view. */
 function restoreViewport() {
   delete (document.documentElement as { clientWidth?: unknown }).clientWidth;
   delete (document.documentElement as { clientHeight?: unknown }).clientHeight;
@@ -228,9 +209,11 @@ function restoreViewport() {
  * A prototype patch rather than an own-property override only because there
  * is no element to override: the popover does not exist until the peek opens,
  * and the height has to be readable by the layout effect that runs in the
- * same commit. Same mechanism, and the same `delete`-rather-than-restore
- * teardown, as GraphCanvas.test.tsx's React Flow measurement stub -- see its
- * comment for why deleting is what restores an inherited method.
+ * same commit. Deleting an own property restores whatever the prototype
+ * supplies beneath it, with no reference of what that was needed here --
+ * GraphCanvas.test.tsx's React Flow measurement stub used the same mechanism
+ * for the same reason, until it was deleted 2026-09-05 with the rest of the
+ * graph view.
  *
  * Without this the popover measures 0x0 (jsdom does no layout), App.tsx falls
  * back to POPOVER_ESTIMATE, and a test that means to exercise the measured
@@ -346,7 +329,7 @@ describe("App -- the service page route", () => {
   });
 
   // The page replaces the board outright, so the toggle must not still be
-  // sitting underneath it -- it selects between three views of the project and
+  // sitting underneath it -- it selects between two views of the project and
   // a page is not one of them. Since 2026-09-03 the toggle is handed to the
   // shell as the board head rather than rendered beside the board, so this also
   // covers that App stops handing it over rather than merely stops rendering it.
@@ -421,13 +404,13 @@ describe("App -- focus when the page closes", () => {
   // button element `lastFocusedRef` captured on click is removed from the
   // document. `document.contains(opener)` in App.tsx's close effect is then
   // always false, so the "restore the literal opener" path can never fire
-  // any more, for any click, in any of the three views -- it silently falls
+  // any more, for any click, in either view -- it silently falls
   // through to the id-based fallback every time. On the list view that
   // fallback is itself the other known defect (serviceNodeDomId, not
   // serviceTileDomId), so the combination is a hard failure end to end;
-  // Migrations/Graph happen to still land correctly, purely because their
+  // Migrations happens to still land correctly, purely because its
   // fallback id (serviceNodeDomId, keyed by entry id) matches whatever
-  // freshly-remounted node carries that same id.
+  // freshly-remounted row carries that same id.
   //
   // Was `it.fails`: the page unmounts the board on open, so the captured
   // opener element was detached by the time anything closed and focus fell to
@@ -454,12 +437,12 @@ describe("App -- focus when the page closes", () => {
     expect((document.activeElement as HTMLElement | null)?.id).toBe(openerId);
   });
 
-  // The Migrations/Graph-view sibling of the test above: it still passes,
-  // because those views' rows/nodes key their DOM id by entry id
-  // (serviceNodeDomId) -- the same id the close effect's fallback looks up
-  // -- so a freshly-remounted row with the same id is a correct-looking
-  // substitute for the exact element that was clicked, even though the
-  // "restore the literal opener" path never actually fires (see above).
+  // The Migrations-view sibling of the test above: it still passes, because
+  // that view's rows key their DOM id by entry id (serviceNodeDomId) -- the
+  // same id the close effect's fallback looks up -- so a freshly-remounted
+  // row with the same id is a correct-looking substitute for the exact
+  // element that was clicked, even though the "restore the literal opener"
+  // path never actually fires (see above).
   it("lands focus on a same-id row after a click-opened page closes on the migration board", async () => {
     await renderLoaded(
       payload({
@@ -491,11 +474,12 @@ describe("App -- focus when the page closes", () => {
   // A deep link opens a page with nothing on screen having opened it, so
   // there is no opener to hand focus back to and the fallback has to find the
   // tile by id. Was `it.fails` once: the fallback looked the closed service up
-  // with `serviceNodeDomId` alone, which names the graph's nodes, so on the
+  // with `serviceNodeDomId` alone, which named the graph's nodes (the graph
+  // view is gone as of 2026-09-05, docs/graph-removal-brief.md), so on the
   // board it found nothing and focus fell to `<body>` -- the exact regression
   // the fallback exists to prevent. App.tsx now tries the tile id and the node
-  // id in turn, covering the board, the graph and the migration board without
-  // knowing which is mounted.
+  // id in turn, covering the board and the migration board without knowing
+  // which is mounted.
   //
   // The two ids used to key differently as well as prefix differently -- tiles
   // by catalog slug, because a tile stood for every entry of one vendor, and
@@ -1496,62 +1480,6 @@ describe("App -- the popover's edge counts are wired the right way round", () =>
 // The toggle, per docs/PLAN.md's Phase 3.7 DAG decision 1: a view switch, the
 // list as default, and one addressable page rather than a second route.
 describe("App -- the view toggle", () => {
-  it("starts on the list", async () => {
-    await renderLoaded();
-    expect(screen.getByRole("radio", { name: "List" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull();
-  });
-
-  // The `defaultView` preference (preferences.ts, docs/menus-brief.md's
-  // owner answer 2) is read once, at mount, through App.tsx's `mode`
-  // initializer -- this is that read proven end to end, storage to screen,
-  // rather than only at preferences.ts's own unit-test level.
-  it("starts on the stored default view instead of List, when one is set", async () => {
-    window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify({ iconColour: "monochrome", defaultView: "graph" }));
-    await renderLoaded();
-    await waitFor(() => expect(screen.getByRole("radio", { name: "Graph" }).getAttribute("aria-checked")).toBe("true"));
-    expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).toBeNull();
-  });
-
-  it("swaps the list for the canvas, and back", async () => {
-    await renderLoaded();
-    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
-
-    // The band headings are the board's; the legend is the canvas's.
-    await waitFor(() => expect(screen.queryByText(/Arrows point from a service to what it depends on/)).not.toBeNull());
-    expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).toBeNull();
-
-    fireEvent.click(screen.getByRole("radio", { name: "List" }));
-    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull());
-    expect(screen.queryByText(/Arrows point from a service to what it depends on/)).toBeNull();
-  });
-
-  // The original intent here was "selecting a service survives a List<->Graph
-  // mode swap while its panel stays open beside the view". That mechanism no
-  // longer exists: opening a service now replaces the *entire* board,
-  // including the toggle itself, so a mode swap cannot happen while a service
-  // page is open at all -- there is nothing to click. What does survive is
-  // the *mode setting itself*, underneath the page: reopening the board after
-  // closing the page returns to whichever mode was active before, not a
-  // reset to List. That is the closest surviving claim to the original test's
-  // intent, and it is what this asserts.
-  it("remembers the active mode underneath the page -- closing it does not reset to List", async () => {
-    await renderLoaded();
-    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
-    await waitFor(() => expect(screen.queryByText(/Arrows point from a service to what it depends on/)).not.toBeNull());
-
-    fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
-    await waitFor(() => expect(servicePage()).not.toBeNull());
-    // The toggle is gone while the page is open (asserted elsewhere); mode is
-    // plain state that keeps its value regardless.
-    expect(screen.queryByRole("radiogroup")).toBeNull();
-
-    fireEvent.keyDown(document, { key: "Escape" });
-    await waitFor(() => expect(servicePage()).toBeNull());
-    expect(screen.getByRole("radio", { name: "Graph" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).toBeNull();
-  });
-
   const migratingPayload = () =>
     payload({
       services: [
@@ -1568,6 +1496,30 @@ describe("App -- the view toggle", () => {
       ],
     });
 
+  it("starts on the list", async () => {
+    await renderLoaded();
+    expect(screen.getByRole("radio", { name: "List" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull();
+  });
+
+  // The `defaultView` preference (preferences.ts, docs/menus-brief.md's
+  // owner answer 2) is read once, at mount, through App.tsx's `mode`
+  // initializer -- this is that read proven end to end, storage to screen,
+  // rather than only at preferences.ts's own unit-test level.
+  //
+  // Stored as "migrations" rather than the graph view this test exercised
+  // before 2026-09-05: the graph view was decommissioned that day (the
+  // owner's own call, docs/graph-removal-brief.md), and "graph" is no longer
+  // a value `DefaultViewPreference` accepts, so it can no longer stand in
+  // here as "some stored view other than List".
+  it("starts on the stored default view instead of List, when one is set", async () => {
+    window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify({ iconColour: "monochrome", defaultView: "migrations" }));
+    await renderLoaded(migratingPayload());
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Migrations" }).getAttribute("aria-checked")).toBe("true"));
+    expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).toBeNull();
+  });
+
   it("swaps the list for the migration board, and back", async () => {
     await renderLoaded(migratingPayload());
     fireEvent.click(screen.getByRole("radio", { name: "Migrations" }));
@@ -1579,6 +1531,45 @@ describe("App -- the view toggle", () => {
     fireEvent.click(screen.getByRole("radio", { name: "List" }));
     await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "Runs in production" })).not.toBeNull());
     expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).toBeNull();
+  });
+
+  // The original intent here was "selecting a service survives a List<->Graph
+  // mode swap while its panel stays open beside the view". That mechanism no
+  // longer exists: opening a service now replaces the *entire* board,
+  // including the toggle itself, so a mode swap cannot happen while a service
+  // page is open at all -- there is nothing to click. What does survive is
+  // the *mode setting itself*, underneath the page: reopening the board after
+  // closing the page returns to whichever mode was active before, not a
+  // reset to List. That is the closest surviving claim to the original test's
+  // intent, and it is what this asserts.
+  //
+  // Demonstrated with Migrations rather than Graph since 2026-09-05: the
+  // graph view is gone (docs/graph-removal-brief.md, the owner's own call),
+  // and Migrations is the only other mode left to prove "not List" with. This
+  // also absorbed "drops the view rail when a service page opens from the
+  // graph, though the mode is still 'graph'", a sibling test that stood here
+  // until the same day and proved the identical radiogroup-disappears fact
+  // for the graph -- recorded here rather than carried forward as a second,
+  // now-redundant test, since this one already opens the page from a non-List
+  // mode and checks for exactly that.
+  it("remembers the active mode underneath the page -- closing it does not reset to List", async () => {
+    await renderLoaded(migratingPayload());
+    fireEvent.click(screen.getByRole("radio", { name: "Migrations" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull());
+
+    // Supabase, not Fly.io: the migration board renders only the
+    // phasing_out/deprecated rows (MigrationList.tsx's own header), and
+    // fly-api is `active` in this fixture.
+    fireEvent.click(screen.getByRole("button", { name: /Supabase/ }));
+    await waitFor(() => expect(servicePage()).not.toBeNull());
+    // The toggle is gone while the page is open (asserted elsewhere); mode is
+    // plain state that keeps its value regardless.
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(servicePage()).toBeNull());
+    expect(screen.getByRole("radio", { name: "Migrations" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull();
   });
 
   // The original two tests here ("drops the text edge list on the migration
@@ -1593,10 +1584,12 @@ describe("App -- the view toggle", () => {
   // in the app renders the flat text transcript of the manifest's edges.
   //
   // The assertion outlives the component on purpose. It is a statement about
-  // the design -- edges are shown as structure, on the canvas and in the
-  // summary, never as a wall of `id (Name) -> id (Name)` lines -- so it should
-  // fail if someone reintroduces one, whatever they call it.
-  it("renders no flat text edge list ('Dependencies' heading, or 'id (Name) -> id (Name)' lines) on any view", async () => {
+  // the design -- edges are shown as structure in the summary, never as a
+  // wall of `id (Name) -> id (Name)` lines -- so it should fail if someone
+  // reintroduces one, whatever they call it. ("On the canvas" dropped
+  // 2026-09-05: the graph view -- the canvas -- is gone, and this test's own
+  // graph portion went with it.)
+  it("renders no flat text edge list ('Dependencies' heading, or 'id (Name) -> id (Name)' lines) on either view", async () => {
     await renderLoaded(migratingPayload());
     const asserts = () => {
       // "Dependencies" was EdgesList's own heading and is nothing else's --
@@ -1610,46 +1603,6 @@ describe("App -- the view toggle", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Migrations" }));
     await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "In flight" })).not.toBeNull());
     asserts();
-
-    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
-    await waitFor(() => expect(screen.queryByText(/Arrows point from a service/)).not.toBeNull());
-    asserts();
-  });
-
-  /*
-   * Two tests stood here until 2026-09-03 and are recorded rather than quietly
-   * dropped, because deleting a test is a claim that what it protected no
-   * longer exists.
-   *
-   * They asserted that `App.tsx` put a `wide` class on `<main>` for the graph
-   * and only the graph -- App.module.css's `.page` capped the app at a 1680px
-   * measure and `.wide` was the canvas's exemption from it, since a
-   * left-to-right layered DAG has no comfortable measure at all. What they
-   * could prove was narrow and they said so: vitest's CSS Module proxy
-   * synthesises a class name for any key, so no test in this suite could see
-   * whether `.wide` still existed in the stylesheet -- only that App applied
-   * whatever `styles.wide` resolved to.
-   *
-   * The approved shell has no measure to be exempt from. `<main>` is the
-   * shell's element now, the board fills whatever the rail leaves, and both
-   * rules were deleted with the wiring that applied them (App.module.css's
-   * header carries the full account). There is no conditional left for a test
-   * to check: the graph gets the window at every width, which is what `.wide`
-   * existed to arrange.
-   */
-
-  // What survives from those two is the part that was never about the measure:
-  // the graph and the migrations board are three views of the project and the
-  // service page replaces all of them, so the shell's board head must be gone
-  // on a page opened from the graph even though `mode` is still "graph".
-  it("drops the view rail when a service page opens from the graph, though the mode is still 'graph'", async () => {
-    await renderLoaded();
-    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
-    await waitFor(() => expect(screen.queryByText(/Arrows point from a service/)).not.toBeNull());
-
-    fireEvent.click(screen.getByRole("button", { name: /Fly\.io/ }));
-    await waitFor(() => expect(servicePage()).not.toBeNull());
-    expect(screen.queryByRole("radiogroup")).toBeNull();
   });
 });
 
@@ -1694,17 +1647,13 @@ describe("App wires the shell", () => {
 
   // The band anchors point at sections only the list view mounts. The rail's
   // identity block survives everywhere; the index does not.
-  it("keeps the rail on the graph and the migrations board but drops the band index there", async () => {
+  it("keeps the rail on the migration board but drops the band index there", async () => {
     // Two elements name the project -- the top bar and the rail -- so the
     // count is the assertion: one alone would mean the rail went with its
-    // index, which is a different shell at three of the four destinations.
+    // index, which would be a different shell than the list view's own.
     const namesTheProject = () => screen.getAllByText("Scratch").length;
     await renderLoaded(migrating());
     expect(screen.getByRole("navigation", { name: "Bands" })).not.toBeNull();
-    expect(namesTheProject()).toBe(2);
-
-    fireEvent.click(screen.getByRole("radio", { name: "Graph" }));
-    await waitFor(() => expect(screen.queryByRole("navigation", { name: "Bands" })).toBeNull());
     expect(namesTheProject()).toBe(2);
 
     fireEvent.click(screen.getByRole("radio", { name: "Migrations" }));

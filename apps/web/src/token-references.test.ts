@@ -10,7 +10,10 @@
 // ServiceNode.test.tsx, one in GraphCanvas.test.tsx -- that each read their
 // own stylesheet and checked it against a list of names typed into the test
 // by hand (the ones tokens.css's migration bridge, deleted 2026-08-26, used
-// to alias). Each protected exactly the one file it was written against:
+// to alias). (GraphCanvas.test.tsx itself is gone now too, deleted 2026-09-05
+// with the rest of the graph view -- docs/graph-removal-brief.md -- but the
+// discovery-based sweep below never named it, so nothing here depended on it
+// existing.) Each protected exactly the one file it was written against:
 // together they covered 2 of the component stylesheets under apps/web/src,
 // and neither covered anything written afterward. A validator proved the
 // gap by reintroducing `--color-surface-raised` into

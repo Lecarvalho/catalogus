@@ -1,18 +1,25 @@
-// Pure. The one control that switches between the grouped list, the DAG,
-// and the migration board.
+// Pure. The one control that switches between the grouped list and the
+// migration board.
 //
 // A toggle rather than a second route or a replacement, per docs/PLAN.md's
-// Phase 3.7 DAG decision 1: the list answers "what does this project use"
-// and the graph answers "what breaks if this dies", both are questions the
-// viewer exists for, and neither has been used against a real manifest yet.
-// The migrations view joined the same toggle rather than a fourth route for
-// the same reason, answering a third question this viewer exists for --
+// Phase 3.7 DAG decision 1: the list answers "what does this project use",
+// and the migrations view joined the same toggle rather than a second route
+// for the same reason, answering a second question this viewer exists for --
 // "what still needs a decision" -- when the scope widened on 2026-08-25.
 // The list stays the default.
 //
+// **2026-09-05: the graph view is gone.** It once answered a third question
+// here, "what breaks if this dies" -- the owner's own call
+// (docs/graph-removal-brief.md): "it's not yet the way I'd like to read it,
+// it's confusing. Let's finish the basic first." `GraphCanvas.tsx`, its
+// layout engine and its two dependencies (`@xyflow/react`, `elkjs`) went with
+// it. This file's own shape -- a roving-tabindex radio group sized off
+// `MODES.length` rather than a hardcoded count -- is exactly why removing a
+// third option cost one array entry and nothing else below.
+//
 // It rendered in the main field, above the board, until 2026-09-03; it is
 // handed to `AppShell` now and drawn inside the board head, which is sticky, so
-// a reader who has scrolled a long board still has the three views in reach.
+// a reader who has scrolled a long board still has both views in reach.
 // Only its placement and its visuals moved -- everything below this comment is
 // unchanged, because what it announces and how it takes a key are not the
 // shell's to redecide.
@@ -34,18 +41,18 @@
 // every other option is `tabIndex={-1}` (still reachable once the group has
 // focus, just not from Tab), and the arrow keys move both focus and
 // selection along the group with wraparound. The invariant is "exactly one
-// tab stop", not "the other of two" -- it was written for two options and
-// held unchanged when the third arrived, because everything here is derived
-// from MODES rather than from a count. A checkbox would say "graph: on/off",
-// which is not what this is, and a row of independent buttons -- the thing
-// this would have been without the fix above -- announces no relationship at
-// all.
+// tab stop", not "the other of two" -- it was written for two options, held
+// unchanged when a third arrived, and held unchanged again when that third
+// one left, because everything here is derived from MODES rather than from a
+// count. A checkbox would say "migrations: on/off", which is not what this
+// is, and a row of independent buttons -- the thing this would have been
+// without the fix above -- announces no relationship at all.
 import { useEffect, useRef } from "react";
 import type { KeyboardEvent } from "react";
 
 import styles from "./ViewToggle.module.css";
 
-export type ViewMode = "list" | "graph" | "migrations";
+export type ViewMode = "list" | "migrations";
 
 export interface ViewToggleProps {
   mode: ViewMode;
@@ -54,7 +61,6 @@ export interface ViewToggleProps {
 
 const MODES: { value: ViewMode; label: string; hint: string }[] = [
   { value: "list", label: "List", hint: "Everything this project uses, grouped by rollup" },
-  { value: "graph", label: "Graph", hint: "The dependency graph, laid out left to right" },
   { value: "migrations", label: "Migrations", hint: "Everything phasing out or deprecated, with its replacement" },
 ];
 

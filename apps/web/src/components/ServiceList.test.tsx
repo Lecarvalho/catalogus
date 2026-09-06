@@ -10,7 +10,8 @@ afterEach(() => {
 });
 
 describe("ServiceList", () => {
-  // The counterpart to GraphCanvas.test.tsx's "no list item on the canvas".
+  // Once the counterpart to GraphCanvas.test.tsx's "no list item on the
+  // canvas" (deleted with the graph view, 2026-09-05); stands on its own now.
   // `ServiceNode` returns a bare `<button>` and each caller supplies its own
   // wrapper, so the `<ul>` -> `<li>` -> `<button>` chain the list depends on
   // is now a property of ServiceGroup rather than of the node, and nothing

@@ -8,9 +8,9 @@
 //   - **Appearance** (Light/Dark/System) -- omitted. The dark theme was
 //     removed 2026-09-03 (tokens.css's `color-scheme: light` comment), and a
 //     row whose only live choice is "Light" is not a setting.
-//   - **Density** (Comfortable/Compact) -- omitted for now. The mockup draws
-//     it, but "Compact" carries no values anywhere the owner could see to
-//     decide against, so this is a deferred row, not a forgotten one.
+//   - **Density** (Comfortable/Compact) -- the owner ruled it out outright on
+//     2026-09-05: "Users don't need to choose the density, remove it."
+//     Nothing rendered for this row before that ruling and nothing does now.
 //
 // The two rows that ship are a "region", not a `<dialog>` -- this panel
 // closes on Escape or an outside click the same way the other two menus do
@@ -144,7 +144,6 @@ const ICON_COLOUR_OPTIONS: readonly SegmentOption<IconColourPreference>[] = [
 
 const DEFAULT_VIEW_OPTIONS: readonly SegmentOption<DefaultViewPreference>[] = [
   { value: "list", label: "List" },
-  { value: "graph", label: "Graph" },
   { value: "migrations", label: "Migrations" },
 ];
 

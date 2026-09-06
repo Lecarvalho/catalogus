@@ -1,5 +1,6 @@
 // Where the hover popover goes, as arithmetic rather than as DOM. Pure and
-// window-free for the same reason graph-layout.ts and hash-route.ts are: the
+// window-free for the same reason hash-route.ts is (and graph-layout.ts was,
+// until the graph view was decommissioned on 2026-09-05): the
 // rules are the part that keeps getting this wrong, and rules that live
 // inside a `useCallback` can only be tested by rendering a component,
 // stubbing a viewport and reading an inline style back -- which is how two

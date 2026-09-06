@@ -314,8 +314,8 @@
   --icon-label-gap-narrow: 9px;
 
   /* Section spacing: the air above each band, and around the board's own
-     head (the List/Graph view rail) -- both above the icon grid, neither
-     part of the frozen app shell. */
+     head (the List/Migrations view rail) -- both above the icon grid,
+     neither part of the frozen app shell. */
   --band-spacing-top: 40px;
   --band-spacing-bottom: 8px;
   --band-head-gap: 10px;
@@ -496,23 +496,31 @@
   --page-crumb-gap: 10px;
 
   /*
-   * The graph node and the canvas chrome, added 2026-08-31, and chosen rather
-   * than measured for the same reason as the four above: candidate E is the
-   * List view only and there is no approved graph.
+   * The node's own sizing, added 2026-08-31 for the graph view's move into
+   * candidate E, and chosen rather than measured for the same reason as the
+   * four above: candidate E is the List view only and there was no approved
+   * graph to measure a node from.
    *
-   * These are not free-hand, though, and the difference is worth stating. The
-   * node has a hard constraint the service page does not: `NODE_SIZE` in
-   * graph-layout.ts is 216x64, the elk layout is computed against it, and a
-   * node that does not fit the box it was laid out for produces a graph that
-   * still renders and is quietly wrong -- the failure mode docs/PLAN.md
-   * already records for this view. So the three icon values are the tile's
-   * own ratios scaled to fit that box (radius 26.3% of the tile, mark 60.5%
-   * of it, both preserved exactly), not new proportions. The type and gaps
-   * are chosen, and the worst case that has to fit -- a three-line label of
-   * name, id and status -- is what sizes them.
+   * These were not free-hand, though, and the difference is worth keeping on
+   * record. The node had a hard constraint the service page does not: elk
+   * laid its layout out against a fixed 216x64 box (graph-layout.ts's own
+   * `NODE_SIZE`), and a node that did not fit the box it was laid out for
+   * produced a graph that still rendered and was quietly wrong -- the
+   * failure mode docs/PLAN.md recorded for that view. So the three icon
+   * values below are the tile's own ratios scaled to fit that box (radius
+   * 26.3% of the tile, mark 60.5% of it, both preserved exactly), not new
+   * proportions. The type and gaps were chosen, and the worst case that had
+   * to fit -- a three-line label of name, id and status -- is what sized
+   * them.
    *
-   * The two canvas values are chrome with no counterpart anywhere in the
-   * approved artifact at all.
+   * **2026-09-05: the graph view is gone (the owner's own call,
+   * docs/graph-removal-brief.md), and `graph-layout.ts` with it.** These
+   * tokens are not part of that removal -- ServiceNode.module.css still reads
+   * every one of them for the mark it draws in the grouped list -- so they
+   * stay even though the fixed box they were originally sized to fit does
+   * not. The two canvas-only tokens that stood below this block
+   * (`--graph-legend-gap`, `--graph-message-padding`) had no reader left once
+   * `GraphCanvas.module.css` was deleted, and went with it.
    */
   --icon-node-tile-size: 42px;
   --icon-node-tile-radius: 11px;
@@ -525,9 +533,6 @@
   --node-id-gap: 2px;
   --node-status-gap: 3px;
 
-  --graph-legend-gap: 16px;
-  --graph-message-padding: 24px;
-
   /*
    * The app shell -- top bar, left rail, the board's frame, footer. Added
    * 2026-09-03, when the shell was finally built; every value is read off
@@ -536,8 +541,8 @@
    * board and popover blocks above were read off theirs.
    *
    * The owner approved this shell on sight and froze it -- "your new app shell
-   * is perfect, don't touch it" -- so unlike the service page and the graph
-   * node further up, not one number here is chosen. That is the whole reason
+   * is perfect, don't touch it" -- so unlike the service page and the node
+   * further up, not one number here is chosen. That is the whole reason
    * the block is this granular: a frozen artifact's geometry is a record, and
    * a record kept as literals scattered across four stylesheets is a record
    * nobody can check against the artifact.
@@ -757,8 +762,8 @@ body {
 }
 
 /*
- * The document is the scrolling element, and the three views are not the
- * same height: at 1280px List and Graph scroll while Migrations does not, so
+ * The document is the scrolling element, and the two views are not the
+ * same height: at 1280px List scrolls while Migrations does not, so
  * on a classic-scrollbar platform toggling to Migrations shifted the shell,
  * the rail and the board 15px sideways. Always showing the track keeps the
  * layout width the same in every view. `scrollbar-gutter: stable` was tried

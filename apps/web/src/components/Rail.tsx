@@ -37,11 +37,13 @@ export interface RailProps {
    * The bands to index, already grouped by `groupIntoBands` so this list is
    * the board's own -- same order, same membership, same counts.
    *
-   * Empty means "render no index", which is what the graph and the migrations
-   * views pass: their anchors would have no target on the page. Empty rather
-   * than a `showIndex` flag beside a populated list, because there is exactly
-   * one condition under which the index is correct -- the sections it links to
-   * are mounted -- and two arguments can disagree about it.
+   * Empty means "render no index", which is what the migrations view passes:
+   * its anchors would have no target on the page. (So did the graph view,
+   * until the owner decommissioned it 2026-09-05 --
+   * docs/graph-removal-brief.md.) Empty rather than a `showIndex` flag beside
+   * a populated list, because there is exactly one condition under which the
+   * index is correct -- the sections it links to are mounted -- and two
+   * arguments can disagree about it.
    */
   bands: readonly BandGroup[];
 }
@@ -68,12 +70,12 @@ export function Rail({ project, manifestPath, bands }: RailProps) {
 
   return (
     // A plain `<div>`, not the mockup's `<nav class="rail">`. The rail's
-    // identity block is not navigation, and on the graph and migrations views
-    // it is the *only* thing in here -- a navigation landmark holding a project
-    // name and nothing to navigate to announces a promise the element does not
-    // keep. The `<nav>` below wraps the part that genuinely is one, and only
-    // when it exists. Nothing about the render changes; the semantics stop
-    // being a claim.
+    // identity block is not navigation, and on the migrations view it is the
+    // *only* thing in here -- a navigation landmark holding a project name and
+    // nothing to navigate to announces a promise the element does not keep.
+    // The `<nav>` below wraps the part that genuinely is one, and only when it
+    // exists. Nothing about the render changes; the semantics stop being a
+    // claim.
     <div className={styles.rail}>
       {/*
         Not an `<h1>`. The project name is chrome here, and the document's own

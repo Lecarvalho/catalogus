@@ -76,12 +76,14 @@ export interface AppShellProps {
    * Whether the rail's band index has anything to point at.
    *
    * The band anchors jump to the `<section>`s the board mounts, so they are
-   * correct on the list view and nowhere else: the graph, the migrations board
-   * and a service page mount no bands, and an anchor that jumps nowhere reads
-   * as a page that failed to scroll. Neither the mockup nor FIRST VIEWPORT
+   * correct on the list view and nowhere else: the migrations board and a
+   * service page mount no bands, and an anchor that jumps nowhere reads as a
+   * page that failed to scroll. Neither the mockup nor FIRST VIEWPORT
    * describes a rail for those views -- the mockup draws the List view only --
    * so the rail keeps its identity block there and drops the index, rather
-   * than growing a graph index or a migrations index that nobody has designed.
+   * than growing a migrations index that nobody has designed. (The graph view
+   * was the same story, and its own index, once considered, went with it when
+   * the owner decommissioned the view 2026-09-05 -- docs/graph-removal-brief.md.)
    */
   showBandIndex: boolean;
   /**
@@ -89,7 +91,7 @@ export interface AppShellProps {
    *
    * A prop rather than something this file renders, because *when* the view
    * rail shows is App.tsx's decision and it already has one: the toggle
-   * selects between three views of the project, and a service page is not one
+   * selects between two views of the project, and a service page is not one
    * of them, so leaving it on screen would offer to switch a view that is no
    * longer showing. The head is not rendered at all when this is absent, and
    * the board takes the head's own top padding instead so the content does not

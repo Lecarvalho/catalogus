@@ -21,11 +21,10 @@
 //   - **Appearance** (Light/Dark/System): the dark theme was removed
 //     2026-09-03 (tokens.css's own comment on `color-scheme: light`), and a
 //     row whose only live choice is "Light" is not a setting.
-//   - **Density** (Comfortable/Compact): the mockup draws it, but "Compact"
-//     carries no values anywhere the owner could see to decide against on
-//     2026-09-05 -- deferred, not forgotten. Left out of `Preferences` on
-//     purpose; do not re-propose this row as new without reading this
-//     comment first.
+//   - **Density** (Comfortable/Compact): the mockup draws it, but the owner
+//     ruled it out outright on 2026-09-05 -- "Users don't need to choose the
+//     density, remove it." Left out of `Preferences` on purpose; do not
+//     re-propose this row as new without reading this comment first.
 import { createContext, createElement, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 /** The one key every reader and writer of this module agrees on. */
@@ -34,8 +33,20 @@ export const PREFERENCES_STORAGE_KEY = "catalogus.preferences.v1";
 /** "Colour" renders a tile's brand mark in the brand's own colour, the way the popover and the brand page already do; "monochrome" is the mechanism `Icon.module.css` has carried since candidate E with no live caller (Icon.tsx's own header) -- this is that caller. */
 export type IconColourPreference = "colour" | "monochrome";
 
-/** Which view `App.tsx` opens on the *next* load. Does not move the view a reader is already on -- App.tsx's `mode` state reads this once, at mount, the same way it reads `Date.now()` once for the footer's read time. */
-export type DefaultViewPreference = "list" | "graph" | "migrations";
+/**
+ * Which view `App.tsx` opens on the *next* load. Does not move the view a
+ * reader is already on -- App.tsx's `mode` state reads this once, at mount,
+ * the same way it reads `Date.now()` once for the footer's read time.
+ *
+ * Lost `"graph"` 2026-09-05, when the owner decommissioned the graph view
+ * (docs/graph-removal-brief.md): "it's not yet the way I'd like to read it,
+ * it's confusing." A value of `"graph"` already in a reader's `localStorage`
+ * from before that day is exactly the "an object carrying a value neither
+ * field recognises" case `parsePreferences` below was already built to
+ * survive -- see its own doc comment and preferences.test.ts's case naming
+ * it directly.
+ */
+export type DefaultViewPreference = "list" | "migrations";
 
 export interface Preferences {
   iconColour: IconColourPreference;
@@ -56,7 +67,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 };
 
 const ICON_COLOUR_VALUES: readonly IconColourPreference[] = ["colour", "monochrome"];
-const DEFAULT_VIEW_VALUES: readonly DefaultViewPreference[] = ["list", "graph", "migrations"];
+const DEFAULT_VIEW_VALUES: readonly DefaultViewPreference[] = ["list", "migrations"];
 
 /**
  * Total: every input either produces a valid `Preferences` or falls back to

@@ -15,6 +15,16 @@
 // (the arithmetic is in this move's own report), so `NODE_SIZE` is
 // untouched.
 //
+// **2026-09-05: the graph view is gone (the owner's own call,
+// docs/graph-removal-brief.md), and `graph-layout.ts`, `elk-layout.ts` and
+// `GraphCanvas.tsx`/`.module.css`/`.test.tsx` went with it.** This component
+// did not: it still renders the same mark inside the grouped list
+// (ServiceGroup.tsx) and lends its `serviceNodeDomId` to the migration
+// board's own focus restore, so it keeps its geometry unchanged. `NODE_SIZE`
+// above and the `GraphCanvas.tsx` mentions below are history now, not a live
+// constraint -- named here once rather than rewritten throughout, since a
+// past decision is a past decision (CLAUDE.md).
+//
 // No card, no border, no background box around the node -- the same "sharp
 // structure... a graph node is not a transient surface" rule that keeps a
 // radius off everything but the icon tile itself

@@ -284,11 +284,28 @@ describe("the direction contract is present in apps/web/index.html", () => {
   // is still no account system; Phase 5 is unbuilt). Both are the same shape
   // as the mark's own pin below: a fact this contract should keep saying
   // rather than one the next build is expected to close.
+  //
+  // **Moved a sixth time on 2026-09-05 (later the same day), and this move
+  // shrinks the list instead of rewording an entry in it.** The owner ruled
+  // directly on the gap the fifth move had just started tracking: "Users
+  // don't need to choose the density, remove it." That turns "the Settings
+  // panel has no Density row" from an open gap into a closed decision --
+  // FIRST VIEWPORT's own settings sentence drops "density" in the same pass
+  // (see the section comparison above), so the build and the contract now
+  // agree and a disclosure section that exists to name disagreements has
+  // nothing left to say about it. The pin is removed rather than reworded,
+  // because there is no fact this gap turned into that belongs in a list of
+  // open gaps -- DIRECTION.md's 2026-09-05 revision carries the ruling in the
+  // owner's own words instead, which is where a reader asking "why did this
+  // leave" should look. "Appearance" went the same way the same evening: the
+  // dark theme was removed by the owner on 2026-09-03, a row whose only
+  // choice is Light is not a setting, and a contract sentence still naming
+  // "appearance" was the stale half of a closed decision. Both copies drop
+  // the word, the disclosure bullet goes, and no pin replaces it.
   it("carries its disclosure section, naming what the build does not do", () => {
     const disclosure = flat(regionBetween(sourceContract ?? "", DISCLOSURE_HEADING, FINISH_LINE));
     expect(disclosure.length, "the disclosure section is empty or its FINISH boundary moved").toBeGreaterThan(500);
     for (const known of [
-      "Settings panel has no Density row",
       "profile menu names no account",
       "mark is still deferred",
     ]) {

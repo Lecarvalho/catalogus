@@ -53,8 +53,10 @@ export interface IconProps {
    * 2026-09-05, when the settings panel's "Brand icons" toggle (default
    * Monochrome, the measured decision above; Colour on request) started
    * driving `colour` on the board's tiles through the preferences context.
-   * The graph's nodes are not on that switch and stay in colour -- an owner
-   * question recorded in docs/PLAN.md, not a decision made here.
+   * The graph view's own nodes were never on that switch and stayed in
+   * colour, an owner question recorded in docs/PLAN.md rather than a decision
+   * made here -- moot now that the graph view itself is gone (decommissioned
+   * 2026-09-05, docs/graph-removal-brief.md).
    *
    * The fallback glyph is never coloured under any circumstances -- it
    * conveys a shape, never a brand, and tinting it would assert a brand

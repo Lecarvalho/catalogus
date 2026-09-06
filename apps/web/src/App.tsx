@@ -26,7 +26,7 @@
 // page. `groupFor` below is the one place this file re-derives which group
 // an entry currently renders inside, for the two things that need to know:
 // the deep-link/close focus restore, and `ServicePage`'s own `brand` prop.
-import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ViewPayload, ViewService } from "@catalogus/cli";
 
 import { BANDS, bandOf, collapseByService, type BandDefinition, type VendorGroup } from "./bands.js";
@@ -45,18 +45,6 @@ import { ViewToggle, type ViewMode } from "./components/ViewToggle.js";
 import { brandFromHash, hashForBrand, hashForServiceId, serviceIdFromHash } from "./hash-route.js";
 import { POPOVER_ESTIMATE, placePopover, samePlacement, type PopoverSize } from "./popover-placement.js";
 import { PreferencesProvider, loadPreferences } from "./preferences.js";
-
-// Both halves of the graph view load on demand, and for two different
-// reasons. React Flow is several hundred KB that a viewer who never leaves
-// the list should not download, so the canvas is a lazy chunk. elkjs is
-// worse than large: it reaches its worker through a Vite `?worker` import
-// that cannot be evaluated outside a browser at all, so a static import here
-// would make every test in this file fail at module load. Neither is loaded
-// until someone actually asks for the graph.
-const GraphCanvas = lazy(() => import("./components/GraphCanvas.js").then((module) => ({ default: module.GraphCanvas })));
-
-const layoutWithElk = (services: readonly ViewService[], edges: readonly { from: string; to: string }[]) =>
-  import("./elk-layout.js").then((module) => module.layoutGraph(services, edges));
 
 type LoadState = { kind: "loading" } | { kind: "error"; message: string } | { kind: "loaded"; payload: ViewPayload };
 
@@ -139,8 +127,11 @@ export function App() {
   // Plain state, deliberately not a second route: docs/PLAN.md's Phase 3.7
   // DAG decision 1 chose a toggle over `#/graph` precisely so the viewer
   // stays one addressable page, and `#/service/<id>` keeps addressing the
-  // panel from any of the three views -- the migration board joined the
-  // same toggle for the same reason (ViewToggle.tsx's top comment).
+  // panel from either view -- the migration board joined the same toggle
+  // for the same reason (ViewToggle.tsx's top comment). The graph view
+  // itself is gone as of 2026-09-05, the owner's own call
+  // (docs/graph-removal-brief.md); `#/graph` above is a historical name, not
+  // a route this app still recognises.
   //
   // **The initial value, added 2026-09-05 (docs/menus-brief.md), is the
   // stored `defaultView` preference rather than the literal `"list"`.** Read
@@ -748,18 +739,20 @@ export function App() {
   //
   // Two ids are tried because two surfaces render a service, and each names
   // its DOM node with its own prefix -- `service-tile-` on the board,
-  // `service-node-` in the graph and the migration board. Trying both covers
-  // all three without this file knowing which view is mounted.
+  // `service-node-` in the migration board. Trying both covers both without
+  // this file knowing which view is mounted. (A third surface, the graph,
+  // shared the `service-node-` prefix with the migration board until it was
+  // decommissioned 2026-09-05.)
   //
   // **2026-09-04: the board's tile id is no longer just the entry id.** A
   // repeated vendor collapses to one band-qualified tile again
   // (`serviceTileDomId`'s own header), so the id to restore focus to is
   // recomputed here through `groupFor` -- at close time, off the still-loaded
   // payload, exactly the same lookup `BandModule.tsx` performed to render
-  // the tile in the first place. The graph and the migration board are
-  // untouched by any of this (both stay per entry, owner decision,
-  // 2026-09-04), so `serviceNodeDomId(closed.id)` keeps keying on the bare
-  // entry id, unchanged.
+  // the tile in the first place. The migration board is untouched by any of
+  // this (it stays per entry, owner decision, 2026-09-04), so
+  // `serviceNodeDomId(closed.id)` keeps keying on the bare entry id,
+  // unchanged.
   //
   // A focus restore that silently finds nothing is invisible in a passing test
   // suite -- this repo has shipped that exact defect twice now, once on the
@@ -791,9 +784,9 @@ export function App() {
   // rather than folding into it, per `previousBrandRef`'s own comment. There
   // is no `serviceNodeDomId` fallback here: a brand page is only ever
   // reached from a list-view tile click or a hand-typed/deep-linked
-  // `#/brand/...` hash, never from the graph or the migration board (neither
-  // renders a control that opens one), so there is no second surface for a
-  // fallback id to name.
+  // `#/brand/...` hash, never from the migration board (it renders no
+  // control that opens one), so there is no second surface for a fallback id
+  // to name.
   useEffect(() => {
     const matched = selectedBrand ? { tileDomId: serviceTileDomId(selectedBrand.band.id, selectedBrand.group) } : null;
     const closed = previousBrandRef.current;
@@ -823,8 +816,8 @@ export function App() {
     // the cost of it rather than leaving it to be discovered.
     //
     // `showBandIndex` is the list view's alone: the rail's anchors point at the
-    // `<section>`s the board mounts, and the graph, the migrations board, a
-    // service page and (since 2026-09-04) a brand page mount none.
+    // `<section>`s the board mounts, and the migrations board, a service page
+    // and (since 2026-09-04) a brand page mount none.
     //
     // `PreferencesProvider`, added 2026-09-05, wraps the whole shell rather
     // than sitting inside AppShell.tsx or any file below it: both
@@ -868,7 +861,7 @@ export function App() {
               and then clicking it rendered the identical facts twice, once
               floating and once docked on the right.
   
-              The toggle goes with the board. It selects between three views of
+              The toggle goes with the board. It selects between two views of
               the *project*, and neither page is one of them -- leaving it on
               screen would offer to switch a view that is no longer showing. It
               is handed to the shell as the board head now rather than rendered
@@ -906,16 +899,6 @@ export function App() {
                       onPeek={handlePeek}
                       onPeekEnd={handlePeekEnd}
                     />
-                  ) : mode === "graph" ? (
-                    <Suspense fallback={<p>Loading the graph…</p>}>
-                      <GraphCanvas
-                        services={state.payload.services}
-                        edges={state.payload.edges}
-                        selectedId={selectedId}
-                        onSelect={handleSelect}
-                        layout={layoutWithElk}
-                      />
-                    </Suspense>
                   ) : (
                     <MigrationList services={state.payload.services} selectedId={selectedId} onSelect={handleSelect} />
                   )}
