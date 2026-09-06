@@ -40,8 +40,8 @@ export type { InitCommandOptions } from "./commands/init.js";
 export { runDetect } from "./commands/detect.js";
 export type { DetectCommandOptions } from "./commands/detect.js";
 
-export { runDiff } from "./commands/diff.js";
-export type { DiffCommandOptions } from "./commands/diff.js";
+export { computeDiff, runDiff } from "./commands/diff.js";
+export type { DiffCommandOptions, DiffFailureReason, DiffOutcome, DiffPayload, DiffResult } from "./commands/diff.js";
 
 export { runValidate } from "./commands/validate.js";
 
@@ -58,6 +58,23 @@ export type { ViewPayload, ViewService } from "./view-payload.js";
 
 export { createViewServer, DEFAULT_VIEW_PORT, runView } from "./commands/view.js";
 export type { CreateViewServerOutcome, ViewCommandOptions, ViewServerHandle } from "./commands/view.js";
+
+export { runMcp } from "./commands/mcp.js";
+export type { RunMcpOptions } from "./commands/mcp.js";
+
+export { createCatalogusMcpServer } from "./mcp/server.js";
+export type { CatalogusMcpServerOptions } from "./mcp/server.js";
+
+export { applyManifestEdit } from "./mcp/apply-edit.js";
+export type {
+  ApplyManifestEditInput,
+  ApplyManifestEditNotFound,
+  ApplyManifestEditOptions,
+  ApplyManifestEditReport,
+  ApplyManifestEditResult,
+  ApplyManifestEditStaleBase,
+  ApplyManifestEditStep,
+} from "./mcp/apply-edit.js";
 
 export { InvalidWorkspaceRootError, scanWorkspace } from "./workspace-scan.js";
 export type {

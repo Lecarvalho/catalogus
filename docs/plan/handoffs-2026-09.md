@@ -1,8 +1,71 @@
-# Handoffs — 2026-09-02 to 2026-09-05 (menus, icons, brand tile, shell, rename/remove)
+# Handoffs — 2026-09-02 to 2026-09-06 (menus, icons, brand tile, shell, rename/remove, MCP)
 
 > Split out of `docs/PLAN.md` on 2026-09-05, content verbatim. `docs/PLAN.md` is the index and the
 > only place status is summarised; this file is the record. Section headings are unchanged so a
 > code comment that names one still finds it by grep.
+
+### Handoff — 2026-09-06 (late), decision 14: the MCP is the agent's surface
+
+**Read this first.** After the morning's three tools, the owner ran the skill from a client
+session and the agent used Bash for everything with the tools connected and unloaded. The owner
+ruled (decision 14, in their words in `decisions.md`): the MCP is first class for agents, the CLI
+is for people and CI, and the end state is the same tools served by the web platform against an
+account so a client installs only the skill. Same day, same session: `apply_manifest_edit`,
+`init_manifest`, `validate_manifest`, `render_graph`, `list_icons` (one implementer,
+`docs/mcp-apply-brief.md`), the skill rewritten MCP-first and cut to 250 lines on the owner's
+"needs to be concise" rule (a second implementer, `docs/skill-mcp-first-brief.md`), one validator
+on the strongest model (`docs/mcp-apply-validation-brief.md`), six findings fixed by the main
+session with two regression tests. **1695 tests / 92 files**, twice, build and typecheck exit 0.
+The record is in `phase-6-mcp.md` under "Decision 14, the same day". Not committed by this
+session: the tree holds everything for the owner to commit.
+
+Traps for a fresh session:
+- **The skill instructs; it never narrates.** The owner's rule, 2026-09-06: no session history,
+  no dated asides, nothing specific to this repo's story in `SKILL.md`. Background goes to
+  `skills/README.md`.
+- **Wrapping a command function in a tool inherits its path rule.** `runValidate` walks up; the
+  tool must not. Check the named directory first (`command-tools.ts`).
+- **The SDK runs tool calls concurrently.** Anything that writes needs the per-server queue in
+  `server.ts`, or two pipelined calls both succeed and one write is lost.
+- **A field the skill names must exist on the wire.** `staleBase` lived only inside
+  `apply-edit.ts`; the server dropped it. Read the JSON the client gets, not the TypeScript type.
+- The test count went *down* with more coverage; the accounting is in `status-history.md`.
+
+**Next:** the live wiring (ready-now item), the npm publish (parallel track), and D4.
+
+### Handoff — 2026-09-06, `catalogus mcp` and its three read-only tools (Phase 6, boxes 1–3)
+
+**Read this first.** The board had no ready-now item and nothing waiting on the owner, so the
+session took the one phase with no blocker: Phase 6's three tools that need no backend. Two
+implementers on a smaller model ran in parallel on disjoint files (`docs/mcp-server-brief.md`:
+server, `read_manifest`, `detect_stack`, the `mcp` command, the `computeDiff` extraction;
+`docs/propose-edit-brief.md`: `propose_manifest_edit` as a standalone function). The main session
+wired the third tool into the server, made `detect_stack` refuse to walk up past an explicit path
+(the implementer had left the two read tools disagreeing on that), and added `mcp` to the skill's
+prose-only rule. One validator on the strongest model drove the built binary
+(`docs/mcp-validation-brief.md`), found three defects, and re-validated the fixes clean.
+**1724 tests / 89 files**, twice, build and typecheck exit 0. Not committed by this session: the
+tree holds the change and this board for the owner to commit.
+
+The record of what was built, the three defects and what was recorded but not changed is in
+`phase-6-mcp.md` under "What was built on 2026-09-06". Traps for a fresh session:
+
+- **The in-memory MCP tests cannot see stdio lifecycle bugs.** D1 (tool calls dropped at stdin
+  EOF) was invisible to every `InMemoryTransport` and `PassThrough` test and to the SDK client,
+  which waits for each reply before hanging up. Only a spawned `dist/cli.js` fed newline-delimited
+  JSON-RPC with stdin closed immediately reproduces it, and only that test catches the mutation.
+  Anything touching `commands/mcp.ts` earns a raw-pipe check.
+- **Quoting is not enough for a positional that starts with `-`.** The shell strips the quotes
+  before commander sees the token. `--` is the fix, and it has to sit after the options.
+- **The SDK's `StdioServerTransport` (1.30.0) never listens for stdin `end`.** `runMcp` does it
+  itself; the reason is in the file's header.
+- **A brief that says "same as the commands" hides a fork.** `diff` walks up from an explicit
+  path, `add` does not; the two implementers each copied a different one. Say which.
+- The mutation checks had to restore untracked files from backups rather than `git checkout`.
+  Validators of untracked work should be told that up front.
+
+**Not done, and where it goes:** the live wiring into Claude Code (box 5) is the board's one
+ready-now item; `push_private` waits on Phase 5.
 
 ### Handoff — 2026-09-05 (late), the owner's batch answered and the graph view decommissioned
 

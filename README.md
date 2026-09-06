@@ -117,10 +117,106 @@ Let a coding agent do the cataloging. Copy [`skills/catalogus/SKILL.md`](skills/
 
 The skill teaches the agent to run the CLI, then ask you for everything above that a scan cannot reach.
 
+## The MCP server
+
+`catalogus mcp` runs the CLI as an [MCP](https://modelcontextprotocol.io) server over stdio. For an
+agent, this is the interface: read the manifest, diff it against detection, propose a change, show
+the diff, apply it, validate. It ships inside `@catalogus/cli`; there is nothing separate to
+install. Eight tools:
+
+| Tool | Does |
+|---|---|
+| `read_manifest` | Returns `catalogus.yaml` as text and, when it validates, as a parsed object. An invalid manifest comes back with its problems, not as an error. |
+| `detect_stack` | Runs detection and returns the same structured diff `catalogus diff --json` prints, plus `hasDiff`. A claim about one checkout, not about what is deployed. |
+| `init_manifest` | Scaffolds `catalogus.yaml` the way `catalogus init --yes` does. Visibility is written only when given, never inferred. |
+| `propose_manifest_edit` | Runs `add`, `set`, `link`, `unlink`, `deprecate`, `remove` or `rename` against a scratch copy and returns a unified diff, the equivalent `catalogus ...` lines, and a hash of the file it read. Writes nothing. |
+| `apply_manifest_edit` | Applies the same edits for real, through the same validated write path the CLI uses. Given the proposal's hash, it refuses if the file changed in between. |
+| `validate_manifest` | `catalogus validate` as a tool: exit code, lines, `valid`. |
+| `render_graph` | The dependency graph as text or Mermaid. |
+| `list_icons` | Which services have no icon and where each icon file lives. |
+
+The intended loop is propose, show the diff, get approval, apply. Every write goes through the same
+code the CLI's commands use, so a manifest an agent wrote and one a person wrote are the same file:
+validated before writing, comments intact, private-looking data refused.
+
+Each tool takes an optional `path`. A path named in the call, or on the server's command line, is
+used as given and never walks up to a parent directory's manifest; with no path anywhere the
+current directory is used and the usual upward search applies.
+
+Where this is going: the same tools, served over HTTP by the Catalogus web platform against an
+account, so a client installs the skill and nothing else. The stdio server is the local edition of
+that contract and stays for offline use and CI.
+
+### Getting the server
+
+> **Not published yet.** `@catalogus/cli` is not on npm as of 2026-09-06; publishing it is on the
+> launch checklist. Until it lands, the only way to run the server is
+> from a clone of this repository (see [Install](#install) at the top, then use
+> `node <clone>/packages/cli/dist/cli.js mcp` in place of `npx -y @catalogus/cli mcp` below).
+> Everything else in this section is the procedure as it will work once published.
+
+The server is the CLI package. Nothing to download by hand: the client's agent launches it with
+`npx`, which fetches `@catalogus/cli` on first use and caches it. Prerequisite: Node.js 22 or newer
+on the machine running the agent.
+
+To pin a version, write `@catalogus/cli@1.2.3` instead of `@catalogus/cli`. To update an unpinned
+install, `npx` picks up the latest on its next cold start; `npm cache clean --force` forces it.
+
+### Claude Code
+
+In the repo you want catalogued:
+
+```
+claude mcp add --scope project catalogus -- npx -y @catalogus/cli mcp .
+```
+
+That writes `.mcp.json` at the repo root, which you check in so every clone of the repo gets it:
+
+```json
+{
+  "mcpServers": {
+    "catalogus": {
+      "command": "npx",
+      "args": ["-y", "@catalogus/cli", "mcp", "."]
+    }
+  }
+}
+```
+
+The trailing `.` is the default directory the tools work on; Claude Code starts the server in the
+repo root, so `.` is the repo. Use `--scope user` to register it once for every project on the
+machine, drop the `.`, and let each tool call name its `path`.
+
+**Windows:** `npx` is a `.cmd` shim, and a stdio server has to be launched through `cmd`:
+
+```json
+{
+  "mcpServers": {
+    "catalogus": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@catalogus/cli", "mcp", "."]
+    }
+  }
+}
+```
+
+Restart Claude Code in that repo. `/mcp` should list `catalogus` as connected with eight tools.
+Because `.mcp.json` is project-scoped, Claude Code asks once whether to trust it.
+
+### Other clients
+
+Any MCP client that launches stdio servers (Cursor, Windsurf, Codex, Zed, an SDK client) takes the
+same command in its own config format: `npx -y @catalogus/cli mcp <repo>`. The server speaks
+JSON-RPC on stdout and writes nothing else there; diagnostics go to stderr. It exits when the
+client closes stdin, after answering every request it has already received.
+
+Do not have an agent run `catalogus mcp` from a shell. It is a server: the call never returns. The
+skill says the same about `catalogus view`.
+
 ## Current limitations
 
 - No backend yet, so the private overlay, `login` and `push` do not exist.
-- No viewer yet. `graph --mermaid` is the only rendering.
+- The viewer (`catalogus view`) shows one repo at a time; there is no portfolio across projects.
 - Not published to npm.
 - Catalogus's category enum has thirteen values and no bucket for monitoring, queue or email, so
   Sentry, Datadog, SQS, RabbitMQ, Resend, SendGrid and Twilio land in `other` despite being

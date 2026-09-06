@@ -420,6 +420,8 @@ catalogus mcp                             # run as MCP server (stdio)
 
 Typical loop: during any coding session, the agent runs detect → diff → proposes "I see you added the Anthropic SDK — add it to stack.yaml?" → on approval, edits the manifest → `catalogus push`.
 
+**Amendment 2026-09-06 (owner):** the MCP server is the first-class surface for agents and the CLI is for people, CI and the machine holding the credential. "Propose, never write" becomes "propose, then apply": `apply_manifest_edit` writes through the same command functions the CLI uses, after a proposal the user has seen; `init_manifest`, `validate_manifest`, `render_graph` and `list_icons` complete the surface so an agent needs no shell. The stdio server is the local edition; the end state is the same tools served by the web platform over HTTP against a Catalogus account, so a client installs the skill and nothing else. `docs/plan/decisions.md` 14 has the owner's words and the recorded constraint on hosted detection.
+
 ### Detection engine
 - Reference/foundation: **`@specfy/stack-analyser`** (MIT, TypeScript, npm: `@specfy/stack-analyser`, still maintained as of Jan 2026). Detects 500–700+ technologies from `package.json`, `docker-compose.yml`, `go.mod`, lockfiles, config files. Usable via `npx` or programmatically (`analyser({ provider: new FSProvider({...}) })`, `flatten(result)`).
 - Options: (a) depend on it directly and map its output slugs → Catalogus catalog slugs; (b) vendor the rules; (c) reimplement a smaller ruleset. **Recommend (a) for v1** — mapping table `specfy_slug → catalogus_service_slug`.

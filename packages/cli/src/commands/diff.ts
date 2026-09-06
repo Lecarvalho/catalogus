@@ -49,11 +49,34 @@
 // pass-through, since pass-through slugs are derived from stack-analyser's
 // own tech keys, which have no notion of a DNS registrar or a PM tool at
 // all -- so it's undetectable by design, not stale.
+//
+// **2026-09-06: the payload construction moved into computeDiff() below,**
+// so the MCP `detect_stack` tool (packages/cli/src/mcp/detect-stack.ts) can
+// return the exact same object `catalogus diff --json` prints, built once,
+// in this one place, rather than a second hand-copied construction of "the
+// diff" that would eventually disagree with this one. runDiff's own
+// observable output is unchanged: the --json payload is still exactly the
+// object it always was (diff.test.ts, unmodified, is what proves that), and
+// the plain-text rendering below now reads its fields off that same object
+// instead of off separately-named local variables that held identical
+// values anyway.
+//
+// hasDiff deliberately stays *outside* payload rather than becoming one
+// more key JSON.stringify prints -- `catalogus diff --json`'s output would
+// otherwise gain a field no caller of this CLI ever asked for, which is the
+// one change this extraction was told not to make. detect_stack needs
+// exactly this boolean up front (an agent should not have to re-derive "is
+// there a diff" by checking four array lengths itself), so its own handler
+// composes `{ ...payload, hasDiff }` as *its* returned object -- the tool
+// contract's object, not diff.ts's.
 import { detect, SPECFY_TO_CATALOGUS } from "@catalogus/core";
+import type { CodingAgentDetection, Evidence } from "@catalogus/core";
 
 import { collectAllDetectedServices, collectDetectedServices } from "../detected-services.js";
 import type { DetectedServiceCandidate } from "../detected-services.js";
 import { loadValidManifest } from "../load-manifest.js";
+import { ManifestNotFoundError } from "../manifest-io.js";
+import type { ManifestLocation } from "../manifest-io.js";
 import { resolveTargetPath } from "../paths.js";
 import type { CommandResult } from "../types.js";
 import { errorMessage } from "../types.js";
@@ -68,12 +91,63 @@ export interface DiffCommandOptions {
   json?: boolean;
 }
 
-export async function runDiff(pathArg: string | undefined, options: DiffCommandOptions = {}): Promise<CommandResult> {
-  const targetDir = resolveTargetPath(pathArg);
+// Exactly what `catalogus diff --json` prints today -- see the header note
+// above on why hasDiff isn't a member of this type.
+export interface DiffPayload {
+  manifestPath: string;
+  missingServices: DetectedServiceCandidate[];
+  // Named for what it is rather than for what it looks like. A key called
+  // `staleServices` -- which this was -- makes the same wrong claim to a
+  // program that the old heading made to a person, and a program acting on
+  // "stale" deletes. `status` rides along because it is the one reason for
+  // absence the manifest already knows.
+  notDetectedServices: Array<{ id: string; service: string; role: string; status: string }>;
+  detectionWarnings: string[];
+  unidentifiedCodingAgents: Evidence[];
+  missingCodingAgents: CodingAgentDetection[];
+  // Structured the same way notDetectedServices is above -- these are
+  // manifest service entries (role: coding-agent) now, not raw strings from
+  // a project.coding_agents list, so a program acting on this has the id to
+  // hand to `catalogus remove`, not just a bare slug.
+  staleCodingAgents: Array<{ id: string; service: string; role: string }>;
+}
 
+export interface DiffResult {
+  location: ManifestLocation;
+  hasDiff: boolean;
+  payload: DiffPayload;
+}
+
+/**
+ * Which of computeDiff's three failure paths fired, for callers (right now
+ * just detect_stack) that need to react differently to "nothing here yet"
+ * than to everything else. loadValidManifest itself doesn't distinguish --
+ * every existing caller (diff, add, graph) just prints its CommandResult and
+ * stops -- so this is computeDiff's own addition, not a fact loadValidManifest
+ * exposes.
+ */
+export type DiffFailureReason = "not-found" | "load-failed" | "detect-failed";
+
+export type DiffOutcome = { ok: true; value: DiffResult } | { ok: false; reason: DiffFailureReason; error: CommandResult };
+
+/**
+ * Runs detection and compares it against the manifest, without rendering
+ * either the --json or the plain-text report -- that split is what lets
+ * detect_stack reuse this instead of running its own copy of the same
+ * comparison (see the header note above).
+ */
+export async function computeDiff(targetDir: string): Promise<DiffOutcome> {
   const loaded = await loadValidManifest(targetDir);
   if (!loaded.ok) {
-    return loaded.error;
+    // ManifestNotFoundError's message is a pure function of targetDir, so
+    // reconstructing one here and comparing is an exact match, not a
+    // substring guess, and it's the only way to tell "no manifest" apart
+    // from "manifest exists but doesn't read/validate" without changing
+    // loadValidManifest's own CommandResult-shaped return (out of scope --
+    // diff/add/graph all depend on that shape today).
+    const reason: DiffFailureReason =
+      loaded.error.stderr[0] === new ManifestNotFoundError(targetDir).message ? "not-found" : "load-failed";
+    return { ok: false, reason, error: loaded.error };
   }
   const { location, manifest } = loaded.value;
 
@@ -81,7 +155,7 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
   try {
     detection = await detect(location.dir);
   } catch (error) {
-    return { exitCode: 2, stdout: [], stderr: [errorMessage(error)] };
+    return { ok: false, reason: "detect-failed", error: { exitCode: 2, stdout: [], stderr: [errorMessage(error)] } };
   }
 
   const missingCandidates = collectDetectedServices(detection);
@@ -115,30 +189,34 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
   const hasDiff =
     missingServices.length > 0 || notDetectedServices.length > 0 || missingAgents.length > 0 || staleAgents.length > 0;
 
+  const payload: DiffPayload = {
+    manifestPath: location.filePath,
+    missingServices,
+    notDetectedServices: notDetectedServices.map((s) => ({
+      id: s.id,
+      service: s.service,
+      role: s.role,
+      status: s.status ?? "active",
+    })),
+    detectionWarnings: detection.warnings,
+    unidentifiedCodingAgents: unidentifiedAgents,
+    missingCodingAgents: missingAgents,
+    staleCodingAgents: staleAgents.map((s) => ({ id: s.id, service: s.service, role: s.role })),
+  };
+
+  return { ok: true, value: { location, hasDiff, payload } };
+}
+
+export async function runDiff(pathArg: string | undefined, options: DiffCommandOptions = {}): Promise<CommandResult> {
+  const targetDir = resolveTargetPath(pathArg);
+
+  const computed = await computeDiff(targetDir);
+  if (!computed.ok) {
+    return computed.error;
+  }
+  const { location, hasDiff, payload } = computed.value;
+
   if (options.json) {
-    const payload = {
-      manifestPath: location.filePath,
-      missingServices,
-      // Named for what it is rather than for what it looks like. A key
-      // called `staleServices` -- which this was -- makes the same wrong claim to a program
-      // that the old heading made to a person, and a program acting on
-      // "stale" deletes. `status` rides along because it is the one reason
-      // for absence the manifest already knows.
-      notDetectedServices: notDetectedServices.map((s) => ({
-        id: s.id,
-        service: s.service,
-        role: s.role,
-        status: s.status ?? "active",
-      })),
-      detectionWarnings: detection.warnings,
-      unidentifiedCodingAgents: unidentifiedAgents,
-      missingCodingAgents: missingAgents,
-      // Structured the same way notDetectedServices is above -- these are
-      // manifest service entries (role: coding-agent) now, not raw strings
-      // from a project.coding_agents list, so a program acting on this has
-      // the id to hand to `catalogus remove`, not just a bare slug.
-      staleCodingAgents: staleAgents.map((s) => ({ id: s.id, service: s.service, role: s.role })),
-    };
     return { exitCode: hasDiff ? 1 : 0, stdout: [JSON.stringify(payload, null, 2)], stderr: [] };
   }
 
@@ -147,19 +225,18 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
   lines.push("");
 
   lines.push("Detected but missing from the manifest:");
-  pushServiceLines(lines, missingServices, "+");
+  pushServiceLines(lines, payload.missingServices, "+");
   lines.push("");
 
   lines.push("Declared in the manifest but not visible to detection here:");
-  if (notDetectedServices.length === 0) {
+  if (payload.notDetectedServices.length === 0) {
     lines.push("  (none)");
   } else {
-    for (const s of notDetectedServices) {
-      const status = s.status ?? "active";
+    for (const s of payload.notDetectedServices) {
       // An entry the manifest itself says is on the way out is *supposed*
       // to stop showing up. Saying so inline is the difference between a
       // line that needs investigating and one that confirms the record.
-      const because = status === "active" ? "" : ` -- marked ${status}, so this is expected`;
+      const because = s.status === "active" ? "" : ` -- marked ${s.status}, so this is expected`;
       lines.push(`  - ${s.id} (service: ${s.service}, role: ${s.role})${because}`);
     }
     lines.push("");
@@ -172,38 +249,38 @@ export async function runDiff(pathArg: string | undefined, options: DiffCommandO
   // The difference between "detection found nothing here" and "detection
   // could not read something here" is exactly the reason an entry above may
   // be missing, and it was previously dropped on the floor.
-  if (detection.warnings.length > 0) {
+  if (payload.detectionWarnings.length > 0) {
     lines.push("Detection could not read everything in this checkout:");
-    for (const warning of detection.warnings) {
+    for (const warning of payload.detectionWarnings) {
       lines.push(`  ! ${warning}`);
     }
     lines.push("");
   }
 
-  if (missingAgents.length > 0 || staleAgents.length > 0) {
+  if (payload.missingCodingAgents.length > 0 || payload.staleCodingAgents.length > 0) {
     lines.push("Coding agents detected but not declared as a service entry (role: coding-agent):");
-    if (missingAgents.length === 0) {
+    if (payload.missingCodingAgents.length === 0) {
       lines.push("  (none)");
     } else {
-      for (const agent of missingAgents) {
+      for (const agent of payload.missingCodingAgents) {
         lines.push(`  + ${agent.agent} (${agent.name}) -- catalogus add ${agent.agent} --role coding-agent`);
       }
     }
     lines.push("");
 
     lines.push("Coding agents declared but no longer detected:");
-    if (staleAgents.length === 0) {
+    if (payload.staleCodingAgents.length === 0) {
       lines.push("  (none)");
     } else {
-      for (const s of staleAgents) {
+      for (const s of payload.staleCodingAgents) {
         lines.push(`  - ${s.id} (service: ${s.service}, role: coding-agent)`);
       }
     }
     lines.push("");
   }
 
-  if (unidentifiedAgents.length > 0) {
-    const files = [...new Set(unidentifiedAgents.map((e) => e.file))].join(", ");
+  if (payload.unidentifiedCodingAgents.length > 0) {
+    const files = [...new Set(payload.unidentifiedCodingAgents.map((e) => e.file))].join(", ");
     lines.push("Coding agent in use but not identified:");
     lines.push(`  ${files} says an agent works in this repo without naming which one.`);
     lines.push("  Ask the owner, then: catalogus add <agent> --role coding-agent");

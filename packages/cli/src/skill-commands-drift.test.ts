@@ -343,16 +343,24 @@ describe("skills/catalogus/SKILL.md's `catalogus ...` shell lines vs. this CLI's
   // allowlist: a list of commands the skill is forbidden to teach would
   // need maintaining, and would go stale the way everything else this file
   // exists to catch does.
+  //
+  // `mcp` joined the set on 2026-09-06 for the same reason with a worse
+  // failure: `catalogus mcp` speaks JSON-RPC over stdin/stdout and returns
+  // only when the client hangs up. An agent that runs it in a shell holds
+  // the call open *and* is the wrong party to be running it at all -- the
+  // MCP server is configured once by the user in their agent's settings
+  // (`.mcp.json` or equivalent), which is what SKILL.md's prose says.
   it("never teaches a long-running server command in a fenced block, where an agent would run it", () => {
-    const blocking = new Set(["view"]);
+    const blocking = new Set(["view", "mcp"]);
     const offenders = commandLines.filter((line) => line.tokens[0] !== undefined && blocking.has(line.tokens[0]));
     expect(
       offenders.map((line) => `SKILL.md:${line.lineNumber} ${line.text}`),
-      "a fenced `catalogus view` tells the agent to run the viewer itself. It is a server -- it holds " +
-        "the event loop open until Ctrl+C, so the agent's tool call never returns and nothing after it " +
-        "in the agent's plan runs. The viewer is for the human: mention it in prose and let the user " +
-        "run it, which is what SKILL.md's \"Hand the viewer to the user\" section says. `catalogus " +
-        "graph` is the agent's own check -- it prints and exits.",
+      "a fenced `catalogus view` or `catalogus mcp` tells the agent to run a server itself. Both hold " +
+        "the event loop open until the client or the user stops them, so the agent's tool call never " +
+        "returns and nothing after it in the agent's plan runs. The viewer is for the human, and the MCP " +
+        "server is for the user's agent configuration: mention them in prose and let the user run them, " +
+        "which is what SKILL.md's \"Hand the viewer to the user\" section says. `catalogus graph` is " +
+        "the agent's own check -- it prints and exits.",
     ).toEqual([]);
   });
 

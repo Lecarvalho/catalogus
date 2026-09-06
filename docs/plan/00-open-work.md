@@ -7,9 +7,16 @@ file or the handoff.
 
 ## Ready now — no decision needed
 
-Nothing at the moment. The three items compiled here on 2026-09-05 (the `add --help` sentence,
-the board's recency mark, the stale Phase 3.6 box) closed the same day — see the 2026-09-05
-evening handoff in `handoffs-2026-09.md`.
+- **Wire `catalogus mcp` into Claude Code and run the loop on a real repo** (Phase 6, box 5). The
+  server and its eight tools were validated on 2026-09-06 with the SDK client and raw JSON-RPC,
+  not with a live agent. `claude mcp add --scope local catalogus -- node <clone>/packages/cli/dist/cli.js mcp .`
+  in the target repo is the whole setup; the loop is `detect_stack` → `propose_manifest_edit` →
+  show the diff → `apply_manifest_edit` with `baseSha256` → `validate_manifest`. What to watch
+  for: whether the agent loads the deferred tools and prefers them over Bash now that the skill
+  says so, whether it proposes before applying, and whether stderr noise (stack-analyser's
+  warning on a corrupt `package.json`) ever needs surfacing. (`phase-6-mcp.md`.)
+- **Drift test D4**: `skill-tools-drift.test.ts`'s op-list check should assert every occurrence
+  of the op list in the skill, not one. Small. (`phase-6-mcp.md`.)
 
 ## Waiting on the owner — nothing open
 
@@ -55,11 +62,13 @@ Device flow, `@napi-rs/keyring`, `catalogus login`, `catalogus push`, `push --pr
 field allow-list, and the test that the token never lands in a file an agent can read.
 (`phase-5-auth-push.md`.)
 
-## Phase 6 — MCP server mode ⬜
+## Phase 6 — MCP server mode 🔶 first class for agents (decision 14)
 
-`catalogus mcp` over stdio: `detect_stack`, `read_manifest`, `propose_manifest_edit`,
-`push_private`, wired into Claude Code. The first three read and diff only and do not need a
-backend; `push_private` needs Phase 5. (`phase-6-mcp.md`.)
+`catalogus mcp` over stdio with eight tools, and the skill MCP-first at 250 lines; all shipped and
+validated 2026-09-06. Left: `push_private` (needs Phase 5), the live wiring (ready-now item
+above), and the hosted edition served by the web platform against an account (Phase 7; the
+recorded constraint is that `detect_stack` needs repo access the hosted server does not have).
+(`phase-6-mcp.md`, `decisions.md` 14.)
 
 ## Phase 7 — Viewer backed by the platform ⬜ (after 4)
 
@@ -73,6 +82,10 @@ store behind them and adds the portfolio with cost totals and the cross-project 
 - [ ] CIPO/USPTO knock-out search, Nice Class 9 + 42
 - [ ] Publish the JSON Schema at `https://catalogus.dev/schema/v1.json` — until it resolves, the
       `$schema` modeline the CLI writes gives editors nothing
+- [ ] Publish `@catalogus/schema`, `@catalogus/core`, `@catalogus/cli` to npm — the owner's
+      2026-09-06 ruling: a client installs the MCP server without the source, so the README
+      documents `npx -y @catalogus/cli mcp` as the procedure, marked pending. The five publish
+      steps are in `parallel-track.md`. Blocked on nothing but the owner's npm account.
 
 Plus two things that become due on publish, recorded in `phase-3.6-dogfooding.md`: the skill
 installer becomes a `catalogus` subcommand, and the `link:cli` shims give way to

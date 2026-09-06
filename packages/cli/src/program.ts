@@ -42,6 +42,7 @@ import { runGraph } from "./commands/graph.js";
 import { runIcons } from "./commands/icons.js";
 import { runInit } from "./commands/init.js";
 import { runLink } from "./commands/link.js";
+import { runMcp } from "./commands/mcp.js";
 import { runRemove } from "./commands/remove.js";
 import { runRename } from "./commands/rename.js";
 import { runSet, SETTABLE_FIELDS } from "./commands/set.js";
@@ -315,6 +316,17 @@ export function createProgram(): Command {
     .option("--no-open", "do not open a browser automatically")
     .action(async (path: string | undefined, opts: { port?: string; open?: boolean }) => {
       emit(await runView(path, opts));
+    });
+
+  program
+    .command("mcp")
+    .description(
+      "run as an MCP server over stdio (tools: read_manifest, detect_stack, propose_manifest_edit, " +
+        "apply_manifest_edit, init_manifest, validate_manifest, render_graph, list_icons)"
+    )
+    .argument("[path]", "default repo directory for tools that do not name one")
+    .action(async (path: string | undefined) => {
+      emit(await runMcp(path));
     });
 
   return program;

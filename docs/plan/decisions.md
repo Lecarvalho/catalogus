@@ -92,6 +92,38 @@ From HANDOFF §9, plus decisions taken during implementation. Settled — reopen
     measurement, and this is the owner saying it in words. The token, the contract and the
     tripwire in `direction-contract.test.ts` all name `#d40010`.
 
+14. **The MCP server is the first-class surface for agents; the CLI is for people, CI and the
+    machine that holds the credential** — owner, 2026-09-06: *"let's make the MCP the first
+    class for agents. When Catalogus gonna run in the web, the MCP gonna call the web service,
+    not a local workload, so then, for agents Catalogus MCP won't need any local installation,
+    only the skill, and an account in Catalogus."*
+
+    What this settles, and what it amends:
+
+    - **HANDOFF §6's "propose, never write" becomes "propose, then apply".** The single-writer
+      rule was always about the code path (`manifest-edit.ts`: validate before write, comments
+      survive, private data refused), not about the binary. An MCP tool that calls the same
+      command functions is that same writer over a different transport. So the server grows
+      `apply_manifest_edit` (same `edits` schema as the proposal, writes for real, refuses when the
+      manifest changed since the proposal it was given), plus `init_manifest`, `validate_manifest`,
+      `render_graph` and `list_icons`, so an agent never needs a shell. `view` and `login` stay
+      CLI-only: a server cannot hand a person a browser or a keychain.
+    - **The skill is rewritten MCP-first.** When the `catalogus` tools are connected the agent
+      uses them, proposes before it applies, and shows the diff; the fenced CLI commands stay as
+      the fallback for an agent that has the skill and no server. The observed 2026-09-06 session
+      that ran everything through Bash with the tools loaded but unused is the defect this fixes:
+      the skill never told the agent to prefer a tool.
+    - **The end state is a hosted server.** When the platform exists (Phase 4 onwards), the same
+      tools are served over HTTP by the web service, authenticated by a Catalogus account; the
+      client installs the skill and nothing else. The stdio server built today is the local
+      edition of the same tool contract and stays for offline use and for CI. **Constraint
+      recorded, not solved:** `detect_stack` reads a filesystem. A hosted server has no local
+      checkout, so the hosted edition needs repo access through the VCS provider (a GitHub App
+      or equivalent) or a local-scan upload; that belongs to Phase 7's design, and the tool
+      contract should not assume a local path forever — `path` is already optional.
+    - **Publishing to npm stays on the launch checklist** (parallel track) for the local edition
+      and for CI; it stops being the way an agent gets Catalogus.
+
 ## Non-goals
 
 From HANDOFF §8. Worth restating because each is a plausible-sounding scope creep.

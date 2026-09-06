@@ -92,7 +92,15 @@ trusting anything below. **In that order**: the direction contract guard compare
 `apps/web/index.html` against the build output, so a `pnpm test` run against a `dist` older than your
 last edit to that file fails on a difference you created and already fixed.
 
-**The expected total as of 2026-09-05 (end of day) is 1701 tests / 86 files** (1637 / 81 after the icon-following `rename` and `remove`; 1623 / 80 after `RankModule` went; 1701 / 86 with the three menus, the binary test and the preferences module. The 1637 was +16 for `rename` and `remove` following the vendored icon; see the newest handoff. Before that, 1621 on 2026-09-04 evening: 1617 after the brand-tile slice and its two validation passes, +4 for the evening's three owner requests; +214 across the owner-supplied-icons slice and the brand-tile slice — 1606 before the four D1–D4 fixes and their eleven tests; it was 1403 / 77 on the evening of 2026-09-03, 1375 / 77 that morning before the thesvg icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
+**The expected total as of 2026-09-06 (late) is 1695 tests / 92 files** (1751 / 91 with
+`apply_manifest_edit` and the four command tools, then −58 when the skill went from 594 to 250
+lines: `skill-commands-drift.test.ts` makes three tests per fenced `catalogus` line and one per
+`set` line, 40 lines → 21; +5 for `skill-tools-drift.test.ts`; +2 regression tests for the
+validation fixes). Before that, **the expected total as of 2026-09-06 (midday) was 1724 tests / 89 files** (1680 / 84 after the graph view
+went on 2026-09-05 late; +44 tests and +5 files for `catalogus mcp`: `server.test.ts`,
+`read-manifest.test.ts`, `detect-stack.test.ts`, `propose-edit.test.ts`, `commands/mcp.test.ts`,
+plus two spawned-binary cases in `cli-binary.test.ts` and one in `detect-stack.test.ts` from the
+validation fixes). Before that: **the expected total as of 2026-09-05 (end of day) was 1701 tests / 86 files** (1637 / 81 after the icon-following `rename` and `remove`; 1623 / 80 after `RankModule` went; 1701 / 86 with the three menus, the binary test and the preferences module. The 1637 was +16 for `rename` and `remove` following the vendored icon; see the newest handoff. Before that, 1621 on 2026-09-04 evening: 1617 after the brand-tile slice and its two validation passes, +4 for the evening's three owner requests; +214 across the owner-supplied-icons slice and the brand-tile slice — 1606 before the four D1–D4 fixes and their eleven tests; it was 1403 / 77 on the evening of 2026-09-03, 1375 / 77 that morning before the thesvg icons slice, and 1402 before Codex and xAI joined it). The paragraph that follows is the 2026-08-26 history of why this line once named none.
 
 **The expected total moved on 2026-08-26 and this line no longer names one.** It said **1218 tests /
 72 files**, which was correct at the start of that session and is the number to compare against if
