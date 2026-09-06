@@ -205,6 +205,38 @@
 }
 
 /*
+ * The recency mark, 2026-09-05 (HANDOFF §4.2 query 5, docs/plan/00-open-
+ * work.md, "Ready now" item 2): `New` for a single recently-added entry,
+ * `<n> new` for a group, in the same slot `.status` occupies when there is
+ * no status word to show (ServiceTile.tsx's `SingleEntryTile` and
+ * `GroupTile` render one or the other, never both). Every metric here is
+ * `.status`'s own -- same `margin-top`, `font-size`, `line-height` and
+ * weight, so the line reads at the same size and sits at the same distance
+ * from the id/count above it whichever of the two occupies the slot.
+ *
+ * The one deliberate difference is `color`: ink (`--color-text`), never
+ * `--color-signal`. OWN-WORLD (apps/web/docs/DIRECTION.md) spends the
+ * signal colour in exactly two places, "the status badge and the status
+ * word, and nowhere else: not a view, not a count" -- recency is a third
+ * thing, not a restatement of either, so it does not inherit `.status`'s
+ * red by reusing that class, and it is not given a class of its own that
+ * merely repaints it in disguise. Ink is not a compromise here: it is
+ * already this vocabulary's colour for "new" -- the popover and service
+ * page's own `new` tag resolves `signal-outline` to
+ * `--tag-phasing-ink: var(--color-text)` (Tag.module.css), so this rule
+ * matches a choice this codebase already made rather than inventing a
+ * second one. `signal-red.test.ts` scans every stylesheet for a red
+ * declaration outside its allow-list; this rule adds nothing to that list.
+ */
+.recency {
+  margin-top: var(--icon-status-gap);
+  font-size: var(--text-icon-status);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-icon-status);
+  color: var(--color-text);
+}
+
+/*
  * The tile tightens below 480px alongside the grid it sits in
  * (BandModule.module.css's own identical breakpoint and comment) -- the
  * mockup's own values (candidate-e-homescreen.html's

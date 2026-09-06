@@ -2,7 +2,7 @@
 // component. The one rule that matters most: `active` earns none.
 import { describe, expect, it, vi } from "vitest";
 
-import { RECENT_WINDOW_DAYS, isRecentlyAdded, tagsFor } from "./service-tags.js";
+import { RECENT_WINDOW_DAYS, countRecentlyAdded, isRecentlyAdded, tagsFor } from "./service-tags.js";
 import { makeViewService as service } from "./test-support/fixtures.js";
 
 describe("isRecentlyAdded", () => {
@@ -54,6 +54,57 @@ describe("isRecentlyAdded", () => {
 
   it("exports the window it uses as a named constant", () => {
     expect(RECENT_WINDOW_DAYS).toBe(30);
+  });
+});
+
+describe("countRecentlyAdded", () => {
+  const readAt = "2026-08-24T00:00:00.000Z";
+
+  it("is zero when none of the services are recent", () => {
+    const services = [
+      service({ id: "a", role: "hosting", added: "2020-01-01T00:00:00.000Z" }),
+      service({ id: "b", role: "hosting", added: "2020-06-01T00:00:00.000Z" }),
+    ];
+    expect(countRecentlyAdded(services, readAt)).toBe(0);
+  });
+
+  it("counts only the recent ones among a mix of recent and old", () => {
+    const services = [
+      service({ id: "a", role: "hosting", added: "2026-08-20T00:00:00.000Z" }),
+      service({ id: "b", role: "hosting", added: "2020-01-01T00:00:00.000Z" }),
+      service({ id: "c", role: "hosting", added: "2026-08-22T00:00:00.000Z" }),
+    ];
+    expect(countRecentlyAdded(services, readAt)).toBe(2);
+  });
+
+  it("is the whole length when every service is recent", () => {
+    const services = [
+      service({ id: "a", role: "hosting", added: "2026-08-20T00:00:00.000Z" }),
+      service({ id: "b", role: "hosting", added: "2026-08-22T00:00:00.000Z" }),
+    ];
+    expect(countRecentlyAdded(services, readAt)).toBe(services.length);
+  });
+
+  // isRecentlyAdded's own rule for a missing added date, exercised through
+  // the count rather than re-asserted independently: an entry with no
+  // `added` at all does not count as recent, it counts as unanswered.
+  it("does not count an entry with an undefined added date", () => {
+    const services = [service({ id: "a", role: "hosting", added: undefined })];
+    expect(countRecentlyAdded(services, readAt)).toBe(0);
+  });
+
+  it("is zero for an empty list", () => {
+    expect(countRecentlyAdded([], readAt)).toBe(0);
+  });
+
+  // The same purity guarantee isRecentlyAdded carries, exercised at this
+  // function's own boundary rather than trusted to the call underneath it:
+  // a count of several services must still be a function of readAt alone.
+  it("never calls Date.now() -- measured from readAt alone, like isRecentlyAdded itself", () => {
+    const spy = vi.spyOn(Date, "now");
+    countRecentlyAdded([service({ id: "a", role: "hosting", added: "2026-08-20T00:00:00.000Z" })], readAt);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });
 

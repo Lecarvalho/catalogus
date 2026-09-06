@@ -70,6 +70,24 @@ export function isRecentlyAdded(added: string | undefined, readAt: string, windo
 }
 
 /**
+ * 2026-09-05: how many of `services` fall inside the recency window, all
+ * measured from the same `readAt` instant. Built on `isRecentlyAdded` rather
+ * than re-deriving its window or its NaN handling a second time, so a
+ * group's count and a single entry's mark can never drift apart from having
+ * two independent readings of the same rule.
+ *
+ * This is what closes HANDOFF §4.2 query 5 on the board specifically
+ * (docs/plan/phase-3.7-viewer.md, "HANDOFF §4.2 at the close of Phase 3.7"):
+ * a collapsed multi-entry tile has no single `added` for `isRecentlyAdded`
+ * to check, only several, so the board's group tile renders this count in
+ * its status slot ("2 new") in place of the single-entry `new` tag it
+ * cannot honestly show.
+ */
+export function countRecentlyAdded(services: readonly ViewService[], readAt: string): number {
+  return services.filter((service) => isRecentlyAdded(service.added, readAt)).length;
+}
+
+/**
  * Status tag, or null for `active`.
  *
  * A Map rather than a keyed object literal: `status` is manifest-derived,

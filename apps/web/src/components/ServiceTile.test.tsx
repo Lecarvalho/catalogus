@@ -100,6 +100,27 @@ describe("ServiceTile.module.css's label stack", () => {
   });
 });
 
+// The same source-level shape as the block above, for the recency mark
+// (HANDOFF §4.2 query 5): jsdom's CSS Modules proxy carries no real
+// stylesheet, so the only way to see what colour `.recency` paints is to
+// read the rule itself. This is the guard signal-red.test.ts's own
+// allow-list does not need to carry, because `.recency` is never added to
+// it -- if this rule ever painted the signal colour, the app-wide sweep
+// would fail it as an unlicensed site, and this test fails it first, named
+// for the one rule that matters here.
+describe("ServiceTile.module.css's .recency rule", () => {
+  const css = readFileSync(fileURLToPath(import.meta.url).replace(/ServiceTile\.test\.tsx$/, "ServiceTile.module.css"), "utf8");
+  const recencyRuleStart = css.indexOf(".recency {");
+  const recencyRule = css.slice(recencyRuleStart, css.indexOf("}", recencyRuleStart));
+
+  it("exists, and paints ink rather than naming the signal colour in any form", () => {
+    expect(recencyRuleStart).toBeGreaterThan(-1);
+    expect(recencyRule).not.toMatch(/--color-signal/);
+    expect(recencyRule).not.toMatch(/#d40010/i);
+    expect(recencyRule).toMatch(/color:\s*var\(--color-text\)/);
+  });
+});
+
 describe("ServiceTile -- the no-brand-icon case, single entry", () => {
   it("renders the monogram, not the generic rollup glyph", () => {
     renderTile({ group: soloGroup({ id: "a", role: "finance-ledger", service: "acme-ledger", name: "acme-ledger", icon: null }) });
@@ -300,6 +321,44 @@ describe("ServiceTile -- status, the active + replaced_by ruling, single entry",
   it("does not desaturate the mark for active + replaced_by", () => {
     renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "active", replaced_by: "db-primary" }) });
     expect(screen.getByTestId("icon-mark").className).not.toContain("desaturated");
+  });
+});
+
+// HANDOFF §4.2 query 5 (docs/plan/00-open-work.md, "Ready now" item 2): the
+// board's recency mark, single entry. `readAt` above this file is
+// "2026-08-24T00:00:00.000Z" -- `recentlyAdded` below sits four days before
+// it, inside `RECENT_WINDOW_DAYS` (service-tags.ts), and `longAgo` sits well
+// outside it.
+describe("ServiceTile -- recency, single entry", () => {
+  const recentlyAdded = "2026-08-20T00:00:00.000Z";
+  const longAgo = "2020-01-01T00:00:00.000Z";
+
+  it("renders 'New' in the status slot for a recent, active entry -- no status word, no badge, no desaturation", () => {
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "active", added: recentlyAdded }) });
+    expect(screen.getByTestId("recency-text").textContent).toBe("New");
+    expect(screen.queryByTestId("status-text")).toBeNull();
+    expect(screen.queryByTestId("status-badge")).toBeNull();
+    expect(screen.getByTestId("icon-mark").className).not.toContain("desaturated");
+  });
+
+  // The precedence the file header states: status claims the slot first, so
+  // a recent entry that also departs from active shows the departure, not
+  // "New" -- the same fixed order tagsFor uses for the popover and the page.
+  it("renders the status word, not the recency mark, when a recent entry also departs from active", () => {
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "phasing_out", added: recentlyAdded }) });
+    expect(screen.getByTestId("status-text").textContent).toBe("Phasing out");
+    expect(screen.queryByTestId("recency-text")).toBeNull();
+  });
+
+  it("renders neither mark for an active entry added outside the window", () => {
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", status: "active", added: longAgo }) });
+    expect(screen.queryByTestId("recency-text")).toBeNull();
+    expect(screen.queryByTestId("status-text")).toBeNull();
+  });
+
+  it("carries the recency phrase in the accessible name, in the status word's own slot", () => {
+    renderTile({ group: soloGroup({ id: "a", role: "hosting", service: "flyio", name: "Fly.io", status: "active", added: recentlyAdded }) });
+    expect(screen.getByRole("button", { name: "Fly.io, a, New" })).not.toBeNull();
   });
 });
 
@@ -563,6 +622,63 @@ describe("ServiceTile -- the multi-entry group tile, status", () => {
 
     renderTile({ group: flyGroup([{ id: "host-api" }, { id: "host-worker", status: "removed" }]) });
     expect(screen.getByTestId("status-text").textContent).toBe("host-worker removed");
+  });
+});
+
+// HANDOFF §4.2 query 5 (docs/plan/00-open-work.md, "Ready now" item 2): the
+// group form's own recency mark, `countRecentlyAdded` (service-tags.ts)
+// rendered as "<n> new" in the same slot `groupStatusPhrase` occupies when
+// the group has a departure to name. `flyGroup` above carries no `added`
+// field, so these build the group directly the way `multiGroup` itself is
+// built elsewhere in this file.
+describe("ServiceTile -- the multi-entry group tile, recency", () => {
+  const recentlyAdded = "2026-08-20T00:00:00.000Z";
+  const longAgo = "2020-01-01T00:00:00.000Z";
+
+  it("renders '<n> new', counting only the recent entries among five -- not a fraction of the total", () => {
+    const group = multiGroup([
+      service({ id: "host-api", role: "hosting-api", service: "flyio", name: "Fly.io", added: recentlyAdded }),
+      service({ id: "host-web", role: "hosting-web", service: "flyio", name: "Fly.io", added: recentlyAdded }),
+      service({ id: "host-cron", role: "hosting-cron", service: "flyio", name: "Fly.io", added: longAgo }),
+      service({ id: "host-preview", role: "hosting-preview", service: "flyio", name: "Fly.io", added: longAgo }),
+      service({ id: "host-worker", role: "hosting-worker", service: "flyio", name: "Fly.io" }),
+    ]);
+    renderTile({ group });
+    expect(screen.getByTestId("recency-text").textContent).toBe("2 new");
+    expect(screen.getByTestId("recency-text").textContent).not.toContain("of 5");
+    expect(screen.queryByTestId("status-text")).toBeNull();
+  });
+
+  // The same precedence as the single-entry tile: the departure phrase
+  // claims the slot first, so a group with both a recent entry and a
+  // departing one shows the departure, not the recent count.
+  it("renders the departure phrase, not the recency mark, when the group also has a departing entry", () => {
+    const group = multiGroup([
+      service({ id: "host-api", role: "hosting-api", service: "flyio", name: "Fly.io", added: recentlyAdded }),
+      service({ id: "host-preview", role: "hosting-preview", service: "flyio", name: "Fly.io", status: "phasing_out" }),
+    ]);
+    renderTile({ group });
+    expect(screen.getByTestId("status-text").textContent).toBe("host-preview phasing out");
+    expect(screen.queryByTestId("recency-text")).toBeNull();
+  });
+
+  it("renders no recency mark when none of the entries are recent", () => {
+    const group = multiGroup([
+      service({ id: "host-api", role: "hosting-api", service: "flyio", name: "Fly.io", added: longAgo }),
+      service({ id: "host-web", role: "hosting-web", service: "flyio", name: "Fly.io" }),
+    ]);
+    renderTile({ group });
+    expect(screen.queryByTestId("recency-text")).toBeNull();
+  });
+
+  it("carries the recent count in the accessible name, in the departure phrase's own slot", () => {
+    const group = multiGroup([
+      service({ id: "host-api", role: "hosting-api", service: "flyio", name: "Fly.io", added: recentlyAdded }),
+      service({ id: "host-web", role: "hosting-web", service: "flyio", name: "Fly.io", added: recentlyAdded }),
+      service({ id: "host-cron", role: "hosting-cron", service: "flyio", name: "Fly.io" }),
+    ]);
+    renderTile({ group });
+    expect(screen.getByRole("button").getAttribute("aria-label")).toBe("Fly.io, 3 entries, 2 new");
   });
 });
 

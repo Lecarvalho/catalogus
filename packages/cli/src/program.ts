@@ -195,7 +195,7 @@ export function createProgram(): Command {
     .argument("<service>", "catalog slug for the service, e.g. supabase, fly-io")
     .argument("[path]", "target directory (defaults to the current directory)")
     .requiredOption("--role <role>", "the role this instance plays, e.g. database, hosting")
-    .option("--id <id>", "local id (derived from service+role when omitted)")
+    .option("--id <id>", "local id (defaults to the service slug, then service-role, then a numbered suffix)")
     .option("--depends-on <ids...>", "local ids this new entry depends on")
     .option("--status <status>", "active | deprecated | phasing_out | removed")
     .option("--kind <kind>", "service (default) | component | stack")

@@ -93,6 +93,7 @@ import type { ViewService } from "@catalogus/cli";
 import type { BandId, VendorGroup } from "../bands.js";
 import { groupStatus } from "../bands.js";
 import { usePreferences } from "../preferences.js";
+import { countRecentlyAdded, isRecentlyAdded } from "../service-tags.js";
 import { Icon } from "./Icon.js";
 import { STATUS_WORDS, statusPhrase as sharedStatusPhrase, StatusBadgeGlyph } from "./ServiceStatus.js";
 import styles from "./ServiceTile.module.css";
@@ -104,11 +105,20 @@ export interface ServiceTileProps {
   bandId: BandId;
   /**
    * Server-stamped moment the manifest was read; every recency mark
-   * measures from it. Accepted for shape parity with ServicePopover's props
-   * (both read off the same payload) but not consulted by this component:
-   * candidate E's mockup carries no "recently added" mark on the tile
-   * itself, only the status treatment below, so there is nothing here yet
-   * for it to drive.
+   * measures from it, this component's own included. **2026-09-05: now
+   * consulted** (HANDOFF §4.2 query 5, docs/plan/00-open-work.md, "Ready
+   * now" item 2). Until this pass `readAt` was accepted for shape parity
+   * with ServicePopover's props (both read off the same payload) and left
+   * unused: candidate E's mockup carries no "recently added" mark on the
+   * tile at all, so there was nothing here yet for it to drive, and the
+   * board -- the one surface that shows every service at once -- was the
+   * only place `isRecentlyAdded` had no mark to show
+   * (docs/plan/phase-3.7-viewer.md's own account of the gap). It now drives
+   * the third label line's other tenant: `New` for a single recent entry,
+   * `<n> new` for a group, rendered only where the status word has not
+   * already claimed that slot -- see `statusPhrase` and `groupStatusPhrase`
+   * below for the precedence, and `SingleEntryTile` / `GroupTile` for where
+   * each is read.
    */
   readAt: string;
   /** True when the currently open entry page belongs to this group -- one of its entries for a multi-entry group, the entry itself for a single one. */
@@ -272,7 +282,7 @@ function usePeekHandlers(group: VendorGroup, onPeek: ServiceTileProps["onPeek"],
  * exactly this switch (its monochrome rule "has no live caller" until now,
  * Icon.tsx's own words) -- nothing new was added to make the toggle work.
  */
-export function ServiceTile({ group, bandId, selected, onActivate, onPeek, onPeekEnd }: ServiceTileProps) {
+export function ServiceTile({ group, bandId, readAt, selected, onActivate, onPeek, onPeekEnd }: ServiceTileProps) {
   const { preferences } = usePreferences();
   const isGroup = group.entries.length > 1;
   const domId = serviceTileDomId(bandId, group);
@@ -282,6 +292,7 @@ export function ServiceTile({ group, bandId, selected, onActivate, onPeek, onPee
       <GroupTile
         group={group}
         domId={domId}
+        readAt={readAt}
         selected={selected}
         onActivate={onActivate}
         onPeek={onPeek}
@@ -296,6 +307,7 @@ export function ServiceTile({ group, bandId, selected, onActivate, onPeek, onPee
       service={group.entries[0]}
       group={group}
       domId={domId}
+      readAt={readAt}
       selected={selected}
       onActivate={onActivate}
       onPeek={onPeek}
@@ -308,6 +320,8 @@ export function ServiceTile({ group, bandId, selected, onActivate, onPeek, onPee
 interface TileShellProps {
   group: VendorGroup;
   domId: string;
+  /** Threaded from `ServiceTile`'s own prop of the same name; see its doc comment for what this now drives. */
+  readAt: string;
   selected: boolean;
   onActivate: (group: VendorGroup) => void;
   onPeek: (group: VendorGroup, anchor: HTMLElement) => void;
@@ -326,16 +340,27 @@ interface TileShellProps {
  * defensively throughout was harder to see as "this case is untouched" than
  * a second, small component is.
  */
-function SingleEntryTile({ service, group, domId, selected, onActivate, onPeek, onPeekEnd, colour }: TileShellProps & { service: ViewService }) {
+function SingleEntryTile({ service, group, domId, readAt, selected, onActivate, onPeek, onPeekEnd, colour }: TileShellProps & { service: ViewService }) {
   const isActive = service.status === "active";
   const isFallback = service.icon === null;
   const phrase = statusPhrase(service);
+  // The third label line's other tenant, 2026-09-05 (HANDOFF §4.2 query 5):
+  // status keeps the slot when it has something to say -- `phrase` is
+  // `undefined` for every recently-added entry that is also `active`, which
+  // is the only case this can ever render, since a departing entry already
+  // fills the slot with its own status word. `tagsFor` orders the same two
+  // facts status-then-recency for the same reason: status is the more
+  // consequential thing to notice, and a row rarely earns both.
+  const recent = phrase === undefined && isRecentlyAdded(service.added, readAt);
 
   // Name and id both go in, unconditionally: they are both load-bearing on
   // screen (point 2 above), and a screen reader gets no benefit from the
   // visual layout that makes that obvious, so the accessible name states
   // both explicitly rather than leaning on the button's rendered children.
-  const label = [service.name, service.id, phrase].filter(Boolean).join(", ");
+  // The recency phrase takes the same slot `phrase` does -- never both, per
+  // the precedence above -- so the popover and the service page remain the
+  // only surfaces that ever show status and recency together.
+  const label = [service.name, service.id, phrase ?? (recent ? "New" : undefined)].filter(Boolean).join(", ");
 
   const squircleClassName = [styles.squircle, isFallback ? styles.fallback : "", !isActive ? styles.desaturated : ""].filter(Boolean).join(" ");
 
@@ -425,6 +450,22 @@ function SingleEntryTile({ service, group, domId, selected, onActivate, onPeek, 
             )}
           </span>
         )}
+
+        {/*
+          2026-09-05, HANDOFF §4.2 query 5: the same slot's other tenant.
+          `recent` above is already false whenever `phrase` claimed the slot,
+          so this and the block just above are mutually exclusive by
+          construction, never by a second check here. `.recency` is ink
+          (`var(--color-text)`), not `.status`'s signal red -- recency is not
+          a status, and OWN-WORLD spends red on exactly two things, neither
+          of which this is (ServiceTile.module.css's own comment on
+          `.recency`).
+        */}
+        {recent && (
+          <span className={styles.recency} data-testid="recency-text">
+            New
+          </span>
+        )}
       </span>
     </button>
   );
@@ -437,16 +478,28 @@ function SingleEntryTile({ service, group, domId, selected, onActivate, onPeek, 
  * a single entry's own tile and the one that deliberately does not
  * (desaturation).
  */
-function GroupTile({ group, domId, selected, onActivate, onPeek, onPeekEnd, colour }: TileShellProps) {
+function GroupTile({ group, domId, readAt, selected, onActivate, onPeek, onPeekEnd, colour }: TileShellProps) {
   const isFallback = group.icon === null;
   const worst = groupStatus(group);
   const departure = groupStatusPhrase(group);
+  // The same precedence as the single-entry tile, at group scale: the
+  // departure phrase already claims the status slot, so a recent count is
+  // only ever computed -- and only ever shown -- when there is no departure
+  // to name (2026-09-05, HANDOFF §4.2 query 5). This is deliberately a
+  // count ("2 new"), not a fraction ("2 of 5 new"): the line above it
+  // already states how many entries there are, so a fraction would repeat
+  // that number rather than add to it.
+  const recentCount = departure === undefined ? countRecentlyAdded(group.entries, readAt) : 0;
 
   // The accessible name states the same facts the label renders: the vendor
   // name, the entry count (not an id -- there is no single id for a group),
-  // and the departure phrase when there is one. Mirrors the single-entry
-  // tile's own `label` construction just above.
-  const label = [group.name, `${group.entries.length} entries`, departure ? `${departure.entryId} ${departure.word}` : undefined]
+  // and, in the same slot, the departure phrase or the recent count, never
+  // both. Mirrors the single-entry tile's own `label` construction above.
+  const label = [
+    group.name,
+    `${group.entries.length} entries`,
+    departure ? `${departure.entryId} ${departure.word}` : recentCount > 0 ? `${recentCount} new` : undefined,
+  ]
     .filter(Boolean)
     .join(", ");
 
@@ -494,6 +547,19 @@ function GroupTile({ group, domId, selected, onActivate, onPeek, onPeekEnd, colo
           <span className={styles.status} data-testid="status-text">
             <span className={styles.statusTarget}>{departure.entryId}</span>
             {` ${departure.word}`}
+          </span>
+        )}
+
+        {/*
+          2026-09-05, HANDOFF §4.2 query 5: the group form's recency mark --
+          "2 new", not "2 of 5 new" (see `recentCount` above for why). Ink,
+          not signal red, for the identical reason the single-entry tile's
+          own `.recency` is ink: recency is not one of OWN-WORLD's two
+          licensed red spends.
+        */}
+        {recentCount > 0 && (
+          <span className={styles.recency} data-testid="recency-text">
+            {recentCount} new
           </span>
         )}
       </span>
