@@ -7,42 +7,25 @@ file or the handoff.
 
 ## Ready now — no decision needed
 
-1. **`add --help`'s id-derivation sentence** in `packages/cli/src/program.ts`. It says the id is
-   "derived from service+role when omitted"; `deriveLocalId` uses the bare slug first. One line.
-   (`handoffs-2026-09.md`, 2026-09-05.)
-2. **HANDOFF §4.2 query 5 — "everything added in the last N days", surfaced somewhere scannable.**
-   The recency rule exists (`service-tags.ts`, `RECENT_WINDOW_DAYS`, the `new` tag on the page and
-   popover); the board carries no recency mark because a collapsed tile stands for several entries.
-   Single-project, unblocked, the cheapest §4.2 item by a distance. (`phase-3.7-viewer.md`,
-   "HANDOFF §4.2 at the close of Phase 3.7".)
-3. **A stale box in Phase 3.6.** The rehearsal cold run section still carries `[ ] The real second
-   cold run …`, while the phase's own list ticks the second cold run as done by the owner
-   (25 services / 31 edges). Reconcile: tick it with a pointer, or say why it is still open.
-   (`phase-3.6-dogfooding.md`.)
+Nothing at the moment. The three items compiled here on 2026-09-05 (the `add --help` sentence,
+the board's recency mark, the stale Phase 3.6 box) closed the same day — see the 2026-09-05
+evening handoff in `handoffs-2026-09.md`.
 
-## Waiting on the owner — ask once, then a small edit
+## Waiting on the owner — nothing open
 
-The 2026-09-05 handoff's list, plus the older items that are still the owner's call:
+The 2026-09-05 list was answered in one batch on 2026-09-05 (evening). The answers, recorded in
+`decisions.md` (12 and 13) and the 2026-09-05 late handoff in `handoffs-2026-09.md`:
 
-- **Density row in Settings.** Omitted; the owner has the screenshot of the built panel. Add the
-  row or record "no density".
-- **Do the graph's nodes join the Monochrome switch?** Today only the board's tiles do.
-- **`?` inside the open Settings panel** closes it and opens Help. Not obviously wrong; noted.
-- **The utility red.** The direction contract names `#E60012`, the shipped token has been `#d40010`
-  since first written, and nothing records why. (`handoffs-2026-08-26-design.md`.)
-- **Board-in-colour contrast.** Real brand palettes on `--color-surface` measure down to 1.57:1
-  (Vertex AI). Options recorded: a mono board, or the colour toggle defaulting off — the switch
-  now exists and defaults to Monochrome, so re-check whether this is answered.
-  (`handoffs-2026-09.md`, 2026-09-03.)
-- **thesvg.org licence basis** for the five vendored marks — `packages/core/icons/thesvg/LICENSES.md`
-  says what it rests on; the owner reads it once and decides.
-- **The service page's fallback glyph inset** (Loki fills its 46px tile edge to edge; the popover
-  keeps 2px). A number for the owner or the mockup to name.
-- **Three graph-view items from 2026-08-26**: four selected-state treatments are dead code (design
-  decision, not cleanup); status is colour-only for a screen reader on the graph; `.kind-stack`'s
-  shape cue is invisible. (`handoffs-2026-08-26-design.md`, "Three things left open".)
-- **The mark.** The logo is deferred by the owner indefinitely. The `/impeccable` finish review and
-  `DESIGN.md` wait on it or on the owner lifting the condition. Do not invent a mark.
+- Recency mark's slot and window edge: **OK as built.**
+- Density row: **removed** — "users don't need to choose the density."
+- Graph nodes and the Monochrome switch: **moot** — the graph view is decommissioned (decision 12).
+- `?` inside the open Settings panel: **OK as is.**
+- The utility red: **`#d40010` is the red** (decision 13); the `#E60012` question is closed.
+- Board-in-colour contrast: **Monochrome default stands**; the reader can switch in Settings.
+- thesvg.org marks: **keep them**; the item is closed.
+- Service page fallback glyph inset: **OK as is.**
+- Three graph-view items from 2026-08-26: **gone with the graph.**
+- The mark: **still deferred, indefinitely.** Do not invent a logo; do not block on it.
 
 ## Portfolio page — Phase 3.7's one open box
 
@@ -98,6 +81,5 @@ installer becomes a `catalogus` subcommand, and the `link:cli` shims give way to
 ## Not to do
 
 Recorded across the handoffs so they are not re-proposed: re-derive the entry page's width, the
-phone grid's numbers or the popover's tap rule; re-investigate the graph's fit-to-view (a hidden tab,
-not a defect); re-run any `docs/*-brief.md`; re-roll the design direction; add a fenced
+phone grid's numbers or the popover's tap rule; re-propose the graph view (deferred by the owner on 2026-09-05, decision 12); re-run any `docs/*-brief.md`; re-roll the design direction; add a fenced
 `catalogus view` to the skill.

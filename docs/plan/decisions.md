@@ -77,6 +77,21 @@ From HANDOFF §9, plus decisions taken during implementation. Settled — reopen
     and helpfully adds it. Mutation-checked: adding a fenced `catalogus view` to `SKILL.md` fails
     with a message naming the fix.
 
+12. **The viewer's graph view is decommissioned; deferred, not rejected** — owner, 2026-09-05:
+    *"It's not yet the way I'd like to read it, it's confusing. Let's finish the basic first,
+    someday we can come back to that graph. Decommission all of that."* The viewer has two views,
+    List and Migrations. `GraphCanvas`, `graph-layout.ts`, `elk-layout.ts`, `@xyflow/react` and
+    `elkjs` are gone from `apps/web`; git history keeps them. `catalogus graph`, the CLI command,
+    is not the graph view and stays. The three graph items left open on 2026-08-26 and the
+    "do the graph's nodes join Monochrome" question closed with it. Reopen only when the owner
+    asks for a graph they can read — and start from the reading, not from the old code.
+
+13. **The signal red is `#d40010`** — owner, 2026-09-05: *"Keep the #d40010, that's the red we
+    should use."* Closes the `#E60012`-versus-`#d40010` question for good; the 2026-08-26 ruling
+    on contrast (4.89:1 on the cream ground against 4.26:1) was the same answer with a
+    measurement, and this is the owner saying it in words. The token, the contract and the
+    tripwire in `direction-contract.test.ts` all name `#d40010`.
+
 ## Non-goals
 
 From HANDOFF §8. Worth restating because each is a plausible-sounding scope creep.

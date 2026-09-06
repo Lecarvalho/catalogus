@@ -4,6 +4,101 @@
 > only place status is summarised; this file is the record. Section headings are unchanged so a
 > code comment that names one still finds it by grep.
 
+### Handoff — 2026-09-05 (late), the owner's batch answered and the graph view decommissioned
+
+**Read this first.** The owner answered every item on the "Waiting on the owner" list in one
+batch, and one answer was a removal: the viewer's graph view is gone. Two implementers on a
+smaller model ran in parallel on disjoint files (`docs/graph-removal-brief.md` for the code,
+`docs/graph-removal-contract-brief.md` for the contract page), one validator on the strongest
+model drove the built app. **1680 tests / 84 files**, build and typecheck exit 0. Committed at the
+owner's request at the end of the session.
+
+#### The answers (all recorded in `00-open-work.md` and `decisions.md` 12 and 13)
+
+Recency slot and window edge: OK. Density: removed — "users don't need to choose the density."
+Graph nodes under Monochrome: moot. `?` inside Settings: OK. The red: `#d40010`, in the owner's
+words. Board contrast: Monochrome default stands, the reader can switch. thesvg marks: keep.
+Fallback glyph inset: OK. The logo: still deferred; keep going without one.
+
+#### The graph view, removed
+
+Deleted: `GraphCanvas.tsx` / `.module.css` / `.test.tsx`, `graph-layout.ts` / `.test.ts`,
+`elk-layout.ts`; `@xyflow/react` and `elkjs` out of `apps/web/package.json` and the lockfile.
+`ViewMode` and `DefaultViewPreference` are `"list" | "migrations"`; a stored `"graph"` preference
+falls back to the default without a throw (a test names the case). `App.tsx` lost its lazy graph
+import, the elk layout thunk and the graph branch. `tokens.css` lost the two `--graph-*` tokens
+and kept every `--*node*` token `ServiceNode` still reads — `ServiceNode` stays: it is the list's
+node and `serviceNodeDomId` keys the migration board and the close-focus return. The Settings
+panel's Density comment now records the ruling. Comments that stated the graph as a present
+surface were corrected; historical ones got a one-sentence dated append.
+
+The contract moved with it: `apps/web/docs/DIRECTION.md` and the embedded copy in `index.html`
+name "List, Migrations", drop "density" and — the main session's own edit, on the 2026-09-03
+dark-theme removal — "appearance" from the settings sentence; the Density and Appearance
+disclosure bullets go because the build and the contract agree again. `DIRECTION.md` carries a
+dated revision in the owner's words. No `DECLARED_DEPARTURES` entry: both copies moved together.
+The guard stays at 43.
+
+**Test accounting:** −14 (`GraphCanvas.test.tsx`), −20 (`graph-layout.test.ts`), −2
+(`App.test.tsx`, the two graph-mode cases), +1 (`preferences.test.ts`), −1
+(`token-references.test.ts`: its per-stylesheet `it.each` row for `GraphCanvas.module.css` went
+with the file). The implementer's sum missed the last one; the validator found it by running the
+HEAD tree in a worktree and diffing test names per file.
+
+**Validation** (Chrome, the built app on a CLI-written scratch project): rail shows List and
+Migrations only, arrow keys wrap both ways, Settings offers the two views and no Density or
+Appearance row, a stored `defaultView: "graph"` falls back to List with the sibling `iconColour`
+honoured and no console message, the Help shortcut text names two tabs, the served bundle has no
+`xyflow` / `elkjs` / `reactflow` / `Graph`, the guard is 43 / 43, one mutation (re-adding
+`"graph"` to the preference values) turns one named test red. Two prose defects it found were
+fixed by the main session before the commit: `DIRECTION.md`'s Density entry contradicted the
+sentence it described, and `HelpMenu.tsx`'s header still counted three tabs.
+
+**Not the graph and untouched:** `catalogus graph`, the CLI command; the payload's `edges`; the
+popover's and the page's depends-on lists.
+
+#### What the next session does first
+
+1. **The portfolio page** is the only Phase 3.7 box left, still on the owner's data condition.
+   Otherwise Phase 4's backend decision is the next thing that unblocks anything.
+2. `00-open-work.md` has no "ready now" and no "waiting on the owner" items. That is new.
+
+### Handoff — 2026-09-05 (evening), the three ready-now items close
+
+**Read this first.** Three bounded items, all from `00-open-work.md`'s "Ready now" list. Two were
+main-session edits; the third (the board's recency mark, HANDOFF §4.2 query 5) went to an
+implementer on a smaller model from `docs/recency-brief.md` and to a separate validator on the
+strongest model, who drove the built app in Chrome. **1716 tests / 86 files**, twice, build and
+typecheck exit 0. Nothing committed by the session that did this work; the tree holds the change
+and this board for the owner to commit.
+
+1. **`add --help`'s id sentence** in `packages/cli/src/program.ts` now reads "defaults to the
+   service slug, then service-role, then a numbered suffix", which is what `deriveLocalId` does.
+2. **The stale Phase 3.6 box** for the real second cold run is ticked with a pointer to the
+   phase list's own entry (25 services / 31 edges).
+3. **Recency on the board.** The tile's third label line — the slot the status word uses —
+   renders `New` for a single recent entry and `<n> new` for a group with recent entries, in ink,
+   with the status word taking the slot when there is one. No badge, no desaturation: those are
+   status signals. `countRecentlyAdded` joins `service-tags.ts`. The validator measured five tile
+   shapes on the built page, ran the adversarial dates (29 / 30 / 31 days, future, every-entry
+   recent, recent beside `removed`), mutated the count and saw four tests go red, and confirmed
+   `.recency` is off the signal-red allow-list with the guard green.
+
+**Recorded for the owner, not changed:**
+- **The slot is a choice the mockup does not make.** Candidate E carries no recency mark. The
+  third label line was picked because it exists, and because the board is the only surface that
+  shows every service; reversible in `ServiceTile.tsx` alone.
+- **The window edge.** `added` is a date and `readAt` a timestamp, so `isRecentlyAdded`'s
+  inclusive `<= 30` excludes day 30 for all but its first instant. Pre-existing, shared by the
+  popover and the page. Fix would be a calendar-day comparison; the owner decides whether "30
+  days" means that.
+- `validate` accepts a future `added` without comment. Noted, not in scope.
+
+#### What the next session does first
+
+1. The owner's list in `00-open-work.md` ("Waiting on the owner") — ask once, in one batch.
+2. The portfolio page, if the owner lifts the data condition.
+
 ### Handoff — 2026-09-05, rename and remove follow the vendored icon, and the graph "defect" was a hidden tab
 
 **Read this first.** One bounded change, done by the main session and validated by a separate

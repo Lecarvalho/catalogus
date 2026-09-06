@@ -13,8 +13,10 @@ decision 7" still finds its target by grepping the heading under `docs/plan/`. T
 deliberately not rewritten — about forty sites across four packages, all prose.
 
 - **Status:** Phases 0–3.7 complete, 3.7 less its portfolio page (deferred by the owner on
-  2026-08-25, viewer stays single-repo). Phase 4 is blocked on the backend decision; 5, 6 and 7
-  wait on 4. The parallel track has three unticked items. The full list of what is left, with what
+  2026-08-25, viewer stays single-repo). The viewer's graph view was decommissioned by the owner on
+  2026-09-05 (viewer has List and Migrations; `decisions.md` 12). Phase 4 is blocked on the
+  backend decision; 5, 6 and 7 wait on 4. The parallel track has three unticked items. No item
+  is "ready now" and none waits on the owner as of 2026-09-05 late. The full list of what is left, with what
   each waits on, is `docs/plan/00-open-work.md`.
 - **Last updated:** 2026-09-05
 
@@ -23,8 +25,8 @@ deliberately not rewritten — about forty sites across four packages, all prose
 1. Run `pnpm build && pnpm test`, then `pnpm typecheck`, **in that order** — the direction contract
    guard compares `apps/web/index.html` against the build output, so a test run against a stale
    `dist` fails on a difference you already fixed.
-2. **Expected: 1701 tests / 86 files**, green, typecheck clean across four packages (as of
-   2026-09-05, commit `16e837c`). Two legitimate variations: `direction-contract.test.ts` derives
+2. **Expected: 1680 tests / 84 files**, green, typecheck clean across four packages (as of
+   2026-09-05 late, the graph view removed). Two legitimate variations: `direction-contract.test.ts` derives
    its count from the contract's own sections, so a contract edit moves the total by design; and
    `workspace-scan.test.ts` skips six junction tests where Windows refuses the privilege, so
    1695 passed + 6 skipped is the same tree. A count one or two off is a reason to read that file's
@@ -41,7 +43,7 @@ deliberately not rewritten — about forty sites across four packages, all prose
 | File | Holds |
 |---|---|
 | `docs/plan/00-open-work.md` | Everything left, grouped by what it waits on. The list to pick from. |
-| `docs/plan/handoffs-2026-09.md` | Handoffs 2026-09-02 to 09-05: shell, menus, icons, brand tile, `rename`/`remove` vs a vendored icon. Newest first. |
+| `docs/plan/handoffs-2026-09.md` | Handoffs 2026-09-02 to 09-05: shell, menus, icons, brand tile, `rename`/`remove` vs a vendored icon, recency on the board, the graph view removed. Newest first. |
 | `docs/plan/handoffs-2026-08-26-design.md` | The design world replaced and the form chosen; `/impeccable` state; contract in the page; DAG and migrations joining the world. |
 | `docs/plan/handoffs-2026-08-24-25.md` | Brand interview and shell; viewer redesign; closing 3.7; DAG; drift-and-corpus; viewer foundations. |
 | `docs/plan/phases-0-3.5.md` | Phases 0–3.5 ✅ — scaffold, schema, core, CLI, defect fixes. |
@@ -52,7 +54,7 @@ deliberately not rewritten — about forty sites across four packages, all prose
 | `docs/plan/phase-6-mcp.md` | Phase 6 ⬜ — `catalogus mcp` over stdio. |
 | `docs/plan/phase-7-platform-viewer.md` | Phase 7 ⬜ — the viewer backed by the platform; the §4.2 acceptance line. |
 | `docs/plan/parallel-track.md` | Names, trademark, schema URL. |
-| `docs/plan/decisions.md` | The eleven settled decisions and the non-goals. Reopen only with a reason. |
+| `docs/plan/decisions.md` | The thirteen settled decisions and the non-goals. Reopen only with a reason. |
 | `docs/plan/status-history.md` | The old top-of-board paragraph and the test-count history, kept for bisecting. |
 
 Briefs that were run are kept beside this file as the record (`docs/*-brief.md`) and are not to be
@@ -75,4 +77,4 @@ closed moves out of `00-open-work.md`. The main session is the only writer of th
 pnpm build && pnpm test && pnpm typecheck
 ```
 
-Current baseline: **1701 tests / 86 files** (2026-09-05). Build and typecheck both exit 0.
+Current baseline: **1680 tests / 84 files** (2026-09-05, late). Build and typecheck both exit 0.

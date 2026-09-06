@@ -534,8 +534,10 @@ environment. Every one of those is a category previously described here as human
 per-service `git log` calls are independent of each other, and the skill never said so. It does now,
 along with an optional delegated research pass for harnesses that can run one.
 
-- [ ] The real second cold run, on a working tree with its ignored config present, driven by a
-      person who answers the questions. That is still the outstanding item at the top of Phase 3.6.
+- [x] The real second cold run, on a working tree with its ignored config present, driven by a
+      person who answers the questions. Done by the owner — see "Second cold run" in this phase's
+      list above (25 services, 31 edges, 7 notes, both validates exit 0). This box was left stale
+      when that entry was ticked; reconciled 2026-09-05.
 
 ### Open questions this raised ⬜ open
 

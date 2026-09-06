@@ -6,6 +6,14 @@
 
 ### Phase 3.7, the viewer — closed 2026-08-25, less its portfolio page
 
+> **2026-09-05, evening: the graph view is decommissioned** (`decisions.md`, 12). Everything below
+> that describes the DAG canvas, `GraphCanvas`, `graph-layout.ts`, elk, React Flow, the graph's
+> selected states, its fit-to-view and its legend is the record of what was built and is no longer
+> in the tree. The owner: *"It's not yet the way I'd like to read it, it's confusing. Let's finish
+> the basic first, someday we can come back to that graph."* Deferred, not rejected. The viewer has
+> two views, List and Migrations. `catalogus graph` (the CLI command) is untouched. The build and
+> validation record is the 2026-09-05 late handoff in `handoffs-2026-09.md`.
+
 *(This section was headed "The next thing is Phase 3.7" and opened "it is unblocked, build the
 single-project DAG first". Both were true when written and the DAG is now built; the heading is
 updated and the sentence kept below, because the rest of the section is written as advice to
@@ -895,8 +903,9 @@ the checkbox list.
 1. **All services for project X, grouped by category, with icons — yes.** The List view, with the
    rollup grouping and the server-resolved icons plus the category fallback.
 2. **All projects depending on service Y — no.** Cross-project by definition; deferred with the
-   portfolio page. Single-project blast radius is *partly* visible in the Graph view's edges, but
-   the query asks across projects and the viewer sees one.
+   portfolio page. Single-project blast radius was *partly* visible in the Graph view's edges until the
+   graph was decommissioned on 2026-09-05; the popover and the service page still list one
+   entry's edges. The query asks across projects and the viewer sees one.
 3. **Cost across all projects — no, and doubly so.** Layer 3 has no store, so the detail panel
    renders the explicit "not connected" empty state; and "across all projects" needs the portfolio.
    The empty state is the shipped answer to *neither field is missing from your manifest*, not to
@@ -933,6 +942,17 @@ the checkbox list.
    correction and the reasoning did not**, which is the more useful half: "not answerable" now
    rests on the board being the only place that shows every service, not on the page showing
    nothing.
+
+   *Closed 2026-09-05, evening.* The board carries the mark now: a single tile whose entry is
+   inside the window renders `New` in the third label line, a group tile renders `<n> new`, both
+   in ink (signal red stays with the badge and the status word, and `signal-red.test.ts` still
+   passes), and the status word takes the slot when there is one — the same status-then-recency
+   order `tagsFor` fixes. `countRecentlyAdded` in `service-tags.ts` is the group's count. Built
+   from `docs/recency-brief.md`; validated by a separate agent driving the built app in Chrome on
+   a CLI-written scratch manifest (five tile shapes measured, ink `rgb(36,33,28)` against red
+   `rgb(212,0,16)`, no badge and no desaturation on a recency-only tile, one mutation caught by
+   four tests). 1716 tests / 86 files. The slot is the main session's choice, recorded in
+   `00-open-work.md` for the owner; so is the window-edge quirk the validator found.
 6. **Which projects use coding agent Z / architecture W / PM tool V — no.** Cross-project; deferred
    with the portfolio page. The `role`-based grouping that would answer it *within* one project is
    already there, which is why this is a transport gap rather than a modelling one.
