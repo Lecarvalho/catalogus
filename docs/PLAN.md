@@ -14,26 +14,33 @@ deliberately not rewritten — about forty sites across four packages, all prose
 
 - **Status:** Phases 0–3.7 complete, 3.7 less its portfolio page (deferred by the owner on
   2026-08-25, viewer stays single-repo). The viewer's graph view was decommissioned by the owner on
-  2026-09-05 (viewer has List and Migrations; `decisions.md` 12). Phase 6 is six boxes of eight
-  as of 2026-09-06: `catalogus mcp` with eight tools and an MCP-first skill, validated on the
-  built binary, under decision 14 (the MCP is the agent's surface; the CLI is for people and
-  CI); `push_private` waits on Phase 5, the live Claude Code wiring is the ready-now item, and
-  the hosted edition is Phase 7. Phase 4 is blocked on the backend decision; 5
-  and 7 wait on 4. The parallel track has three unticked items. Nothing waits on the owner. The
-  full list of what is left, with what each waits on, is `docs/plan/00-open-work.md`.
-- **Last updated:** 2026-09-06
+  2026-09-05 (viewer has List and Migrations; `decisions.md` 12). Phase 6 is seven boxes of eight
+  as of 2026-09-06 (night): `catalogus mcp` with eight tools and an MCP-first skill, validated
+  on the built binary and driven end to end by a headless Claude Code on a real repo, under
+  decision 14 (the MCP is the agent's surface; the CLI is for people and CI); `push_private`
+  waits on Phase 5 and the hosted edition is Phase 7. The live run found that every CLI writer
+  had been rewriting CRLF manifests as LF since Phase 2; fixed and validated the same night.
+  Phase 4 is blocked on the backend decision; 5 and 7 wait on 4. The parallel track has four
+  unticked items. Nothing waits on the owner; the one ready-now item is an interactive run to
+  watch the agent stop at the diff. The full list of what is left, with what each waits on, is
+  `docs/plan/00-open-work.md`.
+- **Last updated:** 2026-09-06 (later): owner-supplied icons hoist their `style` paint at read
+  time and a white fill is reported, not judged; eight validator rounds on the parser.
 
 ## Start here on a fresh session
 
 1. Run `pnpm build && pnpm test`, then `pnpm typecheck`, **in that order** — the direction contract
    guard compares `apps/web/index.html` against the build output, so a test run against a stale
    `dist` fails on a difference you already fixed.
-2. **Expected: 1695 tests / 92 files**, green, typecheck clean across four packages (as of
-   2026-09-06 late, eight MCP tools and the 250-line skill; the count fell from 1751 because the
-   command drift test generates tests per fenced skill line). Two legitimate variations: `direction-contract.test.ts` derives
+2. **Expected: 1778 tests / 92 files**, green, typecheck clean across four packages (as of
+   2026-09-06 later: +66 on the night figure of 1712 for the `style` hoist, the render-risk
+   scan and eight validator rounds against them, in `icons.test.ts`, `set.test.ts`,
+   `icons.test.ts` (cli) and `icon-resolution.test.ts`; 1712 was +17 on 1695 for the
+   CRLF-preserving writer; 1695 fell from 1751 because the command drift test generates tests
+   per fenced skill line). Two legitimate variations: `direction-contract.test.ts` derives
    its count from the contract's own sections, so a contract edit moves the total by design; and
    `workspace-scan.test.ts` skips six junction tests where Windows refuses the privilege, so
-   1689 passed + 6 skipped is the same tree. A count one or two off is a reason to read that file's
+   1772 passed + 6 skipped is the same tree. A count one or two off is a reason to read that file's
    diff, not a failure. The history of how the number got here is `docs/plan/status-history.md`.
 3. **Run it more than once before believing it.** vitest parallelises across files; the suite has
    flaked before on two files mutating one real directory while every single-file run passed.
@@ -47,7 +54,7 @@ deliberately not rewritten — about forty sites across four packages, all prose
 | File | Holds |
 |---|---|
 | `docs/plan/00-open-work.md` | Everything left, grouped by what it waits on. The list to pick from. |
-| `docs/plan/handoffs-2026-09.md` | Handoffs 2026-09-02 to 09-06: shell, menus, icons, brand tile, `rename`/`remove` vs a vendored icon, recency on the board, the graph view removed, the MCP server. Newest first. |
+| `docs/plan/handoffs-2026-09.md` | Handoffs 2026-09-02 to 09-06: shell, menus, icons, brand tile, `rename`/`remove` vs a vendored icon, recency on the board, the graph view removed, the MCP server, the live loop and CRLF. Newest first. |
 | `docs/plan/handoffs-2026-08-26-design.md` | The design world replaced and the form chosen; `/impeccable` state; contract in the page; DAG and migrations joining the world. |
 | `docs/plan/handoffs-2026-08-24-25.md` | Brand interview and shell; viewer redesign; closing 3.7; DAG; drift-and-corpus; viewer foundations. |
 | `docs/plan/phases-0-3.5.md` | Phases 0–3.5 ✅ — scaffold, schema, core, CLI, defect fixes. |
@@ -55,7 +62,7 @@ deliberately not rewritten — about forty sites across four packages, all prose
 | `docs/plan/phase-3.7-viewer.md` | Phase 3.7 ✅ less the portfolio page — the viewer on manifests, its decisions, scope notes, HANDOFF §4.2 status. |
 | `docs/plan/phase-4-backend.md` | Phase 4 ⛔ — the backend decision and what follows it. |
 | `docs/plan/phase-5-auth-push.md` | Phase 5 ⬜ — device flow, keychain, `login`, `push`. |
-| `docs/plan/phase-6-mcp.md` | Phase 6 🔶 — `catalogus mcp` over stdio; eight tools and the MCP-first skill built and validated 2026-09-06 (decision 14), `push_private`, the live wiring and the hosted edition left. |
+| `docs/plan/phase-6-mcp.md` | Phase 6 🔶 — `catalogus mcp` over stdio; eight tools and the MCP-first skill built and validated 2026-09-06 (decision 14), the live loop run on a real repo the same night; `push_private` and the hosted edition left. |
 | `docs/plan/phase-7-platform-viewer.md` | Phase 7 ⬜ — the viewer backed by the platform; the §4.2 acceptance line. |
 | `docs/plan/parallel-track.md` | Names, trademark, schema URL. |
 | `docs/plan/decisions.md` | The fourteen settled decisions and the non-goals. Reopen only with a reason. |
@@ -81,4 +88,4 @@ closed moves out of `00-open-work.md`. The main session is the only writer of th
 pnpm build && pnpm test && pnpm typecheck
 ```
 
-Current baseline: **1695 tests / 92 files** (2026-09-06, late). Build and typecheck both exit 0.
+Current baseline: **1778 tests / 92 files** (2026-09-06, later). Build and typecheck both exit 0.

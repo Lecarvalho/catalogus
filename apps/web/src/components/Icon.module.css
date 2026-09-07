@@ -60,8 +60,30 @@
  * fallback glyph solid. `:not(.colour)` is the second exclusion, and it is
  * the entire mechanism by which asking for colour turns this rule off.
  */
-.icon:not(.fallback):not(.colour) svg [fill] {
+.icon:not(.fallback):not(.colour) svg [fill]:not([fill="none"]) {
   fill: currentColor;
+}
+
+/*
+ * Strokes, the same way. An owner-supplied mark (resolveLocalIcon) can
+ * paint with `stroke` as well as `fill` -- Healthchecks.io's two bars are
+ * each a fill plus a 30-unit stroke in the same colour -- and a stroke
+ * left in its brand colour beside a fill turned to ink is a coloured
+ * outline round a monochrome shape. `:not([stroke="none"])` for the same
+ * reason as the fill rule's own exclusion: `[stroke]` matches by presence,
+ * and turning an explicit `none` into ink would draw an outline the file
+ * never had. Both exclusions were added 2026-09-06, when the first
+ * owner-supplied marks reached the viewer: until then every resolved body
+ * came from simple-icons or the vendored thesvg set, none of which carry
+ * `fill="none"` or a stroke at all, so `[fill]` alone was enough. Those
+ * marks arrived with their colour inside `style="..."`, which an attribute
+ * selector never sees and an inline declaration outranks anyway --
+ * @catalogus/core's parseIconMarkup now hoists `fill`/`stroke`/`stop-color`
+ * out of `style` into attributes at read time, which is why these rules
+ * can stay attribute-based rather than reaching for `!important`.
+ */
+.icon:not(.fallback):not(.colour) svg [stroke]:not([stroke="none"]) {
+  stroke: currentColor;
 }
 
 /*

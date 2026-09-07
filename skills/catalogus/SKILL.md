@@ -46,7 +46,7 @@ catalogus icons            # which services have no icon, and where each icon fi
 
 ### There is no hand-edit exception
 
-A wrong role/id/edge is `set`/`rename`/`unlink`, never remove-and-re-add. Visibility is asked, never
+A wrong role/id/edge is `set`, `rename` or `unlink`, never remove-and-re-add. Visibility is asked, never
 guessed. On the tool path, `apply_manifest_edit` takes the same `edits` a proposal took — the
 fragment below shows the resulting shape, for reading rather than copying:
 
@@ -222,7 +222,11 @@ reports each entry's icon as `local` (vendored), `simple-icons`/`thesvg` (built-
 `none`. For `none`, search the web for the brand's mark and run `catalogus set services.<id>.icon
 <https-url-or-path>` — the sanitiser refuses scripts, event handlers, external references and
 anything over 256 KB. When nothing turns up, ask instead of approximating a mark; list every icon you
-set and its source.
+set and its source. Re-run `catalogus icons` after setting one: a row marked `(check: ...)`, the
+trailing `icons to check in the viewer` line, or a `check services.<id>.icon renders` line from `set`
+itself means the file paints with white or pale ink that can vanish on the viewer's light ground —
+don't judge the render yourself, ask the user to open `catalogus view` and confirm it reads well, and
+set a different source if it doesn't.
 
 ### 8. Hand the viewer to the user — do not run it yourself
 
@@ -241,6 +245,7 @@ graph`.
 - Recording tenant identifiers (project refs, account numbers, org slugs).
 - Inventing `added` dates — check git, offer a default, or ask.
 - Inventing or approximating an icon when a web search finds nothing — ask for a URL or file.
+- Deciding a `(check: ...)`-flagged icon renders fine yourself — ask the user to look in `catalogus view`.
 - Guessing past a contradiction, or rewording prose to satisfy a validator — surface or report it.
 - Deleting `catalogus.yaml`, or re-adding an entry, instead of `catalogus remove`/`unlink`.
 - Running `catalogus view`/`catalogus mcp` yourself, or the CLI through a shell while tools connect.

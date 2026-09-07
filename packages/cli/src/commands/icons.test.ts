@@ -12,6 +12,24 @@ const CLEAN_SVG =
 const HOSTILE_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><script>alert(1)</script><path d="M0 0"/></svg>';
 
+// Healthchecks.io's real vendored mark (see @catalogus/core's
+// findIconRenderRisks doc comment for why this exact file is the running
+// example): a green ink path and a white one, both painted with matching
+// fill and stroke -- style="..." on both, so this also proves the risk
+// scan runs after commands/icons.ts's own resolution has already hoisted
+// those into real fill/stroke attributes. Two risks: `fill #ffffff` and
+// `stroke #ffffff`, in that order (the white path's fill comes before its
+// stroke in the markup) -- the green path's #22bc66 never clears
+// findIconRenderRisks's luminance floor.
+const HEALTHCHECKS_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="46.6 2.94 418.8 506.2">' +
+  '<path d="M309.2 899.8h-45.3l41.4 246.7h46.1l24-142.8h70.1l4.9-46.7H335.9l-7.5 44.6z" ' +
+  'style="fill-rule:evenodd;clip-rule:evenodd;fill:#22bc66;stroke:#22bc66;stroke-width:30" ' +
+  'transform="translate(0 -652.362)"/>' +
+  '<path d="m218.9 670.3-47.6 283.1H68.6l-7 46.7h74.3l14.4 85.9h46.1l20.7-115.8 22.8-135.4 52.7-.1L265 670.3z" ' +
+  'style="fill-rule:evenodd;clip-rule:evenodd;fill:#ffffff;stroke:#ffffff;stroke-width:30" ' +
+  'transform="translate(0 -652.362)"/></svg>';
+
 // One entry of each source `catalogus icons` reports: nginx (simple-icons),
 // openai (thesvg -- see @catalogus/core's catalog.ts THESVG_ICON_OVERLAY),
 // loki with a vendored local file, and healthchecks-io, a real catalogued
@@ -149,5 +167,72 @@ dependencies: []
 
     const result = await runIcons(dir);
     expect(result.stdout.at(-1)).toBe("0 services of 1 have no icon.");
+  });
+
+  // Added 2026-09-06 alongside @catalogus/core's findIconRenderRisks.
+  describe("render-risk reporting", () => {
+    it("extends a local, non-stale detail with a '(check: ...)' suffix naming every risk", async () => {
+      await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
+      await mkdir(join(dir, ".catalogus", "icons"), { recursive: true });
+      await writeFixtureFile(dir, ".catalogus/icons/loki.svg", HEALTHCHECKS_SVG);
+
+      const result = await runIcons(dir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(
+        "loki  loki  local  .catalogus/icons/loki.svg (check: white fill #ffffff, white stroke #ffffff)"
+      );
+    });
+
+    it("omits the '(check: ...)' suffix, and the trailing summary line, when nothing is flagged", async () => {
+      await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
+      await mkdir(join(dir, ".catalogus", "icons"), { recursive: true });
+      await writeFixtureFile(dir, ".catalogus/icons/loki.svg", CLEAN_SVG);
+
+      const result = await runIcons(dir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("loki  loki  local  .catalogus/icons/loki.svg");
+      expect(result.stdout.some((row) => row.includes("to check in the viewer"))).toBe(false);
+    });
+
+    it("uses the singular 'icon' form in the check summary when exactly one row is flagged", async () => {
+      await writeFixtureFile(dir, "catalogus.yaml", MANIFEST);
+      await mkdir(join(dir, ".catalogus", "icons"), { recursive: true });
+      await writeFixtureFile(dir, ".catalogus/icons/loki.svg", HEALTHCHECKS_SVG);
+
+      const result = await runIcons(dir);
+      expect(result.stdout.at(-1)).toBe(
+        "1 icon to check in the viewer: loki. Ask the owner to confirm each in catalogus view; if a mark is unreadable, set a different file."
+      );
+    });
+
+    it("names every flagged icon in manifest order, plural, when more than one row is flagged", async () => {
+      const multiLocal = `catalogus: 1
+project:
+  name: Example App
+  slug: example-app
+services:
+  - id: healthchecks
+    service: healthchecks-io
+    role: monitoring
+    added: 2026-01-01
+    icon: .catalogus/icons/healthchecks.svg
+  - id: loki
+    service: loki
+    role: logging
+    added: 2026-01-01
+    icon: .catalogus/icons/loki.svg
+dependencies: []
+`;
+      await writeFixtureFile(dir, "catalogus.yaml", multiLocal);
+      await mkdir(join(dir, ".catalogus", "icons"), { recursive: true });
+      await writeFixtureFile(dir, ".catalogus/icons/healthchecks.svg", HEALTHCHECKS_SVG);
+      await writeFixtureFile(dir, ".catalogus/icons/loki.svg", HEALTHCHECKS_SVG);
+
+      const result = await runIcons(dir);
+      expect(result.stdout.at(-1)).toBe(
+        "2 icons to check in the viewer: healthchecks, loki. Ask the owner to confirm each in catalogus view; if a mark is unreadable, " +
+          "set a different file."
+      );
+    });
   });
 });

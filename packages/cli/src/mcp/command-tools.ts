@@ -205,7 +205,9 @@ export const LIST_ICONS_DESCRIPTION =
   "directory, or the current directory) comes from -- a catalogued brand icon, a vendored local " +
   "file, or none -- one line per entry plus a summary count, the same report `catalogus icons` " +
   "prints. A service with no icon names the `catalogus set services.<id>.icon <url|path>` line that " +
-  "fills it.";
+  "fills it. A vendored file's detail is suffixed `(check: ...)` when it paints with white or pale " +
+  "ink that can vanish on the viewer's light ground -- ask the user to open `catalogus view` and " +
+  "confirm it reads well rather than judging the render yourself.";
 
 export function createListIconsHandler(options: CommandToolOptions = {}) {
   return async (input: ListIconsInput): Promise<CallToolResult> => {

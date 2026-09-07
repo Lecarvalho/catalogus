@@ -267,12 +267,28 @@ const FORBIDDEN_MARKUP_RE = /<script\b|<foreignobject\b|<style\b|\bon[a-zA-Z-]*\
  * hostile file could put it on, and there is no legitimate reason for this
  * sanitiser to draw that line narrower than "everywhere".
  */
-const URL_FUNCTION_RE = /\burl\(\s*(['"]?)([^'")]*)\1\s*\)/gi;
+const URL_FUNCTION_RE = /\burl\(\s*(?:['"]|&quot;|&apos;|&#34;|&#39;|&#x22;|&#x27;)?\s*([^'")\s]*)/gi;
 
-/** True when a `url(...)` argument matched by URL_FUNCTION_RE is not a same-document fragment reference (`#...`) -- see URL_FUNCTION_RE's own comment for why that is the one shape this sanitiser allows. */
+/**
+ * True when a `url(...)` argument matched by URL_FUNCTION_RE is not a
+ * same-document fragment reference (`#...`) -- see URL_FUNCTION_RE's own
+ * comment for why that is the one shape this sanitiser allows.
+ *
+ * Validator, 2026-09-06 (later): the first cut of URL_FUNCTION_RE matched
+ * the closing quote and `)` with a backreference, so `url('https://evil)`
+ * -- an opening quote never closed -- failed to match at all and slipped
+ * through as "no url() here". The regex now stops reading at the argument's
+ * first character run and never requires the call to be well-formed: a
+ * `url(` is judged on what follows it, whatever punctuation comes after.
+ * Fifth pass: the entity spellings of a quote (`&quot;`, `&#34;`, ...) are
+ * skipped like a literal one, so `url(&quot;#grad&quot;)` -- the spec's
+ * own escaping of a quoted fragment inside a double-quoted attribute -- is
+ * read as the `#grad` it is. Any other entity stays part of the argument,
+ * so `url(&#104;ttps://...)` does not start with `#` and is refused.
+ */
 function hasUnsafeUrlFunction(svg: string): boolean {
   for (const match of svg.matchAll(URL_FUNCTION_RE)) {
-    const argument = (match[2] ?? "").trim();
+    const argument = match[1] ?? "";
     if (!argument.startsWith("#")) {
       return true;
     }
@@ -284,10 +300,11 @@ function hasForbiddenMarkup(svg: string): boolean {
   return FORBIDDEN_MARKUP_RE.test(svg) || hasUnsafeUrlFunction(svg);
 }
 
-/** Reads one double-quoted attribute value out of a raw attribute string (an already-isolated `<tag ...>`'s inside, never the whole document). */
+/** Reads one attribute's value out of a raw attribute string (an already-isolated `<tag ...>`'s inside, never the whole document) -- by position, via tokenizeAttrs, so any quoting the HTML parser accepts is read the same way here (validator, 2026-09-06 (later), fifth pass: a single-quoted `viewBox='...'` used to read as "no viewBox"). */
 function getAttr(attrs: string, name: string): string | undefined {
-  const match = new RegExp(`\\b${name}\\s*=\\s*"([^"]*)"`, "i").exec(attrs);
-  return match?.[1];
+  const lower = name.toLowerCase();
+  const token = tokenizeAttrs(attrs).find((candidate) => candidate.name.toLowerCase() === lower);
+  return token?.value ?? undefined;
 }
 
 /**
@@ -299,8 +316,19 @@ function getAttr(attrs: string, name: string): string | undefined {
  * `<path ... / fill="...">`. The attrs group is lazy so the engine finds
  * the *narrowest* span ending in the tag's own close, rather than a greedy
  * match swallowing a later tag's `/>` too.
+ *
+ * Validator, 2026-09-06 (later), fourth pass: the attrs group used to be a
+ * flat `[^<>]*?`, so a raw `>` inside a *quoted* value -- a Figma layer
+ * name like `id="Group 1 > Path"`, legal in SVG and HTML alike -- ended the
+ * tag early, and every rewrite built on that slice (the hoist, the root
+ * default) pushed the rest of the tag out into text content. Quoted values
+ * are now consumed whole, so a `>` only ends the tag when it sits outside
+ * quotes.
  */
-const OPENING_TAG_RE = /<([a-zA-Z][\w:-]*)((?:\s[^<>]*?)?)\s*(\/)?>/g;
+const OPENING_TAG_RE = /<([a-zA-Z][\w:-]*)((?:\s(?:"[^"]*"|'[^']*'|[^<>"'])*?)?)\s*(\/)?>/g;
+
+/** The root `<svg ...>` opening tag, its attribute text captured -- quote-aware for the same reason OPENING_TAG_RE is. */
+const ROOT_SVG_TAG_RE = /<svg\b((?:"[^"]*"|'[^']*'|[^>"'])*)>/i;
 
 /**
  * Materialises an inherited default onto every element in `markup` that has
@@ -313,13 +341,389 @@ const OPENING_TAG_RE = /<([a-zA-Z][\w:-]*)((?:\s[^<>]*?)?)\s*(\/)?>/g;
  * reproduction of the original file's rendering, not a shortcut.
  */
 function withElementDefault(markup: string, attrName: string, value: string): string {
-  const hasAttr = new RegExp(`\\b${attrName}\\s*=`, "i");
   return markup.replace(OPENING_TAG_RE, (whole, tag: string, attrs: string, selfClose: string | undefined) => {
-    if (hasAttr.test(attrs)) {
+    if (hasAttrToken(attrs, attrName)) {
       return whole;
     }
     return `<${tag}${attrs} ${attrName}="${value}"${selfClose ? " /" : ""}>`;
   });
+}
+
+/**
+ * The paint-shaped presentation properties this module's own fill-based
+ * logic (FILL_ATTR_RE, applyInkPolicy, applyKnockout, withElementDefault,
+ * and the light-paint scan further below) and the viewer's monochrome CSS
+ * rule (Icon.module.css's `.icon:not(.fallback):not(.colour) svg [fill]`
+ * selector) all key off -- every one of them looks for a real attribute,
+ * none of them look inside a `style="..."` string. Real-world owner-supplied
+ * files (added 2026-09-06 after two from an actual client repo: Healthchecks
+ * carries `style="fill:#22bc66;..."` on its own paths, Loki's 14 gradients
+ * carry `style="stop-color:#faed1e"` on every `<stop>`) routinely carry
+ * exactly these properties as CSS instead, which every one of those
+ * consumers would silently miss. `fill-rule`/`stroke-width` are on the list
+ * too even though neither is a *colour* property, because they ride along in
+ * the same `style="..."` string in practice (Healthchecks' own files do
+ * exactly this) and hoistStyleOnAttrs below has no reason to leave one
+ * paint-adjacent property behind while moving its neighbours.
+ */
+const HOISTABLE_STYLE_PROPS = ["fill", "stroke", "stop-color", "fill-rule", "stroke-width"] as const;
+
+/**
+ * One attribute inside an already-isolated opening tag, as the HTML
+ * tokenizer the viewer hands `body` to would read it: a name, an optional
+ * value (double-quoted, single-quoted, or unquoted up to the next
+ * whitespace), and the span it occupies in the attrs string -- `start`
+ * includes the whitespace before the name so a dropped attribute takes its
+ * own separator with it.
+ */
+interface AttrToken {
+  readonly name: string;
+  readonly value: string | null;
+  readonly start: number;
+  readonly nameStart: number;
+  readonly end: number;
+}
+
+/**
+ * Splits an element's raw attribute text into AttrTokens, by position.
+ *
+ * Validator, 2026-09-06 (later), third pass: every earlier cut found the
+ * `style` attribute with a regex over the whole attrs string, and however
+ * tight its lookbehind got, a `style=` sitting *inside another attribute's
+ * value* (`id="style=fill:white"`, Inkscape's `inkscape:label="..."`)
+ * still matched: paint was invented and the host value truncated, an `id`
+ * wiped breaking every `url(#id)` that pointed at it. Only a walk that
+ * knows where each value starts and ends can say which `style=` is an
+ * attribute name, so this is that walk. It follows the HTML tokenizer's
+ * rules for names and values (a name runs to whitespace, `=`, `/` or the
+ * tag end; an unquoted value runs to whitespace; an unterminated quote runs
+ * to the end) because the HTML parser, not an XML one, is what the viewer's
+ * dangerouslySetInnerHTML actually feeds this markup to.
+ */
+function tokenizeAttrs(attrs: string): AttrToken[] {
+  const tokens: AttrToken[] = [];
+  let i = 0;
+  // The HTML tokenizer's whitespace set, not JS's `\s`: U+00A0 or U+000B
+  // before a name is part of the name to a browser, so `\u00a0style` is
+  // not a style attribute (validator, 2026-09-06 (later), seventh pass).
+  const isSpace = (c: string) => c === " " || c === "\t" || c === "\n" || c === "\f" || c === "\r";
+  while (i < attrs.length) {
+    const start = i;
+    while (i < attrs.length && isSpace(attrs[i]!)) i++;
+    if (i >= attrs.length) break;
+    if (attrs[i] === "/" || attrs[i] === "=") {
+      // A stray `/` or `=` where a name should be: the tokenizer skips it.
+      i++;
+      continue;
+    }
+    const nameStart = i;
+    while (i < attrs.length && !isSpace(attrs[i]!) && attrs[i] !== "=" && attrs[i] !== "/") i++;
+    const name = attrs.slice(nameStart, i);
+    let j = i;
+    while (j < attrs.length && isSpace(attrs[j]!)) j++;
+    if (attrs[j] !== "=") {
+      tokens.push({ name, value: null, start, nameStart, end: i });
+      continue;
+    }
+    j++;
+    while (j < attrs.length && isSpace(attrs[j]!)) j++;
+    const quote = attrs[j];
+    let value: string;
+    if (quote === '"' || quote === "'") {
+      const close = attrs.indexOf(quote, j + 1);
+      value = close === -1 ? attrs.slice(j + 1) : attrs.slice(j + 1, close);
+      i = close === -1 ? attrs.length : close + 1;
+    } else {
+      const valueStart = j;
+      while (j < attrs.length && !isSpace(attrs[j]!)) j++;
+      value = attrs.slice(valueStart, j);
+      i = j;
+    }
+    tokens.push({ name, value, start, nameStart, end: i });
+  }
+  return tokens;
+}
+
+/** True when the attrs string carries an attribute called exactly `name` (case-insensitive), by position -- the same tokenizer walk hoistStyleOnAttrs uses, so `id="fill=x"` is never mistaken for a `fill`. */
+function hasAttrToken(attrs: string, name: string): boolean {
+  const lower = name.toLowerCase();
+  return tokenizeAttrs(attrs).some((token) => token.name.toLowerCase() === lower);
+}
+
+/**
+ * Wraps an attribute value in whichever quote it does not itself contain,
+ * or returns null when it contains both (an HTML value cannot: a quoted
+ * value cannot contain its own quote and an unquoted one contains neither,
+ * so null is a defensive floor rather than a reachable branch). `<` is
+ * refused too -- the value is about to sit inside markup this module has
+ * already sanitised. `>` is not: it is legal inside a quoted attribute,
+ * OPENING_TAG_RE reads past it, and a real file can carry one in a
+ * `font-family` (validator, seventh pass).
+ */
+function quoteAttrValue(value: string): string | null {
+  if (value.includes("<")) {
+    return null;
+  }
+  if (!value.includes('"')) {
+    return `"${value}"`;
+  }
+  if (!value.includes("'")) {
+    return `'${value}'`;
+  }
+  return null;
+}
+
+/** One CSS block comment, anywhere inside a `style` value -- stripped before the value is split into declarations, since a comment can sit inside a value as easily as between declarations. */
+const CSS_COMMENT_RE = /\/\*[\s\S]*?\*\//g;
+
+/** A trailing `!important` on a declaration's value, with any CSS whitespace around the `!`. */
+const CSS_IMPORTANT_RE = /[ \t\n\f\r]*![ \t\n\f\r]*important[ \t\n\f\r]*$/i;
+
+/** `String.prototype.trim` for CSS: only tab, LF, FF, CR and space are whitespace to a CSS parser, so a U+00A0 stays part of the property name (`\u00a0fill` is not `fill`) instead of being trimmed into a match (validator, 2026-09-06 (later), seventh pass -- the CSS-side mirror of tokenizeAttrs's own whitespace set). */
+function cssTrim(text: string): string {
+  return text.replace(/^[ \t\n\f\r]+|[ \t\n\f\r]+$/g, "");
+}
+
+/** A quoted same-document `url("#x")` / `url('#x')` -- rewritten to the bare `url(#x)` on hoist, which CSS reads identically, so the quote never has to sit inside the new attribute's own quotes. A non-fragment argument never reaches here: hasUnsafeUrlFunction refused the whole file first. */
+const QUOTED_FRAGMENT_URL_RE = /url\(\s*(['"])(#[^'"()\s]*)\1\s*\)/gi;
+
+/**
+ * Splits a `style` value into declarations on `;`, except a `;` inside
+ * parentheses or a quoted string. Validator, 2026-09-06 (later), second
+ * pass: `clip-path:url(#a;fill:#fff;)` is one declaration to CSS (a `;` is
+ * legal inside an unquoted `url()` token), and a plain `split(";")` turned
+ * its tail into a `fill` the browser never applies -- so the hoist painted
+ * the mark white where the original renders in the default ink, which is
+ * the exact opposite of the render-preservation the hoist exists for.
+ * A character reference (`&#35;`, `&#x23;`, `&quot;`) is copied whole for
+ * the same reason: its terminating `;` is part of the reference, not a
+ * separator, and the HTML parser decodes it inside the attribute value
+ * before CSS ever sees it.
+ */
+function splitStyleDeclarations(style: string): string[] {
+  const declarations: string[] = [];
+  let current = "";
+  let depth = 0;
+  let quote: string | null = null;
+  for (let index = 0; index < style.length; index++) {
+    const char = style[index]!;
+    if (char === "&") {
+      const reference = /^&#?\w+;/.exec(style.slice(index));
+      if (reference) {
+        current += reference[0];
+        index += reference[0].length - 1;
+        continue;
+      }
+    }
+    if (quote !== null) {
+      if (char === quote) {
+        quote = null;
+      }
+    } else if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "(") {
+      depth += 1;
+    } else if (char === ")") {
+      depth = Math.max(0, depth - 1);
+    } else if (char === ";" && depth === 0) {
+      declarations.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  declarations.push(current);
+  return declarations;
+}
+
+/**
+ * Rewrites one element's raw attribute text (already isolated by
+ * OPENING_TAG_RE, the same "not a parser, regex over already-isolated
+ * opening tags" posture as getAttr/withElementDefault) so every paint
+ * declaration inside its `style="..."` attribute (HOISTABLE_STYLE_PROPS)
+ * becomes a real presentation attribute, and is removed from `style`. An
+ * element with no `style` attribute at all is returned unchanged --
+ * `unsafe: false` and `attrs` identical to the input, so hoistStyleAttributes
+ * below can skip reconstructing (and thus reformatting) a tag that needed no
+ * change at all.
+ *
+ * SVG/CSS's own cascade rule says a `style` declaration always outranks a
+ * presentation attribute of the same name -- so an element carrying both
+ * `fill="red"` and `style="fill:blue"` renders blue, not red, in a real
+ * browser. When that happens here, the hoisted value *overwrites* the
+ * existing attribute rather than losing to it, which reproduces the file's
+ * real rendering rather than inventing a new one.
+ *
+ * Returns `unsafe: true` (with `attrs` unchanged) when a hoisted value would
+ * contain `"` or `<` -- becoming a presentation attribute means the value
+ * is about to sit inside a new double-quoted attribute of its own, and a
+ * `"` would let it escape that quote; a `<` has no business in a value this
+ * module has already sanitised. Both checks are load-bearing since the
+ * quote-aware OPENING_TAG_RE: a single-quoted `style='fill:red"'` carries a
+ * double quote tokenizeAttrs reads straight through as part of the value,
+ * and a `<` inside a quoted value reaches here the same way. A `>` is
+ * allowed: legal inside a quoted attribute, and real files carry one.
+ *
+ * Exported only for icons.test.ts, the same reason parseIconMarkup's own
+ * comment states for itself: through a real SVG document (parseIconMarkup ->
+ * hoistStyleAttributes -> here), `attrs` only ever arrives OPENING_TAG_RE-
+ * isolated, so a `<`/`>` in a hoisted value has no way to be exercised except
+ * by calling this function directly with an `attrs` string OPENING_TAG_RE
+ * itself could never have isolated in the first place. Not part of this
+ * package's public API surface -- index.ts does not re-export it.
+ */
+export function hoistStyleOnAttrs(attrs: string): { attrs: string; unsafe: boolean } {
+  const tokens = tokenizeAttrs(attrs);
+  const styleTokens = tokens.filter((token) => token.name.toLowerCase() === "style");
+  const firstStyle = styleTokens[0];
+  if (!firstStyle) {
+    return { attrs, unsafe: false };
+  }
+
+  // Validator, 2026-09-06 (later): an element carrying two `style`
+  // attributes hoisted from the second and left the first in place. The
+  // viewer hands `body` to the HTML parser (dangerouslySetInnerHTML), whose
+  // rule for a duplicate attribute is that the first wins and every later
+  // one is dropped -- so that is what happens here too: the first `style`
+  // is the one read, and all of them are excised below.
+  const styleValue = firstStyle.value ?? "";
+
+  const kept: string[] = [];
+  const hoisted: { name: (typeof HOISTABLE_STYLE_PROPS)[number]; value: string }[] = [];
+
+  // Comments go first, before the split: `fill:/* x */#fff` is one
+  // declaration with a comment inside its value, and a comment can carry a
+  // `;` of its own.
+  for (const rawDeclaration of splitStyleDeclarations(styleValue.replace(CSS_COMMENT_RE, ""))) {
+    const declaration = cssTrim(rawDeclaration);
+    if (!declaration) {
+      continue;
+    }
+    const colonIndex = declaration.indexOf(":");
+    if (colonIndex === -1) {
+      kept.push(declaration);
+      continue;
+    }
+    const prop = cssTrim(declaration.slice(0, colonIndex)).toLowerCase();
+    const hoistableName = HOISTABLE_STYLE_PROPS.find((name) => name === prop);
+    if (!hoistableName) {
+      kept.push(declaration);
+      continue;
+    }
+    // `!important` is a cascade priority, not part of the value; as a
+    // presentation attribute the value has no cascade left to win, so the
+    // marker is dropped. An empty value (`fill:;`) is an invalid declaration
+    // a browser ignores outright, so it is neither hoisted nor kept.
+    const value = cssTrim(
+      declaration.slice(colonIndex + 1).replace(CSS_IMPORTANT_RE, "").replace(QUOTED_FRAGMENT_URL_RE, "url($2)")
+    );
+    if (value === "") {
+      continue;
+    }
+    hoisted.push({ name: hoistableName, value });
+  }
+
+  if (hoisted.some(({ value }) => value.includes('"') || value.includes("<"))) {
+    return { attrs, unsafe: true };
+  }
+
+  // What remains of `style` keeps whatever the author wrote, so a kept
+  // `font-family:"a"` needs single quotes around it (validator, third
+  // pass: it used to be re-emitted inside double quotes, which the HTML
+  // parser read back as a truncated style plus a junk attribute).
+  const keptStyle = kept.length > 0 ? quoteAttrValue(kept.join(";")) : undefined;
+  if (keptStyle === null) {
+    return { attrs, unsafe: true };
+  }
+
+  // Rebuild by token: every `style` is dropped (its leading whitespace with
+  // it); the first existing attribute by a hoisted name is replaced in
+  // place -- a `fill='red'` beside `style="fill:blue"` must become one
+  // `fill="blue"`, not gain a second `fill` the HTML parser would drop in
+  // favour of the first (validator, 2026-09-06 (later)); everything else is
+  // copied verbatim, separators included.
+  const replaced = new Set<string>();
+  let rewritten = "";
+  let cursor = 0;
+  // Every emitted attribute gets a whitespace separator before its name,
+  // whether the source had one or not: a dropped leading `style` used to
+  // take the tag's only separator with it, and `<path style="..."d="..."/>`
+  // (no whitespace, a recoverable HTML parse error) came back as `<pathd=`
+  // (validator, 2026-09-06 (later), sixth pass).
+  const emit = (separator: string, text: string) => {
+    rewritten += /\s$/.test(separator) ? separator + text : `${separator} ${text}`;
+  };
+  for (const token of tokens) {
+    const lowerName = token.name.toLowerCase();
+    if (lowerName === "style") {
+      cursor = token.end;
+      continue;
+    }
+    const hoistedHere = hoisted.filter(({ name }) => name === lowerName);
+    const last = hoistedHere[hoistedHere.length - 1];
+    if (last) {
+      // The first raw attribute by this name takes the hoisted value; a
+      // later duplicate is dropped, which is what the HTML parser would do
+      // with it anyway and keeps the body well-formed.
+      if (!replaced.has(lowerName)) {
+        replaced.add(lowerName);
+        emit(attrs.slice(cursor, token.nameStart), `${last.name}="${last.value}"`);
+      }
+      cursor = token.end;
+      continue;
+    }
+    emit(attrs.slice(cursor, token.nameStart), attrs.slice(token.nameStart, token.end));
+    cursor = token.end;
+  }
+  rewritten += attrs.slice(cursor);
+
+  if (keptStyle !== undefined) {
+    rewritten += ` style=${keptStyle}`;
+  }
+  // Appended last-wins too (validator, fifth pass): `fill:#22bc66;...;
+  // fill:#ffffff` renders white in CSS, and the in-place branch above
+  // already takes the last declaration, so this branch must as well. The
+  // attributes still land in the order their property first appeared.
+  const lastByName = new Map<string, string>();
+  for (const { name, value } of hoisted) {
+    lastByName.set(name, value);
+  }
+  for (const [name, value] of lastByName) {
+    if (replaced.has(name)) {
+      continue;
+    }
+    replaced.add(name);
+    rewritten += ` ${name}="${value}"`;
+  }
+
+  return { attrs: rewritten, unsafe: false };
+}
+
+/**
+ * Runs hoistStyleOnAttrs across every element in `markup`. Must run before
+ * withElementDefault (parseIconMarkup's own call order enforces this): a
+ * root `fill=` default materialised first would land on an element whose
+ * real fill was still hiding in `style="..."` at that point, painting it
+ * with the wrong colour instead of leaving its own (about to be hoisted)
+ * fill alone. `unsafe: true` means some element's hoisted value failed the
+ * quoted-attribute-escape check above -- parseIconMarkup turns that into a
+ * flat null, the same refusal shape every other sanitiser check in this file
+ * already returns.
+ */
+function hoistStyleAttributes(markup: string): { markup: string; unsafe: boolean } {
+  let unsafe = false;
+  const rewritten = markup.replace(OPENING_TAG_RE, (whole, tag: string, attrs: string, selfClose: string | undefined) => {
+    if (unsafe || !hasAttrToken(attrs, "style")) {
+      return whole;
+    }
+    const result = hoistStyleOnAttrs(attrs);
+    if (result.unsafe) {
+      unsafe = true;
+      return whole;
+    }
+    return `<${tag}${result.attrs}${selfClose ? " /" : ""}>`;
+  });
+  return { markup: rewritten, unsafe };
 }
 
 /** Matches one `fill="..."` attribute anywhere in a markup string, whatever element it sits on -- csharp's knockout fill is set on a `<g>`, not on the `<path>` elements it wraps, so this is deliberately not scoped to `<path>`. */
@@ -434,7 +838,7 @@ export function parseIconMarkup(raw: string): ParsedIconMarkup | null {
     return null;
   }
 
-  const openTag = /<svg\b([^>]*)>/i.exec(stripped);
+  const openTag = ROOT_SVG_TAG_RE.exec(stripped);
   const closeIndex = stripped.lastIndexOf("</svg>");
   if (!openTag || closeIndex === -1 || closeIndex < openTag.index + openTag[0].length) {
     return null;
@@ -452,6 +856,23 @@ export function parseIconMarkup(raw: string): ParsedIconMarkup | null {
     .replace(/<desc\b[^>]*>[\s\S]*?<\/desc>/gi, "")
     .trim();
 
+  // Added 2026-09-06 (two real owner-supplied files from a client repo):
+  // hoist every paint declaration out of a `style="..."` attribute and into
+  // a real presentation attribute (hoistStyleAttributes's own comment has
+  // the full reasoning). Must run before the root-default materialisation
+  // just below: withElementDefault only looks at real attributes, so a root
+  // `fill=` default applied first would land on an element whose actual
+  // fill was still hiding in `style="..."` at that point, painting over it
+  // with the wrong colour instead of leaving the (about to be hoisted) real
+  // one alone. None of the five vendored thesvg files carry a `style`
+  // attribute at all (confirmed by reading all five, and guarded by the
+  // sha256 drift test below), so this is a no-op for every one of them.
+  const hoistResult = hoistStyleAttributes(body);
+  if (hoistResult.unsafe) {
+    return null;
+  }
+  body = hoistResult.markup;
+
   // aws.svg sets `fill="currentColor" fill-rule="evenodd"` once, as a
   // default on the root <svg>, rather than repeating it on its one child
   // that carries no fill of its own -- valid SVG (both are inherited
@@ -462,8 +883,16 @@ export function parseIconMarkup(raw: string): ParsedIconMarkup | null {
   // what TRADEMARK.md's "accurate, unmodified official marks" requires --
   // and is a no-op for the other four vendored files, none of which set a
   // root-level default at all.
-  const defaultFill = getAttr(attrs, "fill");
-  const defaultFillRule = getAttr(attrs, "fill-rule");
+  // The root's own `style="fill:..."` is a default in exactly the same way
+  // a root `fill="..."` is (validator, 2026-09-06 (later): it was dropped
+  // with the root tag), so the root's attributes are hoisted first and the
+  // default read off the result.
+  const rootHoist = hoistStyleOnAttrs(attrs);
+  if (rootHoist.unsafe) {
+    return null;
+  }
+  const defaultFill = getAttr(rootHoist.attrs, "fill");
+  const defaultFillRule = getAttr(rootHoist.attrs, "fill-rule");
   if (defaultFill !== undefined) {
     body = withElementDefault(body, "fill", defaultFill);
   }
@@ -601,6 +1030,156 @@ export async function resolveIcon(icon: string | undefined): Promise<ResolvedIco
   }
 
   return SAFE_ICON_REF.test(icon) ? resolveSimpleIconsIcon(icon) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Render risk: paint that may vanish on the viewer's light ground. Added
+// 2026-09-06, same pass as hoistStyleAttributes above and for the same
+// underlying reason -- an owner-supplied file can carry a fill that is
+// perfectly legitimate on the ground it was originally drawn for, and wrong
+// on the viewer's. This section works on any already-resolved ResolvedIcon's
+// `body`, whichever of the three sources (simple-icons, thesvg, owner-
+// supplied) produced it -- it is not part of resolution itself, and is
+// deliberately a separate exported function rather than a field on
+// ResolvedIcon (see its own comment for why).
+
+/** One `fill`/`stroke`/`stop-color` presentation attribute anywhere in a resolved body, double-quoted, single-quoted or unquoted (group 2, 3 or 4; the HTML parser reads all three the same way), separated by HTML whitespace only -- `<path fill=...>` is a tag named `path fill=...` to a browser and paints nothing (validator, eighth pass) -- run after the hoist above, so a colour hiding inside `style="..."` has already become one of these three real attributes by the time findIconRenderRisks ever sees it. */
+const PAINT_ATTR_RE = /[ \t\n\f\r](fill|stroke|stop-color)[ \t\n\f\r]*=[ \t\n\f\r]*(?:"([^"]*)"|'([^']*)'|([^ \t\n\f\r"'<>=`]+))/gi;
+
+/**
+ * Decodes numeric character references (`&#35;`, `&#x23;`) the way the HTML
+ * parser does before CSS reads an attribute value. A reference outside the
+ * Unicode range becomes U+FFFD, as in a browser, rather than a thrown
+ * RangeError (validator, 2026-09-06 (later), fifth pass: `&#x110000;` took
+ * down `catalogus icons` and `list_icons` for the whole manifest).
+ */
+function decodeNumericReferences(value: string): string {
+  const decode = (codePoint: number) => (Number.isFinite(codePoint) && codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : "\uFFFD");
+  return value
+    .replace(/&#x([0-9a-f]+);/gi, (_whole, hex: string) => decode(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_whole, dec: string) => decode(Number(dec)));
+}
+
+/**
+ * normalizeHexValue for the light-paint scan only: the 4-digit (`#rgba`)
+ * and 8-digit (`#rrggbbaa`) spellings have their alpha digits cut before
+ * normalising, so `#ffffff80` is judged as the white it is. Alpha does not
+ * make a light paint darker, only fainter, and fainter white on a light
+ * ground is the very thing this scan reports. Kept out of normalizeHexValue
+ * itself because that one also drives the knockout comparison, where an
+ * alpha-carrying spelling has never been declared and must not start
+ * matching a knockout entry by accident.
+ */
+function normalizePaintHexValue(value: string): string | null {
+  const trimmed = cssTrim(value);
+  const hexPart = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
+  if (/^[0-9a-fA-F]{4}$/.test(hexPart)) {
+    return normalizeHexValue(hexPart.slice(0, 3));
+  }
+  if (/^[0-9a-fA-F]{8}$/.test(hexPart)) {
+    return normalizeHexValue(hexPart.slice(0, 6));
+  }
+  // Only a bare 3- or 6-digit run goes on to normalizeHexValue: that one
+  // trims with JS whitespace, which would let a U+00A0 the CSS parser
+  // treats as part of the value (an invalid colour) read as white here.
+  return /^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(hexPart) ? normalizeHexValue(hexPart) : null;
+}
+
+/** The WCAG relative-luminance floor a colour must clear to be reported. 1.0 (pure white) and the `white` keyword both clear it easily; #faed1e, a real saturated brand yellow pulled from one of the two fixtures below, computes to ~0.81 and does not -- the threshold is meant to catch pale-to-white paint that can vanish against a light page, not merely bright colour. */
+const LIGHT_PAINT_LUMINANCE_THRESHOLD = 0.85;
+
+/** One channel of sRGB (0-1) converted to linear light, the standard WCAG relative-luminance gamma step. */
+function srgbChannelToLinear(channel: number): number {
+  return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
+/** WCAG relative luminance (0 = black, 1 = white) of a bare, lowercase 6-digit hex string -- callers are expected to have already run normalizeHexValue (or to hand in "ffffff" directly for the `white` keyword) rather than a raw, unvalidated value. */
+function relativeLuminance(hex6: string): number {
+  const r = Number.parseInt(hex6.slice(0, 2), 16) / 255;
+  const g = Number.parseInt(hex6.slice(2, 4), 16) / 255;
+  const b = Number.parseInt(hex6.slice(4, 6), 16) / 255;
+  return 0.2126 * srgbChannelToLinear(r) + 0.7152 * srgbChannelToLinear(g) + 0.0722 * srgbChannelToLinear(b);
+}
+
+/**
+ * One paint value in a resolved icon's body that is light enough to risk
+ * disappearing against the viewer's light page ground -- see
+ * findIconRenderRisks's own comment for the full "why report instead of
+ * decide" reasoning. `value` is always the normalised form (lowercase
+ * 6-digit hex, no leading `#`; `white` itself normalises to `ffffff`) so two
+ * spellings of the same colour never produce two entries.
+ */
+export interface IconRenderRisk {
+  readonly kind: "light-paint";
+  readonly attribute: "fill" | "stroke" | "stop-color";
+  readonly value: string;
+}
+
+/**
+ * Scans a resolved icon's body for paint light enough to vanish against the
+ * viewer's light page ground, one entry per distinct (attribute, normalised
+ * value) pair actually found.
+ *
+ * Why this reports a fact instead of making a call: the same bytes mean two
+ * opposite things depending on what the file was drawn for. Healthchecks'
+ * own mark carries a white bar -- real painted ink, meant to sit on the
+ * brand's dark green ground it was designed against. csharp's thesvg file
+ * carries `fill="#fff"` on its cut-out letters -- not ink at all, a hole
+ * this package's own knockout policy turns into `data-knockout` so the
+ * viewer paints the page ground through it (see applyKnockout's comment).
+ * Nothing in a file's bytes says which one a given white fill is; a mark
+ * this package has never seen a fill policy declared for (every owner-
+ * supplied icon, via resolveLocalIcon) carries no such policy at all. Both
+ * "invent a currentColor inversion" and "invent a knockout" are exactly the
+ * shape of guess CLAUDE.md's "ask, never guess" rule forbids, so this
+ * function does neither: it reports the fact, and leaves "does this look
+ * right?" to a caller that can put the rendered mark in front of the owner
+ * (the CLI's `catalogus icons` report, and the skill's guidance to look at
+ * the rendered result before moving on).
+ *
+ * Parses only what it can prove is a colour: 3-, 4-, 6- or 8-digit hex
+ * (normalizePaintHexValue) and the CSS keyword `white`. `none`, `currentColor`,
+ * `url(#...)` (a gradient reference, resolved to whatever colours its own
+ * `<stop>` elements carry -- each already scanned in its own right),
+ * `inherit`, `transparent`, `rgb()`/`hsl()` functions, and every other named
+ * CSS colour are skipped outright, the same "do not guess" floor applied to
+ * parsing rather than to the paint-or-hole judgement above: a value this
+ * function cannot classify with certainty is left unreported, not guessed
+ * at either way.
+ *
+ * Elements carrying `data-knockout` (applyKnockout's own output) have no
+ * fill attribute left at all by the time this runs -- PAINT_ATTR_RE simply
+ * never matches them, so a knockout body reports nothing, without this
+ * function needing to know `data-knockout` exists.
+ */
+export function findIconRenderRisks(body: string): IconRenderRisk[] {
+  const seen = new Set<string>();
+  const risks: IconRenderRisk[] = [];
+
+  for (const match of body.matchAll(PAINT_ATTR_RE)) {
+    const attribute = match[1]!.toLowerCase() as IconRenderRisk["attribute"];
+    // A numeric character reference is what the HTML parser decodes before
+    // CSS reads the value, so `&#35;fff` is judged as the `#fff` it renders.
+    const rawValue = cssTrim(decodeNumericReferences(match[2] ?? match[3] ?? match[4] ?? ""));
+
+    const normalizedValue = /^white$/i.test(rawValue) ? "ffffff" : normalizePaintHexValue(rawValue);
+    if (normalizedValue === null) {
+      continue;
+    }
+
+    if (relativeLuminance(normalizedValue) < LIGHT_PAINT_LUMINANCE_THRESHOLD) {
+      continue;
+    }
+
+    const dedupeKey = `${attribute}:${normalizedValue}`;
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+    risks.push({ kind: "light-paint", attribute, value: normalizedValue });
+  }
+
+  return risks;
 }
 
 // ---------------------------------------------------------------------------

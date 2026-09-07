@@ -375,6 +375,49 @@ describe("runSet", () => {
       }
     });
 
+    // Validator, 2026-09-06 (later): commitIconVendor ran after the
+    // manifest write inside the same try, so a failed rename fell into the
+    // generic catch and printed "nothing was written" about a manifest that
+    // was. A directory squatting on the destination path is the portable
+    // way to make that rename fail.
+    it("reports the manifest as updated, not 'nothing was written', when placing the vendored file fails after the write", async () => {
+      const sourceDir = await createTempDir();
+      try {
+        const sourcePath = await writeFixtureFile(sourceDir, "source.svg", CLEAN_SVG);
+        await mkdir(join(dir, ".catalogus", "icons", "fly-api.svg"), { recursive: true });
+        const result = await runSet(dir, ["services.fly-api.icon", sourcePath]);
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr.join("\n")).not.toContain("nothing was written");
+        expect(result.stderr.join("\n")).toContain("was written, but the icon could not be placed at .catalogus/icons/fly-api.svg");
+        expect(result.stderr.join("\n")).toContain("services.fly-api.icon is set without its new bytes");
+        expect(await manifestText()).toContain("icon: .catalogus/icons/fly-api.svg");
+        expect(await iconsDirEntries(dir)).toEqual(["fly-api.svg"]);
+      } finally {
+        await removeTempDir(sourceDir);
+      }
+    });
+
+    it("names every field left without its bytes when an earlier icon in a multi-pair call fails to place", async () => {
+      const sourceDir = await createTempDir();
+      try {
+        const sourcePath = await writeFixtureFile(sourceDir, "source.svg", CLEAN_SVG);
+        await mkdir(join(dir, ".catalogus", "icons", "fly-api.svg"), { recursive: true });
+        const result = await runSet(dir, [
+          "services.fly-api.icon",
+          sourcePath,
+          "services.heroku-api.icon",
+          sourcePath,
+        ]);
+        expect(result.exitCode).toBe(1);
+        const stderr = result.stderr.join("\n");
+        expect(stderr).toContain("could not be placed at .catalogus/icons/fly-api.svg");
+        expect(stderr).toContain("services.fly-api.icon, services.heroku-api.icon are set without their new bytes");
+        expect(await iconsDirEntries(dir)).toEqual(["fly-api.svg"]);
+      } finally {
+        await removeTempDir(sourceDir);
+      }
+    });
+
     it("accepts the already-vendored file's own path a second time -- no self-copy, no error", async () => {
       const sourceDir = await createTempDir();
       try {
@@ -602,6 +645,56 @@ describe("runSet", () => {
       expect(fetchWasCalled).toBe(false);
       expect(await manifestText()).toBe(before);
       expect(await iconsDirEntries(dir)).toEqual([]);
+    });
+
+    // Added 2026-09-06 alongside @catalogus/core's findIconRenderRisks and
+    // commands/icons.ts's own "(check: ...)" column: `set` reads the same
+    // fact back off the file it just committed, rather than making an
+    // owner run `catalogus icons` separately to learn it.
+    describe("render-risk advisory", () => {
+      // Healthchecks.io's real vendored mark -- see @catalogus/core's
+      // findIconRenderRisks doc comment and commands/icons.test.ts's own
+      // copy of this fixture for why this exact file is the running
+      // example: a green ink path and a white one, both fill and stroke,
+      // via style="..." (proving the advisory reads the sanitiser's
+      // already-hoisted output, not raw bytes).
+      const HEALTHCHECKS_SVG =
+        '<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="46.6 2.94 418.8 506.2">' +
+        '<path d="M309.2 899.8h-45.3l41.4 246.7h46.1l24-142.8h70.1l4.9-46.7H335.9l-7.5 44.6z" ' +
+        'style="fill-rule:evenodd;clip-rule:evenodd;fill:#22bc66;stroke:#22bc66;stroke-width:30" ' +
+        'transform="translate(0 -652.362)"/>' +
+        '<path d="m218.9 670.3-47.6 283.1H68.6l-7 46.7h74.3l14.4 85.9h46.1l20.7-115.8 22.8-135.4 52.7-.1L265 670.3z" ' +
+        'style="fill-rule:evenodd;clip-rule:evenodd;fill:#ffffff;stroke:#ffffff;stroke-width:30" ' +
+        'transform="translate(0 -652.362)"/></svg>';
+
+      it("prints a check line naming the service when the vendored file carries a white-paint risk, and still exits 0", async () => {
+        const sourceDir = await createTempDir();
+        try {
+          const sourcePath = await writeFixtureFile(sourceDir, "healthchecks.svg", HEALTHCHECKS_SVG);
+          const result = await runSet(dir, ["services.fly-api.icon", sourcePath]);
+
+          expect(result.exitCode).toBe(0);
+          expect(result.stdout).toContain(
+            "  check services.fly-api.icon renders in the viewer: it paints with white (#ffffff), which can " +
+              "vanish on a light ground. If it is unreadable, set a different file."
+          );
+        } finally {
+          await removeTempDir(sourceDir);
+        }
+      });
+
+      it("prints no check line for a file whose paint is a real brand colour, not white or pale", async () => {
+        const sourceDir = await createTempDir();
+        try {
+          const sourcePath = await writeFixtureFile(sourceDir, "source.svg", CLEAN_SVG);
+          const result = await runSet(dir, ["services.fly-api.icon", sourcePath]);
+
+          expect(result.exitCode).toBe(0);
+          expect(result.stdout.some((line) => line.includes("renders in the viewer"))).toBe(false);
+        } finally {
+          await removeTempDir(sourceDir);
+        }
+      });
     });
   });
 

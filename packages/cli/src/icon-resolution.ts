@@ -17,8 +17,8 @@
 // stitching this module exists to do once.
 import { join, sep } from "node:path";
 
-import { describeLocalIconRefusal, getCatalogEntry, resolveIcon, resolveLocalIcon } from "@catalogus/core";
-import type { ResolvedIcon } from "@catalogus/core";
+import { describeLocalIconRefusal, findIconRenderRisks, getCatalogEntry, resolveIcon, resolveLocalIcon } from "@catalogus/core";
+import type { IconRenderRisk, ResolvedIcon } from "@catalogus/core";
 import type { ServiceEntry } from "@catalogus/schema";
 
 /** Every thesvg ref @catalogus/core resolves is prefixed with this -- mirrors icons.ts's own THESVG_PREFIX, which is not exported (it is that module's own naming detail, not a fact this file needs a second copy of beyond the one prefix string). */
@@ -97,6 +97,25 @@ export interface ServiceIconResolution {
    * stale but whose catalog fallback still renders.
    */
   icon: ResolvedIcon | null;
+  /**
+   * Paint in the vendored file light enough to risk vanishing against the
+   * viewer's light page ground -- @catalogus/core's findIconRenderRisks,
+   * run over `icon.body` once it is known to be the entry's own file, not a
+   * fallback. Set only when `source === "local"` and `stale === false`
+   * (undefined, not an empty array, for every other case): a catalog
+   * source (simple-icons, thesvg) is a file this repo curates and ships,
+   * never one an owner hands the CLI, so there is no fact for this field to
+   * report about it -- reporting `risks: []` there would read as "checked,
+   * found nothing" for something that was never checked at all. Possibly
+   * an empty array for a local, non-stale file that happens to carry no
+   * risky paint; that is the "checked, found nothing" case this field
+   * exists to distinguish from "never checked". commands/icons.ts and
+   * commands/set.ts both read this to tell an owner which vendored file to
+   * actually look at in the viewer -- see findIconRenderRisks's own doc
+   * comment for why this package reports the fact instead of guessing
+   * paint from a hole.
+   */
+  risks?: IconRenderRisk[];
 }
 
 /**
@@ -149,7 +168,13 @@ export async function resolveServiceIcon(manifestDir: string, entry: ServiceEntr
     const contained = isWithinIconsDir(manifestDir, absolute);
     const localIcon = contained ? await resolveLocalIcon(absolute) : null;
     if (localIcon) {
-      return { source: "local", localPath: entry.icon, stale: false, icon: localIcon };
+      return {
+        source: "local",
+        localPath: entry.icon,
+        stale: false,
+        icon: localIcon,
+        risks: findIconRenderRisks(localIcon.body),
+      };
     }
 
     // Stale: named but unresolvable. Still falls back to the catalog icon

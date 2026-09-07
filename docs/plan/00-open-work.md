@@ -7,16 +7,16 @@ file or the handoff.
 
 ## Ready now — no decision needed
 
-- **Wire `catalogus mcp` into Claude Code and run the loop on a real repo** (Phase 6, box 5). The
-  server and its eight tools were validated on 2026-09-06 with the SDK client and raw JSON-RPC,
-  not with a live agent. `claude mcp add --scope local catalogus -- node <clone>/packages/cli/dist/cli.js mcp .`
-  in the target repo is the whole setup; the loop is `detect_stack` → `propose_manifest_edit` →
-  show the diff → `apply_manifest_edit` with `baseSha256` → `validate_manifest`. What to watch
-  for: whether the agent loads the deferred tools and prefers them over Bash now that the skill
-  says so, whether it proposes before applying, and whether stderr noise (stack-analyser's
-  warning on a corrupt `package.json`) ever needs surfacing. (`phase-6-mcp.md`.)
-- **Drift test D4**: `skill-tools-drift.test.ts`'s op-list check should assert every occurrence
-  of the op list in the skill, not one. Small. (`phase-6-mcp.md`.)
+- **Run the MCP loop interactively once.** The 2026-09-06 (night) headless run proved the
+  tool path end to end on Clapline (`phase-6-mcp.md`, "The live loop"), but `claude -p` has no
+  user turn, so whether an interactive agent stops at the proposal diff before
+  `apply_manifest_edit` is unobserved. The owner's session, any time; nothing to build.
+
+- **Rerun the skill on Clapline and confirm Healthchecks in `catalogus view`.** The 2026-09-06
+  (later) handoff: owner-supplied icons now hoist `style` paint, and `catalogus icons` prints
+  `(check: white fill #ffffff)` for the agent to hand to the owner. The owner's session; nothing
+  to build. The same handoff lists eight parser edge cases recorded and deliberately not fixed
+  (named colours unclassified, CDATA, `url(` in a comment, ...); none blocks anything.
 
 ## Waiting on the owner — nothing open
 
@@ -65,8 +65,8 @@ field allow-list, and the test that the token never lands in a file an agent can
 ## Phase 6 — MCP server mode 🔶 first class for agents (decision 14)
 
 `catalogus mcp` over stdio with eight tools, and the skill MCP-first at 250 lines; all shipped and
-validated 2026-09-06. Left: `push_private` (needs Phase 5), the live wiring (ready-now item
-above), and the hosted edition served by the web platform against an account (Phase 7; the
+validated 2026-09-06; the live loop ran on Clapline the same night. Left: `push_private` (needs
+Phase 5) and the hosted edition served by the web platform against an account (Phase 7; the
 recorded constraint is that `detect_stack` needs repo access the hosted server does not have).
 (`phase-6-mcp.md`, `decisions.md` 14.)
 

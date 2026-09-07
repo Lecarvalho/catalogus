@@ -58,6 +58,8 @@
 // A vendored icon file left behind by a value that was later cleared some
 // other way is exactly the kind of dangling state that decision would need
 // to account for. Open item; nobody has needed it enough yet to design it.
+import { findIconRenderRisks, resolveLocalIcon } from "@catalogus/core";
+import type { IconRenderRisk } from "@catalogus/core";
 import { isScalar } from "yaml";
 
 import type { IconSourceShape, PreparedIconVendor } from "../icon-fetch.js";
@@ -318,6 +320,32 @@ function classifyIconValue(field: string, value: string): PreparedIconValue {
   return { ok: true, shape: { kind: "path", path: value } };
 }
 
+/**
+ * The parenthetical paint description in the "check services.<id>.icon
+ * renders in the viewer" advisory below -- one `(#<value>)` per distinct
+ * value @catalogus/core's findIconRenderRisks reported (deduplicated
+ * across `fill`/`stroke`/`stop-color`, since the advisory is about what an
+ * owner will *see*, not which attribute carried it -- unlike
+ * commands/icons.ts's own per-row detail column, which does name the
+ * attribute for a reader comparing several rows at once). "white" only for
+ * the exact value plain white paint normalises to; every other value that
+ * still clears the luminance floor is "light" rather than guessed at by
+ * name, the same floor findIconRenderRisks itself documents.
+ */
+function describeIconPaint(risks: IconRenderRisk[]): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const risk of risks) {
+    if (seen.has(risk.value)) {
+      continue;
+    }
+    seen.add(risk.value);
+    const colour = risk.value === "ffffff" ? "white" : "light";
+    parts.push(`${colour} (#${risk.value})`);
+  }
+  return parts.join(" and ");
+}
+
 interface PreparedEdit {
   field: string;
   node: unknown;
@@ -568,8 +596,81 @@ export async function runSet(
     // to wait for commitManifestEdit's own verdict rather than running
     // alongside it.
     if (result.exitCode === 0) {
-      for (const prepared of preparedIcons) {
-        await commitIconVendor(prepared);
+      for (const [index, prepared] of preparedIcons.entries()) {
+        try {
+          await commitIconVendor(prepared);
+        } catch (error) {
+          // The manifest is already on disk by now, so the generic catch
+          // below -- "nothing was written" -- would be a lie here
+          // (validator, 2026-09-06 (later), sixth pass: a directory
+          // squatting on the destination path). Say what is actually
+          // true: every field in this call is written; this icon and every
+          // one after it were discarded unplaced, so those fields name a
+          // path whose contents this command does not know (the old
+          // vendored file, the squatter, or nothing -- the seventh pass
+          // showed all three), and `catalogus icons` is what tells. Icons
+          // already placed stay.
+          await Promise.all(preparedIcons.slice(index).map((staged) => discardIconVendor(staged)));
+          const message = error instanceof Error ? error.message : String(error);
+          const dangling = iconEdits.slice(index).map((edit) => `services.${edit.serviceId as string}.icon`);
+          const plural = dangling.length > 1;
+          return {
+            exitCode: 1,
+            stdout: result.stdout,
+            stderr: [
+              `${location.filePath} was written, but the icon could not be placed at ${prepared.relativePath}: ${message}`,
+              `  ${dangling.join(", ")} ${plural ? "are" : "is"} set without ${plural ? "their" : "its"} new bytes; run catalogus icons to see what each path holds now, then set again once the path is free.`,
+            ],
+          };
+        }
+      }
+
+      // Added 2026-09-06, same pass as @catalogus/core's
+      // findIconRenderRisks and commands/icons.ts's own "(check: ...)"
+      // column: an owner setting an icon here should hear about the same
+      // risk `catalogus icons` would go on to report, without having to
+      // run that command separately first. `preparedIcons` is built by
+      // iterating `iconEdits` in order and pushing exactly one entry per
+      // successful prepare (see the loop above) -- with every edit in this
+      // call already committed at this point, the two arrays are the same
+      // length and the same order, so zipping them by index is safe. Read
+      // back from `prepared.destPath` -- the file as it now sits committed
+      // -- rather than kept from the earlier prepareIconVendor call, since
+      // that is what a reader opening the viewer will actually see; a null
+      // resolveLocalIcon result here (the sanitiser refusing a file it
+      // already accepted once) is not expected, but is not this advisory's
+      // problem to report on -- it is simply skipped, same as an icon with
+      // no risks at all. This is advice, not a failure: exit code and
+      // every existing line stay exactly as commitManifestEdit produced
+      // them, with these lines only ever appended after them.
+      for (const [index, edit] of iconEdits.entries()) {
+        const prepared = preparedIcons[index];
+        if (!prepared) {
+          continue;
+        }
+        // Wrapped, because by this point the edit is committed: a throw
+        // from the advisory would fall into the catch below and report
+        // "nothing was written" about a manifest that was (validator,
+        // 2026-09-06 (later), fifth pass). Advice that cannot be computed
+        // is skipped, not turned into a failure.
+        let risks: ReturnType<typeof findIconRenderRisks>;
+        try {
+          const committedIcon = await resolveLocalIcon(prepared.destPath);
+          if (!committedIcon) {
+            continue;
+          }
+          risks = findIconRenderRisks(committedIcon.body);
+        } catch {
+          continue;
+        }
+        if (risks.length === 0) {
+          continue;
+        }
+        result.stdout.push(
+          `  check services.${edit.serviceId as string}.icon renders in the viewer: it paints with ` +
+            `${describeIconPaint(risks)}, which can vanish on a light ground. If it is unreadable, set a ` +
+            "different file."
+        );
       }
     } else {
       await Promise.all(preparedIcons.map((prepared) => discardIconVendor(prepared)));

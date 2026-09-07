@@ -38,8 +38,8 @@ export { mapSpecfySlug, SPECFY_TO_CATALOGUS } from "./mapping.js";
 export type { MappingEntry } from "./mapping.js";
 export { CATALOGUS_CATALOG, getCatalogEntry } from "./catalog.js";
 export type { CatalogEntry } from "./catalog.js";
-export { resolveIcon, resolveLocalIcon, describeLocalIconRefusal, MAX_ICON_BYTES } from "./icons.js";
-export type { ResolvedIcon, LocalIconRefusal } from "./icons.js";
+export { resolveIcon, resolveLocalIcon, describeLocalIconRefusal, MAX_ICON_BYTES, findIconRenderRisks } from "./icons.js";
+export type { ResolvedIcon, LocalIconRefusal, IconRenderRisk } from "./icons.js";
 // describeLocalIconRefusal/LocalIconRefusal added 2026-09-04 alongside
 // resolveLocalIcon's own export above -- packages/cli's icon-resolution.ts
 // (the only caller today) needs it re-exported here the same way every

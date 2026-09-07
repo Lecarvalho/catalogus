@@ -22,6 +22,22 @@ function pluralize(count: number, singular: string, plural: string): string {
   return count === 1 ? singular : plural;
 }
 
+/**
+ * One IconRenderRisk as the parenthetical word this report shows a reader:
+ * "white fill #ffffff", "light stroke #eeeeee" -- see
+ * @catalogus/core's findIconRenderRisks for what `attribute` and `value`
+ * mean (`value` is always a normalised, lowercase 6-digit hex with no `#`).
+ * "white" only for the exact value a plain white paint normalises to;
+ * every other value that still clears the luminance floor (a pale grey, a
+ * washed-out tint) is described as "light" rather than guessed at by name
+ * -- the same "report the fact, not a guess" floor findIconRenderRisks
+ * itself documents.
+ */
+function describeRisk(risk: { attribute: string; value: string }): string {
+  const colour = risk.value === "ffffff" ? "white" : "light";
+  return `${colour} ${risk.attribute} #${risk.value}`;
+}
+
 export async function runIcons(pathArg: string | undefined): Promise<CommandResult> {
   const targetDir = resolveTargetPath(pathArg);
 
@@ -40,6 +56,12 @@ export async function runIcons(pathArg: string | undefined): Promise<CommandResu
   // icon-resolution.ts's own comment on why `icon` and `source` can
   // diverge for a stale "local" entry.
   let missing = 0;
+  // Ids of every entry whose vendored file carries at least one render
+  // risk, in manifest order -- printed as one extra summary line below
+  // (see the D5-adjacent comment there) so an agent following the skill's
+  // 7b loop has a short list to hand the user rather than having to
+  // re-scan every row for "(check: ...)".
+  const idsToCheck: string[] = [];
 
   for (const entry of manifest.services) {
     const resolution = await resolveServiceIcon(location.dir, entry);
@@ -54,20 +76,35 @@ export async function runIcons(pathArg: string | undefined): Promise<CommandResu
     // nothing after it would not.
     const columns = [entry.id, entry.service, resolution.source];
     if (resolution.source === "local") {
-      // D3 (validator, 2026-09-04): "(missing file)" used to cover both
-      // "nothing was ever fetched here" and "something was fetched and the
-      // sanitiser refuses it" -- indistinguishable to a reader, even though
-      // an agent following the skill's 7b loop needs to react differently
-      // to each (fetch something, versus pick a different source; see
-      // icon-resolution.ts's own ServiceIconResolution.refusalReason
-      // comment for the full defect). refusalReason being set is exactly
-      // the "something is there" signal; its absence is exactly "missing".
-      const detail = resolution.stale
-        ? `${resolution.localPath} (${
+      if (resolution.stale) {
+        // D3 (validator, 2026-09-04): "(missing file)" used to cover both
+        // "nothing was ever fetched here" and "something was fetched and
+        // the sanitiser refuses it" -- indistinguishable to a reader, even
+        // though an agent following the skill's 7b loop needs to react
+        // differently to each (fetch something, versus pick a different
+        // source; see icon-resolution.ts's own
+        // ServiceIconResolution.refusalReason comment for the full
+        // defect). refusalReason being set is exactly the "something is
+        // there" signal; its absence is exactly "missing".
+        columns.push(
+          `${resolution.localPath} (${
             resolution.refusalReason ? `refused: ${resolution.refusalReason}` : "missing file"
           })`
-        : (resolution.localPath as string);
-      columns.push(detail);
+        );
+      } else {
+        // Added 2026-09-06 alongside @catalogus/core's findIconRenderRisks:
+        // a stale entry never reaches here (the branch above already
+        // returned), and `risks` is only ever set for a "local", non-stale
+        // resolution -- see ServiceIconResolution.risks's own doc comment
+        // -- so this is the one place that field is ever read.
+        const risks = resolution.risks ?? [];
+        if (risks.length > 0) {
+          idsToCheck.push(entry.id);
+          columns.push(`${resolution.localPath} (check: ${risks.map(describeRisk).join(", ")})`);
+        } else {
+          columns.push(resolution.localPath as string);
+        }
+      }
     } else if (resolution.source === "none") {
       columns.push(`catalogus set services.${entry.id}.icon <https-url|path>`);
     }
@@ -92,6 +129,17 @@ export async function runIcons(pathArg: string | undefined): Promise<CommandResu
   rows.push(
     `${missing} ${pluralize(missing, "service", "services")} of ${total} ${pluralize(missing, "has", "have")} no icon.`
   );
+
+  // Added 2026-09-06: only when at least one row above carried a "(check:
+  // ...)" detail -- nothing printed otherwise, the same "say nothing rather
+  // than an empty finding" convention the detail column itself already
+  // follows (see the "no fourth column at all" comment above).
+  if (idsToCheck.length > 0) {
+    rows.push(
+      `${idsToCheck.length} ${pluralize(idsToCheck.length, "icon", "icons")} to check in the viewer: ` +
+        `${idsToCheck.join(", ")}. Ask the owner to confirm each in catalogus view; if a mark is unreadable, set a different file.`
+    );
+  }
 
   return { exitCode: 0, stdout: rows, stderr: [] };
 }

@@ -5,7 +5,15 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { describeLocalIconRefusal, MAX_ICON_BYTES, parseIconMarkup, resolveIcon, resolveLocalIcon } from "./icons.js";
+import {
+  describeLocalIconRefusal,
+  findIconRenderRisks,
+  hoistStyleOnAttrs,
+  MAX_ICON_BYTES,
+  parseIconMarkup,
+  resolveIcon,
+  resolveLocalIcon,
+} from "./icons.js";
 
 // A live ESM binding for a Node builtin (`import * as fsPromises from
 // "node:fs/promises"`) is non-configurable -- `vi.spyOn` on it throws
@@ -45,6 +53,30 @@ const THESVG_DIR = new URL("../icons/thesvg/", import.meta.url);
 // suite below -- both write synthetic SVG bytes that start from the same
 // minimal, valid open tag.
 const VIEWBOX_SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">';
+
+// Two real owner-supplied files from an actual client repo (2026-09-06),
+// copied here verbatim rather than paraphrased -- both carry their paint in
+// `style="..."` instead of a presentation attribute, which is exactly the
+// shape the hoist below (and the render-risk scan further down) exist for.
+// Loki's real file has fourteen gradients; this is the same shape, trimmed
+// to two stops.
+const HEALTHCHECKS_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="46.6 2.94 418.8 506.2">' +
+  '<path d="M309.2 899.8h-45.3l41.4 246.7h46.1l24-142.8h70.1l4.9-46.7H335.9l-7.5 44.6z" ' +
+  'style="fill-rule:evenodd;clip-rule:evenodd;fill:#22bc66;stroke:#22bc66;stroke-width:30" ' +
+  'transform="translate(0 -652.362)"/>' +
+  '<path d="m218.9 670.3-47.6 283.1H68.6l-7 46.7h74.3l14.4 85.9h46.1l20.7-115.8 22.8-135.4 52.7-.1L265 670.3z" ' +
+  'style="fill-rule:evenodd;clip-rule:evenodd;fill:#ffffff;stroke:#ffffff;stroke-width:30" ' +
+  'transform="translate(0 -652.362)"/>' +
+  "</svg>";
+
+const LOKI_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">' +
+  '<linearGradient id="a" x1="485.057" x2="485.057" y1="-705.376" y2="-74.565" gradientUnits="userSpaceOnUse">' +
+  '<stop offset="0" style="stop-color:#faed1e"/><stop offset="1" style="stop-color:#f15b2b"/>' +
+  "</linearGradient>" +
+  '<path d="m139.6 464.9-40.8 6.3 6.3 40.8 40.8-6.3z" style="fill:url(#a)"/>' +
+  "</svg>";
 
 describe("resolveIcon: simple-icons refs (unprefixed)", () => {
   it("resolves a known ref to real SVG body markup, wrapped in a currentColor path", async () => {
@@ -214,6 +246,21 @@ describe("resolveIcon: thesvg refs (thesvg:<slug>)", () => {
     await expect(resolveIcon("thesvg:openai")).resolves.toBeNull();
     expect(readFileMockState.failNext).toBe(false);
   });
+
+  it("all seven thesvg refs still resolve, and none of their bodies contain a style= attribute -- hoistStyleAttributes runs but has nothing to do on any of them", async () => {
+    // None of the five vendored files carried a style attribute before the
+    // 2026-09-06 hoist change (confirmed by reading all five directly), so
+    // this is the "still byte-identical" guarantee the hoist promises for
+    // this set: every per-file assertion in the tests above this one --
+    // exact fill counts, exact path counts, exact viewBox strings -- is
+    // unchanged from before this change, and this adds the one assertion
+    // those tests don't already make individually.
+    for (const slug of ["aws", "csharp", "openai", "slack", "googlevertexai", "codex", "xai"]) {
+      const resolved = await resolveIcon(`thesvg:${slug}`);
+      expect(resolved, slug).not.toBeNull();
+      expect(resolved!.body, slug).not.toContain("style=");
+    }
+  });
 });
 
 describe("parseIconMarkup: sanitiser refusals on synthetic files", () => {
@@ -320,6 +367,476 @@ describe("parseIconMarkup: sanitiser refusals on synthetic files", () => {
     const parsed = parseIconMarkup(svg);
     expect(parsed).not.toBeNull();
     expect(parsed!.body).toContain('fill="url(#grad)"');
+  });
+
+  it("refuses a url() whose argument opens with a quote it never closes -- url('https://...) must not slip past on a quote mismatch", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style="fill:url('https://evil.example/x)"/></svg>`;
+    expect(parseIconMarkup(svg)).toBeNull();
+  });
+
+  it("accepts url('#grad') and url(\"#grad\"), quoted same-document fragment references", () => {
+    const svg =
+      `${VIEWBOX_SVG_OPEN}<linearGradient id="grad"><stop offset="0" stop-color="#000"/></linearGradient>` +
+      `<path d="M0 0" fill="url('#grad')"/><path d="M1 1" fill='url("#grad")'/></svg>`;
+    expect(parseIconMarkup(svg)).not.toBeNull();
+  });
+});
+
+describe("parseIconMarkup: hoisting paint out of style=\"...\" into presentation attributes", () => {
+  // Added 2026-09-06: real owner-supplied files carry their colour in
+  // `style="..."` instead of a presentation attribute -- neither the
+  // viewer's monochrome CSS rule (Icon.module.css's
+  // `.icon:not(.fallback):not(.colour) svg [fill]` selector) nor
+  // findIconRenderRisks below ever look inside a style string, so this
+  // hoist is what makes both actually see the colour a file like
+  // Healthchecks' or Loki's really carries.
+
+  it("healthchecks: hoists fill/stroke/stroke-width/fill-rule off both paths, leaving only clip-rule behind in style", () => {
+    const parsed = parseIconMarkup(HEALTHCHECKS_SVG);
+    expect(parsed).not.toBeNull();
+    const body = parsed!.body;
+
+    expect(body).toContain('fill="#22bc66"');
+    expect(body).toContain('stroke="#22bc66"');
+    expect(body).toContain('stroke-width="30"');
+    expect(body).toContain('fill="#ffffff"');
+    expect(body).toContain('stroke="#ffffff"');
+    // fill-rule was a root-shared default in none of the vendored thesvg
+    // files, but here it rides along in the very same style string as the
+    // colour properties, on both paths -- the hoist has no reason to leave
+    // it behind while moving its neighbours.
+    expect((body.match(/fill-rule="evenodd"/g) ?? []).length).toBe(2);
+
+    // Every style attribute that remains carries exactly clip-rule, and
+    // nothing else -- in particular, no `fill:` survives inside any style
+    // string on this body.
+    const remainingStyles = [...body.matchAll(/style="([^"]*)"/g)].map((m) => m[1]);
+    expect(remainingStyles).toEqual(["clip-rule:evenodd", "clip-rule:evenodd"]);
+    expect(body).not.toMatch(/style="[^"]*fill:/);
+  });
+
+  it("loki: hoists stop-color onto both <stop> elements and fill onto the <path>, dropping style entirely", () => {
+    const parsed = parseIconMarkup(LOKI_SVG);
+    expect(parsed).not.toBeNull();
+    const body = parsed!.body;
+
+    expect(body).toContain('stop-color="#faed1e"');
+    expect(body).toContain('stop-color="#f15b2b"');
+    expect(body).toContain('fill="url(#a)"');
+    expect(body).not.toContain("style=");
+  });
+
+  it("a style declaration overrides an attribute the element already carries -- SVG/CSS cascade, reproducing the file's real rendering", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" fill="red" style="fill:blue"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('fill="blue"');
+    expect(parsed!.body).not.toContain('fill="red"');
+    expect(parsed!.body).not.toContain("style=");
+  });
+
+  it("leaves clip-rule and any other non-hoisted declaration inside style untouched", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style="clip-rule:evenodd;opacity:0.5"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('style="clip-rule:evenodd;opacity:0.5"');
+  });
+
+  it("leaves an element with no style attribute at all byte-identical", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" fill="#000"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path d="M0 0" fill="#000"/>');
+  });
+
+  it("hoistStyleOnAttrs refuses (unsafe: true) a hoisted value containing '<'", () => {
+    // Unreachable through parseIconMarkup itself: by the time any attrs
+    // string reaches hoistStyleOnAttrs, OPENING_TAG_RE has already isolated
+    // it, and OPENING_TAG_RE's own attrs group excludes '<'/'>' outright --
+    // see hoistStyleOnAttrs's own comment. Proven directly against the
+    // function it protects instead, the same defensive-floor testing style
+    // SAFE_ICON_REF's own comment describes for itself.
+    const attrs = ' style="fill:red<script>alert(1)</script>"';
+    expect(hoistStyleOnAttrs(attrs)).toEqual({ attrs, unsafe: true });
+  });
+
+  it("hoistStyleOnAttrs leaves attrs with no style attribute alone, unsafe: false", () => {
+    const attrs = ' d="M0 0" fill="#000"';
+    expect(hoistStyleOnAttrs(attrs)).toEqual({ attrs, unsafe: false });
+  });
+
+  // Validator, 2026-09-06 (later): seven edge cases the first cut of the
+  // hoist got wrong, each reproduced against the built binary before being
+  // fixed here. Every one of them is a shape a real owner-supplied file can
+  // carry (Inkscape and Illustrator both emit single-quoted attributes and
+  // `!important` on request), not a synthetic curiosity.
+
+  it("hoists out of a single-quoted style='...' attribute exactly as it does a double-quoted one", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style='fill:#ffffff;clip-rule:evenodd'/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('fill="#ffffff"');
+    expect(parsed!.body).toMatch(/style="clip-rule:evenodd"/);
+    expect(parsed!.body).not.toContain("style='");
+    expect(findIconRenderRisks(parsed!.body)).toEqual([{ kind: "light-paint", attribute: "fill", value: "ffffff" }]);
+  });
+
+  it("a style declaration overrides a single-quoted attribute too -- one fill survives, not a second one appended after the first", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" fill='red' style="fill:blue"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect((parsed!.body.match(/\sfill\s*=/g) ?? []).length).toBe(1);
+    expect(parsed!.body).toContain('fill="blue"');
+    expect(parsed!.body).not.toContain("red");
+  });
+
+  it("does not treat data-style= or xml:style= as a style attribute -- no paint is invented from an attribute that is not style", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" data-style="fill:red"/><path d="M1 1" xml:style="fill:blue"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path d="M0 0" data-style="fill:red"/><path d="M1 1" xml:style="fill:blue"/>');
+  });
+
+  it("strips !important, /* comments */ and whitespace from a hoisted value, and drops a declaration with an empty value outright", () => {
+    const svg =
+      `${VIEWBOX_SVG_OPEN}<path d="M0 0" style="fill: #ffffff !important; /* brand */ stroke : /* x */ red ; stroke-width:;fill-rule:evenodd"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    const body = parsed!.body;
+    expect(body).toContain('fill="#ffffff"');
+    expect(body).toContain('stroke="red"');
+    expect(body).toContain('fill-rule="evenodd"');
+    expect(body).not.toContain("stroke-width");
+    expect(body).not.toContain("important");
+    expect(body).not.toContain("/*");
+    expect(body).not.toContain("style=");
+  });
+
+  it("a root <svg style=\"fill:...\"> default is materialised onto children the same way a root fill= attribute is", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="fill:#abcdef"><path d="M0 0"/><path d="M1 1" fill="red"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path d="M0 0" fill="#abcdef" /><path d="M1 1" fill="red"/>');
+  });
+
+  it("duplicate style attributes on one element: the first wins and the rest are dropped, the HTML parser's own rule for a duplicate attribute", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style="fill:red" style="fill:blue;opacity:0.5"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path d="M0 0" fill="red" />');
+  });
+
+  it("hoistStyleOnAttrs refuses (unsafe: true) a single-quoted style whose hoisted value carries a double quote", () => {
+    const attrs = ` style='fill:red"'`;
+    expect(hoistStyleOnAttrs(attrs)).toEqual({ attrs, unsafe: true });
+  });
+
+  // Second validator pass, 2026-09-06 (later): the declaration splitter cut
+  // on every `;`, including one inside a `url(...)` argument, and the hoist
+  // only knew quoted attribute values.
+
+  it("does not split a declaration on a ';' inside url(...) -- clip-path:url(#a;fill:#fff;) is one declaration, and no fill is invented from it", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style="clip-path:url(#a;fill:#fff;)"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).not.toMatch(/\sfill\s*=/);
+    expect(parsed!.body).toContain('style="clip-path:url(#a;fill:#fff;)"');
+    expect(findIconRenderRisks(parsed!.body)).toEqual([]);
+  });
+
+  it("hoists fill:url(#a;b) whole rather than cutting it at the ';'", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style="fill:url(#a;b);stroke:#000"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('fill="url(#a;b)"');
+    expect(parsed!.body).toContain('stroke="#000"');
+    expect(parsed!.body).not.toContain("style=");
+  });
+
+  it("hoists out of an unquoted style=fill:#fff attribute, which the HTML parser reads exactly like a quoted one", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style=fill:#fff /></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('fill="#fff"');
+    expect(parsed!.body).not.toContain("style=");
+  });
+
+  it("a style declaration overrides an unquoted fill=red attribute too -- one fill survives", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" fill=red style="fill:blue"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect((parsed!.body.match(/\sfill\s*=/g) ?? []).length).toBe(1);
+    expect(parsed!.body).toContain('fill="blue"');
+    expect(parsed!.body).not.toContain("red");
+  });
+
+  // Third validator pass, 2026-09-06 (later): `style=` inside another
+  // attribute's *value* was read as the style attribute -- the attribute
+  // string is now tokenised into name/value pairs, so position decides.
+
+  it("leaves style= inside another attribute's value alone -- id=\"style=fill:white\" is an id, not a style", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<rect id="style=fill:white" width="24" height="24"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<rect id="style=fill:white" width="24" height="24"/>');
+    expect(findIconRenderRisks(parsed!.body)).toEqual([]);
+  });
+
+  it("hoists the real style while leaving a label whose value happens to contain style= intact", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<g inkscape:label="a style=fill:#fff" style="fill:red"><path d="M0 0"/></g></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('inkscape:label="a style=fill:#fff"');
+    expect(parsed!.body).toContain('fill="red"');
+    expect(parsed!.body).not.toContain('fill="#fff"');
+  });
+
+  it("an existing attribute is matched by position too -- id=\"fill=x\" is not the fill the hoisted value overrides", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path id="fill=x" d="M0 0" style="fill:blue"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('id="fill=x"');
+    expect((parsed!.body.match(/\sfill\s*=/g) ?? []).length).toBe(1);
+    expect(parsed!.body).toContain('fill="blue"');
+  });
+
+  it("a kept declaration carrying a double quote is re-emitted in a single-quoted style, not inside double quotes it would break", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path d="M0 0" style='font-family:"a";fill:#fff'/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain(`style='font-family:"a"'`);
+    expect(parsed!.body).toContain('fill="#fff"');
+  });
+
+  it("hoistStyleOnAttrs refuses (unsafe: true) when a kept declaration carries both quote kinds -- no quoting can hold it", () => {
+    // Unreachable through a real document (a quoted value cannot contain
+    // its own quote, an unquoted one contains neither); proven directly.
+    const attrs = ` style=font-family:"a'b`;
+    expect(hoistStyleOnAttrs(attrs)).toEqual({ attrs, unsafe: true });
+  });
+
+  // Fourth validator pass, 2026-09-06 (later): a raw `>` inside a quoted
+  // attribute value (a Figma layer name in an `id`) cut the opening tag
+  // short, and the tag was rebuilt from the wrong slice.
+
+  it("a '>' inside a quoted attribute value does not end the tag -- the id survives and the style is hoisted", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path style="fill:#22bc66" id="Group 1 > Path" d="M2 12"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path id="Group 1 > Path" d="M2 12" fill="#22bc66" />');
+  });
+
+  it("a '>' inside a quoted value after the style: the style is still hoisted and a white fill still flagged", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path id="Group 1 > Path" style="fill:#fff" d="M2 12"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path id="Group 1 > Path" d="M2 12" fill="#fff" />');
+    expect(findIconRenderRisks(parsed!.body)).toEqual([{ kind: "light-paint", attribute: "fill", value: "ffffff" }]);
+  });
+
+  it("a root default lands correctly on an element whose d attribute carries a '>'", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0 > 1"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path d="M0 0 > 1" fill="currentColor" />');
+  });
+
+  it("a '>' inside a root <svg> attribute value does not hide the viewBox", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" data-x="a > b" viewBox="0 0 24 24"><path d="M0 0"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.viewBox).toBe("0 0 24 24");
+  });
+
+  it("a character reference's own ';' is not a declaration separator -- fill:&#35;fff hoists whole", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path style="fill:&#35;fff;stroke:&#x23;000" d="M0 0"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('fill="&#35;fff"');
+    expect(parsed!.body).toContain('stroke="&#x23;000"');
+    expect(parsed!.body).not.toContain("style=");
+  });
+
+  it("duplicate raw attributes by a hoisted name: the first becomes the hoisted value and the later ones are dropped, so the body stays well-formed", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path fill="a" fill="b" style="fill:#000" d="M0 0"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path fill="#000" d="M0 0" />');
+  });
+
+  // Fifth validator pass, 2026-09-06 (later).
+
+  it("two declarations of one property in a single style: the last wins, as CSS says, even with no raw attribute to replace", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path style="fill:#22bc66;fill-rule:evenodd;fill:#ffffff" d="M0 0"/><path style="fill:#fff;fill:none" d="M1 1"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path d="M0 0" fill="#ffffff" fill-rule="evenodd" /><path d="M1 1" fill="none" />');
+    expect(findIconRenderRisks(parsed!.body)).toEqual([{ kind: "light-paint", attribute: "fill", value: "ffffff" }]);
+  });
+
+  it("a single-quoted root viewBox and a single-quoted root fill default are read like double-quoted ones", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox='0 0 24 24' fill='currentColor'><path d="M0 0"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.viewBox).toBe("0 0 24 24");
+    expect(parsed!.body).toBe('<path d="M0 0" fill="currentColor" />');
+  });
+
+  it("url(&quot;#grad&quot;), the entity-escaped spelling of a same-document reference, is accepted and hoisted", () => {
+    const svg =
+      `${VIEWBOX_SVG_OPEN}<linearGradient id="grad"><stop offset="0" stop-color="#000"/></linearGradient>` +
+      `<path style="fill:url(&quot;#grad&quot;)" d="M0 0"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('fill="url(&quot;#grad&quot;)"');
+  });
+
+  it("url(&#104;ttps://evil) -- an entity hiding a scheme -- is still refused", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path style="fill:url(&#104;ttps://evil.example/x)" d="M0 0"/></svg>`;
+    expect(parseIconMarkup(svg)).toBeNull();
+  });
+
+  // Sixth validator pass, 2026-09-06 (later): dropping a leading `style`
+  // took the tag's only separator with it.
+
+  it("style as the first attribute with the next attribute flush against its closing quote: the tag name survives", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<g style="fill:#fff"transform="scale(1)"><path style='fill:#000'd="M0 0"/></g></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<g transform="scale(1)" fill="#fff"><path d="M0 0" fill="#000" /></g>');
+  });
+
+  // Seventh validator pass, 2026-09-06 (later).
+
+  it("a non-HTML whitespace character before style is part of the attribute name, as the HTML tokenizer reads it -- nothing is hoisted", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path\u00a0style="fill:#ffffff" d="M0 0"/><path\u000bstyle="fill:#ffffff" d="M1 1"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path\u00a0style="fill:#ffffff" d="M0 0"/><path\u000bstyle="fill:#ffffff" d="M1 1"/>');
+    expect(findIconRenderRisks(parsed!.body)).toEqual([]);
+  });
+
+  it("a U+00A0 inside a declaration is not CSS whitespace: '\u00a0fill' is not fill and 'fill:\u00a0#fff' is not a colour, so neither is hoisted", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path style=" fill:#ffffff" d="M0 0"/><path style="fill: #ffffff;stroke:#000" d="M1 1"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path d="M0 0" style=" fill:#ffffff" /><path d="M1 1" fill=" #ffffff" stroke="#000" />');
+    expect(findIconRenderRisks(parsed!.body)).toEqual([]);
+  });
+
+  it("a '>' inside a style value is legal in a quoted attribute and is emitted, hoisted or kept, rather than refusing the file", () => {
+    const svg = `${VIEWBOX_SVG_OPEN}<path style="stroke-width:2>" d="M0 0"/><rect style="font-family:a>b;fill:red" x="0"/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toBe('<path d="M0 0" stroke-width="2>" /><rect x="0" style="font-family:a>b" fill="red" />');
+  });
+
+  it("hoistStyleOnAttrs still refuses (unsafe: true) a '<' in a hoisted value", () => {
+    const attrs = ' style="fill:a<b"';
+    expect(hoistStyleOnAttrs(attrs)).toEqual({ attrs, unsafe: true });
+  });
+
+  it("a quoted same-document url(\"#grad\") inside a single-quoted style is hoisted as url(#grad), not refused for the double quote", () => {
+    const svg =
+      `${VIEWBOX_SVG_OPEN}<linearGradient id="grad"><stop offset="0" stop-color="#000"/></linearGradient>` +
+      `<path d="M0 0" style='fill:url("#grad")'/></svg>`;
+    const parsed = parseIconMarkup(svg);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.body).toContain('fill="url(#grad)"');
+  });
+});
+
+describe("findIconRenderRisks: paint that may vanish on the viewer's light ground", () => {
+  // Threshold and fixture luminance values computed directly (WCAG relative
+  // luminance, sRGB-to-linear) rather than assumed:
+  //   #ffffff -> 1.0            (flagged: white)
+  //   #faed1e -> ~0.8099        (loki's bright yellow stop -- NOT flagged:
+  //                              below the 0.85 floor, a saturated brand
+  //                              colour, not paint that vanishes on light)
+  //   #22bc66 -> ~0.3727        (healthchecks' green -- nowhere close)
+
+  it("healthchecks body (post-hoist) reports exactly two risks: fill #ffffff and stroke #ffffff", () => {
+    const parsed = parseIconMarkup(HEALTHCHECKS_SVG);
+    expect(parsed).not.toBeNull();
+    const risks = findIconRenderRisks(parsed!.body);
+    expect(risks).toHaveLength(2);
+    expect(risks).toContainEqual({ kind: "light-paint", attribute: "fill", value: "ffffff" });
+    expect(risks).toContainEqual({ kind: "light-paint", attribute: "stroke", value: "ffffff" });
+  });
+
+  it("loki body (post-hoist) reports no risks -- #faed1e is bright, not pale", () => {
+    const parsed = parseIconMarkup(LOKI_SVG);
+    expect(parsed).not.toBeNull();
+    expect(findIconRenderRisks(parsed!.body)).toEqual([]);
+  });
+
+  it('flags fill="white" (the CSS keyword, not a hex value)', () => {
+    expect(findIconRenderRisks('<path d="M0 0" fill="white"/>')).toEqual([
+      { kind: "light-paint", attribute: "fill", value: "ffffff" },
+    ]);
+  });
+
+  it('flags fill="#FFF" and normalises it to "ffffff" in the reported value', () => {
+    expect(findIconRenderRisks('<path d="M0 0" fill="#FFF"/>')).toEqual([
+      { kind: "light-paint", attribute: "fill", value: "ffffff" },
+    ]);
+  });
+
+  it("skips values it does not guess at: none, currentColor, url(#...), rgb()", () => {
+    const body =
+      '<path d="M0 0" fill="none"/>' +
+      '<path d="M0 0" fill="currentColor"/>' +
+      '<path d="M0 0" fill="url(#a)"/>' +
+      '<path d="M0 0" fill="rgb(255,255,255)"/>';
+    expect(findIconRenderRisks(body)).toEqual([]);
+  });
+
+  it("a knockout body (csharp, via resolveIcon) reports no risks -- the knockout fill became data-knockout, not a fill attribute", async () => {
+    const resolved = await resolveIcon("thesvg:csharp");
+    expect(resolved).not.toBeNull();
+    expect(resolved!.body).toContain("data-knockout");
+    expect(findIconRenderRisks(resolved!.body)).toEqual([]);
+  });
+
+  it("dedupes on (attribute, normalised value) -- two elements with the same white fill report once", () => {
+    const body = '<path d="M0 0" fill="#fff"/><path d="M1 1" fill="#ffffff"/>';
+    expect(findIconRenderRisks(body)).toEqual([{ kind: "light-paint", attribute: "fill", value: "ffffff" }]);
+  });
+
+  it("flags 8-digit (#rrggbbaa) and 4-digit (#rgba) hex, judged on the colour channels alone and reported without the alpha", () => {
+    const body = '<path d="M0 0" fill="#FFFFFF80"/><path d="M1 1" stroke="#ffff"/><path d="M2 2" fill="#00000080"/>';
+    expect(findIconRenderRisks(body)).toEqual([
+      { kind: "light-paint", attribute: "fill", value: "ffffff" },
+      { kind: "light-paint", attribute: "stroke", value: "ffffff" },
+    ]);
+  });
+
+  it("flags a single-quoted fill='#fff' attribute -- a raw attribute the hoist never touched", () => {
+    expect(findIconRenderRisks(`<path d="M0 0" fill='#fff'/>`)).toEqual([
+      { kind: "light-paint", attribute: "fill", value: "ffffff" },
+    ]);
+  });
+
+  it("decodes a numeric character reference before judging the colour -- fill=\"&#35;fff\" is white", () => {
+    expect(findIconRenderRisks('<path d="M0 0" fill="&#35;fff"/><path d="M1 1" stroke="&#x23;FFFFFF"/>')).toEqual([
+      { kind: "light-paint", attribute: "fill", value: "ffffff" },
+      { kind: "light-paint", attribute: "stroke", value: "ffffff" },
+    ]);
+  });
+
+  it("never throws on an out-of-range numeric character reference -- it is not a colour, so it is skipped", () => {
+    expect(findIconRenderRisks('<path d="M0 0" fill="&#x110000;"/><path d="M1 1" stroke="&#99999999;"/>')).toEqual([]);
+  });
+
+  it("does not flag a fill separated from its tag by a non-HTML whitespace character -- a browser reads that as part of the tag name and paints nothing", () => {
+    expect(findIconRenderRisks('<path fill="#ffffff" d="M0 0"/><path stroke="#fff" d="M1 1"/><path fill ="#fff"/>')).toEqual([]);
+  });
+
+  it("flags an unquoted fill=#fff and fill=white -- the HTML parser reads both exactly as it reads a quoted value", () => {
+    expect(findIconRenderRisks('<path d="M0 0" fill=#fff /><path d="M1 1" stroke=white />')).toEqual([
+      { kind: "light-paint", attribute: "fill", value: "ffffff" },
+      { kind: "light-paint", attribute: "stroke", value: "ffffff" },
+    ]);
   });
 });
 

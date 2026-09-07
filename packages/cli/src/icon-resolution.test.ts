@@ -50,6 +50,56 @@ describe("resolveServiceIcon", () => {
     expect(resolution.icon!.hex).toBeNull();
     expect(resolution.icon!.body).toContain('fill="#123456"');
     expect(resolution.icon!.body).toContain('fill="#abcdef"');
+    // Neither #123456 nor #abcdef clears findIconRenderRisks's luminance
+    // floor -- see the "green-only" and "white-fill" cases below for the
+    // two ends of that same check.
+    expect(resolution.risks).toEqual([]);
+  });
+
+  // Added 2026-09-06 alongside @catalogus/core's findIconRenderRisks: a
+  // local, non-stale entry's `risks` field is that function run over the
+  // resolved body, so a fill hidden inside `style="..."` has to already be
+  // hoisted into a real `fill="..."` attribute by the time it gets there --
+  // proven end to end here rather than only at findIconRenderRisks's own
+  // unit tests in @catalogus/core, since this is the one place that wires
+  // resolution to the risk scan.
+  it("carries a 'local' entry's own risks -- a white fill hidden in style=\"...\" surfaces as one light-paint risk", async () => {
+    await mkdir(join(dir, ".catalogus", "icons"), { recursive: true });
+    const whiteFillSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+      '<path d="M1 1h2v2h-2z" style="fill:#ffffff"/></svg>';
+    await writeFixtureFile(dir, ".catalogus/icons/svc.svg", whiteFillSvg);
+
+    const resolution = await resolveServiceIcon(dir, baseEntry({ icon: ".catalogus/icons/svc.svg" }));
+
+    expect(resolution.source).toBe("local");
+    expect(resolution.stale).toBe(false);
+    expect(resolution.risks).toEqual([{ kind: "light-paint", attribute: "fill", value: "ffffff" }]);
+  });
+
+  it("reports an empty risks array for a 'local' entry whose fill is a real brand colour, not an empty field", async () => {
+    await mkdir(join(dir, ".catalogus", "icons"), { recursive: true });
+    const greenFillSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+      '<path d="M1 1h2v2h-2z" fill="#22bc66"/></svg>';
+    await writeFixtureFile(dir, ".catalogus/icons/svc.svg", greenFillSvg);
+
+    const resolution = await resolveServiceIcon(dir, baseEntry({ icon: ".catalogus/icons/svc.svg" }));
+
+    expect(resolution.source).toBe("local");
+    expect(resolution.stale).toBe(false);
+    expect(resolution.risks).toEqual([]);
+  });
+
+  // Catalog sources are curated by this repo, never owner-supplied -- see
+  // ServiceIconResolution.risks's own doc comment for why the field is
+  // undefined here rather than an empty array: there is no fact to report
+  // about a file nobody outside this repo ever hands the CLI.
+  it("never carries risks for a 'simple-icons' source", async () => {
+    const resolution = await resolveServiceIcon(dir, baseEntry({ service: "nginx" }));
+
+    expect(resolution.source).toBe("simple-icons");
+    expect(resolution.risks).toBeUndefined();
   });
 
   it("reports 'local' with stale: true, refusalReason undefined, and a null icon when the named file is missing and the catalog has nothing to fall back to", async () => {

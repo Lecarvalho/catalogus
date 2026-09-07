@@ -1,8 +1,160 @@
-# Handoffs — 2026-09-02 to 2026-09-06 (menus, icons, brand tile, shell, rename/remove, MCP)
+# Handoffs — 2026-09-02 to 2026-09-06 (menus, icons, brand tile, shell, rename/remove, MCP, the live loop)
 
 > Split out of `docs/PLAN.md` on 2026-09-05, content verbatim. `docs/PLAN.md` is the index and the
 > only place status is summarised; this file is the record. Section headings are unchanged so a
 > code comment that names one still finds it by grep.
+
+### Handoff — 2026-09-06 (later), owner-supplied icons go monochrome, and a white fill is reported rather than judged
+
+**Read this first.** Landed and validated; the tree holds everything for the owner to commit.
+The owner's screenshot from Clapline: the two
+icons the agent added by hand (`healthchecks.svg`, `loki.svg` under `.catalogus/icons/`) stayed
+in colour with "Brand icons" on Monochrome, and Healthchecks' white bar was white on the cream
+tile. Cause: both files carry their colour in `style="fill:..."`, and the viewer's monochrome
+rule is `svg [fill]`, an attribute-presence selector; an inline declaration outranks a stylesheet
+rule anyway. Every mark the repo had shipped until now came from simple-icons or the vendored
+thesvg set, all attribute-based, so nothing had ever hit it.
+
+The owner's rule for the fix: simplest thing for a real user. Two halves, both done, both
+validated by a separate agent driving the built binary and the running viewer:
+
+1. **Catalogus fixes what it can.** `parseIconMarkup` (`packages/core/src/icons.ts`) hoists
+   `fill`, `stroke`, `stop-color`, `fill-rule`, `stroke-width` out of `style` into presentation
+   attributes at read time; bytes on disk stay the owner's original (sha256 checked). The
+   viewer's rule became `[fill]:not([fill="none"])` plus a sibling `[stroke]:not([stroke="none"])`
+   (`apps/web/src/components/Icon.module.css`). Measured in Chrome: both Clapline marks resolve
+   to the page ink in Monochrome, gradient included, and revert to brand colour on Colour.
+2. **Catalogus detects and tells; it never decides.** A white fill in an owner-supplied file is
+   either ink drawn for a dark ground (Healthchecks) or a hole cut through the mark (csharp's
+   knockout) — same bytes, opposite answers, so no default is written. `findIconRenderRisks`
+   (core) flags paints with relative luminance ≥ 0.85; `catalogus icons` prints
+   `(check: white fill #ffffff)` on the row and a trailing "N icons to check in the viewer" line;
+   `set services.<id>.icon` prints a "check ... renders in the viewer" advisory on success; MCP
+   `list_icons` and `apply_manifest_edit` carry both through `runIcons`/`runSet` (executed over
+   stdio). SKILL.md 7b: ask the owner to confirm each flagged icon in `catalogus view`, never
+   judge it or run the viewer yourself; if unreadable, set a different file.
+
+**1736 tests / 92 files** after both halves. Then eight validator rounds on the built binary,
+each on the strongest model, each writing its own inputs and comparing against jsdom where a
+browser oracle was needed; every round's findings were fixed failing-test-first in
+`packages/core/src/icons.ts` (`hoistStyleOnAttrs`, `findIconRenderRisks`, the sanitiser) and, in
+two rounds, `packages/cli/src/commands/set.ts`. What the rounds found, in order, because each one
+is the shape a fresh reader would reintroduce:
+
+1. Single-quoted `style='...'` neither hoisted nor flagged; `\bstyle` matching `data-style=`;
+   `!important`, comments and empty values landing in the attribute; a root `<svg style=>`
+   default dropped; duplicate `style` attributes; 8-digit hex unflagged; `url('https://...)`
+   with an unbalanced quote slipping past a backreference.
+2. A plain `split(";")` cutting `clip-path:url(#a;fill:#fff;)` into an invented white fill (the
+   splitter is now paren-, quote- and entity-aware); unquoted attribute values (`fill=#fff`)
+   invisible to both hoist and scan; `url("#grad")` in a single-quoted style refused.
+3. `style=` inside *another attribute's value* (`id="style=fill:white"`, Inkscape's
+   `inkscape:label`) read as the style attribute and the host value truncated. The regex was
+   replaced by `tokenizeAttrs`, a positional walk under the HTML tokenizer's rules; `getAttr` and
+   `withElementDefault` moved onto it too. A kept `font-family:"a"` is re-emitted single-quoted.
+4. `OPENING_TAG_RE`'s `[^<>]*?` ending a tag at a raw `>` inside a quoted value (a Figma layer
+   name in an `id`); now quote-aware, and so is the root `<svg>` match. Numeric character
+   references decoded in the scan; duplicate raw attributes by a hoisted name dropped.
+5. `String.fromCodePoint` throwing on `&#x110000;` and taking `catalogus icons` and `list_icons`
+   down for the whole manifest; last-wins for a property declared twice in one style; a
+   single-quoted root `viewBox` reading as "no viewBox"; `url(&quot;#grad&quot;)` refused.
+6. `commitIconVendor` (the rename onto `.catalogus/icons/<id>.svg`) running *after* the manifest
+   write inside the same `try`, so a blocked destination printed "nothing was written" about a
+   manifest that was — pre-existing since 2026-09-04, only visible once a validator squatted a
+   directory on the path. `set` now says what is true: the fields are written, these icons were
+   not placed, run `catalogus icons`. A dropped leading `style` taking the tag's only separator
+   with it (`<path style="..."d="..."/>` came back as `<pathd=`).
+7. `tokenizeAttrs` using JS `\s` where the HTML tokenizer's whitespace is tab/LF/FF/CR/space, so
+   `\u00a0style` was hoisted; `>` in a style value refusing the whole file.
+8. The CSS side of the same: `trim()` on declarations, so `\u00a0fill` matched `fill`; then the
+   scan's own attribute regex, the last `\s` in the module.
+
+**1778 tests / 92 files**, build and typecheck exit 0; the eighth validator on the built binary
+found three lows, one fixed (below), two recorded. Recorded and deliberately not fixed, all fail-closed or cosmetic: named colours and
+`rgb()`/`hsl()` are not classified by the scan (only hex and `white`); `url(` inside a CSS
+comment refuses the file; a `<![CDATA[` section is hoisted and scanned though the HTML parser
+never renders it; `fill:#fff:extra` hoists as written; the `<title>`/`<desc>` strip matches
+inside an attribute value; an unquoted value ending in `/>` reads the `/` differently from the
+HTML tokenizer; `url(&#35;grad)` (an entity for the `#`) is refused; `catalogus icons` exits 0
+with a dangling entry and its tail count does not count it; an invalid declaration
+(`style="fill:bogus"`, or `fill:\u00a0#fff`) is hoisted over a valid `fill="red"` where CSS would
+drop it and keep red; a CSS-escaped property name (`\66 ill`) and `color:` behind
+`fill="currentColor"` are not seen by the scan. The `icons` summary line was
+reworded by hand ("Ask the owner to confirm each in catalogus view"): the first wording read as
+an instruction to the agent, which section 8 forbids.
+
+Traps for a fresh session:
+- **The hoist is read-time.** A vendored file never changes; `catalogus view`'s payload and the
+  CLI's risk scan both see the hoisted body. Do not "fix" a file on disk.
+- **Do not reach for `!important` in the viewer.** The whole design is attribute selectors; the
+  fix belongs in core's parser.
+- **`#faed1e` (Loki's yellow) is 0.81, under the floor.** Loki is deliberately not flagged.
+
+- **The viewer sees the HTML parser, not an XML one.** `dangerouslySetInnerHTML` decides what a
+  duplicate attribute, an unquoted value or a `>` inside quotes means; jsdom is the oracle a
+  validator used, with the CSS spec where jsdom's `cssstyle` is lax (whitespace).
+- **Eight rounds is what "one validator, one fix" costs on a parser.** Each round found the
+  next layer under the last fix. The rounds got narrower and cheaper; do not skip the last one
+  because the previous was small.
+
+**Next:** the owner commits; reruns the skill on Clapline and confirms Healthchecks in
+`catalogus view`.
+
+### Handoff — 2026-09-06 (night), the live loop ran on a real repo, and CRLF was the thing it found
+
+**Read this first.** The two ready-now items closed. The main session wired `catalogus mcp` into
+a headless Claude Code (`claude -p` with `--mcp-config` naming `node <clone>/packages/cli/dist/cli.js mcp .`
+and `--strict-mcp-config`, run from the Clapline checkout, the workspace's one real manifest) and
+asked it to bring the manifest in sync with detection. The agent loaded the skill, loaded all
+eight deferred tools with one ToolSearch, ran `detect_stack` and `read_manifest` in parallel,
+spent four Bash/Grep calls confirming the one gap (`javascript`, tooling only) and corroborating
+the four declared-not-detected services in `appsettings.json` and `ops/`, then
+`propose_manifest_edit` → `apply_manifest_edit` with the proposal's `baseSha256` →
+`validate_manifest` (strict, exit 0) → `detect_stack` again (no gap). 18 turns, 70 s, $1.64.
+It never touched the CLI for a write. The applied edit was reverted afterwards: the agent chose
+`role: language-tooling` and an `added:` date from `git log`, both plausible, both the owner's
+call. The record is in `phase-6-mcp.md` under "The live loop, 2026-09-06 (night)".
+
+What the run found: the proposal diff was 217 lines for an 8-line change, because Clapline's
+manifest is CRLF and every CLI writer rendered LF. Pre-existing in the CLI since Phase 2; only
+visible now because the MCP puts the diff in front of the agent. Fixed in `manifest-edit.ts`
+(`OpenedManifest.lineEnding`, `dominantLineEnding()`), with a per-writer suite. D4 from the
+previous handoff is fixed in the same session. One validator on the strongest model drove the
+built binary against both, found four things, three fixed and re-proven by mutation:
+
+- The first D4 cut required a majority of ops, all literals, so a list cut to three ops fell
+  under the threshold and a list with a made-up op stopped being a candidate. Now any
+  slash-joined backtick run naming even one op is the list and must match exactly; the skill's
+  one three-op sentence was reworded to commas (line 49).
+- `includes("
+")` let one stray CRLF flip an LF file to CRLF on the next edit. Now a majority
+  rule, tie is LF.
+- A correct list wrapped across two lines fails the drift test. Recorded in the message ("keep
+  it on one line"), not changed.
+- Recorded, not changed: a hand-wrapped `project.architecture` string is refolded by the `yaml`
+  renderer on any write, LF or CRLF (7 changed lines, pre-existing).
+
+**1712 tests / 92 files**, twice, build and typecheck exit 0. Not committed by this session.
+Clapline's tree also holds two uncommitted files: `.agents/skills/catalogus/SKILL.md` (the
+canonical copy, the owner's rule: `.claude/skills/catalogus/SKILL.md` is a wrapper that reads it,
+shared with Codex) replaced with the current 252-line skill, and the wrapper's frontmatter
+description synced.
+
+Traps for a fresh session:
+- **A headless run cannot "show the diff before applying".** `claude -p` has no user turn, so the
+  agent proposed and applied in one go. Whether an interactive session pauses at the diff is
+  still unobserved; the skill says to.
+- **Line endings are invisible until something diffs.** `git diff` under `autocrlf` hid the
+  rewrite entirely (8 insertions); only the MCP's own diff and `file` showed it. Check `file`
+  before believing a small diff.
+- **Skill prose has a reserved form now.** `` `a`/`b`/`c` `` with op names means the full op
+  list; alternatives are written with commas. The drift test's message says so.
+- **The wrapper-skill indirection on Clapline is unexercised.** The live run loaded the skill
+  while the `.claude` path held the full text; the `.agents` canonical plus wrapper has not
+  been driven by an agent yet.
+
+**Next:** the npm publish (parallel track); an interactive run to see the agent stop at the
+diff; Phase 4's backend decision.
 
 ### Handoff — 2026-09-06 (late), decision 14: the MCP is the agent's surface
 
