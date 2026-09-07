@@ -20,20 +20,25 @@ deliberately not rewritten — about forty sites across four packages, all prose
   decision 14 (the MCP is the agent's surface; the CLI is for people and CI); `push_private`
   waits on Phase 5 and the hosted edition is Phase 7. The live run found that every CLI writer
   had been rewriting CRLF manifests as LF since Phase 2; fixed and validated the same night.
-  Phase 4 is blocked on the backend decision; 5 and 7 wait on 4. The parallel track has four
-  unticked items. Nothing waits on the owner; the one ready-now item is an interactive run to
-  watch the agent stop at the diff. The full list of what is left, with what each waits on, is
-  `docs/plan/00-open-work.md`.
-- **Last updated:** 2026-09-06 (later): owner-supplied icons hoist their `style` paint at read
-  time and a white fill is reported, not judged; eight validator rounds on the parser.
+  Phase 4 is built and validated on a local Postgres 17 as of 2026-09-07 (Supabase, decision
+  15): schema, RLS with the grant revokes, four `security_invoker` views, the generated seed,
+  three validator rounds; the local Supabase stack runs it all (`supabase start`), so Phase 5
+  is ready now and the hosted project is a launch item. The parallel track has four unticked items. The full list of what is left, with
+  what each waits on, is `docs/plan/00-open-work.md`.
+- **Last updated:** 2026-09-07 (evening): Phase 4 built and validated in three rounds; the local
+  Supabase stack set up and the suite green against it; Phase 5 is next.
 
 ## Start here on a fresh session
 
-1. Run `pnpm build && pnpm test`, then `pnpm typecheck`, **in that order** — the direction contract
+1. Start the local Supabase stack first (`supabase start`, Docker running) and set
+   `CATALOGUS_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres`; without
+   it the 125 database tests skip and the count below reads 1780. Then run
+   `pnpm build && pnpm test`, then `pnpm typecheck`, **in that order** — the direction contract
    guard compares `apps/web/index.html` against the build output, so a test run against a stale
    `dist` fails on a difference you already fixed.
-2. **Expected: 1779 tests / 92 files**, green, typecheck clean across four packages (as of
-   2026-09-06 later: +67 on the night figure of 1712 for the `style` hoist, the render-risk
+2. **Expected: 1905 tests / 97 files with `CATALOGUS_TEST_DATABASE_URL` set, 1780 + 125 skipped
+   without it** (2026-09-07: `packages/db` and the local Postgres container, see
+   `phase-4-backend.md`; the 1779 / 92 figure of 2026-09-06 later was: +67 on the night figure of 1712 for the `style` hoist, the render-risk
    scan and eight validator rounds against them, in `icons.test.ts`, `set.test.ts`,
    `icons.test.ts` (cli) and `icon-resolution.test.ts`; 1712 was +17 on 1695 for the
    CRLF-preserving writer; 1695 fell from 1751 because the command drift test generates tests
@@ -54,18 +59,18 @@ deliberately not rewritten — about forty sites across four packages, all prose
 | File | Holds |
 |---|---|
 | `docs/plan/00-open-work.md` | Everything left, grouped by what it waits on. The list to pick from. |
-| `docs/plan/handoffs-2026-09.md` | Handoffs 2026-09-02 to 09-06: shell, menus, icons, brand tile, `rename`/`remove` vs a vendored icon, recency on the board, the graph view removed, the MCP server, the live loop and CRLF. Newest first. |
+| `docs/plan/handoffs-2026-09.md` | Handoffs 2026-09-02 to 09-07: shell, menus, icons, brand tile, `rename`/`remove` vs a vendored icon, recency on the board, the graph view removed, the MCP server, the live loop and CRLF, Phase 4 on Postgres. Newest first. |
 | `docs/plan/handoffs-2026-08-26-design.md` | The design world replaced and the form chosen; `/impeccable` state; contract in the page; DAG and migrations joining the world. |
 | `docs/plan/handoffs-2026-08-24-25.md` | Brand interview and shell; viewer redesign; closing 3.7; DAG; drift-and-corpus; viewer foundations. |
 | `docs/plan/phases-0-3.5.md` | Phases 0–3.5 ✅ — scaffold, schema, core, CLI, defect fixes. |
 | `docs/plan/phase-3.6-dogfooding.md` | Phase 3.6 ✅ and 3.6.1 ✅ — cold runs, the skill, `remove`, the five follow-ups, open questions. |
 | `docs/plan/phase-3.7-viewer.md` | Phase 3.7 ✅ less the portfolio page — the viewer on manifests, its decisions, scope notes, HANDOFF §4.2 status. |
-| `docs/plan/phase-4-backend.md` | Phase 4 ⛔ — the backend decision and what follows it. |
+| `docs/plan/phase-4-backend.md` | Phase 4 ✅ — Supabase (decision 15), the design, the four boxes with numbers, the local stack procedure. |
 | `docs/plan/phase-5-auth-push.md` | Phase 5 ⬜ — device flow, keychain, `login`, `push`. |
 | `docs/plan/phase-6-mcp.md` | Phase 6 🔶 — `catalogus mcp` over stdio; eight tools and the MCP-first skill built and validated 2026-09-06 (decision 14), the live loop run on a real repo the same night; `push_private` and the hosted edition left. |
 | `docs/plan/phase-7-platform-viewer.md` | Phase 7 ⬜ — the viewer backed by the platform; the §4.2 acceptance line. |
 | `docs/plan/parallel-track.md` | Names, trademark, schema URL. |
-| `docs/plan/decisions.md` | The fourteen settled decisions and the non-goals. Reopen only with a reason. |
+| `docs/plan/decisions.md` | The fifteen settled decisions and the non-goals. Reopen only with a reason. |
 | `docs/plan/status-history.md` | The old top-of-board paragraph and the test-count history, kept for bisecting. |
 
 Briefs that were run are kept beside this file as the record (`docs/*-brief.md`) and are not to be
@@ -88,4 +93,5 @@ closed moves out of `00-open-work.md`. The main session is the only writer of th
 pnpm build && pnpm test && pnpm typecheck
 ```
 
-Current baseline: **1779 tests / 92 files** (2026-09-06, later). Build and typecheck both exit 0.
+Current baseline: **1905 tests / 97 files** with `CATALOGUS_TEST_DATABASE_URL` set (2026-09-07);
+1780 passed + 125 skipped without it. Build and typecheck both exit 0.

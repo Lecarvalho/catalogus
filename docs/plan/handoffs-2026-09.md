@@ -1,8 +1,96 @@
-# Handoffs — 2026-09-02 to 2026-09-06 (menus, icons, brand tile, shell, rename/remove, MCP, the live loop)
+# Handoffs — 2026-09-02 to 2026-09-07 (menus, icons, brand tile, shell, rename/remove, MCP, the live loop, Phase 4 on Postgres)
 
 > Split out of `docs/PLAN.md` on 2026-09-05, content verbatim. `docs/PLAN.md` is the index and the
 > only place status is summarised; this file is the record. Section headings are unchanged so a
 > code comment that names one still finds it by grep.
+
+### Handoff — 2026-09-07, Phase 4 built on a local Postgres: schema, RLS, views, seed; three validator rounds
+
+**Read this first.** The owner picked Supabase (decision 15) and Phase 4's four remaining boxes
+were built the same day against a local Postgres 17 container, host-independent, so the hosted
+step is `supabase db push` and not a rewrite. The tree holds everything for the owner to commit:
+`supabase/migrations/0001_schema.sql`, `0002_rls.sql`, `0003_views.sql`, the generated
+`supabase/seed.sql` (172 catalog rows), and `packages/db` (`@catalogus/db`, test-only: the
+harness that builds a fresh database per test file, a local `auth` stub standing in for
+Supabase's, and five test files). The design that governed it is in `phase-4-backend.md` under
+"Design, 2026-09-07"; the boxes are ticked there with the numbers.
+
+Four implementers on the smaller model, each one file pair; then a validator on the strongest
+model driving a scratch database with SQL it wrote; then three fix briefs, a second validator, three
+more fix briefs and one main-session fix, a third validator. What the rounds found, in order,
+because each is the shape a fresh reader would reintroduce:
+
+1. **Grants, not policies, were the hole.** Supabase's own default `grant all` includes
+   TRUNCATE and TRIGGER, which RLS never governs: `authenticated` could wipe every tenant or
+   attach a trigger to `user_service_accounts` and read every other user's cost writes. On PG17
+   the same grant also carries `MAINTAIN` (`vacuum full`, `cluster`), and
+   `information_schema.role_table_grants` does not list it, so a grant audit looked clean.
+   `0002_rls.sql` now revokes `truncate, trigger, references` and, version-guarded, `maintain`,
+   on all tables and in default privileges. PostgREST never issues these; a raw connection or
+   an RPC with dynamic SQL would.
+2. **A row could reference another tenant's project.** `user_service_accounts` checked only
+   `user_id`, so B could park an account on A's project and A's delete cascaded into B's cost
+   row. Edges could carry a `project_id` that disagreed with their endpoints; `replaced_by`
+   pointers could cross projects. Fixed with `with check` on the account policies and, for the
+   structural ones, **composite foreign keys on `(id, project_id)`** — DDL, so it holds for
+   `service_role` too — using the PG15+ `on delete set null (column)` form so a deleted
+   replacement nulls the pointer and not the row's `project_id`.
+3. **The blast radius was exponential.** Path-tracking made every distinct path a row: 20
+   chained diamonds took 106 s, 166 were uncomputable. Rewritten to `union` on
+   `(project_id, dependency, dependent, depth)` with `min(depth)`, cap 1024 (round 2 found the
+   first cap of 64 silently truncated a 70-node chain), and an outer `where dependency <>
+   dependent` so a node inside a cycle is not its own dependent. 200 chained diamonds now run in
+   about 130 ms.
+4. **Cost rows that could not be rolled up.** A cost with no `billing_cycle` vanished from every
+   total while inflating the count; no currency summed under a null group; `numeric(12,2)`
+   rounded `1.005` to `1.01` without saying so. Checks now require cycle and currency with an
+   amount, uppercase three-letter currency, scale ≤ 2 on an unconstrained `numeric`, and the
+   views skip cost-less rows and round `monthly_equivalent` to two places.
+5. **The harness leaked claims.** A `fn` that set `request.jwt.claims` session-wide, or
+   committed early, left the previous user's `auth.uid()` for the next `asAnon`. RLS still
+   returned nothing to anon, so no test noticed. `runAsRole` now always sets the claims (`''`
+   when none) and resets both GUCs in `finally`; `harness.test.ts` proves it by mutation.
+
+Recorded and deliberately not fixed: `lock table ... access exclusive` as `authenticated` is a
+DoS bounded only by PostgREST's timeouts (it needs only the UPDATE grant, so revokes cannot close
+it; `0002_rls.sql` says so beside the MAINTAIN block); the blast-radius view is whole-database,
+so one hostile 1100-node project slows the view for every tenant and is truncated at depth 1024
+without a marker; a real sum keeps its input scale (`120`) beside the typed `0.00` literal;
+`1.100` is refused by the scale check though its value fits; replacement pointers can form multi-node cycles
+(the CLI's job, like acyclicity); a `removed` node still appears through an `active` edge (the
+CLI deletes edges with the node); `explain analyze` reveals filtered row counts; whitespace-only
+names pass both the schema and the DB; `version: ""` is manifest-valid but DB-rejected (the CLI
+refuses empty values, so only a hand edit reaches it); no supported project-transfer path exists.
+Two owner questions the seed leaves open by design: `pricing_model` and `vendor_url` are null
+on every row.
+
+Traps for a fresh session:
+- **`CATALOGUS_TEST_DATABASE_URL` gates 124 tests.** Without it the suite is green with them
+  skipped; a box ticked on a run without the variable is a box ticked on nothing. The container
+  line is in the design section.
+- **`pnpm --filter @catalogus/db test` says "No test files found".** The root vitest include
+  globs are root-relative; run `pnpm exec vitest run packages/db` from the root.
+- **`vacuum` denied is a WARNING, not an error.** `rls.test.ts` asserts on the `notice` event.
+- **The stub grants what Supabase grants.** Change the stub only to match Supabase, never to
+  make a test pass; the revokes live in the migration so they ship.
+- **A validator round on a parser or a policy set finds the next layer under the last fix.**
+  Three rounds here; the third was narrow and cheap. Do not skip it.
+
+**Later the same evening:** the owner asked why a remote database was needed for development.
+It is not. The Supabase CLI was installed, `supabase init` and `supabase start` run, and the
+three migrations plus the seed applied on Supabase's own Postgres 17 image on the first start;
+the suite is green against that database (recorded in `phase-4-backend.md`, "The local Supabase
+stack"). Studio at `localhost:54323` is the visual check. The hosted project is a launch item on
+the parallel track now, not a Phase 4 step.
+
+**Next:** Phase 5 (`login`, `push`) against the local stack; it is the first consumer of
+`packages/db` at runtime. A fresh session starts with `supabase start`, sets
+`CATALOGUS_TEST_DATABASE_URL` to the stack's database (above), confirms 1905 / 97, then opens
+`phase-5-auth-push.md` and HANDOFF §6 "Auth design". Nothing in the tree is committed yet; the
+owner commits. The plain `catalogus-pg` container from earlier in the day is redundant once the
+stack runs. The owner's two
+seed columns and the `category`-less `services` table (decision 15) are the two things to
+confirm or veto.
 
 ### Handoff — 2026-09-06 (later), owner-supplied icons go monochrome, and a white fill is reported rather than judged
 
@@ -106,6 +194,10 @@ Traps for a fresh session:
 **Next:** the owner re-copies the trimmed skill to Clapline's canonical `.agents` path and syncs
 the wrapper's frontmatter description; reruns the skill and confirms Healthchecks in
 `catalogus view`.
+
+**Closed 2026-09-07:** the owner re-copied the trimmed skill to Clapline, reran it and reported
+it validated. Nothing ready-now remains but the interactive MCP run; everything else waits on the
+backend pick (Phase 4) or the owner's npm and GitHub accounts (parallel track).
 
 ### Handoff — 2026-09-06 (night), the live loop ran on a real repo, and CRLF was the thing it found
 

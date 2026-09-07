@@ -124,6 +124,26 @@ From HANDOFF §9, plus decisions taken during implementation. Settled — reopen
     - **Publishing to npm stays on the launch checklist** (parallel track) for the local edition
       and for CI; it stops being the way an agent gets Catalogus.
 
+15. **The backend is Supabase** — owner, 2026-09-07, from the four-way comparison in
+    `phase-4-backend.md`. Postgres with native RLS, so HANDOFF §4's schema transfers unchanged and
+    the ownership boundary stays in the database for the table that holds cost data; bundled Auth
+    with GitHub OAuth is what HANDOFF §9.6 already leaned on for Phase 5. Neon was the runner-up
+    and differs only in auth; D1 and PocketBase were declined because SQLite makes the storage
+    layer a rewrite. Prototyped first on a local Postgres 17 container, and the migrations are
+    written to be host-independent Postgres: the only Supabase-specific surface they touch is
+    `auth.users` and `auth.uid()`, which a local stub provides for the tests.
+
+    Two consequences settled with it:
+
+    - **`services` has no `category` column.** HANDOFF §4 lists one; `packages/core/src/catalog.ts`
+      records why the display catalog dropped it — a vendor has no one true category (Supabase is a
+      database and auth and storage), and the per-project `role` on the manifest entry already
+      answers the question. The DB follows the code's correction: category lives on
+      `project_services.role`. Flagged to the owner rather than silently applied.
+    - **`services.pricing_model` and `vendor_url` are nullable and the seed leaves them null.**
+      Neither fact is in the repo. The seed carries what the repo knows (slug, name, simple-icons
+      slug, from `CATALOGUS_CATALOG`); the owner fills the rest, per the ask-never-guess rule.
+
 ## Non-goals
 
 From HANDOFF §8. Worth restating because each is a plausible-sounding scope creep.

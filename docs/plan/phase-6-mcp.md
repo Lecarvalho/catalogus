@@ -159,6 +159,6 @@ failure message, not changed. Recorded, not changed: the `yaml` renderer refolds
 
 Verified: **1712 tests / 92 files**, twice, build and typecheck exit 0.
 
-Left in this phase: `push_private` (Phase 5), and the hosted edition (Phase 7). Not yet
-observed: an interactive session pausing at the proposal diff before applying, which a headless
-run cannot show.
+Left in this phase: `push_private` (Phase 5), and the hosted edition (Phase 7). The interactive
+pause at the proposal diff before `apply_manifest_edit`, which a headless run cannot show, was
+observed by the owner on Clapline on 2026-09-07 after re-copying the trimmed skill.

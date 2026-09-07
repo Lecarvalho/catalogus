@@ -7,16 +7,16 @@ file or the handoff.
 
 ## Ready now — no decision needed
 
-- **Run the MCP loop interactively once.** The 2026-09-06 (night) headless run proved the
-  tool path end to end on Clapline (`phase-6-mcp.md`, "The live loop"), but `claude -p` has no
-  user turn, so whether an interactive agent stops at the proposal diff before
-  `apply_manifest_edit` is unobserved. The owner's session, any time; nothing to build.
+- **Phase 5** — device flow, keychain, `catalogus login`, `catalogus push`, against the local
+  Supabase stack (`supabase start`); GitHub OAuth needs a real OAuth app even locally, email or
+  magic link work offline through Inbucket. (`phase-5-auth-push.md`.)
 
-- **Re-copy the trimmed skill to Clapline (canonical `.agents` path, wrapper description synced), rerun it, confirm Healthchecks in `catalogus view`.** The 2026-09-06
-  (later) handoff: owner-supplied icons now hoist `style` paint, and `catalogus icons` prints
-  `(check: white fill #ffffff)` for the agent to hand to the owner. The owner's session; nothing
-  to build. The same handoff lists eight parser edge cases recorded and deliberately not fixed
-  (named colours unclassified, CDATA, `url(` in a comment, ...); none blocks anything.
+- ~~Run the MCP loop interactively once~~ — **closed 2026-09-07.** The owner ran it on Clapline
+  and observed the agent stop at the proposal diff before `apply_manifest_edit`.
+
+- ~~Re-copy the trimmed skill to Clapline~~ — **closed 2026-09-07.** The owner re-copied the
+  trimmed skill to Clapline, reran it and validated the result. The eight parser edge cases the
+  2026-09-06 (later) handoff records as deliberately not fixed stay recorded; none blocks anything.
 
 ## Waiting on the owner — nothing open
 
@@ -44,19 +44,16 @@ whether the portfolio is a fourth view mode or its own route. `scanWorkspace()` 
 and dormant — it is what this resumes from. Three of HANDOFF §4.2's six queries need this page
 (2, 3, 6). (`phase-3.7-viewer.md`.)
 
-## Phase 4 — Backend ⛔ blocked on one decision
+## Phase 4 — Backend ✅ (Supabase, decision 15) — local stack running
 
-- [ ] Pick the backend (Neon / D1 / PocketBase / Supabase — the comparison is in the phase file)
-- [ ] Migrations for the HANDOFF §4 schema
-- [ ] Row-level ownership policies, with a test that a second user cannot read the first's
-      `user_service_accounts`
-- [ ] Views: `v_project_costs`, `v_service_blast_radius`, `v_phaseouts`
-- [ ] Seed the global service catalog
+All four boxes built and validated 2026-09-07; the local Supabase stack (`supabase start`) runs
+the migrations and seed on Supabase's own Postgres 17, and the suite is green against it
+(`phase-4-backend.md`, "The local Supabase stack"). Nothing here waits on an account: the hosted
+project (`supabase link`, `db push`) is a launch item and moved to the parallel track below. Two
+things for the owner to confirm or veto: the `services` table has no `category` column
+(decision 15), and the seed leaves `pricing_model` and `vendor_url` null.
 
-A local Postgres container is available for prototyping the §4 schema, RLS and the recursive CTE
-before choosing a host. (`phase-4-backend.md`.)
-
-## Phase 5 — Auth and push ⬜ (after 4)
+## Phase 5 — Auth and push ⬜ — ready now, against the local stack
 
 Device flow, `@napi-rs/keyring`, `catalogus login`, `catalogus push`, `push --private` with the
 field allow-list, and the test that the token never lands in a file an agent can read.
@@ -70,7 +67,7 @@ Phase 5) and the hosted edition served by the web platform against an account (P
 recorded constraint is that `detect_stack` needs repo access the hosted server does not have).
 (`phase-6-mcp.md`, `decisions.md` 14.)
 
-## Phase 7 — Viewer backed by the platform ⬜ (after 4)
+## Phase 7 — Viewer backed by the platform ⬜ (after 5)
 
 Four of its seven boxes already exist as Phase 3.7 reading manifests directly; Phase 7 puts the
 store behind them and adds the portfolio with cost totals and the cross-project blast radius. The
@@ -78,6 +75,7 @@ store behind them and adds the portfolio with cost totals and the cross-project 
 
 ## Parallel track ⬜ — blocks launch, not development
 
+- [ ] Create the hosted Supabase project, `supabase link`, `supabase db push`, seed as `service_role`
 - [ ] Reserve the GitHub org `catalogus`
 - [ ] CIPO/USPTO knock-out search, Nice Class 9 + 42
 - [ ] Publish the JSON Schema at `https://catalogus.dev/schema/v1.json` — until it resolves, the
