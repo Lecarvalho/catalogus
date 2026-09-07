@@ -32,15 +32,15 @@ deliberately not rewritten — about forty sites across four packages, all prose
 1. Run `pnpm build && pnpm test`, then `pnpm typecheck`, **in that order** — the direction contract
    guard compares `apps/web/index.html` against the build output, so a test run against a stale
    `dist` fails on a difference you already fixed.
-2. **Expected: 1778 tests / 92 files**, green, typecheck clean across four packages (as of
-   2026-09-06 later: +66 on the night figure of 1712 for the `style` hoist, the render-risk
+2. **Expected: 1779 tests / 92 files**, green, typecheck clean across four packages (as of
+   2026-09-06 later: +67 on the night figure of 1712 for the `style` hoist, the render-risk
    scan and eight validator rounds against them, in `icons.test.ts`, `set.test.ts`,
    `icons.test.ts` (cli) and `icon-resolution.test.ts`; 1712 was +17 on 1695 for the
    CRLF-preserving writer; 1695 fell from 1751 because the command drift test generates tests
    per fenced skill line). Two legitimate variations: `direction-contract.test.ts` derives
    its count from the contract's own sections, so a contract edit moves the total by design; and
    `workspace-scan.test.ts` skips six junction tests where Windows refuses the privilege, so
-   1772 passed + 6 skipped is the same tree. A count one or two off is a reason to read that file's
+   1773 passed + 6 skipped is the same tree. A count one or two off is a reason to read that file's
    diff, not a failure. The history of how the number got here is `docs/plan/status-history.md`.
 3. **Run it more than once before believing it.** vitest parallelises across files; the suite has
    flaked before on two files mutating one real directory while every single-file run passed.
@@ -88,4 +88,4 @@ closed moves out of `00-open-work.md`. The main session is the only writer of th
 pnpm build && pnpm test && pnpm typecheck
 ```
 
-Current baseline: **1778 tests / 92 files** (2026-09-06, later). Build and typecheck both exit 0.
+Current baseline: **1779 tests / 92 files** (2026-09-06, later). Build and typecheck both exit 0.

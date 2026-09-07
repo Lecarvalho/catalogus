@@ -12,7 +12,7 @@ file or the handoff.
   user turn, so whether an interactive agent stops at the proposal diff before
   `apply_manifest_edit` is unobserved. The owner's session, any time; nothing to build.
 
-- **Rerun the skill on Clapline and confirm Healthchecks in `catalogus view`.** The 2026-09-06
+- **Re-copy the trimmed skill to Clapline (canonical `.agents` path, wrapper description synced), rerun it, confirm Healthchecks in `catalogus view`.** The 2026-09-06
   (later) handoff: owner-supplied icons now hoist `style` paint, and `catalogus icons` prints
   `(check: white fill #ffffff)` for the agent to hand to the owner. The owner's session; nothing
   to build. The same handoff lists eight parser edge cases recorded and deliberately not fixed
