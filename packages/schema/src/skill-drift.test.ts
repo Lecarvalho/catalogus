@@ -288,6 +288,26 @@ function checkFragmentAgainstSchemaFields(schema: SchemaNode, fragment: unknown)
 
 const schemaRoot = catalogusSchemaV1 as unknown as SchemaNode;
 
+// 2026-09-07: Claude Code loads a skill's body into the turn with a size
+// cap that is not documented and cannot be raised; above it the middle of
+// the file is cut ("Skill truncated middle") and the agent sees the head and
+// tail only. Observed on a client repo: 13,157 bytes loaded whole, 13,690
+// did not. The cap here sits under the known-good size with margin, so a
+// wording change that would push the skill over it fails here, not in the
+// client session that first loads it.
+const SKILL_MAX_BYTES = 12_900;
+
+describe("skills/catalogus/SKILL.md stays under the size Claude Code loads whole", () => {
+  it(`is at most ${SKILL_MAX_BYTES} bytes`, () => {
+    const bytes = readFileSync(skillPath).byteLength;
+    expect(
+      bytes,
+      `${skillPath} is ${bytes} bytes; above ${SKILL_MAX_BYTES} Claude Code has been observed to cut the ` +
+        "middle of the skill out when loading it. Trim wording rather than raising the cap."
+    ).toBeLessThanOrEqual(SKILL_MAX_BYTES);
+  });
+});
+
 describe("skills/catalogus/SKILL.md's ```yaml examples vs. packages/schema", () => {
   const skillMarkdown = readFileSync(skillPath, "utf8");
   const allBlocks = extractYamlBlocks(skillMarkdown);

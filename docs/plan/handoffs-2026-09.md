@@ -69,7 +69,7 @@ is the shape a fresh reader would reintroduce:
 8. The CSS side of the same: `trim()` on declarations, so `\u00a0fill` matched `fill`; then the
    scan's own attribute regex, the last `\s` in the module.
 
-**1778 tests / 92 files**, build and typecheck exit 0; the eighth validator on the built binary
+**1779 tests / 92 files** (one is the skill size guard), build and typecheck exit 0; the eighth validator on the built binary
 found three lows, one fixed (below), two recorded. Recorded and deliberately not fixed, all fail-closed or cosmetic: named colours and
 `rgb()`/`hsl()` are not classified by the scan (only hex and `white`); `url(` inside a CSS
 comment refuses the file; a `<![CDATA[` section is hoisted and scanned though the HTML parser
@@ -90,6 +90,12 @@ Traps for a fresh session:
   fix belongs in core's parser.
 - **`#faed1e` (Loki's yellow) is 0.81, under the floor.** Loki is deliberately not flagged.
 
+- **Claude Code cuts the middle out of a skill above an undocumented size.** The owner copied
+  the 13,690-byte skill to Clapline on 2026-09-07 and the fresh session's first words were
+  "Skill truncated middle"; the 13,157-byte version had loaded whole the night before. No
+  setting raises the cap. The skill is 12,663 bytes now (the 691-character description cut to
+  274, the listing shows 250 anyway; 7b and section 8 tightened), and `skill-drift.test.ts`
+  fails above 12,900 bytes so the next wording change trips here, not on a client.
 - **The viewer sees the HTML parser, not an XML one.** `dangerouslySetInnerHTML` decides what a
   duplicate attribute, an unquoted value or a `>` inside quotes means; jsdom is the oracle a
   validator used, with the CSS spec where jsdom's `cssstyle` is lax (whitespace).
@@ -97,7 +103,8 @@ Traps for a fresh session:
   next layer under the last fix. The rounds got narrower and cheaper; do not skip the last one
   because the previous was small.
 
-**Next:** the owner commits; reruns the skill on Clapline and confirms Healthchecks in
+**Next:** the owner re-copies the trimmed skill to Clapline's canonical `.agents` path and syncs
+the wrapper's frontmatter description; reruns the skill and confirms Healthchecks in
 `catalogus view`.
 
 ### Handoff — 2026-09-06 (night), the live loop ran on a real repo, and CRLF was the thing it found

@@ -1,6 +1,6 @@
 ---
 name: catalogus
-description: Catalog a project's service providers, infrastructure and stack metadata into a catalogus.yaml manifest, driving Catalogus through its MCP tools when they are connected and through the `catalogus` CLI otherwise. Runs the scanner, then fills in what a scan can never reveal — dependency edges, registrar, PM tooling, architecture style, lifecycle — by asking the user the right questions and recording the answers. Use when the user asks to catalog, inventory or map this project's services, dependencies, infrastructure or stack; to create, fill in, audit or update a catalogus.yaml or stack.yaml; to answer "what does this project depend on"; or mentions Catalogus by name.
+description: Catalog a project's service providers, infrastructure and stack into catalogus.yaml via the Catalogus MCP tools or CLI, asking the user what a scan can't reveal. Use to catalog, inventory, map or audit a project's services, dependencies or stack, or when Catalogus is named.
 ---
 
 # Catalogus — cataloging a project
@@ -12,10 +12,9 @@ talks to whom, the registrar, what's phased out) isn't in the repo, and finding 
 
 ## Two ways to drive Catalogus, in order
 
-**First:** if the `catalogus` MCP tools are connected, use them. If your harness lists them as
-deferred, load them before doing anything else. **Second:** if they are not connected, run
-`catalogus --version`; if that fails, stop and tell the user. **Third:** never edit the file by
-hand, on either path.
+**First:** if the `catalogus` MCP tools are connected, use them; if your harness lists them as
+deferred, load them first. **Second:** if not connected, run `catalogus --version`; if that fails,
+stop and tell the user. **Third:** never edit the file by hand, on either path.
 
 | Tool | Replaces | Notes |
 |---|---|---|
@@ -101,12 +100,12 @@ catalogus detect
 
 Read the output as three kinds of node — the kind is the flag you pass to `add` — plus noise:
 
-- **`service`** — a vendor with an account and an outage risk (Supabase, Stripe, Fly.io). Default; no `--kind`.
-- **`component`** — infrastructure the project runs itself, on the request path (nginx, an OTel transport). `--kind component`.
-- **`stack`** — the language/runtime/framework the code is written in (.NET, React). Attach it by an edge to whatever runs it, and give it `--version`. `--kind stack`.
+- **`service`** — a vendor with an account and an outage risk (Supabase, Stripe). Default; no `--kind`.
+- **`component`** — infrastructure the project runs itself, on the request path (nginx). `--kind component`.
+- **`stack`** — the language/runtime/framework (.NET, React); edge it to what runs it, give it `--version`. `--kind stack`.
 
-Noise (ESLint, Vitest) isn't an entry, and detection can't see outside the repo. When it can't tell
-what an agent is, ask the owner, then `catalogus add <agent> --role coding-agent`.
+Noise (ESLint, Vitest) isn't an entry; detection can't see outside the repo. When it can't tell what
+an agent is, ask the owner, then `catalogus add <agent> --role coding-agent`.
 
 ### 2. Create the manifest
 
@@ -118,29 +117,29 @@ catalogus init --yes
 ```
 
 Writes the project name (guessed) and, with `--visibility`, `project.vcs` — no service entries yet
-(those need a role, step 6). If a manifest exists already, run `catalogus diff` instead of
-re-initialising; `catalogus remove <id>` undoes a wrong entry.
+(those need a role, step 6). If a manifest exists, run `catalogus diff` instead; `catalogus remove
+<id>` undoes a wrong entry.
 
 ### 3. Corroborate against configuration
 
-`catalogus detect` already reads most of this; read the files yourself too, since a provider outside
-its catalog leaves an unclaimed key group:
+`catalogus detect` reads most of this; read the files too — a provider outside its catalog leaves an
+unclaimed key group:
 
 | Source | What it proves |
 |---|---|
-| `appsettings*.json`, `.env.example`, `config/*.yml` | The authoritative service list — one key group per provider |
+| `appsettings*.json`, `.env.example`, `config/*.yml` | The service list — one key group per provider |
 | `docker-compose.yml` | Local dependencies: databases, caches, queues |
-| `fly.toml`, `vercel.json`, `netlify.toml`, `render.yaml`, `wrangler.toml` | Hosting, often one file per deployed app |
+| `fly.toml`, `vercel.json`, `netlify.toml`, `render.yaml`, `wrangler.toml` | Hosting, one file per app |
 | `.github/workflows`, `.gitlab-ci.yml` | CI provider and the deployment chain |
 | `docs/ARCHITECTURE.md`, `README.md` | Architecture style and PM tool, in prose |
-| Dependency registration (`Program.cs`, `DependencyInjection.cs`, a startup/module file) | Providers actually wired, even ones no settings file names |
-| Client/adapter classes (`Infrastructure/`, `clients/`, `providers/`) | One class per external system |
+| Dependency registration (`Program.cs`, a startup/module file) | Providers wired, even unnamed in settings |
+| Client/adapter classes (`Infrastructure/`, `clients/`) | One class per external system |
 | A configuration-guard class | What the app refuses to start without |
 | Diagrams under `docs/` | What the team believes, not what's true — a checklist |
 
 A key group's location is an edge (`Stripe` in `Api/appsettings.json` proves `api -> stripe`) — derive
-edges this way before step 5. A service can be absent from every readable file; "declared but not
-visible" is a lead, not proof of removal, and configuration wins over prose.
+edges this way before step 5. "Declared but not visible" is a lead, not proof of removal;
+configuration wins over prose.
 
 ### 4. Work out what is missing
 
@@ -222,18 +221,15 @@ reports each entry's icon as `local` (vendored), `simple-icons`/`thesvg` (built-
 `none`. For `none`, search the web for the brand's mark and run `catalogus set services.<id>.icon
 <https-url-or-path>` — the sanitiser refuses scripts, event handlers, external references and
 anything over 256 KB. When nothing turns up, ask instead of approximating a mark; list every icon you
-set and its source. Re-run `catalogus icons` after setting one: a row marked `(check: ...)`, the
-trailing `icons to check in the viewer` line, or a `check services.<id>.icon renders` line from `set`
-itself means the file paints with white or pale ink that can vanish on the viewer's light ground —
-don't judge the render yourself, ask the user to open `catalogus view` and confirm it reads well, and
-set a different source if it doesn't.
+set and its source. A `(check: ...)` row, the `icons to check in the viewer` line, or a `check
+services.<id>.icon renders` line from `set` means white or pale ink that can vanish on the light
+ground: ask the user to confirm it in `catalogus view`, never judge it yourself.
 
 ### 8. Hand the viewer to the user — do not run it yourself
 
-`catalogus view` serves the manifest at `127.0.0.1:4180` — tell the user and let them run it; it's a
-server, blocking until `Ctrl+C`, same as `catalogus mcp` (wired up once, never by you). **Fenced means
-you run it; prose means it's for the user** — neither is ever fenced. Your own check is `catalogus
-graph`.
+`catalogus view` serves the manifest at `127.0.0.1:4180` — tell the user and let them run it; it
+blocks until `Ctrl+C`, same as `catalogus mcp` (wired up once, never by you). **Fenced means you run
+it; prose means it's for the user** — neither is ever fenced. Your own check is `catalogus graph`.
 
 ## Common mistakes
 
@@ -241,11 +237,9 @@ graph`.
 - Listing libraries as services (React, Tailwind aren't dependencies).
 - Promoting a doc mention into a dependency — configuration is evidence, prose is a question.
 - Leaving the manifest with no edges — ask if the user hasn't given them.
-- Copying configuration values — key names only.
-- Recording tenant identifiers (project refs, account numbers, org slugs).
+- Copying configuration values or tenant identifiers (project refs, account numbers) — key names only.
 - Inventing `added` dates — check git, offer a default, or ask.
-- Inventing or approximating an icon when a web search finds nothing — ask for a URL or file.
-- Deciding a `(check: ...)`-flagged icon renders fine yourself — ask the user to look in `catalogus view`.
+- Inventing an icon when a web search finds nothing, or judging a `(check: ...)` one — ask.
 - Guessing past a contradiction, or rewording prose to satisfy a validator — surface or report it.
 - Deleting `catalogus.yaml`, or re-adding an entry, instead of `catalogus remove`/`unlink`.
 - Running `catalogus view`/`catalogus mcp` yourself, or the CLI through a shell while tools connect.
@@ -253,5 +247,5 @@ graph`.
 
 ## Layer 3
 
-Cost and account data never touches this file — point the user at `catalogus push --private`
-(`push_private`, once Phase 5 lands).
+Cost and account data never touches this file — `catalogus push --private` (`push_private`), once
+Phase 5 lands.
