@@ -180,17 +180,55 @@ describe("skills/catalogus/SKILL.md's tool names vs. the catalogus MCP server's 
     ).toEqual([]);
   });
 
-  it("the `edits` op names SKILL.md documents match editSchema's literals, in the same order", () => {
+  it("every op list SKILL.md writes matches editSchema's literals, in the same order", () => {
     const schemaOps = editSchemaOpLiterals();
     const expectedBacktickList = schemaOps.map((op) => `\`${op}\``).join("/");
+    // Every backtick-slash run in the skill that names even one op literal
+    // is taken to be *the* op list and must match it exactly, on one line.
+    // The skill writes the list in more than one place (the tool table's
+    // apply_manifest_edit row and step 6's "batch every edit" sentence, as of
+    // 2026-09-06); asserting only that the expected list appears *somewhere*
+    // let one occurrence go stale as long as the other stayed current, which
+    // is the 2026-09-06 validator's D4 (docs/plan/phase-6-mcp.md). Each
+    // occurrence is checked on its own, with its line number, so a stale one
+    // is the failure.
+    //
+    // "Even one op" is deliberate, and it constrains the skill's prose: a
+    // slash-joined backtick run of ops is reserved for the full list, so a
+    // sentence that offers two or three ops as alternatives writes them
+    // with commas ("`set`, `rename` or `unlink`"). The first cut of this
+    // test required a majority of ops, all of them literals, and the same
+    // day's validator showed both halves of that leak: a list cut to three
+    // ops fell under the threshold and went unchecked, and swapping one op
+    // for a made-up word made the run stop being a candidate at all -- the
+    // more wrong the list, the less the test looked at it.
+    const lines = skillMarkdown.split(/\r?\n/);
+    const occurrences: { lineNumber: number; list: string }[] = [];
+    lines.forEach((line, index) => {
+      for (const match of line.matchAll(/`[a-z]+`(?:\/`[a-z]+`)+/g)) {
+        const members = match[0].split("/").map((m) => m.slice(1, -1));
+        if (members.some((m) => schemaOps.includes(m))) {
+          occurrences.push({ lineNumber: index + 1, list: match[0] });
+        }
+      }
+    });
     expect(
-      skillMarkdown,
-      `expected skills/catalogus/SKILL.md to contain the exact backtick-slash list ` +
-        `"${expectedBacktickList}" (editSchema's op literals, in propose-edit.ts's own union order: ` +
-        `${schemaOps.join(", ")}) somewhere -- e.g. in the tool table's apply_manifest_edit row, or ` +
-        "step 6's \"batch every edit\" sentence. If propose-edit.ts's editSchema gained, lost or " +
-        "reordered an op, update SKILL.md's list to match; if SKILL.md's list changed on its own, " +
-        "put it back."
-    ).toContain(expectedBacktickList);
+      occurrences.length,
+      `expected skills/catalogus/SKILL.md to write the \`edits\` op list ("${expectedBacktickList}") ` +
+        "at least once -- e.g. in the tool table's apply_manifest_edit row, or step 6's \"batch every " +
+        "edit\" sentence. Either the skill stopped listing the ops (a rewrite, not a tweak) or it " +
+        "writes them in a shape this test's regex no longer recognises."
+    ).toBeGreaterThan(0);
+    const stale = occurrences.filter((o) => o.list !== expectedBacktickList);
+    expect(
+      stale.map((o) => `SKILL.md:${o.lineNumber} ${o.list}`),
+      `every op list in skills/catalogus/SKILL.md must be exactly "${expectedBacktickList}" ` +
+        `(editSchema's op literals, in propose-edit.ts's own union order: ${schemaOps.join(", ")}). ` +
+        "If propose-edit.ts's editSchema gained, lost or reordered an op, update every occurrence in " +
+        "SKILL.md to match; if one occurrence in SKILL.md changed on its own, put it back. A list that " +
+        "is right but wrapped across two lines also lands here: keep it on one line. And a sentence " +
+        "that offers two or three ops as alternatives writes them with commas, never slash-joined -- " +
+        "the slash form is reserved for the full list."
+    ).toEqual([]);
   });
 });

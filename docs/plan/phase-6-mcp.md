@@ -4,7 +4,7 @@
 > only place status is summarised; this file is the record. Section headings are unchanged so a
 > code comment that names one still finds it by grep.
 
-## Phase 6 — MCP server mode 🔶 three of five boxes, 2026-09-06
+## Phase 6 — MCP server mode 🔶 seven of eight boxes, 2026-09-06 (night)
 
 The agent workflow, and the differentiator. `catalogus mcp` over stdio.
 
@@ -19,9 +19,8 @@ The agent workflow, and the differentiator. `catalogus mcp` over stdio.
 - [x] The skill rewritten MCP-first, CLI fenced commands as the fallback; a drift test ties the
       tool names the skill teaches to the server's registry (decision 14; 250 lines, validated)
 - [ ] `push_private` — routes through the CLI's credential; the agent never sees it (needs Phase 5)
-- [ ] Wire into Claude Code and run the detect → diff → propose loop against a real repo (the
-      owner's session: an `.mcp.json` entry naming `node packages/cli/dist/cli.js mcp <repo>`; not
-      done by the 2026-09-06 session, which had no live client)
+- [x] Wire into Claude Code and run the detect → diff → propose loop against a real repo
+      (2026-09-06 night, headless `claude -p` on the Clapline checkout; see "The live loop" below)
 
 ### What was built on 2026-09-06
 
@@ -102,7 +101,8 @@ the server's registry.
   ok and one stale refusal.
 - D3: two tool descriptions still routed writes to the CLI lines. Rewritten.
 - D4: the op-list drift assertion only goes red when both occurrences of an op name change.
-  **Recorded, not fixed.**
+  Fixed the same night (see "The live loop" below): every slash-joined backtick run naming an op
+  is checked on its own, with its line number.
 - D5: the skill named `staleBase`, a field the server drops from the wire. Now says "a refusal
   saying the file changed".
 - D6: a history aside about this session in the skill's opening. Removed; the owner's rule is
@@ -112,3 +112,53 @@ Verified after the fixes: **1695 tests / 92 files**, twice, build and typecheck 
 fell from 1751 because `skill-commands-drift.test.ts` generates tests per fenced line and the
 skill has fewer lines; the validator confirmed the accounting.
 
+### The live loop, 2026-09-06 (night)
+
+The eighth box. Run by the main session as a headless client, not by the owner:
+
+```
+claude -p "<bring catalogus.yaml in sync with detection, using the catalogus skill; show the diff, apply, validate>" \
+  --mcp-config <scratch>/mcp.json --strict-mcp-config \
+  --allowedTools "mcp__catalogus__*" Skill Read Glob Grep --permission-mode acceptEdits --max-turns 30
+```
+
+with `mcp.json` naming `node <clone>/packages/cli/dist/cli.js mcp .`, from the Clapline checkout
+(the workspace's one real manifest, 217 lines, CRLF, with one real gap: `javascript` detected and
+absent). Observed, from the stream-json transcript:
+
+- The server connected and listed eight tools at init.
+- The agent invoked the skill, then loaded all eight deferred tools with one ToolSearch call.
+- `detect_stack` and `read_manifest` in parallel; four Bash/Grep calls to confirm the gap was
+  tooling only and to corroborate the four declared-not-detected services in `appsettings.json`,
+  `fly.toml` and `ops/`; then `propose_manifest_edit` (an `add` and a `link`),
+  `apply_manifest_edit` carrying the proposal's `baseSha256`, `validate_manifest` strict (exit
+  0), `detect_stack` again (no gap), `list_icons`.
+- No CLI write from a shell. 18 turns, 70 s, $1.64 on the default model.
+- The manifest was reverted afterwards: `role: language-tooling` and `added: 2026-04-04` (from
+  `git log`) are judgment calls for the owner, who can re-run the prompt interactively.
+
+What it surfaced: the proposal diff was every line of the file. The `yaml` Document API renders
+LF whatever it parsed, so every CLI writer had been turning a CRLF manifest into LF since Phase
+2; `git diff` under `autocrlf` hid it. Fixed in `manifest-edit.ts` (`OpenedManifest.lineEnding`
+from `dominantLineEnding()`, a majority rule with tie to LF; `commitManifestEdit` re-emits CRLF
+when that is the file's ending). Covered per writer in `manifest-edit.test.ts`: CRLF stays CRLF,
+LF stays LF, one stray CRLF in an LF file stays LF. The MCP proposal for the same `add` is now
+five lines.
+
+**Validated** (strongest model, built binary, every writer on CRLF and LF copies of the
+reference manifest including `rename` and `unlink`, the `stack.yaml` fallback, block scalars
+with embedded newlines, raw JSON-RPC into `cli.js mcp` for `propose_manifest_edit` and
+`apply_manifest_edit`, and the drift test under four mutations in a mirrored tree). Four
+findings: two holes in the first D4 cut (a list cut to three ops fell under the majority
+threshold; a made-up op made the run stop being a candidate), fixed: the rule is now "any
+slash-joined backtick run naming an op is the list", and the skill's one three-op sentence was
+reworded to commas; the any-match CRLF detection (one stray CRLF flipped the file), fixed with
+the majority rule; a correct list wrapped across two lines fails the drift test, recorded in the
+failure message, not changed. Recorded, not changed: the `yaml` renderer refolds a hand-wrapped
+`project.architecture` on any write, LF or CRLF.
+
+Verified: **1712 tests / 92 files**, twice, build and typecheck exit 0.
+
+Left in this phase: `push_private` (Phase 5), and the hosted edition (Phase 7). Not yet
+observed: an interactive session pausing at the proposal diff before applying, which a headless
+run cannot show.

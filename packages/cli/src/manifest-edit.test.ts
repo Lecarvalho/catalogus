@@ -9,7 +9,7 @@ import { runLink } from "./commands/link.js";
 import { runRemove } from "./commands/remove.js";
 import { runSet } from "./commands/set.js";
 import { runValidate } from "./commands/validate.js";
-import { cycleKey } from "./manifest-edit.js";
+import { cycleKey, dominantLineEnding } from "./manifest-edit.js";
 import { createTempDir, removeTempDir, writeFixtureFile } from "./test-support/temp-dir.js";
 import type { CommandResult } from "./types.js";
 
@@ -258,6 +258,72 @@ describe("commitManifestEdit -- a pre-existing cycle is not blamed on the curren
 // would make an old cycle look new. Tested directly rather than through a
 // command because no writer in the CLI today reorders services -- the
 // property is defensive, and an untested defensive property is a guess.
+// The Document API renders `\n` no matter what it parsed, so before this
+// suite a CRLF manifest came back from any writer as LF -- a whole-file
+// rewrite for a one-line edit. It surfaced on 2026-09-06 through the MCP
+// server, whose proposal diff for one `add` against a real CRLF checkout
+// showed every line changed; the same thing was happening under every CLI
+// writer, just without a diff to make it visible.
+describe("commitManifestEdit -- the file's own line ending survives every writer", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await createTempDir();
+  });
+
+  afterEach(async () => {
+    await removeTempDir(dir);
+  });
+
+  for (const writer of WRITERS) {
+    it(`${writer.name} writes CRLF back to a CRLF file`, async () => {
+      await writeFixtureFile(dir, "catalogus.yaml", HEALTHY.replace(/\n/g, "\r\n"));
+
+      const result = await writer.run(join(dir, "."));
+
+      expect(result.exitCode, result.stderr.join("\n")).toBe(0);
+      const after = await readFile(join(dir, "catalogus.yaml"), "utf8");
+      expect(after.length).toBeGreaterThan(0);
+      // Every newline is preceded by a CR, and no CR stands alone.
+      expect(after.replace(/\r\n/g, "")).not.toMatch(/[\r\n]/);
+    });
+
+    it(`${writer.name} leaves an LF file LF`, async () => {
+      await writeFixtureFile(dir, "catalogus.yaml", HEALTHY);
+
+      const result = await writer.run(join(dir, "."));
+
+      expect(result.exitCode, result.stderr.join("\n")).toBe(0);
+      expect(await readFile(join(dir, "catalogus.yaml"), "utf8")).not.toContain("\r");
+    });
+
+    // One stray CRLF (a line pasted from a Windows editor, say) must not
+    // decide the whole file's ending; the majority does. The validator's D3
+    // on 2026-09-06.
+    it(`${writer.name} keeps a mostly-LF file LF despite one CRLF line`, async () => {
+      await writeFixtureFile(dir, "catalogus.yaml", HEALTHY.replace("\ncatalogus: 1\n", "\ncatalogus: 1\r\n"));
+
+      const result = await writer.run(join(dir, "."));
+
+      expect(result.exitCode, result.stderr.join("\n")).toBe(0);
+      expect(await readFile(join(dir, "catalogus.yaml"), "utf8")).not.toContain("\r");
+    });
+  }
+});
+
+describe("dominantLineEnding", () => {
+  it("is LF for an empty string, a file with no newline, and a tie", () => {
+    expect(dominantLineEnding("")).toBe("\n");
+    expect(dominantLineEnding("catalogus: 1")).toBe("\n");
+    expect(dominantLineEnding("a\r\nb\n")).toBe("\n");
+  });
+
+  it("is CRLF only when CRLF lines outnumber bare LF lines", () => {
+    expect(dominantLineEnding("a\r\nb\r\nc\n")).toBe("\r\n");
+    expect(dominantLineEnding("a\r\nb\nc\n")).toBe("\n");
+  });
+});
+
 describe("cycleKey", () => {
   it("gives the same key to the same loop entered from a different node", () => {
     expect(cycleKey(["b", "c", "d", "b"])).toBe(cycleKey(["c", "d", "b", "c"]));

@@ -38,6 +38,15 @@ export interface OpenedManifest {
    * which is every manifest the CLI itself has written.
    */
   preexistingCycles: string[][];
+  /**
+   * The line ending the file used when it was read, so the write puts it
+   * back. The Document API renders with `\n` regardless of what it parsed,
+   * and a CRLF manifest (Windows, or `core.autocrlf=true` on any checkout)
+   * written back as LF is a whole-file rewrite: found on 2026-09-06 when the
+   * MCP server's proposal diff for a one-service `add` against a real repo
+   * showed all 217 lines changed, burying the eight that mattered.
+   */
+  lineEnding: "\n" | "\r\n";
 }
 
 export type OpenOutcome = { ok: true; value: OpenedManifest } | { ok: false; error: CommandResult };
@@ -105,8 +114,23 @@ export async function openManifestForEdit(pathArg: string | undefined): Promise<
         loaded.value.manifest.services.map((service) => service.id),
         edgePairs(loaded.value.manifest)
       ).cycles,
+      lineEnding: dominantLineEnding(loaded.value.text),
     },
   };
+}
+
+/**
+ * The line ending most of the file uses. A majority rather than an
+ * any-match: the first cut tested `includes("\r\n")`, and the same day's
+ * validator showed one stray CRLF in an LF file turning the whole file CRLF
+ * on the next edit -- the whole-file rewrite this exists to prevent, facing
+ * the other way. A file with no newline at all is treated as LF, which is
+ * what a fresh `init` writes.
+ */
+export function dominantLineEnding(text: string): "\n" | "\r\n" {
+  const crlf = (text.match(/\r\n/g) ?? []).length;
+  const lf = (text.match(/\n/g) ?? []).length - crlf;
+  return crlf > lf ? "\r\n" : "\n";
 }
 
 export interface CommitOptions {
@@ -193,7 +217,9 @@ export async function commitManifestEdit(opened: OpenedManifest, options: Commit
     };
   }
 
-  const filePath = await writeManifestText(location.dir, doc.toString({ flowCollectionPadding: false }));
+  const rendered = doc.toString({ flowCollectionPadding: false });
+  const text = opened.lineEnding === "\r\n" ? rendered.replace(/\r?\n/g, "\r\n") : rendered;
+  const filePath = await writeManifestText(location.dir, text);
   const lines = options.successLines(filePath);
 
   // writeManifestText always writes catalogus.yaml, even when the manifest
